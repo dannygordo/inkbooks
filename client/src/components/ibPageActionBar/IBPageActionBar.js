@@ -9,7 +9,7 @@ const IBPageActionBar = (props) => {
         case 'artists':
             return (
                 <div className="ibPageActionBarTitleContainer">
-                    <h1 className="ibPageActionBarTitle">Artists</h1>
+                    <h1 className="ibPageActionBarTitle">Artists</h1> 
                     <Link to={"/artist"}>
                         <button>Add Artist</button>
                     </Link>

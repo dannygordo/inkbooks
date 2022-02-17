@@ -11,6 +11,7 @@ import {
     Money,
     AttachMoney 
 } from '@mui/icons-material';
+import UtilsService from '../../../services/UtilsService';
 
 const IBCardShopDetails = (props) => {
     const { user } = useContext(AuthContext);
@@ -34,7 +35,7 @@ const IBCardShopDetails = (props) => {
         </div>
         <div className="ibCardInfoContainer">
             <PhoneAndroidOutlined className="ibCardIcon"/>
-            <span className="ibCardInfoTitle">{shop.phone}</span>
+            <span className="ibCardInfoTitle">{UtilsService.formatPhone(shop.phone)}</span>
         </div>
         <div className="ibCardInfoContainer">
             <HomeOutlined className="ibCardIcon"/>

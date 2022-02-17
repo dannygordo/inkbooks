@@ -54,7 +54,7 @@ const EditArtist = (props) => {
 			instagram: instagram.current.value,
 			facebook: facebook.current.value,
 		};
-		//mutation function takes in updated values in the variables object
+		//mutation function takes in updated values in the variables
 		updateTheArtist({
 			variables: {
 				artist: {

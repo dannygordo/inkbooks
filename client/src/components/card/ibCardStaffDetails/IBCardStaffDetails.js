@@ -11,6 +11,7 @@ import {
     TempleBuddhistOutlined 
 } from '@mui/icons-material';
 import './ibCardStaffDetails.css';
+import UtilsService from '../../../services/UtilsService';
 
 
 const IBCardStaffDetails = (props) => {
@@ -29,9 +30,9 @@ const IBCardStaffDetails = (props) => {
         </div>
         <div className="ibCardInfoContainer">
             <PhoneAndroidOutlined className="ibCardIcon"/>
-            <span className="ibCardInfoTitle">{staff.phone}</span>
+            <span className="ibCardInfoTitle">{UtilsService.formatPhone(staff.phone)}</span>
         </div>
-        <div className="ibCardInfoContainer">
+        {/* <div className="ibCardInfoContainer">
             <HomeOutlined className="ibCardIcon"/>
             <span className="ibCardInfoTitle">{staff.address}</span>
         </div>
@@ -40,7 +41,7 @@ const IBCardStaffDetails = (props) => {
             <span className="ibCardInfoTitle">
                         {staff.city} {staff.state}, {staff.zip}
                     </span>
-        </div>
+        </div> */}
         <div className="ibCardInfoContainer">
             <Instagram className="ibCardIcon"/>
             <span className="ibCardInfoTitle">{staff.instagram}</span>

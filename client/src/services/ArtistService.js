@@ -62,7 +62,7 @@ export const ArtistService = (() => {
 		return useQuery(FETCH_ARTISTS_QUERY);
 	};
 
-	const _updateArtist = () => {
+	const _updateArtist = (artist) => {
 		const UPDATE_ARTIST_MUTATION = gql`
 			mutation ($artist: ArtistInput) {
 				updateArtist(artist: $artist) {
@@ -87,7 +87,7 @@ export const ArtistService = (() => {
 				}
 			}
 		`;
-        return UPDATE_ARTIST_MUTATION
+        return UPDATE_ARTIST_MUTATION;
 	};
 
 	return {

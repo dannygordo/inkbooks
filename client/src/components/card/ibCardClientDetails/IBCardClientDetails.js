@@ -1,6 +1,5 @@
 import React, { useContext} from 'react'
 import { AuthContext } from '../../../context/auth'
-import { ROLES } from '../../../constants';
 import { 
 	Facebook,
 	HomeOutlined,
@@ -9,6 +8,7 @@ import {
     PhoneAndroidOutlined,
 	PlaceOutlined 
 } from '@mui/icons-material';
+import UtilsService from '../../../services/UtilsService';
 
 const IBCardClientDetails = (props) => {
     const { user } = useContext(AuthContext);
@@ -25,9 +25,9 @@ const IBCardClientDetails = (props) => {
         </div>
         <div className="ibCardInfoContainer">
             <PhoneAndroidOutlined className="ibCardIcon"/>
-            <span className="ibCardInfoTitle">{client.phone}</span>
+            <span className="ibCardInfoTitle">{UtilsService.formatPhone(client.phone)}</span>
         </div>
-        <div className="ibCardInfoContainer">
+        {/* <div className="ibCardInfoContainer">
             <HomeOutlined className="ibCardIcon"/>
             <span className="ibCardInfoTitle">{client.address}</span>
         </div>
@@ -36,7 +36,7 @@ const IBCardClientDetails = (props) => {
             <span className="ibCardInfoTitle">
                         {client.city} {client.state}, {client.zip}
                     </span>
-        </div>
+        </div> */}
         <div className="ibCardInfoContainer">
             <Instagram className="ibCardIcon"/>
             <span className="ibCardInfoTitle">{client.instagram}</span>
