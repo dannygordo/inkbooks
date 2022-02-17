@@ -1,0 +1,65 @@
+.reports {
+    flex: 4;
+    padding: 20px;
+}
+.reportsListContainer {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    margin-top: 20px;
+}
+.reportsTitleContainer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.reportsAddButton {
+    width: 80px;
+    border: none;
+    padding: 5px;
+    border-radius: 10px;
+    background-color: #ddd;
+    color: #555;
+    font-size: 16px;
+}
+.reportsAddButton:hover {
+    background-color: #555;
+    color: #ddd;
+    cursor: pointer;
+}
+.reportsListAvatarContainer {
+    display: flex;
+    align-items: center;
+}
+.reportsListAvatarImage {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 10px;
+}
+.reportsListEdit {
+    border: none;
+    border-radius: 10px;
+    padding: 5px 10px;
+    background-color: #ddd;
+    color: #555;
+    cursor: pointer;
+    margin-right: 20px;
+}
+.reportsListEdit:hover {
+    background-color: #555;
+    color: #ddd;
+}
+.reportsListDelete {
+    cursor: pointer;
+}
+.reportsListDelete:hover {
+    cursor: pointer;
+    color: #ccc;
+}
+.reportsContainer {
+    display: flex;
+    margin-top: 20px;
+    flex-wrap: wrap;
+}

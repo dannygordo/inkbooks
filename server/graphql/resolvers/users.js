@@ -1,0 +1,140 @@
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const { UserInputError } = require('apollo-server');
+const { SECRET_KEY } = require('../../config');
+const User = require('../../models/User');
+const {
+  validateRegisterInput,
+  validateLoginInput,
+} = require('../../utils/validators');
+
+function generateToken(user) {
+  return jwt.sign(
+    {
+      id: user.id,
+      email: user.email,
+      username: user.username,
+      role: user.role,
+    },
+    SECRET_KEY,
+    { expiresIn: '5d' },
+  );
+}
+
+module.exports = {
+  Mutation: {
+    async login(_, { username, password }) {
+      // check to see if inputs are valid
+      const { errors, valid } = validateLoginInput(username, password);
+      if (!valid) {
+        throw new UserInputError('Errors', { errors });
+      }
+      // get user and if not found throw error
+      const user = await User.findOne({ username });
+      if (!user) {
+        errors.general = 'User not found';
+        throw new UserInputError('User not found', {
+          errors: {
+            username: 'Username not found',
+          }
+        });
+      }
+      // if user is found make sure password entered is the same as the saved hash
+      const match = await bcrypt.compare(password, user.password);
+      if (!match) {
+        errors.general = 'Invalid username/password';
+        throw new UserInputError('Invalid username/password', {
+          errors: {
+            password: 'Invalid username/password',
+          }
+        });
+      }
+      // user has been authenticated, generate token and return user object
+      const token = generateToken(user);
+      return {
+        ...user._doc,
+        id: user._id,
+        role: user.role,
+        accessToken: token,
+      };
+    },
+    async register(
+      _,
+      {
+        registerInput: {
+          username, password, email, confirmPassword, role,
+        },
+      },
+    ) {
+      // validates user's input from registration form
+      const { valid, errors } = validateRegisterInput(
+        username,
+        email,
+        password,
+        confirmPassword,
+        role,
+      );
+      if (!valid) {
+        throw new UserInputError('Errors', { errors });
+      }
+      // Check to see if the email address is already in use
+      const userEmail = await User.findOne({ email });
+      if (userEmail) {
+        throw new UserInputError('Email is already taken', {
+          errors: {
+            username: 'This email is taken',
+          },
+        });
+      }
+      // Check to see if the username is already in use
+      const userUsername = await User.findOne({ username });
+      if (userUsername) {
+        throw new UserInputError('Username is already taken', {
+          errors: {
+            username: 'This username is taken',
+          },
+        });
+      }
+      // hash password
+      password = await bcrypt.hash(password, 12);
+
+      const newUser = new User({
+        email,
+        username,
+        password,
+        role,
+      });
+
+      // save new user to database and return user object
+      const res = await newUser.save();
+
+      const token = generateToken(res);
+      // change _id to id and add access token to the user object the return to caller
+      return {
+        ...res._doc,
+        id: res._id,
+        accessToken: token,
+      };
+    },
+  },
+  Query: {
+    async getUsers() {
+      try {
+        const users = await User.find().sort({ email: 1 });
+        return users;
+      } catch (err) {
+        throw new Error(err);
+      }
+    },
+    async getUser(_, { userId }) {
+      try {
+        const user = await User.findById(userId);
+        if (user) {
+          return user;
+        } throw new Error('User not found');
+      } catch (err) {
+        throw new Error(err);
+      }
+    },
+  }
+};

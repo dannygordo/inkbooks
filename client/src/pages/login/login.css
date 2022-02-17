@@ -1,0 +1,48 @@
+.login {
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.loginForm {
+    display: flex;
+    flex-direction: column;
+}
+.loginInput {
+    width: 250px;
+    height: 30px;
+    border: 1px solid #bbb;
+    border-radius: 3px;
+    padding: 10px;
+    margin-bottom: 10px;
+
+}
+.loginButton {
+    width: 100%;
+}
+/* .loginButton:hover {
+    background-color: #555;
+    color: #ddd;
+}
+.loginButton:focus{
+    outline: none;
+}
+
+.loginButton:disabled{
+    cursor: not-allowed;
+} */
+
+.loginForgot{
+    text-align: center;
+    color: #b4b4b4;
+    margin-top: 10px;
+}
+
+.loginRegisterButton{
+    width: 100%;
+}
+/* .loginRegisterButton:hover {
+    background-color: #ddd;
+    color: #555;
+} */

@@ -1,0 +1,65 @@
+.clients {
+    flex: 4;
+    padding: 20px;
+}
+.clientsListContainer {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    margin-top: 20px;
+}
+.clientsTitleContainer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.clientsAddButton {
+    width: 80px;
+    border: none;
+    padding: 5px;
+    border-radius: 10px;
+    background-color: #ddd;
+    color: #555;
+    font-size: 16px;
+}
+.clientsAddButton:hover {
+    background-color: #555;
+    color: #ddd;
+    cursor: pointer;
+}
+.clientsListAvatarContainer {
+    display: flex;
+    align-items: center;
+}
+.clientsListAvatarImage {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 10px;
+}
+.clientsListEdit {
+    border: none;
+    border-radius: 10px;
+    padding: 5px 10px;
+    background-color: #ddd;
+    color: #555;
+    cursor: pointer;
+    margin-right: 20px;
+}
+.clientsListEdit:hover {
+    background-color: #555;
+    color: #ddd;
+}
+.clientsListDelete {
+    cursor: pointer;
+}
+.clientsListDelete:hover {
+    cursor: pointer;
+    color: #ccc;
+}
+.clientsContainer {
+    display: flex;
+    margin-top: 20px;
+    flex-wrap: wrap;
+}

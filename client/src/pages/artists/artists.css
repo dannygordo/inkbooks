@@ -1,0 +1,58 @@
+.artists {
+    flex: 4;
+    padding: 20px;
+    overflow: hidden;
+}
+.artistsListContainer {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    margin-top: 20px;
+}
+.artistsTitleContainer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.artistsAddButton:hover {
+    background-color: #555;
+    color: #ddd;
+    cursor: pointer;
+}
+.artistsListAvatarContainer {
+    display: flex;
+    align-items: center;
+}
+.artistsListAvatarImage {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 10px;
+}
+.artistsListEdit {
+    border: none;
+    border-radius: 10px;
+    padding: 5px 10px;
+    background-color: #ddd;
+    color: #555;
+    cursor: pointer;
+    margin-right: 20px;
+}
+.artistsListEdit:hover {
+    background-color: #555;
+    color: #ddd;
+}
+.artistsListDelete {
+    cursor: pointer;
+}
+.artistsListDelete:hover {
+    cursor: pointer;
+    color: #ccc;
+}
+.artistsContainer {
+    display: flex;
+    margin-top: 20px;
+    flex-wrap: wrap;
+}

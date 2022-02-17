@@ -1,0 +1,65 @@
+.projects {
+    flex: 4;
+    padding: 20px;
+}
+.projectsListContainer {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    margin-top: 20px;
+}
+.projectsTitleContainer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.projectsAddButton {
+    width: 80px;
+    border: none;
+    padding: 5px;
+    border-radius: 10px;
+    background-color: #ddd;
+    color: #555;
+    font-size: 16px;
+}
+.projectsAddButton:hover {
+    background-color: #555;
+    color: #ddd;
+    cursor: pointer;
+}
+.projectsListAvatarContainer {
+    display: flex;
+    align-items: center;
+}
+.projectsListAvatarImage {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 10px;
+}
+.projectsListEdit {
+    border: none;
+    border-radius: 10px;
+    padding: 5px 10px;
+    background-color: #ddd;
+    color: #555;
+    cursor: pointer;
+    margin-right: 20px;
+}
+.projectsListEdit:hover {
+    background-color: #555;
+    color: #ddd;
+}
+.projectsListDelete {
+    cursor: pointer;
+}
+.projectsListDelete:hover {
+    cursor: pointer;
+    color: #ccc;
+}
+.projectsContainer {
+    display: flex;
+    margin-top: 20px;
+    flex-wrap: wrap;
+}

@@ -1,0 +1,8 @@
+.ibCardActionsEditLink {
+    padding: 5px;
+    display: flex;
+    justify-content: right;
+}
+.ibCardActionsIcon {
+    cursor: pointer;
+}

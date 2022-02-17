@@ -1,0 +1,65 @@
+.staff {
+    flex: 4;
+    padding: 20px;
+}
+.staffListContainer {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    margin-top: 20px;
+}
+.staffTitleContainer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.staffAddButton {
+    width: 80px;
+    border: none;
+    padding: 5px;
+    border-radius: 10px;
+    background-color: #ddd;
+    color: #555;
+    font-size: 16px;
+}
+.staffAddButton:hover {
+    background-color: #555;
+    color: #ddd;
+    cursor: pointer;
+}
+.staffListAvatarContainer {
+    display: flex;
+    align-items: center;
+}
+.staffListAvatarImage {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 10px;
+}
+.staffListEdit {
+    border: none;
+    border-radius: 10px;
+    padding: 5px 10px;
+    background-color: #ddd;
+    color: #555;
+    cursor: pointer;
+    margin-right: 20px;
+}
+.staffListEdit:hover {
+    background-color: #555;
+    color: #ddd;
+}
+.staffListDelete {
+    cursor: pointer;
+}
+.staffListDelete:hover {
+    cursor: pointer;
+    color: #ccc;
+}
+.staffContainer {
+    display: flex;
+    margin-top: 20px;
+    flex-wrap: wrap;
+}

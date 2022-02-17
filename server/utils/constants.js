@@ -1,0 +1,19 @@
+module.exports.Constants = {
+    ROLES: {
+        ADMIN: 1,
+        SHOP_ADMIN: 10,
+        SHOP_STAFF: 15,
+        ARTIST: 20,
+        CLIENT: 30
+    },
+    ARTIST_STATUS: {
+        ACTIVE: 1,
+        INACTIVE: 2,
+        BOOKS_CLOSED: 3
+    },
+    PROJECT_STATUS: {
+        COMPLETED: 1,
+        IN_PROGRESS: 2,
+        ABANDONDED: 3
+    }
+};

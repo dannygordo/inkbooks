@@ -1,0 +1,65 @@
+.appointments {
+    flex: 4;
+    padding: 20px;
+}
+.appointmentsListContainer {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    margin-top: 20px;
+}
+.appointmentsTitleContainer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.appointmentsAddButton {
+    width: 80px;
+    border: none;
+    padding: 5px;
+    border-radius: 10px;
+    background-color: #ddd;
+    color: #555;
+    font-size: 16px;
+}
+.appointmentsAddButton:hover {
+    background-color: #555;
+    color: #ddd;
+    cursor: pointer;
+}
+.appointmentsListAvatarContainer {
+    display: flex;
+    align-items: center;
+}
+.appointmentsListAvatarImage {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 10px;
+}
+.appointmentsListEdit {
+    border: none;
+    border-radius: 10px;
+    padding: 5px 10px;
+    background-color: #ddd;
+    color: #555;
+    cursor: pointer;
+    margin-right: 20px;
+}
+.appointmentsListEdit:hover {
+    background-color: #555;
+    color: #ddd;
+}
+.appointmentsListDelete {
+    cursor: pointer;
+}
+.appointmentsListDelete:hover {
+    cursor: pointer;
+    color: #ccc;
+}
+.appointmentsContainer {
+    display: flex;
+    margin-top: 20px;
+    flex-wrap: wrap;
+}
