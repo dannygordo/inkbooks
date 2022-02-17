@@ -15,5 +15,10 @@ module.exports.Constants = {
         COMPLETED: 1,
         IN_PROGRESS: 2,
         ABANDONDED: 3
+    },
+    USER_TYPE: {
+        ARTIST: 'artist',
+        CLIENT: 'client',
+        STAFF: 'staff'
     }
 };

@@ -2,7 +2,21 @@ const { gql } = require('apollo-server');
 
 module.exports = gql`
   scalar Date
-  type Artist {
+  interface UserInfo {
+    id: ID!
+    firstName: String
+    lastName: String
+    email: String
+    phone: String
+    address: String
+    city: String
+    state: String
+    zip: String
+    instagram: String
+    facebook: String
+    avatar: String
+  }
+  type Artist implements UserInfo {
     id: ID!
     firstName: String!
     lastName: String!
@@ -20,6 +34,7 @@ module.exports = gql`
     endDate: Date
     hourlyRate: Int
     shopId: ID!
+    shop: Shop
     userId: ID!
     status: Int
   }
@@ -44,7 +59,7 @@ module.exports = gql`
     userId: ID
     status: Int
   }
-  type Shop{
+  type Shop {
     id: ID!
     name: String!
     email: String!
@@ -68,8 +83,10 @@ module.exports = gql`
     username: String!
     role: Int!
     accessToken: String!
+    userType: String!
+    userInfo: UserInfo
   }
-  type Client {
+  type Client implements UserInfo {
     id: ID!
     firstName: String!
     lastName: String!
@@ -84,7 +101,7 @@ module.exports = gql`
     avatar: String
     userId: ID!
   }
-  type Staff {
+  type Staff implements UserInfo {
     id: ID!
     firstName: String!
     lastName: String!
@@ -126,6 +143,7 @@ module.exports = gql`
     password: String!
     confirmPassword: String!
     role: Int!
+    userType: String!
   }
   type Query {
     getArtists: [Artist]

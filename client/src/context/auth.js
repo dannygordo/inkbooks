@@ -11,7 +11,7 @@ if(CacheService.getItem('token')) {
     if(token.exp * 1000 < Date.now()) {
         CacheService.removeItem('token');
     } else {
-        initialState.user = token;
+        initialState.user = CacheService.getItem('token');
     }
 }
 

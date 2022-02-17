@@ -44,5 +44,24 @@ module.exports = {
     shop: async(staff, args, context, info) => {
       return (await Shop.findById(staff.shopId));
     }
+  },
+  Artist: {
+    shop: async(artist, args, context, info) => {
+      return (await Shop.findById(artist.shopId));
+    }
+  },
+  UserInfo: {
+    __resolveType(user, context, info) {
+      if(user.hourlyRate) {
+        return 'Artist';
+      }
+      if(user.title) {
+        return 'Staff';
+      }
+
+      if(!user.hourlyRate && !user.title){
+        return 'Client';
+      }
+    }
   }
 };

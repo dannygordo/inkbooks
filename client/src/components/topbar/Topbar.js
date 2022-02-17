@@ -35,13 +35,13 @@ const Topbar = () => {
                         <Settings />
                         <span className="topIconBadge">2</span>
                     </div>
-                    <div className="topbarIconContainer">
+                    {/* <div className="topbarIconContainer">
                         <span onClick={handleLogout}>Logout</span>
-                    </div>
-                    {/* <span onClick={() => dispatch(logout())}> */}
-                        {/* <img src={user.userInfo.avatar} alt="" className="topAvatar" /> */}
-                        {/* {user.firstName} */}
-                    {/* </span> */}
+                    </div> */}
+                    <span onClick={handleLogout}>
+                        <img src={user.userInfo.avatar} alt="" className="topAvatar" />
+                        {user.firstName}
+                    </span>
                 </div>
             </div>
         </div>

@@ -3,10 +3,14 @@ const jwt = require('jsonwebtoken');
 const { UserInputError } = require('apollo-server');
 const { SECRET_KEY } = require('../../config');
 const User = require('../../models/User');
+const Artist = require('../../models/Artist');
+const Client = require('../../models/Client');
+const Staff = require('../../models/Staff');
 const {
   validateRegisterInput,
   validateLoginInput,
 } = require('../../utils/validators');
+const {Constants} = require('../../utils/constants');
 
 function generateToken(user) {
   return jwt.sign(
@@ -51,18 +55,49 @@ module.exports = {
       }
       // user has been authenticated, generate token and return user object
       const token = generateToken(user);
-      return {
-        ...user._doc,
-        id: user._id,
-        role: user.role,
-        accessToken: token,
-      };
+      let userInfo = {};
+      switch(user.userType) {
+        case Constants.USER_TYPE.ARTIST :
+          userInfo = await Artist.findOne({userId: user.id}).select('-user');
+          userInfo.id = userInfo._id;
+          return {
+            ...user._doc,
+            userInfo: userInfo,
+            id: user._id,
+            role: user.role,
+            accessToken: token,
+            userType: user.userType
+          };
+        case Constants.USER_TYPE.CLIENT :
+            userInfo = await Client.findOne({userId: user.id}).select('-user');
+            userInfo.id = userInfo._id;
+            return {
+              ...user._doc,
+              userInfo: userInfo,
+              id: user._id,
+              role: user.role,
+              accessToken: token,
+              userType: user.userType
+            };
+        case Constants.USER_TYPE.STAFF :
+            userInfo = await Staff.findOne({userId: user.id}).select('-user');
+            userInfo.id = userInfo._id;
+            return {
+              ...user._doc,
+              userInfo: userInfo,
+              id: user._id,
+              role: user.role,
+              accessToken: token,
+              userType: user.userType
+            };
+      }
+      
     },
     async register(
       _,
       {
         registerInput: {
-          username, password, email, confirmPassword, role,
+          username, password, email, confirmPassword, role, userType
         },
       },
     ) {
@@ -73,6 +108,7 @@ module.exports = {
         password,
         confirmPassword,
         role,
+        userType
       );
       if (!valid) {
         throw new UserInputError('Errors', { errors });
@@ -103,6 +139,7 @@ module.exports = {
         username,
         password,
         role,
+        userType
       });
 
       // save new user to database and return user object
