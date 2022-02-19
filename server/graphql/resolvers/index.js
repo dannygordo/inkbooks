@@ -58,7 +58,6 @@ module.exports = {
       if(user.title) {
         return 'Staff';
       }
-
       if(!user.hourlyRate && !user.title){
         return 'Client';
       }

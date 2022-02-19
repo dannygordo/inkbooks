@@ -15,8 +15,8 @@ const IBCardHeader = (props) => {
                   <span className="ibCardName">{cardData.title}</span>
                   <span className="ibCardTitle">
                     {
-                      cardData.description.length > 100 ? 
-                      `${cardData.description.substring(0, 100)}...`: 
+                      cardData.description.length > 50 ? 
+                      `${cardData.description.substring(0, 50)}...`: 
                       cardData.description
                     }
                   </span>

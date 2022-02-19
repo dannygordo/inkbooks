@@ -59,6 +59,24 @@ module.exports = gql`
     userId: ID
     status: Int
   }
+  input ShopInput {
+    id: ID!
+    name: String
+    email: String
+    phone: String
+    address: String
+    city: String
+    state: String
+    zip: String
+    instagram: String
+    facebook: String
+    website: String
+    shopMinimum: Int
+    hourlyRate: Int
+    logo: String
+    billingType: Int
+    status: Int
+  }
   type Shop {
     id: ID!
     name: String!
@@ -101,6 +119,22 @@ module.exports = gql`
     avatar: String
     userId: ID!
   }
+  input ClientInput {
+    id: ID!
+    firstName: String
+    lastName: String
+    email: String
+    phone: String
+    address: String
+    city: String
+    state: String
+    zip: String
+    instagram: String
+    facebook: String
+    avatar: String
+    userId: ID
+    status: Int
+  }
   type Staff implements UserInfo {
     id: ID!
     firstName: String!
@@ -120,6 +154,24 @@ module.exports = gql`
     shopId: ID!
     shop: Shop
   }
+  input StaffInput {
+    id: ID!
+    firstName: String
+    lastName: String
+    email: String
+    phone: String
+    address: String
+    city: String
+    state: String
+    zip: String
+    instagram: String
+    facebook: String
+    avatar: String
+    userId: ID!
+    status: Int!
+    title: String
+    shopId: ID!
+  }
   type Project {
     id: ID!
     title: String!
@@ -128,6 +180,21 @@ module.exports = gql`
     artist: Artist
     clientId: ID!
     client: Client
+    referenceImages: [String]
+    bodyImages: [String]
+    designImages: [String]
+    materialsUsed: [String]
+    notes: [String]
+    tags: [String]
+    status: Int!
+    depositAmount: Int
+  }
+  input ProjectInput {
+    id: ID!
+    title: String!
+    description: String!
+    artistId: ID!
+    clientId: ID!
     referenceImages: [String]
     bodyImages: [String]
     designImages: [String]
@@ -202,6 +269,7 @@ module.exports = gql`
       status: Int
     ): Shop!
     deleteShop(shopId: ID!): String!
+    updateShop(shop: ShopInput): Shop
     createStaff(
       firstName: String!
       lastName: String!
@@ -218,6 +286,7 @@ module.exports = gql`
       status: Int!
     ): Staff!
     deleteStaff(staffId: ID!): String!
+    updateStaff(staff: StaffInput): Staff
     createClient(
       firstName: String!
       lastName: String!
@@ -233,6 +302,7 @@ module.exports = gql`
       userId: ID!
     ): Client!
     deleteClient(clientId: ID!): String!
+    updateClient(client: ClientInput): Client
     createProject(
       title: String!
       description: String!
@@ -248,5 +318,6 @@ module.exports = gql`
       depositAmount: Int
     ): Project!
     deleteProject(projectId: ID!): String!
+    updateProject(project: ProjectInput): Project
   }
 `;

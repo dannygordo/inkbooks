@@ -1,0 +1,41 @@
+.project {
+    flex: 4;
+    padding: 20px;
+}
+.projectForm {
+    display: flex;
+    flex-wrap: wrap;
+}
+.projectItem {
+    width: 500px;
+    display: flex;
+    flex-direction: column;
+    margin-right: 20px;
+    margin-top: 10px;
+}
+.projectItem>label {
+    margin-bottom: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #555;
+}
+.projectItem>input {
+    height: 20px;
+    padding: 10px;
+    border-radius: 5px;
+    border: 1px solid gray;
+}
+.projectActions {
+    padding: 20px;
+    /* -webkit-box-shadow: 2px 2px 15px -12px #000000;
+    box-shadow: 2px 2px 15px -12px #000000; */
+    padding: 5px;
+    display: flex;
+    justify-content: right;
+}
+.projectActionItem {
+    display: flex;
+    flex-direction: row;
+    margin-right: 5px;
+    margin-top: 10px;       
+}

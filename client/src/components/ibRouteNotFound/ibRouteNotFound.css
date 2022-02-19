@@ -1,0 +1,24 @@
+.ibRouteNotFound {
+    flex: 4;
+    padding: 20px;
+    overflow: hidden;
+}
+.ibRouteNotFoundContainer {
+    display: flex;
+    margin-top: 20%;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+.ibRouteNotFoundCard {
+    padding: 20px;
+    box-shadow: 2px 2px 15px -12px #000000;
+    width: 50%;
+    font-weight: 600;
+    font-size: 22px;
+    cursor: pointer;
+}
+
+.ibRouteNotFoundCard:hover {
+    cursor: pointer;
+    background-color: #eee;
+}

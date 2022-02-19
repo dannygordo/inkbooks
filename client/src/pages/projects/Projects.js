@@ -1,37 +1,14 @@
 import React from 'react'
-import { gql, useQuery } from '@apollo/client';
 import IBCard from '../../components/card/ibCard/IBCard';
 import { CircularProgress } from '@material-ui/core';
 import IBPageActionBar from '../../components/ibPageActionBar/IBPageActionBar';
 import './projects.css';
+import ProjectService from '../../services/ProjectService';
+import IBPageLoader from '../../components/ibPageLoader/IBPageLoader';
 
 const Projects = () => {
-    const FETCH_PROJECTS_QUERY = gql`
-    {
-        getProjects {
-            id
-            title
-            description
-            artistId
-            artist {
-            email
-            firstName
-            lastName
-            }
-            clientId
-            client {
-            firstName
-            lastName
-            email
-            }
-            status
-            depositAmount
-        }
-    }
-  `;
-  const { loading, data } = useQuery(FETCH_PROJECTS_QUERY);
-  if(loading) return <CircularProgress>Loading...</CircularProgress>;
-
+  const { loading, data } = ProjectService.fetchProjects();
+  if(loading) return <IBPageLoader />;
   
   return (
     <div className="projects">

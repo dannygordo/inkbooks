@@ -9,6 +9,7 @@ import IBCardStaffDetails from "../ibCardStaffDetails/IBCardStaffDetails";
 import "./ibCard.css";
 import { useNavigate } from "react-router-dom";
 import { APP_SETTINGS_CONSTANTS, ROUTE_CONSTANTS } from "../../../constants";
+import IBRouteNotFound from "../../ibRouteNotFound/IBRouteNotFound";
 
 const IBCard = (props) => {
 	const { cardData, cardType } = props;
@@ -107,9 +108,6 @@ const IBCard = (props) => {
 						navigate(`${ROUTE_CONSTANTS.STAFF}${cardData.id}`)
 					}
 				>
-					{/* <div className="ibCardActionsContainer">
-						<IBCardActions cardData={cardData} key={cardData.id} />
-					</div> */}
 					<IBCardHeader
 						cardData={cardData}
 						key={cardData.id}
@@ -117,6 +115,10 @@ const IBCard = (props) => {
 					/>
 					<IBCardStaffDetails cardData={cardData} key={Date.now()} />
 				</div>
+			);
+		case APP_SETTINGS_CONSTANTS.CARD_TYPES.ROUTE_NOT_FOUND:
+			return (
+					<IBRouteNotFound cardData={cardData} key={Date.now()} />
 			);
 		default:
 			return (

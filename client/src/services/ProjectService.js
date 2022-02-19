@@ -1,0 +1,110 @@
+import { gql, useQuery, useMutation } from "@apollo/client";
+
+const ProjectService = (() => {
+	const _fetchProject = (projectId) => {
+		const FETCH_PROJECT_QUERY = gql`
+			query ($projectId: ID!) {
+				getProject(projectId: $projectId) {
+					id
+					title
+					description
+					artistId
+					artist {
+						firstName
+						lastName
+						email
+						id
+					}
+					clientId
+					client {
+						firstName
+						lastName
+						email
+						id
+					}
+					referenceImages
+					bodyImages
+					designImages
+					materialsUsed
+					notes
+					tags
+					status
+					depositAmount
+				}
+			}
+		`;
+		return useQuery(FETCH_PROJECT_QUERY, {
+			variables: {
+				projectId,
+			},
+		});
+	};
+
+	const _fetchProjects = () => {
+		const FETCH_PROJECTS_QUERY = gql`
+			{
+				getProjects {
+					id
+					title
+					description
+					artistId
+					artist {
+						firstName
+						lastName
+						email
+                        avatar
+						id
+					}
+					clientId
+					client {
+						firstName
+						lastName
+						email
+                        avatar
+						id
+					}
+					referenceImages
+					bodyImages
+					designImages
+					materialsUsed
+					notes
+					tags
+					status
+					depositAmount
+				}
+			}
+		`;
+		return useQuery(FETCH_PROJECTS_QUERY);
+	};
+
+	const _updateProject = (project) => {
+		const UPDATE_PROJECT_MUTATION = gql`
+			mutation ($project: ProjectInput) {
+				updateProject(project: $project) {
+					id
+					title
+					description
+					artistId
+					clientId
+					referenceImages
+					bodyImages
+					designImages
+					materialsUsed
+					notes
+					tags
+					status
+					depositAmount
+				}
+			}
+		`;
+		return UPDATE_PROJECT_MUTATION;
+	};
+
+	return {
+		fetchProject: _fetchProject,
+		fetchProjects: _fetchProjects,
+		updateProject: _updateProject,
+	};
+})();
+
+export default ProjectService;

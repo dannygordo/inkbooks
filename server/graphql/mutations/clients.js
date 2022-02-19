@@ -59,4 +59,22 @@ module.exports = {
       throw new Error(err);
     }
   },
+  async updateClient(_, args, context) {
+    const user = checkAuth(context);
+    try{
+      const client = args.client;
+      console.log('user');
+      console.log(user);
+      if (user.role <= Constants.ROLES.SHOP_ADMIN) {
+
+      console.log('fclient');
+      console.log(client);
+        const res = await Client.findByIdAndUpdate({_id: client.id}, client, {new: true});
+        return res;
+      }
+      throw new AuthenticationError('Action not allowed');
+    } catch (err) {
+        throw new Error(err);
+    }
+  }
 };

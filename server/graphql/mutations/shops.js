@@ -64,6 +64,23 @@ module.exports = {
       } catch (err) {
         throw new Error(err);
       }
-    },
+    },async updateShop(_, args, context) {
+      const user = checkAuth(context);
+      try{
+        const shop = args.shop;
+        console.log('user');
+        console.log(user);
+        if (user.role <= Constants.ROLES.SHOP_ADMIN) {
+  
+        console.log('fshop');
+        console.log(shop);
+          const res = await Shop.findByIdAndUpdate({_id: shop.id}, shop, {new: true});
+          return res;
+        }
+        throw new AuthenticationError('Action not allowed');
+      } catch (err) {
+          throw new Error(err);
+      }
+    }
   };
   

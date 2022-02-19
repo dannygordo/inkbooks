@@ -5,9 +5,19 @@ import { APP_SETTINGS_CONSTANTS } from "../../constants";
 
 const IBPageLoader = () => {
   return (
-    <CircularProgress>
-        {APP_SETTINGS_CONSTANTS.LOADING_TEXT}
-    </CircularProgress>
+    <div className="ibPageLoader">
+        <div className="ibPageLoaderContainer">
+            <div className="ibPageLoaderCard">
+                <div className="ibCardBottom">
+                    <div className="ibCardInfoContainer">
+                      <CircularProgress>
+                          {APP_SETTINGS_CONSTANTS.LOADING_TEXT}
+                      </CircularProgress>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
   )
 }
 

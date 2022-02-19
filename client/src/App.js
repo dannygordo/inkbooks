@@ -20,6 +20,15 @@ import Portfolio from "./pages/portfolio/Portfolio";
 import Payments from "./pages/payments/Payments";
 import Artist from "./pages/artists/Artist";
 import EditArtist from "./components/artist/edit/EditArtist";
+import Client from "./pages/clients/Client";
+import IBCard from "./components/card/ibCard/IBCard";
+import { APP_SETTINGS_CONSTANTS } from "./constants";
+import EditClient from "./components/client/edit/EditClient";
+import StaffProfile from "./pages/staff/StaffProfile";
+import EditStaff from "./components/staff/edit/EditStaff";
+import Project from "./pages/projects/Project";
+import Shop from "./pages/shops/Shop";
+import EditShop from "./components/shop/edit/EditShop";
 
 function App() {
 	return (
@@ -78,6 +87,22 @@ function App() {
 							}
 						/>
 						<Route
+							path="/client/:clientId"
+							element={
+								<AuthRoute>
+									<Client />
+								</AuthRoute>
+							}
+						/>
+						<Route
+							path="/client/edit/:clientId"
+							element={
+								<AuthRoute>
+									<EditClient />
+								</AuthRoute>
+							}
+						/>
+						<Route
 							path="/staff"
 							element={
 								<AuthRoute>
@@ -86,10 +111,42 @@ function App() {
 							}
 						/>
 						<Route
+							path="/staff/:staffId"
+							element={
+								<AuthRoute>
+									<StaffProfile />
+								</AuthRoute>
+							}
+						/>
+						<Route
+							path="/staff/edit/:staffId"
+							element={
+								<AuthRoute>
+									<EditStaff />
+								</AuthRoute>
+							}
+						/>
+						<Route
 							path="/projects"
 							element={
 								<AuthRoute>
 									<Projects />
+								</AuthRoute>
+							}
+						/>
+						<Route
+							path="/project/:projectId"
+							element={
+								<AuthRoute>
+									<Project />
+								</AuthRoute>
+							}
+						/>
+						<Route
+							path="/project/edit/:projectId"
+							element={
+								<AuthRoute>
+									<EditClient />
 								</AuthRoute>
 							}
 						/>
@@ -118,6 +175,22 @@ function App() {
 							}
 						/>
 						<Route
+							path="/shop/:shopId"
+							element={
+								<AuthRoute>
+									<Shop />
+								</AuthRoute>
+							}
+						/>
+						<Route
+							path="/shop/edit/:shopId"
+							element={
+								<AuthRoute>
+									<EditShop />
+								</AuthRoute>
+							}
+						/>
+						<Route
 							path="/portfolio"
 							element={
 								<AuthRoute>
@@ -138,9 +211,9 @@ function App() {
 						<Route
 							path="*"
 							element={
-								<main style={{ padding: "1rem" }}>
-									<p>There's nothing here!</p>
-								</main>
+								<IBCard
+								cardData={{}} 
+								cardType={APP_SETTINGS_CONSTANTS.CARD_TYPES.ROUTE_NOT_FOUND} />
 							}
 						/>
 					</Routes>

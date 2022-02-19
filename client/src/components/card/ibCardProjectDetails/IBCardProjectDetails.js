@@ -18,13 +18,13 @@ const IBCardProjectDetails = (props) => {
 		<div className="ibCardBottom">
 			<span className="ibCardDetailsTitle">Project Details</span>
 			<div className="ibCardInfoContainer">
-				<Palette className="ibCardIcon" />
+			<img src={project.artist.avatar  || APP_SETTINGS_CONSTANTS.NO_IMAGE_URL} alt="" className="ibCardInfoContainerImage"/>
 				<span className="ibCardInfoTitle">
 					{`${project.artist.firstName} ${project.artist.lastName}`}{" "}
 				</span>
 			</div>
 			<div className="ibCardInfoContainer">
-				<EmojiPeople className="ibCardIcon" />
+			<img src={project.client.avatar  || APP_SETTINGS_CONSTANTS.NO_IMAGE_URL} alt="" className="ibCardInfoContainerImage"/>
 				<span className="ibCardInfoTitle">
 					{`${project.client.firstName} ${project.client.lastName}`}{" "}
 				</span>
