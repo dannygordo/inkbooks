@@ -10,6 +10,7 @@ import {
 import { setContext } from '@apollo/client/link/context';
 import { BrowserRouter } from 'react-router-dom';
 import { CacheService } from './services/CacheService';
+import SimpleReactLightbox from 'simple-react-lightbox';
 
 const httpLink = createHttpLink({
   uri: 'http://localhost:5000/',
@@ -35,7 +36,9 @@ const client = new ApolloClient({
 ReactDOM.render(
   <ApolloProvider client={client}>
     <BrowserRouter>
-      <App />
+      <SimpleReactLightbox>
+        <App />
+      </SimpleReactLightbox>
     </BrowserRouter>
   </ApolloProvider>,
   document.getElementById('root')

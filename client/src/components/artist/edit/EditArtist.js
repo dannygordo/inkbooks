@@ -28,7 +28,7 @@ const EditArtist = (props) => {
 	//Gets artist data by id
 	const { loading, data } = ArtistService.fetchArtist(params.artistId);
 
-	//Gets update mutation gql and returns callback funtion to be used in event handler
+	//Gets update mutation gql and returns callback function to be used in event handler
 	const [updateTheArtist] = useMutation(ArtistService.updateArtist());
 
 	if (loading) {

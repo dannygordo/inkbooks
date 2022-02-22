@@ -39,3 +39,11 @@
     margin-right: 5px;
     margin-top: 10px;       
 }
+.projectTitleContainer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.projectContainer {
+    margin-top: 10px;
+}

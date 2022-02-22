@@ -14,6 +14,9 @@ const ProjectService = (() => {
 						lastName
 						email
 						id
+						shop {
+							name
+						}
 					}
 					clientId
 					client {
