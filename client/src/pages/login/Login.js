@@ -27,24 +27,30 @@ const Login = () => {
 					... on Artist {
 						avatar
 						id
-            hourlyRate
-            shop {
-              name
-              website
-            }
+						firstName
+						lastName
+						hourlyRate
+						shop {
+							name
+							website
+						}
 					}
 					... on Client {
 						avatar
 						id
+						firstName
+						lastName
 					}
 					... on Staff {
 						avatar
 						id
-            title
-            shop {
-              name
-              website
-            }
+						firstName
+						lastName
+						title
+						shop {
+							name
+							website
+						}
 					}
 				}
 			}

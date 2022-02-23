@@ -25,7 +25,13 @@ const ProjectService = (() => {
 						email
 						id
 					}
-					referenceImages
+					referenceImages {
+						url
+						avatar
+						title
+						uploadedByDisplayName
+						tags
+					}
 					bodyImages
 					designImages
 					materialsUsed
@@ -66,7 +72,13 @@ const ProjectService = (() => {
                         avatar
 						id
 					}
-					referenceImages
+					referenceImages {
+						url
+						avatar
+						title
+						uploadedByDisplayName
+						tags
+					}
 					bodyImages
 					designImages
 					materialsUsed
@@ -89,7 +101,11 @@ const ProjectService = (() => {
 					description
 					artistId
 					clientId
-					referenceImages
+					referenceImages {
+						url
+						avatar
+						uploadedByDisplayName
+					}
 					bodyImages
 					designImages
 					materialsUsed

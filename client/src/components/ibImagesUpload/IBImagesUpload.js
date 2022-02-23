@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import IBImagesUploadForm from './IBImagesUploadForm'
-import IBProgressList from './ibProgressList/IBProgressList'
+import IBProgressListProject from './ibProgressList/project/IBProgressListProject'
 
 const IBImagesUpload = (props) => {
     const [files, setFiles] = useState([]);
@@ -8,7 +8,7 @@ const IBImagesUpload = (props) => {
     return (
         <div>
             <IBImagesUploadForm setFiles={setFiles}  title={props.title} />
-            <IBProgressList files={files} project={props.project} title={props.title} />
+            <IBProgressListProject files={files} project={props.project} title={props.title} />
         </div>
     )
 }

@@ -1,30 +1,38 @@
 import { CheckCircleOutline } from "@mui/icons-material";
 import { Box, ImageListItem } from "@mui/material";
 import React, { useEffect, useState, useContext } from "react";
-import IBUploadFileWithProgress from "../../../firebase/IBUploadFileWithProgress";
-import IBCircularProgressWithLabel from "./IBCircularProgressWithLabel";
-import { AuthContext } from "../../../context/auth";
-import UtilsService from "../../../services/UtilsService";
-import { useMutation } from "@apollo/client";
-import ProjectService from "../../../services/ProjectService";
+import IBUploadFileWithProgress from "../../../../firebase/IBUploadFileWithProgress";
+import IBCircularProgressWithLabel from "../IBCircularProgressWithLabel";
+import { AuthContext } from "../../../../context/auth";
+import UtilsService from "../../../../services/UtilsService";
 
-const IBProgressItem = ({ file, project, title, setUrlList }) => {
+const IBProgressItemProject = ({ file, project, title, setUrlList }) => {
 	const [progress, setProgress] = useState(100);
 	const [imageUrl, setImageUrl] = useState(null);
 	const { user } = useContext(AuthContext);
-
+	let ibImage = {};
+	console.log(user);
 	useEffect(() => {
 		const uploadImage = async () => {
 			const imageName = `${user.id}.${Date.now()}.${file.name
 				.split(".")
 				.pop()}`;
 
-            const imgPath = `${project.artist.shop.name}/${project.artist.firstName}_${project.artist.lastName}/${project.client.firstName}_${project.client.lastName}/${project.title}/${title}`;
+			const imgPath = `${project.artist.shop.name}/${project.artist.firstName}_${project.artist.lastName}/${project.client.firstName}_${project.client.lastName}/${project.title}/${title}`;
 			try {
 				const url = await IBUploadFileWithProgress(
 					file,
-					UtilsService.formatImagePathForFirebaseStorage( imgPath ), imageName, setProgress );
-                setUrlList(prevState => [...prevState, url]);
+					UtilsService.formatImagePathForFirebaseStorage(imgPath),
+					imageName,
+					setProgress
+				);
+
+				ibImage = {
+					url: url,
+					uploadedByDisplayName: `${user.userInfo.firstName} ${user.userInfo.lastName}`,
+					avatar: user.userInfo.avatar,
+				};
+				setUrlList((prevState) => [...prevState, ibImage]);
 				setImageUrl(null);
 			} catch (err) {
 				alert(err.message);
@@ -64,4 +72,4 @@ const IBProgressItem = ({ file, project, title, setUrlList }) => {
 	);
 };
 
-export default IBProgressItem;
+export default IBProgressItemProject;

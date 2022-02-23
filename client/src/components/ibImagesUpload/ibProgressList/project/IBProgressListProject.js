@@ -1,0 +1,61 @@
+import { useMutation } from "@apollo/client";
+import { ImageList } from "@mui/material";
+import React, { useState } from "react";
+import ProjectService from "../../../../services/ProjectService";
+import IBProgressItemProject from "./IBProgressItemProject";
+
+const IBProgressListProject = ({ files, project, title }) => {
+	const [urlList, setUrlList] = useState([]);
+	const [updateTheArtist] = useMutation(ProjectService.updateProject());
+	let updatedImages = [];
+	const updateProject = () => {
+		//this pulls the destructured properties off of the project object that cannot be updated by Graphql and assigns the remaining properties to ...prj
+		const { __typename, artist, client, ...prj } = project;
+
+		switch(title) {
+			case 'References':
+				const newReferences = prj.referenceImages.map(({__typename, ...keepAttrs}) => keepAttrs);
+				updatedImages = [...newReferences, ...urlList];
+				break;
+			case 'Design':
+				const newDesigns = prj.designImages.map(({__typename, ...keepAttrs}) => keepAttrs);
+				updatedImages = [...newDesigns, ...urlList];
+				break;
+		}
+
+		//merges the new list of images with the old one and updates Mongo
+		//let updatedReferenceImages = updatedImages;
+		updateTheArtist({
+			variables: {
+				project: {
+					...prj,
+					referenceImages: updatedImages,
+				},
+			},
+		});
+		setUrlList([]);
+	};
+	return (
+		<ImageList rowHeight={200} cols={4}>
+			{files.map((file, index) => {
+				return (
+					<IBProgressItemProject
+						file={file}
+						key={index}
+						project={project}
+						title={title}
+						setUrlList={setUrlList}
+					/>
+				);
+			})}
+			{/* If the urlList array is the same length as the files array, then all images have 
+			been uploaded and it's safe to call updateProject
+			*/}
+			{urlList.length > 0 &&
+				urlList.length === files.length &&
+				updateProject()}
+		</ImageList>
+	);
+};
+
+export default IBProgressListProject;

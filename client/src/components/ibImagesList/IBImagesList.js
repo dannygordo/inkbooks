@@ -16,7 +16,8 @@ function srcset(image, size, rows = 1, cols = 1) {
 	};
 }
 
-const IBImagesList = ({project}) => {
+const IBImagesList = ({imageData}) => {
+    console.log(imageData);
 	return (
 		<SRLWrapper>
             <ImageList
@@ -25,9 +26,9 @@ const IBImagesList = ({project}) => {
                 cols={4}
                 rowHeight={121}
             >
-                {itemData.map((item, index) => (
+                {imageData.map((item, index) => (
                     <ImageListItem
-                        key={item.img}
+                        key={item.url}
                         cols={
                             imageLayoutPattern[
                                 index -
@@ -57,7 +58,7 @@ const IBImagesList = ({project}) => {
                         <IBImagesListOptions />
                         <img
                             {...srcset(
-                                item.img,
+                                item.url,
                                 121,
                                 imageLayoutPattern[
                                     index -
@@ -95,14 +96,14 @@ const IBImagesList = ({project}) => {
                         {moment(new Date() - 500 * 60 * 60).fromNow()}
                     </Typography>
                     <Tooltip
-                        title="User Name"
+                        title={item.uploadedByDisplayName}
                         sx={{
                         position: 'absolute',
                         bottom: '3px',
                         right: '3px',
                         }}
                     >
-                        <Avatar src={ APP_SETTINGS_CONSTANTS.NO_IMAGE_URL } imgProps={{ 'aria-hidden': true }} />
+                        <Avatar src={ item.avatar || APP_SETTINGS_CONSTANTS.NO_IMAGE_URL } imgProps={{ 'aria-hidden': true }} />
                     </Tooltip>
                 </ImageListItem>
                 ))}

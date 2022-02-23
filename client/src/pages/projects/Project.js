@@ -50,7 +50,7 @@ const Project = (props) => {
 				</div>
 				<div className="projectContainer">
 					<IBImagesUpload project={data.getProject} title='References' />
-					<IBImagesList project={data.getProject} />
+					<IBImagesList imageData={data.getProject.referenceImages} />
 				</div>
 			</div>
 		);

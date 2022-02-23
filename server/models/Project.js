@@ -1,13 +1,14 @@
 const mongoose = require('mongoose');
+const IBImageSchema = require('./IBImage');
 
 const ProjectSchema = new mongoose.Schema({
 	title: {type: String, required: true},
 	description: {type: String, required: true},
 	artistId: {type: mongoose.Schema.Types.ObjectId, required: true},
 	clientId: {type: mongoose.Schema.Types.ObjectId, required: true},
-	referenceImages: {type: [String]},
-	bodyImages: {type: [String]},
-	designImages: {type: [String]},
+	referenceImages: {type: [IBImageSchema]},
+	bodyImages: {type: [IBImageSchema]},
+	designImages: {type: [IBImageSchema]},
 	materialsUsed: {type: [String]},
 	notes: {type: [String]},
 	tags: {type: [String]},

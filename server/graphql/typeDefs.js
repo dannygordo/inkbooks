@@ -172,6 +172,20 @@ module.exports = gql`
     title: String
     shopId: ID!
   }
+  type IBImage {
+    url: String!
+    title: String
+    uploadedByDisplayName: String
+    avatar: String
+	  tags: [String]
+  }
+  input IBImageInput {
+    url: String!
+    title: String
+    uploadedByDisplayName: String
+    avatar: String
+	  tags: [String]
+  }
   type Project {
     id: ID!
     title: String!
@@ -180,7 +194,7 @@ module.exports = gql`
     artist: Artist
     clientId: ID!
     client: Client
-    referenceImages: [String]
+    referenceImages: [IBImage]
     bodyImages: [String]
     designImages: [String]
     materialsUsed: [String]
@@ -195,7 +209,7 @@ module.exports = gql`
     description: String!
     artistId: ID!
     clientId: ID!
-    referenceImages: [String]
+    referenceImages: [IBImageInput]
     bodyImages: [String]
     designImages: [String]
     materialsUsed: [String]
