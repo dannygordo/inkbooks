@@ -16,7 +16,7 @@ function srcset(image, size, rows = 1, cols = 1) {
 	};
 }
 
-const IBImagesList = ({imageData}) => {
+const IBImagesList = ({imageData, updateCallback}) => {
     console.log(imageData);
 	return (
 		<SRLWrapper>
@@ -26,7 +26,7 @@ const IBImagesList = ({imageData}) => {
                 cols={4}
                 rowHeight={121}
             >
-                {imageData.map((item, index) => (
+                {imageData.referenceImages.map((item, index) => (
                     <ImageListItem
                         key={item.url}
                         cols={
@@ -55,7 +55,7 @@ const IBImagesList = ({imageData}) => {
                           }}
                     >
 
-                        <IBImagesListOptions />
+                        <IBImagesListOptions img={item} updateCallback={updateCallback} />
                         <img
                             {...srcset(
                                 item.url,
@@ -93,7 +93,7 @@ const IBImagesList = ({imageData}) => {
                         borderTopRightRadius: 8,
                         }}
                     >
-                        {moment(new Date() - 500 * 60 * 60).fromNow()}
+                        {moment(item.createdAt).fromNow()}
                     </Typography>
                     <Tooltip
                         title={item.uploadedByDisplayName}

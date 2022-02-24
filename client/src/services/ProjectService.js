@@ -31,6 +31,8 @@ const ProjectService = (() => {
 						title
 						uploadedByDisplayName
 						tags
+						updatedAt
+						createdAt
 					}
 					bodyImages
 					designImages
@@ -61,7 +63,7 @@ const ProjectService = (() => {
 						firstName
 						lastName
 						email
-                        avatar
+						avatar
 						id
 					}
 					clientId
@@ -69,7 +71,7 @@ const ProjectService = (() => {
 						firstName
 						lastName
 						email
-                        avatar
+						avatar
 						id
 					}
 					referenceImages {
@@ -78,6 +80,8 @@ const ProjectService = (() => {
 						title
 						uploadedByDisplayName
 						tags
+						updatedAt
+						createdAt
 					}
 					bodyImages
 					designImages
@@ -105,6 +109,8 @@ const ProjectService = (() => {
 						url
 						avatar
 						uploadedByDisplayName
+						updatedAt
+						createdAt
 					}
 					bodyImages
 					designImages

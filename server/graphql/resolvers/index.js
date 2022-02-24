@@ -11,11 +11,12 @@ const projectMutations = require('../mutations/projects');
 const projectResolvers = require('./projects');
 const Artist = require('../../models/Artist');
 const Client = require('../../models/Client');
-const { DateResolver } = require('graphql-scalars');
-const Shop = require('../../models/Shop');
+const { DateResolver, DateTimeResolver } = require('graphql-scalars');
+const Shop = require('../../models/Shop'); 
 
 module.exports = {
   Date: DateResolver,
+  DateTime: DateTimeResolver,
   Query: {
     ...artistsResolvers.Query,
     ...shopResolvers.Query,

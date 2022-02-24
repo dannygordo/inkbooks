@@ -31,6 +31,8 @@ const IBProgressItemProject = ({ file, project, title, setUrlList }) => {
 					url: url,
 					uploadedByDisplayName: `${user.userInfo.firstName} ${user.userInfo.lastName}`,
 					avatar: user.userInfo.avatar,
+					updatedAt: new Date(Date.now()).toISOString(),
+					createdAt: new Date(Date.now()).toISOString()
 				};
 				setUrlList((prevState) => [...prevState, ibImage]);
 				setImageUrl(null);

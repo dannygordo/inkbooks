@@ -6,9 +6,9 @@ import IBProgressItemProject from "./IBProgressItemProject";
 
 const IBProgressListProject = ({ files, project, title }) => {
 	const [urlList, setUrlList] = useState([]);
-	const [updateTheArtist] = useMutation(ProjectService.updateProject());
+	const [updateProject] = useMutation(ProjectService.updateProject());
 	let updatedImages = [];
-	const updateProject = () => {
+	const handleProjectUpdate = () => {
 		//this pulls the destructured properties off of the project object that cannot be updated by Graphql and assigns the remaining properties to ...prj
 		const { __typename, artist, client, ...prj } = project;
 
@@ -25,7 +25,7 @@ const IBProgressListProject = ({ files, project, title }) => {
 
 		//merges the new list of images with the old one and updates Mongo
 		//let updatedReferenceImages = updatedImages;
-		updateTheArtist({
+		updateProject({
 			variables: {
 				project: {
 					...prj,
@@ -49,11 +49,11 @@ const IBProgressListProject = ({ files, project, title }) => {
 				);
 			})}
 			{/* If the urlList array is the same length as the files array, then all images have 
-			been uploaded and it's safe to call updateProject
+			been uploaded and it's safe to call handleProjectUpdate
 			*/}
 			{urlList.length > 0 &&
 				urlList.length === files.length &&
-				updateProject()}
+				handleProjectUpdate()}
 		</ImageList>
 	);
 };

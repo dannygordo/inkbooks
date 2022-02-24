@@ -5,8 +5,8 @@ const IBImage = new mongoose.Schema({
     title: {type: String},
     uploadedByDisplayName: {type: String},
     avatar: {type: String},
-	tags: {type: [String]}
-}, {
-	timestamps: true
+	tags: {type: [String]},
+    updatedAt: {type: Date},
+    createdAt: {type: Date}
 });
 module.exports = IBImage;

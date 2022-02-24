@@ -2,6 +2,7 @@ const { gql } = require('apollo-server');
 
 module.exports = gql`
   scalar Date
+  scalar DateTime
   interface UserInfo {
     id: ID!
     firstName: String
@@ -178,6 +179,8 @@ module.exports = gql`
     uploadedByDisplayName: String
     avatar: String
 	  tags: [String]
+    createdAt: DateTime
+    updatedAt: DateTime
   }
   input IBImageInput {
     url: String!
@@ -185,6 +188,8 @@ module.exports = gql`
     uploadedByDisplayName: String
     avatar: String
 	  tags: [String]
+    createdAt: DateTime
+    updatedAt: DateTime
   }
   type Project {
     id: ID!

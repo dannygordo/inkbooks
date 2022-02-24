@@ -6,8 +6,9 @@ import ListItemIcon from "@mui/material/ListItemIcon";
 import Tooltip from "@mui/material/Tooltip";
 import { IconButton } from "@mui/material";
 import { Delete, MoreVert } from "@mui/icons-material";
+import IBDeleteFile from "../../firebase/IBDeleteFile";
 
-const IBImagesListOptions = () => {
+const IBImagesListOptions = ({ img, updateCallback }) => {
 	const [anchorEl, setAnchorEl] = React.useState(null);
 	const open = Boolean(anchorEl);
 	const handleClick = (event) => {
@@ -15,6 +16,16 @@ const IBImagesListOptions = () => {
 	};
 	const handleClose = () => {
 		setAnchorEl(null);
+	};
+
+	const handleDelete = async () => {
+		try {
+			await IBDeleteFile(img.url);
+			updateCallback(img);
+		} catch (error) {
+			alert(error.message);
+			console.log(error);
+		}
 	};
 	return (
 		<React.Fragment>
@@ -74,7 +85,7 @@ const IBImagesListOptions = () => {
 				transformOrigin={{ horizontal: "right", vertical: "top" }}
 				anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
 			>
-				<MenuItem>
+				<MenuItem onClick={handleDelete}>
 					<ListItemIcon>
 						<Delete />
 					</ListItemIcon>
