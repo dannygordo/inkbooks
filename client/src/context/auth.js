@@ -1,68 +1,132 @@
-import React, {useReducer, createContext} from 'react';
-import jwtDecode from 'jwt-decode';
-import { CacheService } from '../services/CacheService';
+import React, { useReducer, createContext, useState, useContext } from "react";
+import jwtDecode from "jwt-decode";
+import { CacheService } from "../services/CacheService";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { FIREBASE } from "../config";
+import { auth } from "../firebase/firebase";
+import { AUTH_SETTINGS_CONSTANTS } from "../constants";
 
 const initialState = {
-    user: null
-}
-if(CacheService.getItem('token')) {
-    const token = jwtDecode(CacheService.getItem('token').accessToken);
+	user: null,
+	firebaseUser: null,
+};
+if (CacheService.getItem(AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE)) {
+	const token = jwtDecode(
+		CacheService.getItem(AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE)
+			.accessToken
+	);
 
-    if(token.exp * 1000 < Date.now()) {
-        CacheService.removeItem('token');
-    } else {
-        initialState.user = CacheService.getItem('token');
-    }
+	if (token.exp * 1000 < Date.now()) {
+		CacheService.removeItem(AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE);
+	} else {
+		initialState.user = CacheService.getItem(
+			AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE
+		);
+	}
 }
 
 const AuthContext = createContext({
-    user: null,
-    login: (userData) => {
-
-    },
-    logout: () => {
-
-    }
+	user: null,
+	firebaseUser: null,
+	login: (userData) => {},
+	logout: () => {},
 });
 
+export const useAuth = () => {
+	return useContext(AuthContext);
+};
+
 function authReducer(state, action) {
-    switch(action.type) {
-        case 'LOGIN':
-            return {
-                ...state,
-                user: action.payload
-            }
-            case 'LOGOUT':
-                return {
-                    ...state,
-                    user: null
-                }
-        default:
-            return state;
-    }
+	switch (action.type) {
+		case AUTH_SETTINGS_CONSTANTS.AUTH_REDUCER_TYPES.LOGIN:
+			return {
+				...state,
+				user: action.payload,
+			};
+		case AUTH_SETTINGS_CONSTANTS.AUTH_REDUCER_TYPES.LOGOUT:
+			return {
+				...state,
+				user: null,
+			};
+		case AUTH_SETTINGS_CONSTANTS.AUTH_REDUCER_TYPES.FIREBASE_LOGIN:
+			return {
+				...state,
+				firebaseUser: action.payload,
+			};
+		default:
+			return state;
+	}
 }
 
 function AuthProvider(props) {
-    const [state, dispatch] = useReducer(authReducer, initialState);
+	const [state, dispatch] = useReducer(authReducer, initialState);
+	const [modal, setModal] = useState({
+		isOpen: false,
+		title: "",
+		content: "",
+	});
+	const [alert, setAlert] = useState({
+		isAlert: false,
+		severity: "info",
+		message: "",
+		timeout: null,
+		location: "",
+	});
+	const [loading, setLoading] = useState(false);
 
-    const login = (userData) => {
-        CacheService.setItem('token', JSON.stringify(userData));
-        dispatch({
-            type: 'LOGIN',
-            payload: userData
-        });
-    }
+	const login = (userData) => {
+		CacheService.setItem(
+			AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE,
+			JSON.stringify(userData)
+		);
 
-    const logout = () => {
-        CacheService.removeItem('token');
-        dispatch({type: 'LOGOUT'});
-    }
+		dispatch({
+			type: AUTH_SETTINGS_CONSTANTS.AUTH_REDUCER_TYPES.LOGIN,
+			payload: userData,
+		});
 
-    return (
-        <AuthContext.Provider
-        value={{user: state.user, login, logout}}
-        {...props} />
-    )
+		//login with app level Firebase auth in order to manage images and files.
+		signInWithEmailAndPassword(auth, FIREBASE.EMAIL, FIREBASE.EMAIL_PWD)
+			.then((userCredential) => {
+				// Signed in
+				const fbUser = userCredential.user;
+				console.log(fbUser);
+				dispatch({
+					type: AUTH_SETTINGS_CONSTANTS.AUTH_REDUCER_TYPES
+						.FIREBASE_LOGIN,
+					payload: fbUser,
+				});
+			})
+			.catch((error) => {
+				const errorCode = error.code;
+				const errorMessage = error.message;
+				console.log(errorCode);
+				console.log(errorMessage);
+			});
+	};
+
+	const logout = () => {
+		CacheService.removeItem(AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE);
+		dispatch({ type: AUTH_SETTINGS_CONSTANTS.AUTH_REDUCER_TYPES.LOGOUT });
+	};
+
+	return (
+		<AuthContext.Provider
+			value={{
+				user: state.user,
+				firebaseUser: state.firebaseUser,
+				login,
+				logout,
+				modal,
+				setModal,
+				alert,
+				setAlert,
+				loading,
+				setLoading,
+			}}
+			{...props}
+		/>
+	);
 }
 
 export { AuthContext, AuthProvider };

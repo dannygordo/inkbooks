@@ -1,18 +1,17 @@
 import "./login.css";
 import { useRef, useState, useContext } from "react";
 import { CircularProgress } from "@material-ui/core";
-import { ROUTE_CONSTANTS } from "../../constants";
+import { ALERT_CONSTANTS, ROUTE_CONSTANTS } from "../../constants";
 import { gql, useMutation } from "@apollo/client";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "../../context/auth";
+import { DialogContentText } from "@mui/material";
 
 const Login = () => {
 	const context = useContext(AuthContext);
 	const email = useRef();
 	const password = useRef();
 	const navigate = useNavigate();
-
-	const [errors, setErrors] = useState({});
 
 	const LOGIN_USER = gql`
 		mutation login($username: String!, $password: String!) {
@@ -64,8 +63,14 @@ const Login = () => {
 		},
 		onError(err) {
 			console.log(err);
+			context.setAlert({
+				isAlert: true,
+				severity: ALERT_CONSTANTS.SEVERITY.ERROR,
+				message: err.message,
+				timeout: ALERT_CONSTANTS.TIMEOUT,
+				location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
+			});
 			//console.log(err.graphQLErrors[0].extensions.errors);
-			setErrors(err.graphQLErrors[0].extensions.errors);
 		},
 	});
 
@@ -113,18 +118,6 @@ const Login = () => {
 					</button>
 				</Link>
 			</form>
-			<div>
-				{/* TODO extract this functionality out into a component */}
-				{Object.keys(errors).length > 0 && (
-					<div className="errors">
-						<ul className="list">
-							{Object.values(errors).map((value) => (
-								<li key={value}>{value}</li>
-							))}
-						</ul>
-					</div>
-				)}
-			</div>
 		</div>
 	);
 };

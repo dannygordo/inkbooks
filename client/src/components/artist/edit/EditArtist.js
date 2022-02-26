@@ -4,11 +4,14 @@ import "./editArtist.css";
 import { ArtistService } from "../../../services/ArtistService";
 import IBPageLoader from "../../../components/ibPageLoader/IBPageLoader";
 import { useMutation } from "@apollo/client";
+import { useAuth } from "../../../context/auth";
+import { ALERT_CONSTANTS, AUTH_SETTINGS_CONSTANTS } from "../../../constants";
 
 const EditArtist = (props) => {
 	const navigate = useNavigate();
 	let updatedArtist = {};
 	let params = useParams();
+	const { setAlert } = useAuth();
 	//#region Userefs
 	const firstName = useRef();
 	const lastName = useRef();
@@ -29,12 +32,23 @@ const EditArtist = (props) => {
 	const { loading, data } = ArtistService.fetchArtist(params.artistId);
 
 	//Gets update mutation gql and returns callback function to be used in event handler
-	const [updateTheArtist] = useMutation(ArtistService.updateArtist());
+	const [updateTheArtist] = useMutation(ArtistService.updateArtist(), {
+		onCompleted() {
+			setAlert({
+				isAlert: true,
+				severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
+				message:
+					AUTH_SETTINGS_CONSTANTS.RESPONSE_MESSAGES
+						.RECORD_UPDATE_SUCCESS,
+				timeout: ALERT_CONSTANTS.TIMEOUT,
+				location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
+			});
+		},
+	});
 
 	if (loading) {
 		return <IBPageLoader />;
 	}
-
 
 	const handleSave = (e) => {
 		e.preventDefault();
@@ -66,11 +80,11 @@ const EditArtist = (props) => {
 					title: updatedArtist.title,
 					address: updatedArtist.address,
 					city: updatedArtist.city,
-					state:updatedArtist.state,
+					state: updatedArtist.state,
 					zip: updatedArtist.zip,
 					startDate: updatedArtist.startDate,
 					instagram: updatedArtist.instagram,
-					facebook: updatedArtist.facebook
+					facebook: updatedArtist.facebook,
 				},
 			},
 		});

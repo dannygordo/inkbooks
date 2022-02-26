@@ -22,7 +22,7 @@ export const ROUTE_CONSTANTS = {
 	SHOPS: "shops",
 	SHOP: "/shop/",
 	EDIT_SHOP: "/shop/edit/",
-	CREATE_SHOP: "/shop/create"
+	CREATE_SHOP: "/shop/create",
 };
 
 export const APP_SETTINGS_CONSTANTS = {
@@ -49,7 +49,8 @@ export const APP_SETTINGS_CONSTANTS = {
 	NO_IMAGE_URL:
 		"https://thumbs.dreamstime.com/b/tattoo-machine-icon-sign-symbol-design-tattoo-machine-icon-sign-symbol-149524394.jpg",
 	LOADING_TEXT: "Loading...",
-	ROUTE_NOT_FOUND_TEXT: "The page you're looking for does not exist.  Click anywhere on this card to go back.",
+	ROUTE_NOT_FOUND_TEXT:
+		"The page you're looking for does not exist.  Click anywhere on this card to go back.",
 	SHOP_CUT_STATUS: {
 		UNPAID: 2,
 		PAID: 1,
@@ -94,7 +95,19 @@ export const APP_SETTINGS_CONSTANTS = {
 		SHOP: "shop",
 		REPORT: "report",
 		ERROR: "error",
-		ROUTE_NOT_FOUND: "routenotfound"
+		ROUTE_NOT_FOUND: "routenotfound",
 	},
 	DATE_FORMAT: "MMM Do YYYY",
+};
+
+export const ALERT_CONSTANTS = {
+	DISPLAY_MAIN_PAGE: "main",
+	DISPLAY_MODAL: "modal",
+	SEVERITY: {
+		ERROR: 'error',
+		INFO: 'info',
+		SUCCESS: 'success',
+		WARNING: 'warning'
+	},
+	TIMEOUT: 5000,
 };

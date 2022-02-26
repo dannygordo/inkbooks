@@ -29,11 +29,13 @@ import EditStaff from "./components/staff/edit/EditStaff";
 import Project from "./pages/projects/Project";
 import Shop from "./pages/shops/Shop";
 import EditShop from "./components/shop/edit/EditShop";
+import IBDisplayPageAlert from "./components/ibAlert/IBDisplayPageAlert";
 
 function App() {
 	return (
 		<AuthProvider>
 			<div className="App">
+				<IBDisplayPageAlert />
 				<Topbar />
 				<div className="container">
 					<Sidebar />
