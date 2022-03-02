@@ -100,7 +100,7 @@ const ProjectService = (() => {
 						updatedAt
 						createdAt
 					}
-					bodyImages 
+					bodyImages
 					designImages {
 						url
 						avatar
@@ -143,7 +143,7 @@ const ProjectService = (() => {
 						updatedAt
 						createdAt
 					}
-					bodyImages 
+					bodyImages
 					designImages {
 						url
 						avatar
@@ -177,74 +177,86 @@ const ProjectService = (() => {
 						createdAt
 						updatedAt
 					}
-					}
-				}
-		`;
-		return UPDATE_PROJECT_NOTES_MUTATION;
-	}
-	const GQL_FETCH_PROJECT_QUERY = gql`
-			query ($projectId: ID!) {
-				getProject(projectId: $projectId) {
-					id
-					title
-					description
-					placement
-					size
-					palette
-					artistId
-					artist {
-						firstName
-						lastName
-						email
-						id
-						shop {
-							name
-						}
-					}
-					clientId
-					client {
-						firstName
-						lastName
-						email
-						id
-					}
-					referenceImages {
-						url
-						avatar
-						title
-						uploadedByDisplayName
-						tags
-						updatedAt
-						createdAt
-					}
-					bodyImages
-					designImages {
-						url
-						avatar
-						uploadedByDisplayName
-						updatedAt
-						createdAt
-					}
-					materialsUsed
-					notes {
-						author
-						note
-						createdAt
-						updatedAt
-					}
-					tags
-					status
-					depositAmount
 				}
 			}
 		`;
+		return UPDATE_PROJECT_NOTES_MUTATION;
+	};
+
+	const _updateProjectTags = () => {
+		const UPDATE_PROJECT_TAGS_MUTATION = gql`
+			mutation ($projectId: ID!, $tags: [String]) {
+				updateProjectTags(projectId: $projectId, tags: $tags) {
+					tags
+				}
+			}
+		`;
+		return UPDATE_PROJECT_TAGS_MUTATION;
+	};
+	const GQL_FETCH_PROJECT_QUERY = gql`
+		query ($projectId: ID!) {
+			getProject(projectId: $projectId) {
+				id
+				title
+				description
+				placement
+				size
+				palette
+				artistId
+				artist {
+					firstName
+					lastName
+					email
+					id
+					shop {
+						name
+					}
+				}
+				clientId
+				client {
+					firstName
+					lastName
+					email
+					id
+				}
+				referenceImages {
+					url
+					avatar
+					title
+					uploadedByDisplayName
+					tags
+					updatedAt
+					createdAt
+				}
+				bodyImages
+				designImages {
+					url
+					avatar
+					uploadedByDisplayName
+					updatedAt
+					createdAt
+				}
+				materialsUsed
+				notes {
+					author
+					note
+					createdAt
+					updatedAt
+				}
+				tags
+				status
+				depositAmount
+			}
+		}
+	`;
 
 	return {
 		fetchProject: _fetchProject,
 		fetchProjects: _fetchProjects,
 		updateProject: _updateProject,
 		updateProjectNotes: _updateProjectNotes,
-		fetchProjectGQL: GQL_FETCH_PROJECT_QUERY
+		updateProjectTags: _updateProjectTags,
+		fetchProjectGQL: GQL_FETCH_PROJECT_QUERY,
 	};
 })();
 

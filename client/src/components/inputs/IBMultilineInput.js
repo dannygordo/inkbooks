@@ -3,7 +3,7 @@ import React from "react";
 
 /**
  * Multi line input with some defaults set
- * @param {inputRef, id, label, placeholder, defaultValue, disabled, error, onChange} optionsObject 
+ * @param {inputRef, id, label, placeholder, defaultValue, disabled, error, helperText, autoFocus, onChange} optionsObject 
  * @returns 
  */
 const IBMultilineInput = ({
@@ -15,12 +15,14 @@ const IBMultilineInput = ({
 	disabled = false,
     error = false,
 	helperText,
+	autoFocus = false,
     onChange=()=>{},
 	onKeyDown=()=>{}
 }) => {
 	return (
 		<TextField
 			id={id}
+			autoFocus={autoFocus}
 			label={label}
 			placeholder={placeholder}
 			ref={inputRef}

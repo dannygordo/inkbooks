@@ -96,5 +96,16 @@ module.exports = {
     } catch( err ) {
       throw new Error(err);
     }
+  },
+  async updateProjectTags(_, { tags, projectId }, context) {
+    const user = checkAuth(context);
+    try {
+      if(user.role <= Constants.ROLES.SHOP_ADMIN) {
+        const res = await Project.findByIdAndUpdate({_id: projectId}, {tags: tags}, {new: true});
+        return res;
+      }
+    } catch (err) {
+      throw new Error(err);
+    }
   }
 };

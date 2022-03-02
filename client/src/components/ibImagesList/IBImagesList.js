@@ -17,7 +17,6 @@ function srcset(image, size, rows = 1, cols = 1) {
 }
 
 const IBImagesList = ({ imageData, updateCallback, imageType }) => {
-	console.log(imageData);
 	return (
 		<SRLWrapper>
 			<ImageList

@@ -360,5 +360,6 @@ module.exports = gql`
     deleteProject(projectId: ID!): String!
     updateProject(project: ProjectInput): Project
     updateProjectNotes(notes: [IBNoteInput], projectId: ID!): Project
+    updateProjectTags(tags: [String], projectId: ID!): Project
   }
 `;

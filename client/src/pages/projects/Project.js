@@ -9,11 +9,13 @@ import IBImagesList from "../../components/ibImagesList/IBImagesList";
 import { useMutation } from "@apollo/client";
 import IBCardWrapper from "../../components/card/ibCard/IBCardWrapper";
 import IBInput from "../../components/inputs/IBInput";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import IBMultilineInput from "../../components/inputs/IBMultilineInput";
 import { useAuth } from "../../context/auth";
 import moment from "moment";
 import IBProjectPalettesSelect from "../../components/inputs/IBProjectPalettesSelect";
+import IBTagsWidget from "../../components/ibTagsWidget/IBTagsWidget";
+import { Chip, ListItem, Paper } from "@mui/material";
 
 const Project = (props) => {
 	const navigate = useNavigate();
@@ -29,19 +31,29 @@ const Project = (props) => {
 	let sizeRef = useRef();
 	let paletteRef = useRef();
 	let addNoteRef = useRef();
+	let addTagRef = useRef();
 	let selectPaletteRef = useRef();
-
 	/**
 	 * Gets project by id
 	 */
 	const { loading, data } = ProjectService.fetchProject(params.projectId);
 	const [updateProject] = useMutation(ProjectService.updateProject());
-
 	/**
 	 * Updates the project notes and then refetches the fetchProject mutation
 	 */
 	const [updateProjectNotes] = useMutation(
 		ProjectService.updateProjectNotes(),
+		{
+			refetchQueries: [
+				{
+					query: ProjectService.fetchProjectGQL,
+					variables: { projectId: params.projectId },
+				},
+			],
+		}
+	);
+	const [updateProjectTags] = useMutation(
+		ProjectService.updateProjectTags(),
 		{
 			refetchQueries: [
 				{
@@ -109,6 +121,26 @@ const Project = (props) => {
 		});
 	};
 
+	const handleTagsUpdate = (tag) => {
+		const updatedTags = [...data.getProject.tags, tag];
+		updateProjectTags({
+			variables: {
+				projectId: data.getProject.id,
+				tags: updatedTags
+			}
+		});
+	};
+
+	const handleDeleteTag = (tagToDelete) => {
+		const updatedTags = data.getProject.tags.filter((tag) => tag !== tagToDelete)
+		updateProjectTags({
+			variables: {
+				projectId: data.getProject.id,
+				tags: updatedTags
+			}
+		});
+	}
+
 	/**
 	 * Handles the edit click event
 	 */
@@ -133,8 +165,6 @@ const Project = (props) => {
 		);
 
 		handleProjectReferencesUpdate(referencesToSave);
-		console.log(data.getProject.referenceImages);
-		console.log(updatedReferenceList);
 	};
 
 	/**
@@ -152,7 +182,6 @@ const Project = (props) => {
 		);
 		console.log(designsToSave);
 		handleProjectDesignsUpdate(designsToSave);
-		console.log(updatedDesignsList);
 	};
 
 	/**
@@ -181,13 +210,11 @@ const Project = (props) => {
 				return null;
 		}
 	};
-
 	if (loading) {
 		return <IBPageLoader />;
 	}
 
 	if (data) {
-		console.log(data.getProject.notes);
 		return (
 			<div className="project">
 				<div className="projectTitleContainer">
@@ -299,14 +326,13 @@ const Project = (props) => {
 							<div className="projectActions">
 								<div className="projectActionItem">
 									<IBMultilineInput
-										id="addNote"
-										inputRef={addNoteRef}
+										id="addTag"
+										inputRef={addTagRef}
 										label="Add Tag"
 										helperText="Add tag you'd like to be able to search against and press enter"
 										onKeyDown={(e) => {
 											if (e.key === "Enter") {
-												console.log(e.target.value);
-												handleNotesUpdate(
+												handleTagsUpdate(
 													e.target.value
 												);
 											}
@@ -315,30 +341,7 @@ const Project = (props) => {
 								</div>
 							</div>
 							<div>
-								<ul className="projectUList">
-									{data.getProject.notes
-										.map((note, index) => {
-											return (
-												<li
-													className="projectUListItem"
-													key={index}
-												>
-													<div className="projectNoteContainer">
-														<div className="projectNoteContent">
-															{note.note}
-														</div>
-														<div className="projectNoteAuthor">
-															- {note.author} @{" "}
-															{moment(
-																note.createdAt
-															).fromNow()}
-														</div>
-													</div>
-												</li>
-											);
-										})
-										.reverse()}
-								</ul>
+								<IBTagsWidget tags={data.getProject.tags} onDelete={handleDeleteTag} />
 							</div>
 						</div>
 					</IBCardWrapper>

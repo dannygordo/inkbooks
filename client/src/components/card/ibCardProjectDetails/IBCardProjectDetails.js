@@ -3,9 +3,7 @@ import React, { useContext } from "react";
 import { AuthContext } from "../../../context/auth";
 import { APP_SETTINGS_CONSTANTS } from "../../../constants";
 import {
-	Palette,
 	AttachMoney,
-	EmojiPeople,
 	MonitorHeart,
 } from "@mui/icons-material";
 import UtilsService from "../../../services/UtilsService";
