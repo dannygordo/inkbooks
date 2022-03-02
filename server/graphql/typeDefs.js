@@ -191,19 +191,34 @@ module.exports = gql`
     createdAt: DateTime
     updatedAt: DateTime
   }
+  type IBNote {
+    author: String!
+    note: String!
+    createdAt: DateTime
+    updatedAt: DateTime
+  }
+  input IBNoteInput {
+    author: String!
+    note: String!
+    createdAt: DateTime
+    updatedAt: DateTime
+  }
   type Project {
     id: ID!
     title: String!
     description: String!
+    placement: String
+    size: String
+    palette: String
     artistId: ID!
     artist: Artist
     clientId: ID!
     client: Client
     referenceImages: [IBImage]
     bodyImages: [String]
-    designImages: [String]
+    designImages: [IBImage]
     materialsUsed: [String]
-    notes: [String]
+    notes: [IBNote]
     tags: [String]
     status: Int!
     depositAmount: Int
@@ -212,13 +227,16 @@ module.exports = gql`
     id: ID!
     title: String!
     description: String!
+    placement: String
+    size: String
+    palette: String
     artistId: ID!
     clientId: ID!
     referenceImages: [IBImageInput]
     bodyImages: [String]
-    designImages: [String]
+    designImages: [IBImageInput]
     materialsUsed: [String]
-    notes: [String]
+    notes: [IBNoteInput]
     tags: [String]
     status: Int!
     depositAmount: Int
@@ -325,6 +343,9 @@ module.exports = gql`
     createProject(
       title: String!
       description: String!
+      placement: String
+      size: String
+      palette: String
       artistId: ID!
       clientId: ID!
       referenceImages: [String]
@@ -338,5 +359,6 @@ module.exports = gql`
     ): Project!
     deleteProject(projectId: ID!): String!
     updateProject(project: ProjectInput): Project
+    updateProjectNotes(notes: [IBNoteInput], projectId: ID!): Project
   }
 `;

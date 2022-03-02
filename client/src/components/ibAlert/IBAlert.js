@@ -1,5 +1,5 @@
 import { Close } from "@mui/icons-material";
-import { Alert, Box, Collapse, IconButton } from "@mui/material";
+import { Alert, Box, Collapse, IconButton, Slide } from "@mui/material";
 import { useEffect, useRef } from "react";
 import { useAuth } from "../../context/auth";
 
@@ -30,7 +30,7 @@ const IBAlert = () => {
 	}, [timeout]);
 	return (
 		<Box sx={{ mb: 2 }} ref={alertRef}>
-			<Collapse in={isAlert}>
+			<Slide direction="down" in={isAlert} container={alertRef.current}>
 				<Alert
 					severity={severity}
 					action={
@@ -47,7 +47,7 @@ const IBAlert = () => {
 				>
 					{message}
 				</Alert>
-			</Collapse>
+			</Slide>
 		</Box>
 	);
 };

@@ -38,6 +38,7 @@
     flex-direction: row;
     margin-right: 5px;
     margin-top: 10px;       
+    flex: 2;
 }
 .projectTitleContainer {
     display: flex;
@@ -46,4 +47,32 @@
 }
 .projectContainer {
     margin-top: 10px;
+}
+.projectUList {
+    margin:0;
+    padding: 0;
+    list-style: none;
+}
+.projectUListItem {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 20px 0px;
+}
+.projectNoteContainer {
+    flex-direction: column;
+}
+.projectNoteContent {
+    font-size: medium;
+    justify-content: left;
+    flex: 1;
+    padding: 5px;
+}
+
+.projectNoteAuthor {
+    font-size: small;
+    color: rgb(206, 146, 57);
+    justify-content: left;
+    flex: 1;
+    padding: 5px;
 }

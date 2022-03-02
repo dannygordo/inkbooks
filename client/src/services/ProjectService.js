@@ -8,6 +8,9 @@ const ProjectService = (() => {
 					id
 					title
 					description
+					placement
+					size
+					palette
 					artistId
 					artist {
 						firstName
@@ -35,9 +38,20 @@ const ProjectService = (() => {
 						createdAt
 					}
 					bodyImages
-					designImages
+					designImages {
+						url
+						avatar
+						uploadedByDisplayName
+						updatedAt
+						createdAt
+					}
 					materialsUsed
-					notes
+					notes {
+						author
+						note
+						createdAt
+						updatedAt
+					}
 					tags
 					status
 					depositAmount
@@ -58,6 +72,9 @@ const ProjectService = (() => {
 					id
 					title
 					description
+					placement
+					size
+					palette
 					artistId
 					artist {
 						firstName
@@ -83,10 +100,21 @@ const ProjectService = (() => {
 						updatedAt
 						createdAt
 					}
-					bodyImages
-					designImages
+					bodyImages 
+					designImages {
+						url
+						avatar
+						uploadedByDisplayName
+						updatedAt
+						createdAt
+					}
 					materialsUsed
-					notes
+					notes {
+						author
+						note
+						createdAt
+						updatedAt
+					}
 					tags
 					status
 					depositAmount
@@ -103,6 +131,9 @@ const ProjectService = (() => {
 					id
 					title
 					description
+					placement
+					size
+					palette
 					artistId
 					clientId
 					referenceImages {
@@ -112,10 +143,21 @@ const ProjectService = (() => {
 						updatedAt
 						createdAt
 					}
-					bodyImages
-					designImages
+					bodyImages 
+					designImages {
+						url
+						avatar
+						uploadedByDisplayName
+						updatedAt
+						createdAt
+					}
 					materialsUsed
-					notes
+					notes {
+						author
+						note
+						createdAt
+						updatedAt
+					}
 					tags
 					status
 					depositAmount
@@ -125,10 +167,84 @@ const ProjectService = (() => {
 		return UPDATE_PROJECT_MUTATION;
 	};
 
+	const _updateProjectNotes = () => {
+		const UPDATE_PROJECT_NOTES_MUTATION = gql`
+			mutation ($projectId: ID!, $notes: [IBNoteInput]) {
+				updateProjectNotes(projectId: $projectId, notes: $notes) {
+					notes {
+						author
+						note
+						createdAt
+						updatedAt
+					}
+					}
+				}
+		`;
+		return UPDATE_PROJECT_NOTES_MUTATION;
+	}
+	const GQL_FETCH_PROJECT_QUERY = gql`
+			query ($projectId: ID!) {
+				getProject(projectId: $projectId) {
+					id
+					title
+					description
+					placement
+					size
+					palette
+					artistId
+					artist {
+						firstName
+						lastName
+						email
+						id
+						shop {
+							name
+						}
+					}
+					clientId
+					client {
+						firstName
+						lastName
+						email
+						id
+					}
+					referenceImages {
+						url
+						avatar
+						title
+						uploadedByDisplayName
+						tags
+						updatedAt
+						createdAt
+					}
+					bodyImages
+					designImages {
+						url
+						avatar
+						uploadedByDisplayName
+						updatedAt
+						createdAt
+					}
+					materialsUsed
+					notes {
+						author
+						note
+						createdAt
+						updatedAt
+					}
+					tags
+					status
+					depositAmount
+				}
+			}
+		`;
+
 	return {
 		fetchProject: _fetchProject,
 		fetchProjects: _fetchProjects,
 		updateProject: _updateProject,
+		updateProjectNotes: _updateProjectNotes,
+		fetchProjectGQL: GQL_FETCH_PROJECT_QUERY
 	};
 })();
 

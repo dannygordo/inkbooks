@@ -8,7 +8,7 @@ import { IconButton } from "@mui/material";
 import { Delete, MoreVert } from "@mui/icons-material";
 import IBDeleteFile from "../../firebase/IBDeleteFile";
 
-const IBImagesListOptions = ({ img, updateCallback }) => {
+const IBImagesListOptions = ({ img, updateCallback, imageType }) => {
 	const [anchorEl, setAnchorEl] = React.useState(null);
 	const open = Boolean(anchorEl);
 	const handleClick = (event) => {
@@ -21,7 +21,7 @@ const IBImagesListOptions = ({ img, updateCallback }) => {
 	const handleDelete = async () => {
 		try {
 			await IBDeleteFile(img.url);
-			updateCallback(img);
+			updateCallback(img, imageType);
 		} catch (error) {
 			alert(error.message);
 			console.log(error);

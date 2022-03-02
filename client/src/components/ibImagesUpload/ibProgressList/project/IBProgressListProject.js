@@ -7,19 +7,29 @@ import IBProgressItemProject from "./IBProgressItemProject";
 const IBProgressListProject = ({ files, project, title }) => {
 	const [urlList, setUrlList] = useState([]);
 	const [updateProject] = useMutation(ProjectService.updateProject());
-	let updatedImages = [];
+	let updatedReferenceImages = project.referenceImages.map(
+		({ __typename, ...keepAttrs }) => keepAttrs
+	);
+	let updatedDesignImages = project.designImages.map(
+		({ __typename, ...keepAttrs }) => keepAttrs
+	);
+
 	const handleProjectUpdate = () => {
 		//this pulls the destructured properties off of the project object that cannot be updated by Graphql and assigns the remaining properties to ...prj
 		const { __typename, artist, client, ...prj } = project;
 
-		switch(title) {
-			case 'References':
-				const newReferences = prj.referenceImages.map(({__typename, ...keepAttrs}) => keepAttrs);
-				updatedImages = [...newReferences, ...urlList];
+		switch (title) {
+			case "References":
+				const newReferences = prj.referenceImages.map(
+					({ __typename, ...keepAttrs }) => keepAttrs
+				);
+				updatedReferenceImages = [...newReferences, ...urlList];
 				break;
-			case 'Design':
-				const newDesigns = prj.designImages.map(({__typename, ...keepAttrs}) => keepAttrs);
-				updatedImages = [...newDesigns, ...urlList];
+			case "Design":
+				const newDesigns = prj.designImages.map(
+					({ __typename, ...keepAttrs }) => keepAttrs
+				);
+				updatedDesignImages = [...newDesigns, ...urlList];
 				break;
 		}
 
@@ -29,7 +39,8 @@ const IBProgressListProject = ({ files, project, title }) => {
 			variables: {
 				project: {
 					...prj,
-					referenceImages: updatedImages,
+					referenceImages: updatedReferenceImages,
+					designImages: updatedDesignImages,
 				},
 			},
 		});

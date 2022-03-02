@@ -3,7 +3,7 @@ import { Input, Fab } from "@mui/material";
 import { Add } from "@mui/icons-material";
 import './ibImagesUpload.css';
 
-const IBImagesUploadForm = ({ setFiles, title }) => {
+const IBImagesUploadForm = ({ setFiles, label }) => {
 	const fileRef = useRef();
 	const handleClick = (e) => {
 		e.preventDefault();
@@ -19,7 +19,7 @@ const IBImagesUploadForm = ({ setFiles, title }) => {
 	return (
 		<form className="imagesUploadContainer">
             <div className="imagesUploadTitle">
-                {title}
+                {label}
             </div>
 			<Input
                     type="file"

@@ -9,6 +9,9 @@ module.exports = {
     {
         title,
         description,
+        placement,
+        size,
+        palette,
         artistId,
         clientId,
         referenceImages,
@@ -32,6 +35,9 @@ module.exports = {
     const newProject = new Project({
         title,
         description,
+        placement,
+        size,
+        palette,
         artistId,
         clientId,
         referenceImages,
@@ -70,18 +76,25 @@ module.exports = {
     const user = checkAuth(context);
     try{
       const project = args.project;
-      console.log('user');
-      console.log(user);
       if (user.role <= Constants.ROLES.SHOP_ADMIN) {
-
-      console.log('fproject');
-      console.log(project);
         const res = await Project.findByIdAndUpdate({_id: project.id}, project, {new: true});
         return res;
       }
       throw new AuthenticationError('Action not allowed');
     } catch (err) {
         throw new Error(err);
+    }
+  },
+  async updateProjectNotes(_, { notes, projectId }, context) {
+    const user = checkAuth(context);
+    try {
+      if(user.role <= Constants.ROLES.SHOP_ADMIN) {
+        const res = await Project.findByIdAndUpdate({_id: projectId}, {notes: notes}, {new: true});
+        return res;
+      }
+      throw new AuthenticationError('Action not allowed')
+    } catch( err ) {
+      throw new Error(err);
     }
   }
 };

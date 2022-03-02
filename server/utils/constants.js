@@ -20,5 +20,8 @@ module.exports.Constants = {
         ARTIST: 'artist',
         CLIENT: 'client',
         STAFF: 'staff'
+    },
+    ERRORS: {
+        AUTHENTICATION_ERROR: 'You are not authorized to perform this action'
     }
 };

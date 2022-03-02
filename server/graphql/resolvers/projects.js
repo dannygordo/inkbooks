@@ -13,7 +13,7 @@ const resolvers = {
     },
     async getProject(_, { projectId }) {
       try {
-        const project = await Project.findById(projectId);
+        const project = await Project.findById(projectId).sort({ 'notes.createdAt': -1});
         if (project) {
           return project;
         } throw new Error('Project not found');

@@ -77,6 +77,14 @@ export const APP_SETTINGS_CONSTANTS = {
 		CANCELLED: { VALUE: 2, LABEL: "Cancelled" },
 		CLOSED: { VALUE: 3, LABEL: "Closed" },
 	},
+	PROJECT_PALETTE_OPTIONS: [
+		{ value: "black", label: "Black and Grey" },
+		{ value: "color", label: "Color" },
+	],
+	PROJECT_IMAGE_TYPES: {
+		REFERENCE: "reference",
+		DESIGN: "design",
+	},
 	PAGE_TYPES: {
 		ARTISTS: "artists",
 		CLIENTS: "clients",
@@ -104,10 +112,10 @@ export const ALERT_CONSTANTS = {
 	DISPLAY_MAIN_PAGE: "main",
 	DISPLAY_MODAL: "modal",
 	SEVERITY: {
-		ERROR: 'error',
-		INFO: 'info',
-		SUCCESS: 'success',
-		WARNING: 'warning'
+		ERROR: "error",
+		INFO: "info",
+		SUCCESS: "success",
+		WARNING: "warning",
 	},
-	TIMEOUT: 5000,
+	TIMEOUT: 3000,
 };

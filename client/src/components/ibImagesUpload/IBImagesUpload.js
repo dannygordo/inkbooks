@@ -7,7 +7,7 @@ const IBImagesUpload = (props) => {
 
     return (
         <div>
-            <IBImagesUploadForm setFiles={setFiles}  title={props.title} />
+            <IBImagesUploadForm setFiles={setFiles}  title={props.title} label={props.label} />
             <IBProgressListProject files={files} project={props.project} title={props.title} />
         </div>
     )
