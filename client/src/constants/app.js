@@ -26,6 +26,8 @@ export const ROUTE_CONSTANTS = {
 };
 
 export const APP_SETTINGS_CONSTANTS = {
+	GRAPHQL_SERVER_URL: 'http://localhost:5000/',
+	SOCKET_IO_SERVER_URL: 'http://localhost:4000/',
 	SHOP_CUT_STATUS: {
 		UNPAID: { VALUE: 0, LABEL: "Unpaid" },
 		PAID: { VALUE: 1, LABEL: "Paid" },

@@ -18,6 +18,7 @@ const IBInput = ({
     error=false,
     placeholder='',
 	disabled = false,
+	variant = 'standard',
 	helperText,
 	onChange = () => {},
 	onKeyDown = () =>{}
@@ -26,7 +27,7 @@ const IBInput = ({
 		<TextField
 			autoFocus={autoFocus}
 			margin="normal"
-			variant="standard"
+			variant={variant}
 			id={id}
 			label={label}
 			type={type}

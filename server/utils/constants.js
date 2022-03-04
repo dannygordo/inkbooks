@@ -23,5 +23,9 @@ module.exports.Constants = {
     },
     ERRORS: {
         AUTHENTICATION_ERROR: 'You are not authorized to perform this action'
+    },
+    URLS: {
+        INKBOOKS_WEBAPP: 'http://localhost:3000',
+
     }
 };

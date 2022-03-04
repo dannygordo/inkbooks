@@ -30,6 +30,7 @@ import Project from "./pages/projects/Project";
 import Shop from "./pages/shops/Shop";
 import EditShop from "./components/shop/edit/EditShop";
 import IBDisplayPageAlert from "./components/ibAlert/IBDisplayPageAlert";
+import Messenger from "./pages/messenger/Messenger";
 
 function App() {
 	return (
@@ -205,6 +206,14 @@ function App() {
 							element={
 								<AuthRoute>
 									<Payments />
+								</AuthRoute>
+							}
+						/>
+						<Route
+							path="/messenger"
+							element={
+								<AuthRoute>
+									<Messenger />
 								</AuthRoute>
 							}
 						/>

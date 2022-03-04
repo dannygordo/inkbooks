@@ -76,3 +76,7 @@
     flex: 1;
     padding: 5px;
 }
+.projectDetailsActions {
+    display: flex;
+    justify-content: right;
+}

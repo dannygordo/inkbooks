@@ -11,7 +11,6 @@ const IBProgressItemProject = ({ file, project, title, setUrlList }) => {
 	const [imageUrl, setImageUrl] = useState(null);
 	const { user } = useContext(AuthContext);
 	let ibImage = {};
-	console.log(user);
 	useEffect(() => {
 		const uploadImage = async () => {
 			const imageName = `${user.id}.${Date.now()}.${file.name

@@ -1,0 +1,17 @@
+.ibConversation {
+	display: flex;
+	align-items: center;
+	padding: 10px;
+    cursor: pointer;
+    margin-top: 10px;
+}
+.ibConversation:hover {
+    background-color: #eee;
+}
+.ibConversationImage {
+	
+}
+.ibConversationName {
+	font-weight: 500;
+    margin-left: 20px;
+}

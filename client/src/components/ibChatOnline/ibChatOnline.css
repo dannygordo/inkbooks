@@ -1,0 +1,14 @@
+.chatOnline {
+    margin-top: 5px;
+}
+.chatOnlineFriend {
+    display: flex;
+    align-items: center;
+    font-weight: 500;
+    cursor: pointer;
+    margin-left: 10px;
+}
+.chatOnlineName {
+    font-weight: 500;
+    margin-left: 10px;
+}

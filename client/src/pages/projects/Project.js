@@ -15,7 +15,10 @@ import { useAuth } from "../../context/auth";
 import moment from "moment";
 import IBProjectPalettesSelect from "../../components/inputs/IBProjectPalettesSelect";
 import IBTagsWidget from "../../components/ibTagsWidget/IBTagsWidget";
-import { Chip, ListItem, Paper } from "@mui/material";
+import { Chip, Fab, ListItem, Paper } from "@mui/material";
+import { Save } from "@mui/icons-material";
+import IBMessage from "../../components/ibMessage/IBMessage";
+import IBChatBox from "../../components/ibChatBox/IBChatBox";
 
 const Project = (props) => {
 	const navigate = useNavigate();
@@ -29,10 +32,10 @@ const Project = (props) => {
 	let descriptionRef = useRef();
 	let placementRef = useRef();
 	let sizeRef = useRef();
-	let paletteRef = useRef();
 	let addNoteRef = useRef();
 	let addTagRef = useRef();
 	let selectPaletteRef = useRef();
+	let depositAmountRef = useRef();
 	/**
 	 * Gets project by id
 	 */
@@ -69,13 +72,17 @@ const Project = (props) => {
 	 * @param {List of reference images to pass to useMutation} updatedImages
 	 */
 	const handleProjectReferencesUpdate = (updatedImages) => {
-		console.log(updatedImages);
+		const notesToSave = data.getProject.notes.map(
+			({ __typename, ...keepAttrs }) => keepAttrs
+		);
+		console.log(notesToSave);
 		updateProject({
 			variables: {
 				project: {
 					...currentProject,
 					referenceImages: updatedImages,
 					designImages: updatedDesignImages,
+					notes: [...notesToSave]
 				},
 			},
 		});
@@ -86,13 +93,18 @@ const Project = (props) => {
 	 * @param {List of design images to pass to useMutation} updatedImages
 	 */
 	const handleProjectDesignsUpdate = (updatedImages) => {
-		console.log(updatedImages);
+		const notesToSave = data.getProject.notes.map(
+			({ __typename, ...keepAttrs }) => keepAttrs
+		);
+
+		console.log(notesToSave);
 		updateProject({
 			variables: {
 				project: {
 					...currentProject,
 					designImages: updatedImages,
 					referenceImages: updatedReferenceImages,
+					notes: [...notesToSave]
 				},
 			},
 		});
@@ -121,25 +133,53 @@ const Project = (props) => {
 		});
 	};
 
-	const handleTagsUpdate = (tag) => {
-		const updatedTags = [...data.getProject.tags, tag];
-		updateProjectTags({
-			variables: {
-				projectId: data.getProject.id,
-				tags: updatedTags
-			}
-		});
+	const handleTagsUpdate = (e, tag) => {
+		e.preventDefault();
+		if (data.getProject.tags.lastIndexOf(tag) < 0) {
+			const updatedTags = [...data.getProject.tags, tag];
+			updateProjectTags({
+				variables: {
+					projectId: data.getProject.id,
+					tags: updatedTags,
+				},
+			});
+		} else {
+			addTagRef.current.value = "";
+		}
 	};
 
 	const handleDeleteTag = (tagToDelete) => {
-		const updatedTags = data.getProject.tags.filter((tag) => tag !== tagToDelete)
+		const updatedTags = data.getProject.tags.filter(
+			(tag) => tag !== tagToDelete
+		);
 		updateProjectTags({
 			variables: {
 				projectId: data.getProject.id,
-				tags: updatedTags
-			}
+				tags: updatedTags,
+			},
 		});
-	}
+	};
+
+	const handleUpdateDetails = (e) => {
+		e.preventDefault();
+		console.log(descriptionRef.current.value);
+		updateProject({
+			variables: {
+				project: {
+					id: data.getProject.id,
+					title: titleRef.current.value,
+					description: descriptionRef.current.value,
+					placement: placementRef.current.value,
+					size: sizeRef.current.value,
+					palette: selectPaletteRef.current.value,
+					clientId: data.getProject.clientId,
+					artistId: data.getProject.artistId,
+					status: data.getProject.status,
+					depositAmount: depositAmountRef.current.value ? parseInt(depositAmountRef.current.value) : 0,
+				},
+			},
+		});
+	};
 
 	/**
 	 * Handles the edit click event
@@ -201,6 +241,7 @@ const Project = (props) => {
 		);
 		switch (imageType) {
 			case APP_SETTINGS_CONSTANTS.PROJECT_IMAGE_TYPES.REFERENCE:
+				console.log('refs');
 				formatReferencesForUpdate(deletedImg, updatedReferenceImages);
 				break;
 			case APP_SETTINGS_CONSTANTS.PROJECT_IMAGE_TYPES.DESIGN:
@@ -231,37 +272,58 @@ const Project = (props) => {
 						</div>
 					</div>
 				</div>
-				<div className="projectContainer">
+				<div className="projectContainer"  style={{ display: "flex" }}>
 					<IBCardWrapper>
+						<IBChatBox widget={true} />
+					</IBCardWrapper>
+					<IBCardWrapper>
+						<div><h1>Details</h1></div>
+						<div className="projectDetailsActions">
+							<Fab
+								className="imagesUploadButton"
+								sx={{ backgroundColor: "#333", color: "#ddd" }}
+								aria-label="Save Project"
+								onClick={handleUpdateDetails}
+							>
+								<Save fontSize="medium" />
+							</Fab>
+						</div>
 						<IBInput
 							id="title"
 							inputRef={titleRef}
 							label="Title"
+							helperText=' '
 							defaultValue={data.getProject.title}
 						/>
 						<IBMultilineInput
 							id="description"
 							label="Description"
+							helperText=' '
 							inputRef={descriptionRef}
 							defaultValue={data.getProject.description}
 						/>
 						<IBInput
 							id="placement"
 							label="Placement"
+							helperText=' '
 							inputRef={placementRef}
 							defaultValue={data.getProject.placement}
 						/>
 						<IBInput
 							id="size"
 							label="Approx. Size in Inches"
+							helperText=' '
 							inputRef={sizeRef}
 							defaultValue={data.getProject.size}
 						/>
 						<IBInput
-							id="palette"
-							label="Palette"
-							inputRef={paletteRef}
-							defaultValue={data.getProject.palette}
+							id="depositAmount"
+							label="Deposit Amount $"
+							helperText=' '
+							sx={{ m: 1, width: "25ch" }}
+							type='number'
+							inputRef={depositAmountRef}
+							defaultValue={data.getProject.depositAmount}
 						/>
 						<IBProjectPalettesSelect
 							inputRef={selectPaletteRef}
@@ -333,6 +395,7 @@ const Project = (props) => {
 										onKeyDown={(e) => {
 											if (e.key === "Enter") {
 												handleTagsUpdate(
+													e,
 													e.target.value
 												);
 											}
@@ -341,7 +404,10 @@ const Project = (props) => {
 								</div>
 							</div>
 							<div>
-								<IBTagsWidget tags={data.getProject.tags} onDelete={handleDeleteTag} />
+								<IBTagsWidget
+									tags={data.getProject.tags}
+									onDelete={handleDeleteTag}
+								/>
 							</div>
 						</div>
 					</IBCardWrapper>

@@ -3,6 +3,7 @@ import "./artist.css";
 import { ArtistService } from "../../services/ArtistService";
 import { ROUTE_CONSTANTS } from "../../constants";
 import IBPageLoader from "../../components/ibPageLoader/IBPageLoader";
+import IBChatBox from "../../components/ibChatBox/IBChatBox";
 
 const Artist = (props) => {
 	const navigate = useNavigate();

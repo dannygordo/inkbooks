@@ -1,0 +1,35 @@
+.ibMessage {
+    display: flex;
+    flex-direction: column;
+    margin-left: 10px;
+    margin-top: 20px;
+    padding-right: 5px;
+}
+.ibMessageTop {
+    display: flex;
+}
+
+.ibMessageText {
+    margin-left: 10px;
+    padding: 10px;
+    border-radius: 10px;
+    color: #fff;
+    background-color: rgb(43, 177, 255);
+    -webkit-box-shadow: 5px 5px 15px -12px #000000;
+    box-shadow: 5px 5px 15px -12px #000000;
+    max-width: 300px;
+}
+.ibMessageBottom {
+    font-size: 12px;
+    margin-top: 10px;
+    font-weight: 500;
+    color: #888;
+}
+.ibMessage.own {
+    align-items: flex-end;
+}
+.ibMessage.own .ibMessageText{
+    align-items: flex-end;
+    color: #000;
+    background-color: #efefef;
+}

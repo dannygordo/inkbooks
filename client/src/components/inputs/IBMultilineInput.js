@@ -16,6 +16,7 @@ const IBMultilineInput = ({
     error = false,
 	helperText,
 	autoFocus = false,
+	variant = 'standard',
     onChange=()=>{},
 	onKeyDown=()=>{}
 }) => {
@@ -25,8 +26,8 @@ const IBMultilineInput = ({
 			autoFocus={autoFocus}
 			label={label}
 			placeholder={placeholder}
-			ref={inputRef}
-			variant="standard"
+			inputRef={inputRef}
+			variant={variant}
 			defaultValue={defaultValue}
 			multiline
 			disabled={disabled}

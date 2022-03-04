@@ -17,6 +17,32 @@ module.exports = gql`
     facebook: String
     avatar: String
   }
+  interface IMessage {
+    id: ID!
+    senderId: ID!
+    receiverId: ID!
+    message: String!
+    createdAt: DateTime
+    updatedAt: DateTime
+  }
+  type ProjectMessage implements IMessage {
+    id: ID!
+    senderId: ID!
+    receiverId: ID!
+    message: String!
+    createdAt: DateTime
+    updatedAt: DateTime
+    projectId: ID!
+  }
+  type ShopMessage implements IMessage {
+    id: ID!
+    senderId: ID!
+    receiverId: ID!
+    message: String!
+    createdAt: DateTime
+    updatedAt: DateTime
+    shopId: ID!
+  }
   type Artist implements UserInfo {
     id: ID!
     firstName: String!

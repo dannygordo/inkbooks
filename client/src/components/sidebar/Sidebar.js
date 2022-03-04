@@ -9,7 +9,8 @@ import {
     House,
     Palette, Payment,
     Person,
-    Badge
+    Badge,
+    Message
 } from '@mui/icons-material';
 import {Link, Navigate} from 'react-router-dom';
 import { AuthContext } from '../../context/auth';
@@ -54,6 +55,10 @@ const Sidebar = () => {
                         <li className="sidebarListItem">
                             <Assessment className="sidebarIcon"/>
                             <Link to="/reports">Reports</Link>
+                        </li>
+                        <li className="sidebarListItem">
+                            <Message className="sidebarIcon"/>
+                            <Link to="/messenger">Messenger</Link>
                         </li>
                     </ul>
                     <h3 className="sidebarTitle">Settings</h3>

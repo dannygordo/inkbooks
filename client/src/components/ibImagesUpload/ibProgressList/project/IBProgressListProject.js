@@ -33,6 +33,10 @@ const IBProgressListProject = ({ files, project, title }) => {
 				break;
 		}
 
+		const notesToSave = prj.notes.map(
+			({ __typename, ...keepAttrs }) => keepAttrs
+		);
+
 		//merges the new list of images with the old one and updates Mongo
 		//let updatedReferenceImages = updatedImages;
 		updateProject({
@@ -41,6 +45,7 @@ const IBProgressListProject = ({ files, project, title }) => {
 					...prj,
 					referenceImages: updatedReferenceImages,
 					designImages: updatedDesignImages,
+					notes: [...notesToSave],
 				},
 			},
 		});
