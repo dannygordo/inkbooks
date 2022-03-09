@@ -8,11 +8,18 @@ const staffResolvers = require('./staff');
 const clientMutations = require('../mutations/clients');
 const clientResolvers = require('./clients');
 const projectMutations = require('../mutations/projects');
+const conversationMutations = require('../mutations/conversations');
+const conversationResolvers = require('./conversations');
+const messageMutations = require('../mutations/messages');
+const messageResolvers = require('./messages');
 const projectResolvers = require('./projects');
 const Artist = require('../../models/Artist');
 const Client = require('../../models/Client');
 const { DateResolver, DateTimeResolver } = require('graphql-scalars');
 const Shop = require('../../models/Shop'); 
+const Conversation = require('../../models/Conversation');
+const Message = require('../../models/Message');
+const User = require('../../models/User');
 
 module.exports = {
   Date: DateResolver,
@@ -23,6 +30,8 @@ module.exports = {
     ...staffResolvers.Query,
     ...clientResolvers.Query,
     ...usersResolvers.Query,
+    ...conversationResolvers.Query,
+    ...messageResolvers.Query,
     ...projectResolvers.Query,
   },
   Mutation: {
@@ -31,6 +40,8 @@ module.exports = {
     ...shopMutations,
     ...staffMutations,
     ...clientMutations,
+    ...conversationMutations,
+    ...messageMutations,
     ...projectMutations,
   },
   Project: {
@@ -39,6 +50,9 @@ module.exports = {
     },
     client: async(project, args, context, info) => {
       return (await Client.findOne({id: project.clientId}));
+    },
+    conversation: async(project, args, context, info) => {
+      return (await Conversation.findOne({$and: [{artistId: project.artistId, clientId: project.clientId}]}));
     }
   },
   Staff: {
@@ -49,6 +63,47 @@ module.exports = {
   Artist: {
     shop: async(artist, args, context, info) => {
       return (await Shop.findById(artist.shopId));
+    },
+  },
+  Conversation: {
+    messages: async(conversation, args, context, info) => {
+      return (await Message.find({conversationId: conversation.id}).sort({updatedAt: 1}))
+    },
+    membersInfo: async(conversation, args, context, info) => {
+      return (await User.find({_id: {$in: conversation.members}}));
+    }
+  },
+  Message: {
+    user: async(message, args, context, info) => {
+      let usr =  (await User.findById(message.senderId));
+      if(usr) {
+        let userInfo = {};
+        switch(usr.userType) {
+          case 'artist':
+            userInfo = await Artist.findOne({userId: usr.id}).select('-user');
+            userInfo.id = userInfo._id;
+            return {
+              ...usr._doc,
+              userInfo: userInfo
+            };
+          case 'client':
+            userInfo = await Client.findOne({userId: usr.id}).select('-user');
+            userInfo.id = userInfo._id;
+            return {
+              ...usr._doc,
+              userInfo: userInfo
+            }
+          case 'staff':
+            userInfo = await Staff.findOne({userId: usr.id}).select('-user');
+            userInfo.id = userInfo._id;
+            return {
+              ...usr._doc,
+              userInfo: userInfo
+            }
+        }
+        
+      }
+      return userObject;
     }
   },
   UserInfo: {

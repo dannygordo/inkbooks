@@ -13,6 +13,7 @@ import { CacheService } from "./services/CacheService";
 import SimpleReactLightbox from "simple-react-lightbox";
 import { io } from "socket.io-client";
 import { APP_SETTINGS_CONSTANTS } from "./constants";
+import { AuthProvider } from "./context/auth";
 
 const httpLink = createHttpLink({
 	uri: APP_SETTINGS_CONSTANTS.GRAPHQL_SERVER_URL,
@@ -35,17 +36,19 @@ const client = new ApolloClient({
 	name: "Inkbooks",
 });
 
-const socket = io(APP_SETTINGS_CONSTANTS.SOCKET_IO_SERVER_URL);
-socket.on('connect', () => {
-  console.log(`You connected with id: ${socket.id}`);
-});
+// const socket = io(APP_SETTINGS_CONSTANTS.SOCKET_IO_SERVER_URL);
+// socket.on('connect', () => {
+//   console.log(`You connected with id: ${socket.id}`);
+// });
 
 ReactDOM.render(
 	<ApolloProvider client={client}>
 		<BrowserRouter>
-			<SimpleReactLightbox>
-				<App />
-			</SimpleReactLightbox>
+			<AuthProvider>
+				<SimpleReactLightbox>
+					<App />
+				</SimpleReactLightbox>
+			</AuthProvider>
 		</BrowserRouter>
 	</ApolloProvider>,
 	document.getElementById("root")

@@ -19,6 +19,9 @@ const Login = () => {
 				id
 				email
 				username
+				firstName
+				lastName
+				avatar
 				role
 				accessToken
 				userType
@@ -30,6 +33,7 @@ const Login = () => {
 						lastName
 						hourlyRate
 						shop {
+							id
 							name
 							website
 						}

@@ -17,8 +17,9 @@ import IBProjectPalettesSelect from "../../components/inputs/IBProjectPalettesSe
 import IBTagsWidget from "../../components/ibTagsWidget/IBTagsWidget";
 import { Chip, Fab, ListItem, Paper } from "@mui/material";
 import { Save } from "@mui/icons-material";
-import IBMessage from "../../components/ibMessage/IBMessage";
 import IBChatBox from "../../components/ibChatBox/IBChatBox";
+import { ObjectID } from "bson";
+import MessengerService from "../../services/MessengerService";
 
 const Project = (props) => {
 	const navigate = useNavigate();
@@ -36,10 +37,18 @@ const Project = (props) => {
 	let addTagRef = useRef();
 	let selectPaletteRef = useRef();
 	let depositAmountRef = useRef();
+	const [activeMessages, setActiveMessages] = useState([]);
+
+	// const { loading: loadingMsgs, data: dataMsgs } =
+	// 	MessengerService.fetchProjectConversation(user.id);
+
 	/**
 	 * Gets project by id
 	 */
-	const { loading, data } = ProjectService.fetchProject(params.projectId);
+	const { loading, data } = ProjectService.fetchProject(
+		params.projectId,
+		setActiveMessages
+	);
 	const [updateProject] = useMutation(ProjectService.updateProject());
 	/**
 	 * Updates the project notes and then refetches the fetchProject mutation
@@ -82,7 +91,7 @@ const Project = (props) => {
 					...currentProject,
 					referenceImages: updatedImages,
 					designImages: updatedDesignImages,
-					notes: [...notesToSave]
+					notes: [...notesToSave],
 				},
 			},
 		});
@@ -104,7 +113,7 @@ const Project = (props) => {
 					...currentProject,
 					designImages: updatedImages,
 					referenceImages: updatedReferenceImages,
-					notes: [...notesToSave]
+					notes: [...notesToSave],
 				},
 			},
 		});
@@ -116,6 +125,7 @@ const Project = (props) => {
 	 */
 	const handleNotesUpdate = (note) => {
 		const newNote = {
+			id: new ObjectID(),
 			author: `${user.userInfo.firstName} ${user.userInfo.lastName}`,
 			note: note,
 			createdAt: new Date(Date.now()).toISOString(),
@@ -175,7 +185,9 @@ const Project = (props) => {
 					clientId: data.getProject.clientId,
 					artistId: data.getProject.artistId,
 					status: data.getProject.status,
-					depositAmount: depositAmountRef.current.value ? parseInt(depositAmountRef.current.value) : 0,
+					depositAmount: depositAmountRef.current.value
+						? parseInt(depositAmountRef.current.value)
+						: 0,
 				},
 			},
 		});
@@ -231,7 +243,9 @@ const Project = (props) => {
 	 * @returns
 	 */
 	const handleUpdate = (deletedImg, imageType) => {
-		const { __typename, artist, client, ...project } = data.getProject;
+		console.log("pipstits");
+		const { __typename, artist, client, conversation, ...project } =
+			data.getProject;
 		currentProject = project;
 		updatedReferenceImages = project.referenceImages.map(
 			({ __typename, ...keepAttrs }) => keepAttrs
@@ -241,7 +255,7 @@ const Project = (props) => {
 		);
 		switch (imageType) {
 			case APP_SETTINGS_CONSTANTS.PROJECT_IMAGE_TYPES.REFERENCE:
-				console.log('refs');
+				console.log("refs");
 				formatReferencesForUpdate(deletedImg, updatedReferenceImages);
 				break;
 			case APP_SETTINGS_CONSTANTS.PROJECT_IMAGE_TYPES.DESIGN:
@@ -251,6 +265,7 @@ const Project = (props) => {
 				return null;
 		}
 	};
+
 	if (loading) {
 		return <IBPageLoader />;
 	}
@@ -272,12 +287,20 @@ const Project = (props) => {
 						</div>
 					</div>
 				</div>
-				<div className="projectContainer"  style={{ display: "flex" }}>
+				<div className="projectContainer" style={{ display: "flex" }}>
 					<IBCardWrapper>
-						<IBChatBox widget={true} />
+						<h1 className="projectTitle">Messages</h1>
+						<IBChatBox
+							widget={true}
+							conversation={data.getProject.conversation}
+							messages={activeMessages}
+							setActiveMessages={setActiveMessages}
+						/>
 					</IBCardWrapper>
 					<IBCardWrapper>
-						<div><h1>Details</h1></div>
+						<div>
+							<h1>Details</h1>
+						</div>
 						<div className="projectDetailsActions">
 							<Fab
 								className="imagesUploadButton"
@@ -292,36 +315,36 @@ const Project = (props) => {
 							id="title"
 							inputRef={titleRef}
 							label="Title"
-							helperText=' '
+							helperText=" "
 							defaultValue={data.getProject.title}
 						/>
 						<IBMultilineInput
 							id="description"
 							label="Description"
-							helperText=' '
+							helperText=" "
 							inputRef={descriptionRef}
 							defaultValue={data.getProject.description}
 						/>
 						<IBInput
 							id="placement"
 							label="Placement"
-							helperText=' '
+							helperText=" "
 							inputRef={placementRef}
 							defaultValue={data.getProject.placement}
 						/>
 						<IBInput
 							id="size"
 							label="Approx. Size in Inches"
-							helperText=' '
+							helperText=" "
 							inputRef={sizeRef}
 							defaultValue={data.getProject.size}
 						/>
 						<IBInput
 							id="depositAmount"
 							label="Deposit Amount $"
-							helperText=' '
+							helperText=" "
 							sx={{ m: 1, width: "25ch" }}
-							type='number'
+							type="number"
 							inputRef={depositAmountRef}
 							defaultValue={data.getProject.depositAmount}
 						/>
@@ -354,7 +377,7 @@ const Project = (props) => {
 									/>
 								</div>
 							</div>
-							<div>
+							<div className="projectNoteListWrapper">
 								<ul className="projectUList">
 									{data.getProject.notes
 										.map((note, index) => {

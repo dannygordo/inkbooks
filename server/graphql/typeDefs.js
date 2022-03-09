@@ -17,31 +17,37 @@ module.exports = gql`
     facebook: String
     avatar: String
   }
-  interface IMessage {
+  type Conversation {
     id: ID!
-    senderId: ID!
-    receiverId: ID!
-    message: String!
+    members: [ID!]!
+    membersInfo: [User]
+    messages: [Message]
     createdAt: DateTime
     updatedAt: DateTime
   }
-  type ProjectMessage implements IMessage {
+  input ConversationInput {
     id: ID!
-    senderId: ID!
-    receiverId: ID!
-    message: String!
+    members: [ID!]!
     createdAt: DateTime
     updatedAt: DateTime
-    projectId: ID!
   }
-  type ShopMessage implements IMessage {
+  type Message {
     id: ID!
+    conversationId: ID!
     senderId: ID!
-    receiverId: ID!
+    user: User
     message: String!
     createdAt: DateTime
     updatedAt: DateTime
-    shopId: ID!
+
+  }
+  input MessageInput {
+    id: ID!
+    conversationId: ID!
+    senderId: ID!
+    message: String!
+    createdAt: DateTime
+    updatedAt: DateTime
   }
   type Artist implements UserInfo {
     id: ID!
@@ -126,6 +132,9 @@ module.exports = gql`
     id: ID!
     email: String!
     username: String!
+    firstName: String
+    lastName: String
+    avatar: String
     role: Int!
     accessToken: String!
     userType: String!
@@ -200,6 +209,7 @@ module.exports = gql`
     shopId: ID!
   }
   type IBImage {
+    id: ID!
     url: String!
     title: String
     uploadedByDisplayName: String
@@ -209,6 +219,7 @@ module.exports = gql`
     updatedAt: DateTime
   }
   input IBImageInput {
+    id: ID!
     url: String!
     title: String
     uploadedByDisplayName: String
@@ -218,12 +229,14 @@ module.exports = gql`
     updatedAt: DateTime
   }
   type IBNote {
+    id: ID!
     author: String!
     note: String!
     createdAt: DateTime
     updatedAt: DateTime
   }
   input IBNoteInput {
+    id: ID!
     author: String!
     note: String!
     createdAt: DateTime
@@ -240,6 +253,7 @@ module.exports = gql`
     artist: Artist
     clientId: ID!
     client: Client
+    conversation: Conversation
     referenceImages: [IBImage]
     bodyImages: [String]
     designImages: [IBImage]
@@ -270,6 +284,9 @@ module.exports = gql`
   input RegisterInput {
     username: String!
     email: String!
+    firstName: String!
+    lastName: String!
+    avatar: String
     password: String!
     confirmPassword: String!
     role: Int!
@@ -288,6 +305,14 @@ module.exports = gql`
     getUser(userId: ID!): User
     getProjects: [Project]
     getProject(projectId: ID!): Project
+    getConversation(conversationId: ID!): Conversation
+    getConversationsByShopId(shopId: ID!): [Conversation!]
+    getProjectConversation(artistId: ID!, clientId: ID!): Conversation
+    getConversations: [Conversation]
+    getConversationsByMemberId(memberId: ID!): [Conversation]
+    getMessages: [Message]
+    getMessage(messageId: ID!): Message
+    getMessagesByConversationId(conversationId: ID!): [Message!]
   }
   type Mutation {
     register(registerInput: RegisterInput): User!
@@ -374,11 +399,11 @@ module.exports = gql`
       palette: String
       artistId: ID!
       clientId: ID!
-      referenceImages: [String]
+      referenceImages: [IBImageInput]
       bodyImages: [String]
-      designImages: [String]
+      designImages: [IBImageInput]
       materialsUsed: [String]
-      notes: [String]
+      notes: [IBNoteInput]
       tags: [String]
       status: Int!
       depositAmount: Int
@@ -387,5 +412,23 @@ module.exports = gql`
     updateProject(project: ProjectInput): Project
     updateProjectNotes(notes: [IBNoteInput], projectId: ID!): Project
     updateProjectTags(tags: [String], projectId: ID!): Project
+
+    createConversation(
+      members: [ID!]
+      createdAt: DateTime
+      updatedAt: DateTime
+    ): Conversation!
+    deleteConversation(conversationId: ID!): String!
+    updateConversation(conversation: ConversationInput): Conversation
+
+    createMessage(
+      conversationId: ID!
+      senderId: ID!
+      message: String!
+      createdAt: DateTime
+      updatedAt: DateTime
+    ): Message!
+    deleteMessage(messageId: ID!): String!
+    updateMessage(message: MessageInput): Message
   }
 `;

@@ -17,6 +17,24 @@ const UtilsService = (() => {
 		return result;
 	};
 
+	const _formatDateToISO = (date) => {
+		return new Date(date).toISOString();
+	};
+
+
+	const _isObjectEmpty = (obj) => {
+		if(Object.keys(obj).length === 0) {
+			return true;
+		}
+		return false;
+	};
+
+	const _removePropertiesForUpdate = (list) => {
+		return list.map(
+			({ __typename, ...keepAttrs }) => keepAttrs
+		);
+	};
+
 	const _formatImagePathForFirebaseStorage = (str) => {
 		return str.trim().replace(/\s+/g, "_");
 	};
@@ -25,6 +43,9 @@ const UtilsService = (() => {
 		formatPhone: _formatPhone,
 		prettyConstantsListValue: _prettyConstantsListValue,
 		formatImagePathForFirebaseStorage: _formatImagePathForFirebaseStorage,
+		formatDateToISO: _formatDateToISO,
+		isObjectEmpty: _isObjectEmpty,
+		removePropertiesForUpdate: _removePropertiesForUpdate
 	};
 })();
 

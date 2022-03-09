@@ -8,7 +8,7 @@ import Login from "./pages/login/Login";
 import Register from "./pages/register/Register";
 import Artists from "./pages/artists/Artists";
 import Clients from "./pages/clients/Clients";
-import { AuthProvider, AuthContext } from "./context/auth";
+import { AuthProvider, AuthContext, useAuth } from "./context/auth";
 import AuthRoute from "./utils/AuthRoute";
 import Projects from "./pages/projects/Projects";
 import Shops from "./pages/shops/Shops";
@@ -31,10 +31,12 @@ import Shop from "./pages/shops/Shop";
 import EditShop from "./components/shop/edit/EditShop";
 import IBDisplayPageAlert from "./components/ibAlert/IBDisplayPageAlert";
 import Messenger from "./pages/messenger/Messenger";
+import { SocketProvider } from "./context/SocketProvider";
 
 function App() {
+	const { user } = useAuth();
 	return (
-		<AuthProvider>
+		<SocketProvider id={ user?.id }>
 			<div className="App">
 				<IBDisplayPageAlert />
 				<Topbar />
@@ -217,8 +219,8 @@ function App() {
 								</AuthRoute>
 							}
 						/>
-						<Route path="/login" element={<Login />} />
-						<Route path="/register" element={<Register />} />
+						<Route path="/login" element={user?.id ? <Home /> : <Login />} />
+						<Route path="/register" element={user?.id ? <Home /> : <Register />} />
 						<Route
 							path="*"
 							element={
@@ -230,7 +232,7 @@ function App() {
 					</Routes>
 				</div>
 			</div>
-		</AuthProvider>
+		</SocketProvider>
 	);
 }
 

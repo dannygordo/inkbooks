@@ -5,6 +5,7 @@ import IBUploadFileWithProgress from "../../../../firebase/IBUploadFileWithProgr
 import IBCircularProgressWithLabel from "../IBCircularProgressWithLabel";
 import { AuthContext } from "../../../../context/auth";
 import UtilsService from "../../../../services/UtilsService";
+import { ObjectID } from "bson";
 
 const IBProgressItemProject = ({ file, project, title, setUrlList }) => {
 	const [progress, setProgress] = useState(100);
@@ -27,11 +28,12 @@ const IBProgressItemProject = ({ file, project, title, setUrlList }) => {
 				);
 
 				ibImage = {
+					id: new ObjectID(),
 					url: url,
 					uploadedByDisplayName: `${user.userInfo.firstName} ${user.userInfo.lastName}`,
 					avatar: user.userInfo.avatar,
 					updatedAt: new Date(Date.now()).toISOString(),
-					createdAt: new Date(Date.now()).toISOString()
+					createdAt: new Date(Date.now()).toISOString(),
 				};
 				setUrlList((prevState) => [...prevState, ibImage]);
 				setImageUrl(null);

@@ -1,66 +1,98 @@
 import { gql, useQuery, useMutation } from "@apollo/client";
 
 const ProjectService = (() => {
-	const _fetchProject = (projectId) => {
-		const FETCH_PROJECT_QUERY = gql`
-			query ($projectId: ID!) {
-				getProject(projectId: $projectId) {
+	const _FETCH_PROJECT_QUERY = gql`
+		query ($projectId: ID!) {
+			getProject(projectId: $projectId) {
+				id
+				title
+				description
+				placement
+				size
+				palette
+				artistId
+				artist {
+					firstName
+					lastName
+					email
 					id
-					title
-					description
-					placement
-					size
-					palette
-					artistId
-					artist {
-						firstName
-						lastName
-						email
-						id
-						shop {
-							name
-						}
+					shop {
+						name
 					}
-					clientId
-					client {
-						firstName
-						lastName
-						email
-						id
-					}
-					referenceImages {
-						url
-						avatar
-						title
-						uploadedByDisplayName
-						tags
-						updatedAt
-						createdAt
-					}
-					bodyImages
-					designImages {
-						url
-						avatar
-						uploadedByDisplayName
-						updatedAt
-						createdAt
-					}
-					materialsUsed
-					notes {
-						author
-						note
-						createdAt
-						updatedAt
-					}
-					tags
-					status
-					depositAmount
 				}
+				clientId
+				client {
+					firstName
+					lastName
+					email
+					id
+				}
+				conversation {
+					id
+					members
+					membersInfo {
+						id
+						firstName
+						lastName
+						avatar
+						username
+					}
+					messages {
+						id
+						conversationId
+						senderId
+						user {
+							firstName
+							lastName
+							avatar
+						}
+						message
+						createdAt
+						updatedAt
+					}
+					createdAt
+					updatedAt
+				}
+				referenceImages {
+					id
+					url
+					avatar
+					title
+					uploadedByDisplayName
+					tags
+					updatedAt
+					createdAt
+				}
+				bodyImages
+				designImages {
+					id
+					url
+					avatar
+					uploadedByDisplayName
+					updatedAt
+					createdAt
+				}
+				materialsUsed
+				notes {
+					id
+					author
+					note
+					createdAt
+					updatedAt
+				}
+				tags
+				status
+				depositAmount
 			}
-		`;
-		return useQuery(FETCH_PROJECT_QUERY, {
+		}
+	`;
+	const _fetchProject = (projectId, setActiveMessages) => {
+		return useQuery(_FETCH_PROJECT_QUERY, {
 			variables: {
 				projectId,
+			},
+			onCompleted: (data) => {
+				setActiveMessages(data.getProject.conversation.messages);
 			},
 		});
 	};
@@ -137,6 +169,7 @@ const ProjectService = (() => {
 					artistId
 					clientId
 					referenceImages {
+						id
 						url
 						avatar
 						uploadedByDisplayName
@@ -145,6 +178,7 @@ const ProjectService = (() => {
 					}
 					bodyImages
 					designImages {
+						id
 						url
 						avatar
 						uploadedByDisplayName
@@ -153,6 +187,7 @@ const ProjectService = (() => {
 					}
 					materialsUsed
 					notes {
+						id
 						author
 						note
 						createdAt
@@ -251,6 +286,7 @@ const ProjectService = (() => {
 	`;
 
 	return {
+		FETCH_PROJECT_QUERY: _FETCH_PROJECT_QUERY,
 		fetchProject: _fetchProject,
 		fetchProjects: _fetchProjects,
 		updateProject: _updateProject,

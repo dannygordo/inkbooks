@@ -97,7 +97,7 @@ module.exports = {
       _,
       {
         registerInput: {
-          username, password, email, confirmPassword, role, userType
+          username, password, email, firstName, lastName, avatar, confirmPassword, role, userType
         },
       },
     ) {
@@ -105,6 +105,9 @@ module.exports = {
       const { valid, errors } = validateRegisterInput(
         username,
         email,
+        firstName,
+        lastName,
+        avatar,
         password,
         confirmPassword,
         role,
@@ -136,6 +139,9 @@ module.exports = {
 
       const newUser = new User({
         email,
+        firstName,
+        lastName,
+        avatar,
         username,
         password,
         role,

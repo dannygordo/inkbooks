@@ -1,82 +1,89 @@
 .project {
-    flex: 4;
-    padding: 20px;
+	flex: 4;
+	padding: 20px;
 }
 .projectForm {
-    display: flex;
-    flex-wrap: wrap;
+	display: flex;
+	flex-wrap: wrap;
 }
 .projectItem {
-    width: 500px;
-    display: flex;
-    flex-direction: column;
-    margin-right: 20px;
-    margin-top: 10px;
+	width: 500px;
+	display: flex;
+	flex-direction: column;
+	margin-right: 20px;
+	margin-top: 10px;
 }
-.projectItem>label {
-    margin-bottom: 10px;
-    font-size: 14px;
-    font-weight: 600;
-    color: #555;
+.projectItem > label {
+	margin-bottom: 10px;
+	font-size: 14px;
+	font-weight: 600;
+	color: #555;
 }
-.projectItem>input {
-    height: 20px;
-    padding: 10px;
-    border-radius: 5px;
-    border: 1px solid gray;
+.projectItem > input {
+	height: 20px;
+	padding: 10px;
+	border-radius: 5px;
+	border: 1px solid gray;
 }
 .projectActions {
-    padding: 20px;
-    /* -webkit-box-shadow: 2px 2px 15px -12px #000000;
+	padding: 20px;
+	/* -webkit-box-shadow: 2px 2px 15px -12px #000000;
     box-shadow: 2px 2px 15px -12px #000000; */
-    padding: 5px;
-    display: flex;
-    justify-content: right;
+	padding: 5px;
+	display: flex;
+	justify-content: right;
 }
 .projectActionItem {
-    display: flex;
-    flex-direction: row;
-    margin-right: 5px;
-    margin-top: 10px;       
-    flex: 2;
+	display: flex;
+	flex-direction: row;
+	margin-right: 5px;
+	margin-top: 10px;
+	flex: 2;
+    border-bottom: 1px solid #f0f0f0;
 }
 .projectTitleContainer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
 }
 .projectContainer {
-    margin-top: 10px;
+	margin-top: 10px;
 }
 .projectUList {
-    margin:0;
-    padding: 0;
-    list-style: none;
+	margin: 0;
+	padding: 0;
+	list-style: none;
 }
 .projectUListItem {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin: 20px 0px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin: 20px 0px;
 }
 .projectNoteContainer {
-    flex-direction: column;
+	flex-direction: column;
 }
 .projectNoteContent {
-    font-size: medium;
-    justify-content: left;
-    flex: 1;
-    padding: 5px;
+	font-size: medium;
+	justify-content: left;
+	flex: 1;
+	padding: 5px;
 }
 
 .projectNoteAuthor {
-    font-size: small;
-    color: rgb(206, 146, 57);
-    justify-content: left;
-    flex: 1;
-    padding: 5px;
+	font-size: small;
+	color: rgb(206, 146, 57);
+	justify-content: left;
+	flex: 1;
+	padding: 5px;
 }
 .projectDetailsActions {
-    display: flex;
-    justify-content: right;
+	display: flex;
+	justify-content: right;
+}
+.projectNoteListWrapper {
+	height: 350px;
+	overflow-y: scroll;
+	padding-right: 10px;
+	padding-bottom: 5px;
 }

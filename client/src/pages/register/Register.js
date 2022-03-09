@@ -12,6 +12,9 @@ const Register = () => {
 	const email = useRef();
 	const password = useRef();
 	const confirmPassword = useRef();
+  const firstName = useRef();
+  const lastName = useRef();
+  const avatar = useRef();
 	const navigate = useNavigate();
   const [errors, setErrors] = useState({});
 
@@ -19,6 +22,9 @@ const Register = () => {
     mutation register(
       $username: String!
       $email: String!
+      $firstName: String!
+      $lastName: String!
+      $avatar: String
       $password: String!
       $confirmPassword: String!
       $role: Int!
@@ -26,6 +32,9 @@ const Register = () => {
       register(
         registerInput: {
           email: $email
+          firstName: $firstName
+          lastName: $lastName
+          avatar: $avatar
           username: $username
           password: $password
           confirmPassword: $confirmPassword
@@ -34,6 +43,9 @@ const Register = () => {
       ){
         id
         email
+        firstName
+        lastName
+        avatar
         username
         role
         accessToken
@@ -61,12 +73,18 @@ const handleClick =  (e) => {
     const user = {
       username: username.current.value,
       email: email.current.value,
+      firstName: firstName.current.value,
+      lastName: lastName.current.value,
+      avatar: avatar.current.value,
       password: password.current.value,
       role: 30 //TODO remove this hardcoded value
     };
     registerUser({variables: {
       username: username.current.value,
       email: email.current.value,
+      firstName: firstName.current.value,
+      lastName: lastName.current.value,
+      avatar: avatar.current.value,
       password: password.current.value,
       confirmPassword: confirmPassword.current.value,
       role: 30
@@ -89,6 +107,21 @@ const handleClick =  (e) => {
 						<input
 							placeholder="Username"
 							ref={username}
+							className="registerInput"
+						/>
+            <input
+							placeholder="First Name"
+							ref={firstName}
+							className="registerInput"
+						/>
+            <input
+							placeholder="Last Name"
+							ref={lastName}
+							className="registerInput"
+						/>
+            <input
+							placeholder="Avatar"
+							ref={avatar}
 							className="registerInput"
 						/>
 						<input

@@ -16,7 +16,7 @@ const IBProgressListProject = ({ files, project, title }) => {
 
 	const handleProjectUpdate = () => {
 		//this pulls the destructured properties off of the project object that cannot be updated by Graphql and assigns the remaining properties to ...prj
-		const { __typename, artist, client, ...prj } = project;
+		const { __typename, artist, client, conversation, ...prj } = project;
 
 		switch (title) {
 			case "References":
