@@ -1,6 +1,6 @@
 import React from "react";
 import "./artists.css";
-import { CircularProgress } from "@material-ui/core";
+import { CircularProgress } from "@mui/material";
 import IBCard from "../../components/card/ibCard/IBCard";
 import IBPageActionBar from "../../components/ibPageActionBar/IBPageActionBar";
 import { ArtistService } from "../../services/ArtistService";

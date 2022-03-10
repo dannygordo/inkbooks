@@ -128,6 +128,18 @@ module.exports = gql`
     billingType: Int
     status: Int
   }
+  input UserUpdateInput {
+    id: ID!
+    email: String!
+    username: String!
+    firstName: String
+    lastName: String
+    password: String
+    confirmPassword: String
+    userType: String
+    avatar: String
+    role: Int!
+  }
   type User {
     id: ID!
     email: String!
@@ -317,6 +329,8 @@ module.exports = gql`
   type Mutation {
     register(registerInput: RegisterInput): User!
     login(username: String!, password: String!): User!
+    updateUser(user: UserUpdateInput): User!
+    forgotPassword(username: String!, password: String!): User!
     createArtist(
       firstName: String!
       lastName: String!

@@ -29,9 +29,10 @@ export const AUTH_SETTINGS_CONSTANTS = {
 		LOGIN: "LOGIN",
 		LOGOUT: "LOGOUT",
 		FIREBASE_LOGIN: "FIREBASE_LOGIN",
+		UPDATE_USER: "UPDATE_USER",
 	},
-    RESPONSE_MESSAGES: {
-        IMAGE_UPLOAD_SUCCESS: 'Images have been uploaded successfully!',
-        RECORD_UPDATE_SUCCESS: 'Changes have been successfully saved!!'
-    }
+	RESPONSE_MESSAGES: {
+		IMAGE_UPLOAD_SUCCESS: "Images have been uploaded successfully!",
+		RECORD_UPDATE_SUCCESS: "Changes have been successfully saved!!",
+	},
 };

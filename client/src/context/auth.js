@@ -10,6 +10,7 @@ const initialState = {
 	user: null,
 	firebaseUser: null,
 };
+
 if (CacheService.getItem(AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE)) {
 	const token = jwtDecode(
 		CacheService.getItem(AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE)
@@ -52,6 +53,12 @@ function authReducer(state, action) {
 			return {
 				...state,
 				firebaseUser: action.payload,
+			};
+		case AUTH_SETTINGS_CONSTANTS.AUTH_REDUCER_TYPES.UPDATE_USER:
+			console.log(action.payload);
+			return {
+				...state,
+				user: action.payload
 			};
 		default:
 			return state;
@@ -104,6 +111,17 @@ function AuthProvider(props) {
 				console.log(errorMessage);
 			});
 	};
+	const updateCurrentUser = (userData) => {
+		CacheService.removeItem(AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE);
+		CacheService.setItem(
+			AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE,
+			JSON.stringify(userData)
+		);
+		dispatch({
+			type: AUTH_SETTINGS_CONSTANTS.AUTH_REDUCER_TYPES.UPDATE_USER,
+			payload: userData
+		});
+	};
 
 	const logout = () => {
 		CacheService.removeItem(AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE);
@@ -116,6 +134,7 @@ function AuthProvider(props) {
 				user: state.user,
 				firebaseUser: state.firebaseUser,
 				login,
+				updateCurrentUser,
 				logout,
 				modal,
 				setModal,

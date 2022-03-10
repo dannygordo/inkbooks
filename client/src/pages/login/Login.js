@@ -1,11 +1,10 @@
 import "./login.css";
 import { useRef, useState, useContext } from "react";
-import { CircularProgress } from "@material-ui/core";
 import { ALERT_CONSTANTS, ROUTE_CONSTANTS } from "../../constants";
 import { gql, useMutation } from "@apollo/client";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "../../context/auth";
-import { DialogContentText } from "@mui/material";
+import { DialogContentText, CircularProgress } from "@mui/material";
 
 const Login = () => {
 	const context = useContext(AuthContext);

@@ -14,6 +14,7 @@ const IBPasswordField = ({
 	fullWidth = true,
 	required = true,
 	autoFocus = true,
+	variant = 'standard'
 }) => {
 	const [showPassword, setShowPassword] = useState(false);
 
@@ -27,7 +28,7 @@ const IBPasswordField = ({
 		<TextField
 			autoFocus={autoFocus}
 			margin="normal"
-			variant="standard"
+			variant={variant}
 			id={id}
 			label={label}
 			type={showPassword ? "text" : "password"}

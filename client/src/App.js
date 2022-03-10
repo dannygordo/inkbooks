@@ -32,6 +32,7 @@ import EditShop from "./components/shop/edit/EditShop";
 import IBDisplayPageAlert from "./components/ibAlert/IBDisplayPageAlert";
 import Messenger from "./pages/messenger/Messenger";
 import { SocketProvider } from "./context/SocketProvider";
+import Profile from "./pages/profile/Profile";
 
 function App() {
 	const { user } = useAuth();
@@ -216,6 +217,14 @@ function App() {
 							element={
 								<AuthRoute>
 									<Messenger />
+								</AuthRoute>
+							}
+						/>
+						<Route
+							path="/profile"
+							element={
+								<AuthRoute>
+									<Profile />
 								</AuthRoute>
 							}
 						/>

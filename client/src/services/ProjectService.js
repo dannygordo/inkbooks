@@ -1,4 +1,4 @@
-import { gql, useQuery, useMutation } from "@apollo/client";
+import { gql, useQuery } from "@apollo/client";
 
 const ProjectService = (() => {
 	const _FETCH_PROJECT_QUERY = gql`

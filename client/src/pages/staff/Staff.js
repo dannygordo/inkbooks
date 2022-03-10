@@ -2,8 +2,8 @@ import React from 'react'
 import './staff.css';
 import { gql, useQuery } from '@apollo/client';
 import IBCard from '../../components/card/ibCard/IBCard';
-import { CircularProgress } from '@material-ui/core';
 import IBPageActionBar from '../../components/ibPageActionBar/IBPageActionBar';
+import { CircularProgress } from '@mui/material';
 
 const Staff = () => {
   const FETCH_STAFF_QUERY = gql`

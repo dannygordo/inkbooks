@@ -1,7 +1,7 @@
 import React, { useContext } from "react";
 import { AuthContext } from "../../../context/auth";
 import { ROLES } from "../../../constants";
-import { Tooltip } from "@material-ui/core";
+import { Tooltip } from "@mui/material";
 import { Edit } from "@mui/icons-material";
 import { Link } from "react-router-dom";
 

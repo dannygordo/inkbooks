@@ -10,6 +10,7 @@ const {
   validateRegisterInput,
   validateLoginInput,
 } = require('../../utils/validators');
+const checkAuth = require('../../utils/check-auth');
 const {Constants} = require('../../utils/constants');
 
 function generateToken(user) {
@@ -45,6 +46,7 @@ module.exports = {
       }
       // if user is found make sure password entered is the same as the saved hash
       const match = await bcrypt.compare(password, user.password);
+      console.log(match);
       if (!match) {
         errors.general = 'Invalid username/password';
         throw new UserInputError('Invalid username/password', {
@@ -159,6 +161,71 @@ module.exports = {
         accessToken: token,
       };
     },
+    async updateUser(_, args, context) {
+      const user = checkAuth(context);
+      try {
+        const usr = args.user;
+
+        console.log(usr);
+        if (user.role <= Constants.ROLES.SHOP_ADMIN || user.id === usr.id) {
+          // validates user's input from registration form
+          // const { valid, errors } = validateRegisterInput(
+          //   usr.username,
+          //   usr.email,
+          //   usr.firstName,
+          //   usr.lastName,
+          //   usr.avatar,
+          //   usr.password,
+          //   usr.confirmPassword,
+          //   usr.role,
+          //   usr.userType
+          // );
+
+          // if (!valid) {
+          //   throw new UserInputError('Errors', { errors });
+          // }
+          let res = await User.findByIdAndUpdate({_id: usr.id}, usr, {new: true});
+          res.accessToken = 'temp_' + Date.now();
+          console.log(res);
+          return res;
+        }
+        throw new AuthenticationError('Action not allowed');
+      } catch (err) {
+          throw new Error(err);
+      }
+    },
+    async forgotPassword(_, { username, password }) {
+      // check to see if inputs are valid
+      // const { errors, valid } = validateLoginInput(username, password);
+      // if (!valid) {
+      //   throw new UserInputError('Errors', { errors });
+      // }
+
+      // get user and if not found throw error
+      const user = await User.findOne({ username });
+      if (!user) {
+        errors.general = 'User not found';
+        throw new UserInputError('User not found', {
+          errors: {
+            username: 'Username not found',
+          }
+        });
+      }
+
+      // hash password
+      password = await bcrypt.hash(password, 12);
+
+      // save new user to database and return user object
+      const res = await User.findByIdAndUpdate({_id: user.id}, {password: password}, {new: true});
+
+      const token = generateToken(res);
+      // change _id to id and add access token to the user object the return to caller
+      return {
+        ...res._doc,
+        id: res._id,
+        accessToken: token,
+      };
+    }
   },
   Query: {
     async getUsers() {

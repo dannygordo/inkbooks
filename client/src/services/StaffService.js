@@ -1,4 +1,4 @@
-import { gql, useQuery, useMutation } from "@apollo/client";
+import { gql, useQuery } from "@apollo/client";
 
 const StaffService = (() => {
     const _fetchOneStaff = (staffId) => {

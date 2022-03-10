@@ -2,7 +2,7 @@ import React from "react";
 import "./shops.css";
 import { gql, useQuery } from "@apollo/client";
 import IBCard from "../../components/card/ibCard/IBCard";
-import { CircularProgress } from "@material-ui/core";
+import { CircularProgress } from "@mui/material";
 import IBPageActionBar from "../../components/ibPageActionBar/IBPageActionBar";
 import ShopService from "../../services/ShopService";
 import IBPageLoader from "../../components/ibPageLoader/IBPageLoader";

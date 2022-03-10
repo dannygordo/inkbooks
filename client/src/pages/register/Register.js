@@ -1,7 +1,7 @@
 import { useRef, useState, useContext } from "react";
 import "./register.css";
 import { useNavigate } from "react-router-dom";
-import {CircularProgress} from "@material-ui/core";
+import {CircularProgress} from "@mui/material";
 import { ROUTE_CONSTANTS } from '../../constants';
 import { gql, useMutation } from "@apollo/client";
 import { AuthContext } from "../../context/auth";
