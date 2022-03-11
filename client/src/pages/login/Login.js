@@ -109,8 +109,13 @@ const Login = () => {
 						"Login In"
 					)}
 				</button>
-				{/* TODO hook up Forgot Password functionality */}
-				<span className="loginForgot">Forgot Password?</span>
+				<Link to="/resetPassword">
+					<div className="loginForgotContainer">
+						<div className="loginForgot">
+							Forgot Password?
+						</div>
+					</div>
+				</Link>
 				<Link to="/register">
 					<button className="loginRegisterButton">
 						{loading ? (

@@ -162,6 +162,8 @@ module.exports = {
       };
     },
     async updateUser(_, args, context) {
+
+      console.log('and even here');
       const user = checkAuth(context);
       try {
         const usr = args.user;
@@ -195,11 +197,12 @@ module.exports = {
       }
     },
     async forgotPassword(_, { username, password }) {
+      console.log('we even here');
       // check to see if inputs are valid
-      // const { errors, valid } = validateLoginInput(username, password);
-      // if (!valid) {
-      //   throw new UserInputError('Errors', { errors });
-      // }
+      const { errors, valid } = validateLoginInput(username, password);
+      if (!valid) {
+        throw new UserInputError('Errors', { errors });
+      }
 
       // get user and if not found throw error
       const user = await User.findOne({ username });

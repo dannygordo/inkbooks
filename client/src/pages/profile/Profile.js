@@ -12,11 +12,14 @@ import { useMutation } from "@apollo/client";
 import "./profile.css";
 import UtilsService from "../../services/UtilsService";
 import { ALERT_CONSTANTS, AUTH_SETTINGS_CONSTANTS } from "../../constants";
+import { Upload } from "@mui/icons-material";
+import CropEasy from '../../components/crop/CropEasy';
 
 const Profile = () => {
 	const { user, setLoading, setAlert, updateCurrentUser } = useAuth();
 	const [file, setFile] = useState(null);
 	const [photoURL, setPhotoURL] = useState(user.avatar);
+    const [openCrop, setOpenCrop] = useState(false);
 	const [updateUser] = useMutation(UserService.UPDATE_USER_MUTATION);
 
 	const handleChangeAvatar = (e) => {
@@ -25,6 +28,7 @@ const Profile = () => {
 			console.log(file);
 			setFile(file);
 			setPhotoURL(URL.createObjectURL(file));
+            setOpenCrop(true);
 		}
 	};
 
@@ -73,16 +77,16 @@ const Profile = () => {
 				
                 //This splits the image name off of the current authContext user and deletes it from Firebase
 				if (user?.avatar) {
-					const prevImage = user.avatar
-						.split('%2Fprofile%2F')[1]
-						.split("?")[0];
-					if (prevImage) {
-						try {
-							await IBDeleteFile(`${UtilsService.formatImagePathForFirebaseStorage(imgPath)}/${prevImage}`);
-						} catch (err) {
-							console.log(err);
-						}
-					}
+                    try {
+                        const prevImage = user.avatar
+                            .split('%2Fprofile%2F')[1]
+                            .split("?")[0];
+                        if (prevImage) {
+                                await IBDeleteFile(`${UtilsService.formatImagePathForFirebaseStorage(imgPath)}/${prevImage}`);
+                        }
+                    } catch (err) {
+                        console.log(err);
+                    }
 				}
 			}
             //this updates the authContext user object
@@ -110,7 +114,7 @@ const Profile = () => {
 		setLoading(false);
 	};
 
-	return (
+	return !openCrop ? (
 		<div className="profile">
 			<div
 				className="profileTitleContainer"
@@ -124,7 +128,7 @@ const Profile = () => {
 			<div className="profileContainer">
 				<IBCardWrapper>
 					<div>
-						<h1>Update User Info</h1>
+						<h1>Update Avatar</h1>
 					</div>
 					<form onSubmit={handleSubmit}>
 						<div className="profileAvatarContainer">
@@ -144,15 +148,22 @@ const Profile = () => {
 								/>
 							</label>
 						</div>
-						<IBUpdatePassword />
 						<div>
-							<IBSubmitButton />
+							<IBSubmitButton text="Upload Pic" endIcon={<Upload />} />
 						</div>
 					</form>
 				</IBCardWrapper>
+                <IBCardWrapper>
+					<div>
+						<h1>Update Password</h1>
+					</div>
+					<IBUpdatePassword isPublic={false} />
+                </IBCardWrapper>
 			</div>
 		</div>
-	);
+	): (
+        <CropEasy {...{photoURL, setOpenCrop, setPhotoURL, setFile}} />
+    );
 };
 
 export default Profile;

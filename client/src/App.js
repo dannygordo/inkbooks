@@ -33,6 +33,7 @@ import IBDisplayPageAlert from "./components/ibAlert/IBDisplayPageAlert";
 import Messenger from "./pages/messenger/Messenger";
 import { SocketProvider } from "./context/SocketProvider";
 import Profile from "./pages/profile/Profile";
+import ResetPassword from "./pages/resetPassword/ResetPassword";
 
 function App() {
 	const { user } = useAuth();
@@ -228,6 +229,7 @@ function App() {
 								</AuthRoute>
 							}
 						/>
+						<Route path="/resetPassword" element={<ResetPassword />} />
 						<Route path="/login" element={user?.id ? <Home /> : <Login />} />
 						<Route path="/register" element={user?.id ? <Home /> : <Register />} />
 						<Route

@@ -16,11 +16,8 @@ const io = require('socket.io')(4000, {
 let messengerUsers = [];
 
 const addMessengerUser = (userId, socketId) => {
-  console.log('............line 19: ' + userId + ' ' + socketId);
   if(!messengerUsers.some((user) => user.userId === userId))  {
     messengerUsers.push({ userId, socketId });
-    console.log('....line 22 follows');
-    console.log(messengerUsers);
   }
 }
 
@@ -44,18 +41,10 @@ io.on('connection', (socket) => {
   socket.join(id);
 
   socket.on('send-message', ({recipients, savedMessage}) => {
-    console.log('-------------line 48-----------'); 
-    console.log(recipients);
-    console.log('-------------line 50-----------'); 
-    console.log(savedMessage);
     recipients.forEach(recipient => {
 
       const newRecipients = recipients.filter(r => r !== id);
 
-      //newRecipients.push(id);
-
-      console.log('-------------line 58-----------'); 
-      console.log(newRecipients);
       socket.broadcast.to(recipient).emit('receive-message', {
         recipients: newRecipients,
         sender: id,
@@ -64,30 +53,9 @@ io.on('connection', (socket) => {
     });
   });
 
-
-  // socket.on('addUser', (userId) => {
-  //   console.log('....line 41 follows');
-  //   addMessengerUser(userId, socket.id);
-  //   io.emit('getUsers', messengerUsers);
-  // });
-
-  //send and receive messages
-  // socket.on('sendMessage', ({message}) => {
-  //   console.log('....line 49 follows');
-  //     console.log(message);
-  //     const messageReceiver = getMessengerUser(message.receiverId);
-  //     console.log('....line 52 follows');
-  //     console.log(messageReceiver);
-  //     console.log(messengerUsers);
-  //     io.to(messageReceiver.socketId).emit('test', message);
-  //     io.to(messageReceiver.socketId).emit('receiveMessage', message);
-  // });
-
   //socket disconnect event
   socket.on('disconnect', () => {
     console.log('a user disconnected');
-    // removeMessengerUser(socket.id);
-    // io.emit('getUsers', messengerUsers);
   });
 
 });

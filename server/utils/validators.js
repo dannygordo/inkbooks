@@ -1,9 +1,13 @@
 module.exports.validateRegisterInput = (
   username,
-  email,
-  password,
-  confirmPassowrd,
-  role
+        email,
+        firstName,
+        lastName,
+        avatar,
+        password,
+        confirmPassword,
+        role,
+        userType
 ) => {
   const errors = {};
   if (username.trim() === "") {
@@ -21,9 +25,10 @@ module.exports.validateRegisterInput = (
   }
   if (password.trim() === "") {
     errors.password = "Password must not be empty";
-  } else if (password !== confirmPassowrd) {
-    errors.confirmPassowrd = "Passwords must match";
+  } else if (password !== confirmPassword) {
+    errors.confirmPassword = "Passwords must match";
   }
+  console.log(role);
   if (!role || role < 1) {
     errors.role = "Invalid role assignment";
   }

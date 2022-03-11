@@ -5,9 +5,12 @@
 }
 .ibPageLoaderContainer {
     display: flex;
-    margin-top: 20%;
+    margin-bottom: 10%;
     flex-wrap: wrap;
     justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    height: 100%
 }
 .ibPageLoaderCard {
     padding: 20px;

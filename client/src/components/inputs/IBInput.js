@@ -11,6 +11,7 @@ const IBInput = ({
 	id,
 	label,
 	type,
+	sx,
 	defaultValue,
     required=false,
     autoFocus=false,
@@ -29,6 +30,7 @@ const IBInput = ({
 			margin="normal"
 			variant={variant}
 			id={id}
+			sx={sx}
 			label={label}
 			type={type}
 			defaultValue={defaultValue}

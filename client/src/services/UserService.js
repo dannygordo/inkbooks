@@ -24,14 +24,33 @@ const UserService = (() => {
         }
     }
     `;
-    const _updateUser = (user) => {
 
-    };
-
+    const _FORGOT_PASSWORD_MUTATION = gql`
+    mutation ForgotPassword($username: String!, $password: String!) {
+        forgotPassword(username: $username, password: $password) {
+            id
+            email
+            username
+            firstName
+            lastName
+            avatar
+            role
+            accessToken
+            userType
+            userInfo {
+                id
+                firstName
+                lastName
+                email
+                avatar
+            }
+        }
+    }
+    `;
 
     return {
         UPDATE_USER_MUTATION: _UPDATE_USER_MUTATION,
-        updateUser: _updateUser
+        FORGOT_PASSWORD_MUTATION: _FORGOT_PASSWORD_MUTATION
     }
 })();
 

@@ -19,6 +19,7 @@
 
 }
 .loginButton {
+    margin-bottom: 10px;
     width: 100%;
 }
 /* .loginButton:hover {
@@ -33,13 +34,17 @@
     cursor: not-allowed;
 } */
 
-.loginForgot{
-    text-align: center;
+.loginForgotContainer{
     color: #b4b4b4;
-    margin-top: 10px;
+    display: flex;
+}
+.loginForgot{
+    justify-content: right;
+    color: #b4b4b4;
 }
 
 .loginRegisterButton{
+    margin-top: 20px;
     width: 100%;
 }
 /* .loginRegisterButton:hover {

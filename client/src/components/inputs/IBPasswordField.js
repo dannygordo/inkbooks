@@ -13,7 +13,8 @@ const IBPasswordField = ({
 	label = "password",
 	fullWidth = true,
 	required = true,
-	autoFocus = true,
+	sx,
+	autoFocus = false,
 	variant = 'standard'
 }) => {
 	const [showPassword, setShowPassword] = useState(false);
@@ -30,6 +31,7 @@ const IBPasswordField = ({
 			margin="normal"
 			variant={variant}
 			id={id}
+			sx={sx}
 			label={label}
 			type={showPassword ? "text" : "password"}
 			fullWidth={fullWidth}

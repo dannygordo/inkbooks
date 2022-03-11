@@ -28,6 +28,7 @@ const Register = () => {
       $password: String!
       $confirmPassword: String!
       $role: Int!
+      $userType: String!
     ) {
       register(
         registerInput: {
@@ -39,6 +40,7 @@ const Register = () => {
           password: $password
           confirmPassword: $confirmPassword
           role: $role
+          userType: $userType
         }
       ){
         id
@@ -49,6 +51,7 @@ const Register = () => {
         username
         role
         accessToken
+        userType
       }
     }
   `;
@@ -68,6 +71,8 @@ const [registerUser, {data, loading, error}] = useMutation(REGISTER_USER, {
 const handleClick =  (e) => {
   e.preventDefault();
   if (confirmPassword.current.value !== password.current.value) {
+    console.log(confirmPassword.current.value);
+    console.log(password.current.value);
     confirmPassword.current.setCustomValidity("Passwords do not match!!");
   } else {
     const user = {
@@ -77,7 +82,8 @@ const handleClick =  (e) => {
       lastName: lastName.current.value,
       avatar: avatar.current.value,
       password: password.current.value,
-      role: 30 //TODO remove this hardcoded value
+      role: 30, //TODO remove this hardcoded value
+      userType: 'client'
     };
     registerUser({variables: {
       username: username.current.value,
@@ -87,7 +93,8 @@ const handleClick =  (e) => {
       avatar: avatar.current.value,
       password: password.current.value,
       confirmPassword: confirmPassword.current.value,
-      role: 30
+      role: 30,
+      userType: 'client'
     }
   });
   }

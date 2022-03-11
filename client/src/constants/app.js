@@ -1,6 +1,6 @@
 export const ROUTE_CONSTANTS = {
-	LOGIN: "auth/login",
-	REGISTER: "auth/register",
+	LOGIN: "/login",
+	REGISTER: "/register",
 	USER: "users",
 	HOME: "/",
 	ARTISTS: "artists",
