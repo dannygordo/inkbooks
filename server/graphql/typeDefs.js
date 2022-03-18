@@ -278,7 +278,7 @@ module.exports = gql`
     materialsUsed: [String]
     notes: [IBNote]
     tags: [String]
-    status: Int!
+    status: String!
     depositAmount: Int
   }
   input ProjectInput {
@@ -296,7 +296,7 @@ module.exports = gql`
     materialsUsed: [String]
     notes: [IBNoteInput]
     tags: [String]
-    status: Int!
+    status: String!
     depositAmount: Int
   }
   input RegisterInput {
