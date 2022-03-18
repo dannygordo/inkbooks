@@ -4,7 +4,7 @@ const resolvers = {
   Query: {
     async getProjects(parent, args, context, info ) {
       try {
-          //console.log(info);
+          console.log(info);
         const projects = await Project.find().sort({ createdAt: -1 });
         return projects;
       } catch (err) {
@@ -21,6 +21,19 @@ const resolvers = {
         throw new Error(err);
       }
     },
+    async getProjectsByArtist(_, { artistId }) {
+
+      console.log(artistId);
+      try {
+        const projects = await Project.find({artistId: artistId}).sort({createdAt: -1});
+        const results = projects.filter((proj) => {
+          return (proj.status !== 'completed' && proj.status !== 'closed');
+        });
+        return results;
+      }catch(err) {
+        throw new Error(err);
+      }
+    }
   }
 };
 

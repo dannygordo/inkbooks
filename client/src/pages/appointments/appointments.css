@@ -1,6 +1,6 @@
 .appointments {
     flex: 4;
-    padding: 20px;
+    margin-top: 55px;
 }
 .appointmentsListContainer {
     display: flex;

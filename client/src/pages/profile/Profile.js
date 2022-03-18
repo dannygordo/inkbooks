@@ -69,7 +69,7 @@ const Profile = () => {
 					.split(".")
 					.pop()}`;
                 //creates the image path, formats the path for storage in Firebase
-				const imgPath = `${user.userInfo.shop.name}/${user.firstName}_${user.lastName}/profile`;
+				const imgPath = `${user.userInfo.shop.id}/${user.id}/profile`;
 				url = await IBUploadFile(
 					file,
 					`${UtilsService.formatImagePathForFirebaseStorage(imgPath)}/${imageName}`

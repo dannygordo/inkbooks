@@ -69,6 +69,7 @@ module.exports = gql`
     shopId: ID!
     shop: Shop
     userId: ID!
+    user: User
     status: Int
   }
   input ArtistInput {
@@ -107,7 +108,7 @@ module.exports = gql`
     shopMinimum: Int
     hourlyRate: Int
     logo: String
-    billingType: Int
+    billingType: String
     status: Int
   }
   type Shop {
@@ -125,7 +126,7 @@ module.exports = gql`
     shopMinimum: Int
     hourlyRate: Int
     logo: String
-    billingType: Int
+    billingType: String
     status: Int
   }
   input UserUpdateInput {
@@ -166,6 +167,7 @@ module.exports = gql`
     facebook: String
     avatar: String
     userId: ID!
+    user: User
   }
   input ClientInput {
     id: ID!
@@ -197,6 +199,7 @@ module.exports = gql`
     facebook: String
     avatar: String
     userId: ID!
+    user: User
     status: Int!
     title: String
     shopId: ID!
@@ -225,6 +228,8 @@ module.exports = gql`
     url: String!
     title: String
     uploadedByDisplayName: String
+    userId: ID!
+    userInfo: User
     avatar: String
 	  tags: [String]
     createdAt: DateTime
@@ -235,6 +240,7 @@ module.exports = gql`
     url: String!
     title: String
     uploadedByDisplayName: String
+    userId: ID!
     avatar: String
 	  tags: [String]
     createdAt: DateTime
@@ -304,9 +310,24 @@ module.exports = gql`
     role: Int!
     userType: String!
   }
+  type Appointment {
+    id: ID!
+    projectId: ID
+    project: Project
+    userId: ID
+    userInfo: User
+    title: String
+    description: String
+    total: Int
+    tip: Int
+    shopCutStatus: String!
+    appointmentType: String!
+    appointmentStatus: String!
+  }
   type Query {
     getArtists: [Artist]
     getArtist(artistId: ID!): Artist
+    getArtistsByShop(shopId: ID!): [Artist]
     getShops:[Shop]
     getShop(shopId: ID!): Shop
     getStaff: [Staff]
@@ -315,7 +336,10 @@ module.exports = gql`
     getClient(clientId: ID!): Client
     getUsers: [User]
     getUser(userId: ID!): User
+    getAppointmentsByShop(userIds: [ID!]): [Appointment]
+    getAppointmentsByUser(userId: ID!): [Appointment]
     getProjects: [Project]
+    getProjectsByArtist(artistId: ID!): [Project]
     getProject(projectId: ID!): Project
     getConversation(conversationId: ID!): Conversation
     getConversationsByShopId(shopId: ID!): [Conversation!]

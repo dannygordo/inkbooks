@@ -8,10 +8,10 @@ const IBProgressListProject = ({ files, project, title }) => {
 	const [urlList, setUrlList] = useState([]);
 	const [updateProject] = useMutation(ProjectService.updateProject());
 	let updatedReferenceImages = project.referenceImages.map(
-		({ __typename, ...keepAttrs }) => keepAttrs
+		({ __typename, userInfo, ...keepAttrs }) => keepAttrs
 	);
 	let updatedDesignImages = project.designImages.map(
-		({ __typename, ...keepAttrs }) => keepAttrs
+		({ __typename, userInfo, ...keepAttrs }) => keepAttrs
 	);
 
 	const handleProjectUpdate = () => {
@@ -21,13 +21,13 @@ const IBProgressListProject = ({ files, project, title }) => {
 		switch (title) {
 			case "References":
 				const newReferences = prj.referenceImages.map(
-					({ __typename, ...keepAttrs }) => keepAttrs
+					({ __typename, userInfo, ...keepAttrs }) => keepAttrs
 				);
 				updatedReferenceImages = [...newReferences, ...urlList];
 				break;
 			case "Design":
 				const newDesigns = prj.designImages.map(
-					({ __typename, ...keepAttrs }) => keepAttrs
+					({ __typename, userInfo, ...keepAttrs }) => keepAttrs
 				);
 				updatedDesignImages = [...newDesigns, ...urlList];
 				break;

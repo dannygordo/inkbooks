@@ -17,6 +17,7 @@ const ProjectService = (() => {
 					email
 					id
 					shop {
+						id
 						name
 					}
 				}
@@ -59,6 +60,12 @@ const ProjectService = (() => {
 					avatar
 					title
 					uploadedByDisplayName
+					userId
+					userInfo {
+						firstName
+						lastName
+						avatar
+					}
 					tags
 					updatedAt
 					createdAt
@@ -69,6 +76,12 @@ const ProjectService = (() => {
 					url
 					avatar
 					uploadedByDisplayName
+					userId
+					userInfo {
+						firstName
+						lastName
+						avatar
+					}
 					updatedAt
 					createdAt
 				}
@@ -96,6 +109,41 @@ const ProjectService = (() => {
 			},
 		});
 	};
+	const _FETCH_PROJECTS_BY_ARTIST_QUERY = gql`
+		query GetProjectsByArtist($artistId: ID!) {
+			getProjectsByArtist(artistId: $artistId) {
+				id
+				title
+				description
+				client {
+					user {
+						id
+						firstName
+						lastName
+						avatar
+					}
+				}
+				artist {
+					user {
+						id
+						firstName
+						lastName
+						avatar
+					}
+				}
+			}
+			}
+	`;
+	const _fetchProjectsByArtist = (artistId) => {
+		return useQuery(_FETCH_PROJECTS_BY_ARTIST_QUERY, {
+			variables: {
+				artistId,
+			},
+			onCompleted: (data) => {
+				// setActiveMessages(data.getProject.conversation.messages);
+			},
+		});
+	}
 
 	const _fetchProjects = () => {
 		const FETCH_PROJECTS_QUERY = gql`
@@ -173,6 +221,7 @@ const ProjectService = (() => {
 						url
 						avatar
 						uploadedByDisplayName
+						userId
 						updatedAt
 						createdAt
 					}
@@ -182,6 +231,7 @@ const ProjectService = (() => {
 						url
 						avatar
 						uploadedByDisplayName
+						userId
 						updatedAt
 						createdAt
 					}
@@ -244,6 +294,7 @@ const ProjectService = (() => {
 					email
 					id
 					shop {
+						id
 						name
 					}
 				}
@@ -259,6 +310,12 @@ const ProjectService = (() => {
 					avatar
 					title
 					uploadedByDisplayName
+					userId
+					userInfo {
+						firstName
+						lastName
+						avatar
+					}
 					tags
 					updatedAt
 					createdAt
@@ -268,6 +325,12 @@ const ProjectService = (() => {
 					url
 					avatar
 					uploadedByDisplayName
+					userId
+					userInfo {
+						firstName
+						lastName
+						avatar
+					}
 					updatedAt
 					createdAt
 				}
@@ -293,6 +356,7 @@ const ProjectService = (() => {
 		updateProjectNotes: _updateProjectNotes,
 		updateProjectTags: _updateProjectTags,
 		fetchProjectGQL: GQL_FETCH_PROJECT_QUERY,
+		fetchProjectsByArtist: _fetchProjectsByArtist
 	};
 })();
 

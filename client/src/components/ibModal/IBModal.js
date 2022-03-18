@@ -1,6 +1,6 @@
 import { Close } from "@mui/icons-material";
 import { Dialog, DialogTitle, IconButton } from "@mui/material";
-import React, { useEffect } from "react";
+import React, { useContext, useEffect } from "react";
 import { AuthContext } from "../../context/auth";
 import IBAlert from "../ibAlert/IBAlert";
 import { ALERT_CONSTANTS } from "../../constants";
@@ -24,7 +24,7 @@ const IBModal = () => {
 		}
 	}, [modal?.isOpen]);
 	return (
-		<Dialog open={modal.isOpen} onClose={handleClose}>
+		<Dialog open={modal.isOpen} onClose={handleClose} >
 			<DialogTitle>
 				{modal.title}
 				<IconButton

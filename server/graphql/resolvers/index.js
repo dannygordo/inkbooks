@@ -55,15 +55,31 @@ module.exports = {
       return (await Conversation.findOne({$and: [{artistId: project.artistId, clientId: project.clientId}]}));
     }
   },
+  IBImage: {
+    userInfo: async(ibImage, arts, context, info) => {
+      return (await User.findOne({id: ibImage.userId}));
+    }
+  },
   Staff: {
     shop: async(staff, args, context, info) => {
       return (await Shop.findById(staff.shopId));
+    },
+    user: async(staff, args, context, info) => {
+      return (await User.findById(staff.userId));
     }
   },
   Artist: {
     shop: async(artist, args, context, info) => {
       return (await Shop.findById(artist.shopId));
     },
+    user: async(artist, args, context, info) => {
+      return (await User.findById(artist.userId));
+    }
+  },
+  Client: {
+    user: async(client, args, context, info) => {
+      return (await User.findById(client.userId));
+    }
   },
   Conversation: {
     messages: async(conversation, args, context, info) => {

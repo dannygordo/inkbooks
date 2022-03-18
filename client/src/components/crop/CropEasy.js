@@ -56,6 +56,7 @@ const CropEasy = ({ photoURL, setOpenCrop, setPhotoURL, setFile }) => {
 					background: "#333",
 					position: "relative",
 					height: 400,
+					marginTop: 10,
 					width: "auto",
 					minWidth: { sm: 500 },
 				}}

@@ -2,7 +2,8 @@
     padding-top: 10px;
     height: calc(100vh - 70px);
     flex: 4;
-    margin-left: 5px;
+    margin-top: 60px;
+    margin-left: 10px;
 }
 .messengerContainer {
     display: flex;

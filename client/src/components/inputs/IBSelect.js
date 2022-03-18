@@ -26,7 +26,7 @@ const IBSelect = ({
 	};
 
 	return (
-		<FormControl sx={{ m: 1, minWidth: 120 }}>
+		<FormControl sx={{ minWidth: 120, marginTop: 2}}>
 			<InputLabel id="demo-simple-select-helper-label">
 				{label}
 			</InputLabel>

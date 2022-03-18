@@ -29,57 +29,38 @@ export const ROUTE_CONSTANTS = {
 export const APP_SETTINGS_CONSTANTS = {
 	GRAPHQL_SERVER_URL: 'http://localhost:5000/',
 	SOCKET_IO_SERVER_URL: 'http://localhost:4000/',
-	SHOP_CUT_STATUS: {
-		UNPAID: { VALUE: 0, LABEL: "Unpaid" },
-		PAID: { VALUE: 1, LABEL: "Paid" },
-		RECEIVED: { VALUE: 2, LABEL: "Received" },
-	},
-	APPOINTMENT_TYPE: {
-		SESSION: { VALUE: 0, LABEL: "Session" },
-		CONSULT: { VALUE: 1, LABEL: "Consult" },
-	},
-	APPOINTMENT_STATUS: {
-		COMPLETED: { VALUE: 0, LABEL: "Completed" },
-		SCHEDULED: { VALUE: 1, LABEL: "Scheduled" },
-		RESCHEDULED: { VALUE: 2, LABEL: "Rescheduled" },
-		CANCELLED: { VALUE: 3, LABEL: "Cancelled" },
-		NO_SHOW: { VALUE: 4, LABEL: "No Show" },
-	},
-	BILLING_TYPE: {
-		HOURLY: { VALUE: 0, LABEL: "Hourly" },
-		FLAT_RATE: { VALUE: 1, LABEL: "Flat Rate" },
-	},
 	NO_IMAGE_URL:
 		"https://thumbs.dreamstime.com/b/tattoo-machine-icon-sign-symbol-design-tattoo-machine-icon-sign-symbol-149524394.jpg",
 	LOADING_TEXT: "Loading...",
 	ROUTE_NOT_FOUND_TEXT:
 		"The page you're looking for does not exist.  Click anywhere on this card to go back.",
-	SHOP_CUT_STATUS: {
-		UNPAID: 2,
-		PAID: 1,
-		RECEIVED: 0,
-	},
-	APPOINTMENT_TYPE: {
-		SESSION: 0,
-		CONSULT: 1,
-	},
-	APPOINTMENT_STATUS: {
-		COMPLETE: 0,
-		SCHEDULED: 1,
-		RESCHEDULED: 2,
-		CANCELLED: 3,
-		NO_SHOW: 4,
-	},
-	BILLING_TYPE: {
-		HOURLY: 0,
-		FLAT_RATE: 1,
-	},
-	PROJECT_STATUS: {
-		OPEN: { VALUE: 0, LABEL: "Open" },
-		IN_PROGRESS: { VALUE: 1, LABEL: "In Progress" },
-		CANCELLED: { VALUE: 2, LABEL: "Cancelled" },
-		CLOSED: { VALUE: 3, LABEL: "Closed" },
-	},
+	SHOP_CUT_STATUS: [
+		{ value: 'unpaid', label: 'Unpaid' },
+		{ value: 'paid', label: 'Paid' },
+		{ value: 'received', label: 'Received' }
+	],
+	APPOINTMENT_TYPE: [
+		{ value: 'consult', label: 'Consult' },
+		{ value: 'session', label: 'Session' },
+		{ value: 'other', label: 'Other' }
+	],
+	APPOINTMENT_STATUS: [
+		{ value: 'scheduled', label: 'Scheduled' },
+		{ value: 'completed', label: 'Completed' },
+		{ value: 'rescheduled', label: 'Rescheduled' },
+		{ value: 'cancelled', label: 'Cancelled' },
+		{ value: 'no_show', label: 'No Show' },
+	],
+	BILLING_TYPE: [
+		{ value: 'hourly', label: 'Hourly' },
+		{ value: 'flat_rate', label: 'Flat Rate' }
+	],
+	PROJECT_STATUS: [
+		{ value: 'open', label: 'Open'},
+		{ value: 'in_progress', label: 'In Progress'},
+		{ value: 'cancelled', label: 'Cancelled'},
+		{ value: 'completed', label: 'Completed'}
+	],
 	PROJECT_PALETTE_OPTIONS: [
 		{ value: "black", label: "Black and Grey" },
 		{ value: "color", label: "Color" },

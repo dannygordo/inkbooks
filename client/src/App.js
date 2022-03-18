@@ -34,6 +34,8 @@ import Messenger from "./pages/messenger/Messenger";
 import { SocketProvider } from "./context/SocketProvider";
 import Profile from "./pages/profile/Profile";
 import ResetPassword from "./pages/resetPassword/ResetPassword";
+import { CalendarProvider } from "./context/calendar";
+import IBModal from "./components/ibModal/IBModal";
 
 function App() {
 	const { user } = useAuth();
@@ -41,9 +43,10 @@ function App() {
 		<SocketProvider id={ user?.id }>
 			<div className="App">
 				<IBDisplayPageAlert />
-				<Topbar />
+				<IBModal />
+				{/* <Topbar /> */}
 				<div className="container">
-					<Sidebar />
+					{user && <Sidebar />}
 					<Routes>
 						<Route
 							path="/"
@@ -54,10 +57,20 @@ function App() {
 							}
 						/>
 						<Route
+							path="/dashboard"
+							element={
+								<AuthRoute>
+									<Home />
+								</AuthRoute>
+							}
+						/>
+						<Route
 							path="/appointments"
 							element={
 								<AuthRoute>
-									<Appointments />
+									<CalendarProvider>
+										<Appointments />
+									</CalendarProvider>
 								</AuthRoute>
 							}
 						/>

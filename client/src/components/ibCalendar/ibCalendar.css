@@ -1,0 +1,130 @@
+.ibCalendar {
+	height: calc(100vh - 70px);
+	flex: 4;
+	flex-direction: column;
+	overflow: hidden;
+	padding-top: 10px;
+	padding-right: 10px;
+}
+
+.ibCalendarHeader {
+	padding: 8px 2px;
+	display: flex;
+	align-items: center;
+	border-bottom: 1px solid #f0f0f0;
+}
+.ibCalendarContainer {
+	flex: 1;
+	height: calc(100vh);
+	overflow: hidden;
+}
+
+.ibCalendarDayContainer {
+	border: solid 1px #000;
+}
+.ibCalendarDateCell {
+	font-size: 14px;
+	font-weight: 600;
+	height: 24px;
+	line-height: 24px;
+}
+.ibCalendarToday {
+	margin-top: 0px;
+	height: 24px;
+	line-height: 24px;
+	color: #fff;
+	background-color: #1a73e8;
+	-webkit-border-radius: 50%;
+	border-radius: 50%;
+	width: 24px;
+	margin-left: 45%;
+}
+.ibCalendarTodayButton {
+	margin-left: 10px;
+	margin-right: 20px;
+	height: 38px;
+}
+
+.ibCalendarChevronButton {
+	margin: 0 5px;
+}
+.ibCalendarCurrentMonthYear {
+    margin-left: 20px;
+    font-weight: 600;
+    color: #333;
+}
+.ibCalendarAsideContainer {
+    border-right: 1px solid #ddd;
+    padding: 5px;
+    flex: .2;
+    margin-right: 3px;
+}
+.ibCalendarCreateEventButton {
+    display: flex;
+	margin-left: 10px;
+    margin-top: 20px;
+}
+.ibCalendarCreateEventButton:hover {
+    cursor: pointer;
+}
+.ibCalendarCreateEventButtonText {
+    padding-left: 3px;
+    padding-right: 7px;
+    margin-top: 10px;
+}
+.ibSmallCalendarContainer {
+    margin-top: 10px;
+}
+.ibSmallCalendarHeader {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 20px;
+    padding-left: 10px;
+    font-weight: 600;
+}
+.ibSmallCalendarDays {
+    padding-top: 1px;
+    align-items: center;
+    font-size: 10px;
+    font-weight: 500;
+    width: 24px;
+    height: 24px;
+}
+
+.ibSmallCalendarToday {
+    padding-top: 1px;
+	font-weight: 500;
+    -webkit-border-radius: 50%;
+    border-radius: 50%;
+    background-color: #1a73e8;
+    color: #fff;
+    width: 24px;
+    height: 24px;
+    margin-left: -7px !important;
+    padding-right: 2px;
+}
+.ibSmallCalendarSelectedDay {
+    padding-top: 1px;
+    color: #185abc;
+    background-color: #d2e3fc;
+    font-weight: 500;
+    -webkit-border-radius: 50%;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    margin-left: -7px !important;
+    padding-right: 2px;
+}
+
+.ibCalendarAddEventContainer{
+    width: 600px;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: stretch;
+    box-shadow: 0px 24px 38px 3px rgb(0 0 0 / 14%), 0px 9px 46px 8px rgb(0 0 0 / 12%), 0px 11px 15px -7px rgb(0 0 0 / 20%);
+    border-radius: 8px;
+}
+.ibCalendarDateCellBody {
+    flex: 1;
+    cursor: pointer;
+}

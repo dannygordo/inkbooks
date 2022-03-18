@@ -14,7 +14,7 @@ const ShopSchema = new mongoose.Schema({
 	shopMinimum: {type: Number, default: 0},
 	hourlyRate: {type: Number, default: 0},
 	logo: {type: String, default: ""},
-	billingType: {type: Number, default: 0},
+	billingType: {type: String, default: ""},
 	status: {type: Number}
 
 }, {

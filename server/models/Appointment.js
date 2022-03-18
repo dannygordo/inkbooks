@@ -2,12 +2,13 @@ const mongoose = require('mongoose');
 
 const AppointmentSchema = new mongoose.Schema({
 	appointmentDate: {type: Date, required: true},
-	projectId: {type: mongoose.Schema.Types.ObjectId, required: true},
-	artistUserId: {type: mongoose.Schema.Types.ObjectId, required: true},
-	clientUserId: {type: mongoose.Schema.Types.ObjectId, required: true},
+	projectId: {type: mongoose.Schema.Types.ObjectId},
+	userId: {type: mongoose.Schema.Types.ObjectId},
+	title: {type: String},
+	description: {type: String},
 	total: {type: Number, default: 0},
 	tip: {type: Number, default: 0},
-	shopCutStatus: {type: Number, required: true},
+	shopCutStatus: {type: String, required: true},
 	appointmentType: {type: String, required: true},
 	appointmentStatus: {type: String, required: true}
 

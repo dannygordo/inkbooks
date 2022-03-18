@@ -7,8 +7,11 @@ import Tooltip from "@mui/material/Tooltip";
 import { IconButton } from "@mui/material";
 import { Delete, MoreVert } from "@mui/icons-material";
 import IBDeleteFile from "../../firebase/IBDeleteFile";
+import { useAuth } from "../../context/auth";
+import { ALERT_CONSTANTS, AUTH_SETTINGS_CONSTANTS } from "../../constants";
 
 const IBImagesListOptions = ({ img, updateCallback, imageType }) => {
+	const { setAlert } = useAuth();
 	const [anchorEl, setAnchorEl] = React.useState(null);
 	const open = Boolean(anchorEl);
 	const handleClick = (event) => {
@@ -21,11 +24,36 @@ const IBImagesListOptions = ({ img, updateCallback, imageType }) => {
 	const handleDelete = async () => {
 		try {
 			await IBDeleteFile(img.url);
-			updateCallback(img, imageType);
 		} catch (error) {
-			alert(error.message);
+			setAlert({
+				isAlert: true,
+				severity: ALERT_CONSTANTS.SEVERITY.ERROR,
+				message: error.message,
+				timeout: ALERT_CONSTANTS.TIMEOUT,
+				location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE
+			});
 			console.log(error);
 		}
+		try {
+			updateCallback(img, imageType);
+		}catch(error) {
+			setAlert({
+				isAlert: true,
+				severity: ALERT_CONSTANTS.SEVERITY.ERROR,
+				message: error.message,
+				timeout: ALERT_CONSTANTS.TIMEOUT,
+				location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE
+			});
+		}
+		setAlert({
+			isAlert: true,
+			severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
+			message:
+				AUTH_SETTINGS_CONSTANTS.RESPONSE_MESSAGES
+					.RECORD_UPDATE_SUCCESS,
+			timeout: ALERT_CONSTANTS.TIMEOUT,
+			location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
+		});
 	};
 	return (
 		<React.Fragment>

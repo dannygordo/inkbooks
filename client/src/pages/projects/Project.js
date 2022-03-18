@@ -84,7 +84,7 @@ const Project = (props) => {
 		const notesToSave = data.getProject.notes.map(
 			({ __typename, ...keepAttrs }) => keepAttrs
 		);
-		console.log(notesToSave);
+		console.log(updatedReferenceImages);
 		updateProject({
 			variables: {
 				project: {
@@ -106,7 +106,7 @@ const Project = (props) => {
 			({ __typename, ...keepAttrs }) => keepAttrs
 		);
 
-		console.log(notesToSave);
+		console.log(updatedReferenceImages);
 		updateProject({
 			variables: {
 				project: {
@@ -213,9 +213,9 @@ const Project = (props) => {
 		});
 
 		const referencesToSave = updatedReferenceList.map(
-			({ __typename, ...keepAttrs }) => keepAttrs
+			({ __typename, userInfo, ...keepAttrs }) => keepAttrs
 		);
-
+			console.log(referencesToSave);
 		handleProjectReferencesUpdate(referencesToSave);
 	};
 
@@ -230,7 +230,7 @@ const Project = (props) => {
 		});
 
 		const designsToSave = updatedDesignsList.map(
-			({ __typename, ...keepAttrs }) => keepAttrs
+			({ __typename, userInfo, ...keepAttrs }) => keepAttrs
 		);
 		console.log(designsToSave);
 		handleProjectDesignsUpdate(designsToSave);
@@ -248,10 +248,10 @@ const Project = (props) => {
 			data.getProject;
 		currentProject = project;
 		updatedReferenceImages = project.referenceImages.map(
-			({ __typename, ...keepAttrs }) => keepAttrs
+			({ __typename, userInfo, ...keepAttrs }) => keepAttrs
 		);
 		updatedDesignImages = project.designImages.map(
-			({ __typename, ...keepAttrs }) => keepAttrs
+			({ __typename, userInfo, ...keepAttrs }) => keepAttrs
 		);
 		switch (imageType) {
 			case APP_SETTINGS_CONSTANTS.PROJECT_IMAGE_TYPES.REFERENCE:

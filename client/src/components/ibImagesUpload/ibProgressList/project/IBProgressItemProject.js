@@ -18,7 +18,7 @@ const IBProgressItemProject = ({ file, project, title, setUrlList }) => {
 				.split(".")
 				.pop()}`;
 
-			const imgPath = `${project.artist.shop.name}/${project.artist.firstName}_${project.artist.lastName}/${project.client.firstName}_${project.client.lastName}/${project.title}/${title}`;
+			const imgPath = `${project.artist.shop.id}/${project.artistId}/${project.id}/${title}`;
 			try {
 				const url = await IBUploadFileWithProgress(
 					file,
@@ -32,6 +32,7 @@ const IBProgressItemProject = ({ file, project, title, setUrlList }) => {
 					url: url,
 					uploadedByDisplayName: `${user.userInfo.firstName} ${user.userInfo.lastName}`,
 					avatar: user.userInfo.avatar,
+					userId: user.id,
 					updatedAt: new Date(Date.now()).toISOString(),
 					createdAt: new Date(Date.now()).toISOString(),
 				};

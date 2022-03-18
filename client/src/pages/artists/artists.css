@@ -2,6 +2,8 @@
     flex: 4;
     padding: 20px;
     overflow: hidden;
+    margin-top: 60px;
+    margin-left: 10px;
 }
 .artistsListContainer {
     display: flex;
