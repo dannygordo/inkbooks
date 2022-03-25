@@ -15,21 +15,20 @@ const IBProjectsByArtistSelect = ({
 	autoWidth = true,
 	helperText,
 	inputRef,
-    selectedVal,
-    setSelectedVal,
-    defaultValue
+	selectedVal,
+	setSelectedVal,
+	defaultValue,
 }) => {
-	//const [selectedVal, setSelectedVal] = useState("");
 	const handleOnChange = (e) => {
 		if (onChange) {
-			return onChange;
+            onChange(e);
 		} else {
 			console.log(e.target.value);
 		}
 	};
 
 	return (
-		<FormControl sx={{ minWidth: 120, marginTop: 2}}>
+		<FormControl sx={{ minWidth: 120, marginTop: 2 }}>
 			<InputLabel id="demo-simple-select-helper-label">
 				{label}
 			</InputLabel>
@@ -39,7 +38,7 @@ const IBProjectsByArtistSelect = ({
 				value={selectedVal}
 				autoWidth={autoWidth}
 				label={label}
-                defaultValue={defaultValue}
+				defaultValue={defaultValue}
 				onChange={handleOnChange}
 				inputRef={inputRef}
 			>
@@ -47,30 +46,59 @@ const IBProjectsByArtistSelect = ({
 					<em>None</em>
 				</MenuItem>
 				{data.map((item) => {
-                    {console.log(item)}
 					return (
-                        <MenuItem key={item.id} value={item.id}>
-                            <div style={{maxWidth: 450, display: 'flex', flexDirection: 'row', justifyContent: 'space-between'}}>
-                                <Tooltip disableFocusListener disableTouchListener title={`${item.client.user.firstName} ${item.client.user.lastName}`}>
-                                    <div>
-                                        <IBAvatar imgUrl={item.client.user.avatar} size="small" label={`${item.client.user.firstName} ${item.client.user.lastName}`} />
-                                    </div>
-                                </Tooltip>
-                                <div style={{display: 'flex', flexDirection: 'column', alignContent: 'space-between', marginLeft: '10px'}}>
-                                    <div style={{width: '350px'}}>
-                                        <Typography noWrap sx={{fontWeight: 600, fontSize: '14px'}}>
-                                            {item.title}
-                                        </Typography>
-                                    </div>
-                                    <div style={{ width: '350px'}}>
-                                        <Typography noWrap sx={{fontSize: '14px'}}>
-                                            {item.description}
-                                        </Typography>
-                                    </div>
-                                </div>
-                            </div>
-                        </MenuItem>
-                    )
+						<MenuItem key={item.id} value={item.id}>
+							<div
+								style={{
+									maxWidth: 450,
+									display: "flex",
+									flexDirection: "row",
+									justifyContent: "space-between",
+								}}
+							>
+								<Tooltip
+									disableFocusListener
+									disableTouchListener
+									title={`${item.client.user.firstName} ${item.client.user.lastName}`}
+								>
+									<div>
+										<IBAvatar
+											imgUrl={item.client.user.avatar}
+											size="small"
+										/>
+									</div>
+								</Tooltip>
+								<div
+									style={{
+										display: "flex",
+										flexDirection: "column",
+										alignContent: "space-between",
+										marginLeft: "10px",
+									}}
+								>
+									<div style={{ width: "350px" }}>
+										<Typography
+											noWrap
+											sx={{
+												fontWeight: 600,
+												fontSize: "14px",
+											}}
+										>
+											{item.title}
+										</Typography>
+									</div>
+									<div style={{ width: "350px" }}>
+										<Typography
+											noWrap
+											sx={{ fontSize: "14px" }}
+										>
+											{item.description}
+										</Typography>
+									</div>
+								</div>
+							</div>
+						</MenuItem>
+					);
 				})}
 			</Select>
 			<FormHelperText>{helperText}</FormHelperText>
@@ -78,4 +106,4 @@ const IBProjectsByArtistSelect = ({
 	);
 };
 
-export default IBProjectsByArtistSelect
+export default IBProjectsByArtistSelect;

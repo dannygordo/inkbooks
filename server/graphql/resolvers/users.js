@@ -113,7 +113,8 @@ module.exports = {
         password,
         confirmPassword,
         role,
-        userType
+        userType,
+        tagColor
       );
       if (!valid) {
         throw new UserInputError('Errors', { errors });
@@ -147,7 +148,8 @@ module.exports = {
         username,
         password,
         role,
-        userType
+        userType,
+        tagColor
       });
 
       // save new user to database and return user object
@@ -249,5 +251,28 @@ module.exports = {
         throw new Error(err);
       }
     },
+    async getUserTagColors(_, { shopId }) {
+      try {
+        let usrIds = [];
+        let usrs = [];
+        const artists = await Artist.find({shopId: shopId});
+        if(artists) {
+          artists.map((artist) => {
+            usrIds.push(artist.userId);
+          });
+        }
+        const staff = await Staff.find({shopId: shopId});
+        if(staff) {
+          staff.map((stf) => {
+            usrIds.push(stf.userId);
+          });
+          usrs = await User.find({ _id: { $in: usrIds } });
+        }
+        console.log(usrs);
+        return usrs;
+      }catch(err) {
+        throw new Error(err);
+      }
+    }
   }
 };

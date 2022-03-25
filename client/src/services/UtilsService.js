@@ -54,6 +54,23 @@ const UtilsService = (() => {
 		return daysMatrix;
 	}
 
+	const _showAvailableColorTags = (tags, usedTags, userColor) => {
+		let tagArr = usedTags.map(t => t.tagColor);
+		let result = [];
+		console.log(tags);
+		console.log(usedTags);
+		console.log(userColor);
+		tags.map((tag) => {
+			if(tag.value === userColor) {
+				result.unshift(tag);
+			}
+			if(!tagArr.includes(tag.value)) {
+				result.push(tag);
+			}
+		});
+		return result;
+	}
+
 	return {
 		formatPhone: _formatPhone,
 		prettyConstantsListValue: _prettyConstantsListValue,
@@ -61,7 +78,8 @@ const UtilsService = (() => {
 		formatDateToISO: _formatDateToISO,
 		isObjectEmpty: _isObjectEmpty,
 		removePropertiesForUpdate: _removePropertiesForUpdate,
-		getMonth: _getMonth
+		getMonth: _getMonth,
+		showAvailableColorTags: _showAvailableColorTags
 	};
 })();
 

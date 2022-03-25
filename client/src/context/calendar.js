@@ -36,11 +36,7 @@ export function CalendarProvider(props) {
 	const [monthIndex, setMonthIndex] = useState(moment().month());
 	const [smallCalendarMonth, setSmallCalendarMonth] = useState(null);
 	const [daySelected, setDaySelected] = useState(moment());
-	const [savedEvents, dispatchCalendarEvent] = useReducer(
-		savedEventsReducer,
-		[],
-		initEvents
-	);
+	const [savedEvents, setSavedEvents] = useState([]);
 
 	useEffect(() => {
 		if (smallCalendarMonth !== null) {
@@ -57,6 +53,8 @@ export function CalendarProvider(props) {
 				setSmallCalendarMonth,
 				daySelected,
 				setDaySelected,
+                savedEvents,
+                setSavedEvents
 			}}
 			{...props}
 		/>

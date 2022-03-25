@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const AppointmentSchema = new mongoose.Schema({
 	appointmentDate: {type: Date, required: true},
 	projectId: {type: mongoose.Schema.Types.ObjectId},
+	shopId: {type: mongoose.Schema.Types.ObjectId},
 	userId: {type: mongoose.Schema.Types.ObjectId},
 	title: {type: String},
 	description: {type: String},
@@ -10,9 +11,9 @@ const AppointmentSchema = new mongoose.Schema({
 	tip: {type: Number, default: 0},
 	shopCutStatus: {type: String, required: true},
 	appointmentType: {type: String, required: true},
-	appointmentStatus: {type: String, required: true}
+	appointmentStatus: {type: String, required: true},
+    createdAt: {type: Date, required: true},
+    updatedAt: {type: Date, required: true}
 
-}, {
-	timestamps: true
 });
 module.exports = mongoose.model('Appointment', AppointmentSchema);

@@ -13,6 +13,8 @@ const conversationResolvers = require('./conversations');
 const messageMutations = require('../mutations/messages');
 const messageResolvers = require('./messages');
 const projectResolvers = require('./projects');
+const appointmentResolvers = require('./appointments');
+const appointmentMutations = require('../mutations/appointments');
 const Artist = require('../../models/Artist');
 const Client = require('../../models/Client');
 const { DateResolver, DateTimeResolver } = require('graphql-scalars');
@@ -20,6 +22,8 @@ const Shop = require('../../models/Shop');
 const Conversation = require('../../models/Conversation');
 const Message = require('../../models/Message');
 const User = require('../../models/User');
+const Appointment = require('../../models/Appointment');
+const Project = require('../../models/Project');
 
 module.exports = {
   Date: DateResolver,
@@ -33,6 +37,7 @@ module.exports = {
     ...conversationResolvers.Query,
     ...messageResolvers.Query,
     ...projectResolvers.Query,
+    ...appointmentResolvers.Query
   },
   Mutation: {
     ...usersResolvers.Mutation,
@@ -43,6 +48,7 @@ module.exports = {
     ...conversationMutations,
     ...messageMutations,
     ...projectMutations,
+    ...appointmentMutations
   },
   Project: {
     artist: async(project, args, context, info) => {
@@ -66,6 +72,17 @@ module.exports = {
     },
     user: async(staff, args, context, info) => {
       return (await User.findById(staff.userId));
+    }
+  },
+  Appointment: {
+    shop: async(appointment, args, context, info) => {
+      return (await Shop.findById(appointment.shopId));
+    },
+    user: async(appointment, args, context, info) => {
+      return (await User.findById(appointment.userId));
+    },
+    project: async(appointment, args, context, info) => {
+      return (await Project.findById(appointment.projectId));
     }
   },
   Artist: {

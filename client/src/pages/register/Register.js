@@ -29,6 +29,7 @@ const Register = () => {
       $confirmPassword: String!
       $role: Int!
       $userType: String!
+      $tagColor: String
     ) {
       register(
         registerInput: {
@@ -41,6 +42,7 @@ const Register = () => {
           confirmPassword: $confirmPassword
           role: $role
           userType: $userType
+          tagColor; $tagColor
         }
       ){
         id
@@ -52,6 +54,7 @@ const Register = () => {
         role
         accessToken
         userType
+        tagColor
       }
     }
   `;
@@ -83,7 +86,8 @@ const handleClick =  (e) => {
       avatar: avatar.current.value,
       password: password.current.value,
       role: 30, //TODO remove this hardcoded value
-      userType: 'client'
+      userType: 'client', //TODO remove this
+      tagColor: '#fff' //TODO remove this
     };
     registerUser({variables: {
       username: username.current.value,
@@ -93,8 +97,9 @@ const handleClick =  (e) => {
       avatar: avatar.current.value,
       password: password.current.value,
       confirmPassword: confirmPassword.current.value,
-      role: 30,
-      userType: 'client'
+      role: 30, //TODO remove this hardcoded value
+      userType: 'client', //TODO remove this
+      tagColor: '#fff' //TODO remove this
     }
   });
   }

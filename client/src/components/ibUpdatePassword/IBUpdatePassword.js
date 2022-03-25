@@ -97,7 +97,7 @@ const IBUpdatePassword = ({isPublic = false}) => {
                         />
                         <IBPasswordField
                             passwordRef={confirmNewPasswordRef}
-                            label="Confrim New Password"
+                            label="Confirm New Password"
                             required={false}
                             id="confirmNewPassword"
                         />

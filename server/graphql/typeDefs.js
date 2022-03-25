@@ -140,6 +140,7 @@ module.exports = gql`
     userType: String
     avatar: String
     role: Int!
+    tagColor: String
   }
   type User {
     id: ID!
@@ -152,6 +153,7 @@ module.exports = gql`
     accessToken: String!
     userType: String!
     userInfo: UserInfo
+    tagColor: String
   }
   type Client implements UserInfo {
     id: ID!
@@ -310,12 +312,32 @@ module.exports = gql`
     role: Int!
     userType: String!
   }
+  input AppointmentInput {
+    id: ID
+    appointmentDate: DateTime!
+    projectId: ID
+    userId: ID
+    shopId: ID
+    title: String
+    description: String
+    total: Int
+    tip: Int
+    shopCutStatus: String
+    appointmentType: String
+    appointmentStatus: String
+    createdAt: DateTime
+    updatedAt: DateTime
+  }
+
   type Appointment {
     id: ID!
+    appointmentDate: DateTime!
     projectId: ID
     project: Project
+    shopId: ID!
+    shop: Shop
     userId: ID
-    userInfo: User
+    user: User
     title: String
     description: String
     total: Int
@@ -323,38 +345,78 @@ module.exports = gql`
     shopCutStatus: String!
     appointmentType: String!
     appointmentStatus: String!
+    createdAt: DateTime
+    updatedAt: DateTime
   }
   type Query {
+    ######### Appointments ############
+
+    getAppointmentsByShop(shopId: ID!): [Appointment]
+    getAppointmentsByArtist(userId: ID!): [Appointment]
+    getAppointment(appointmentId: ID!): Appointment
+
+    ######### Artists ###########
+    
     getArtists: [Artist]
     getArtist(artistId: ID!): Artist
     getArtistsByShop(shopId: ID!): [Artist]
+    
+    ######### Shops ###########
+    
     getShops:[Shop]
     getShop(shopId: ID!): Shop
+    
+    ######### Staff ###########
+    
     getStaff: [Staff]
     getOneStaff(staffId: ID!): Staff
+    
+    ######### Clients ###########
+    
     getClients: [Client]
     getClient(clientId: ID!): Client
+    
+    ######### Users ###########
+    
     getUsers: [User]
     getUser(userId: ID!): User
-    getAppointmentsByShop(userIds: [ID!]): [Appointment]
-    getAppointmentsByUser(userId: ID!): [Appointment]
+    getUserTagColors(shopId: ID!): [User]
+    
+    ######### Projects ###########
+    
     getProjects: [Project]
     getProjectsByArtist(artistId: ID!): [Project]
     getProject(projectId: ID!): Project
+
+    ######### Conversations ###########
+
     getConversation(conversationId: ID!): Conversation
     getConversationsByShopId(shopId: ID!): [Conversation!]
     getProjectConversation(artistId: ID!, clientId: ID!): Conversation
     getConversations: [Conversation]
     getConversationsByMemberId(memberId: ID!): [Conversation]
+
+    ######### Messages ###########
+
     getMessages: [Message]
     getMessage(messageId: ID!): Message
     getMessagesByConversationId(conversationId: ID!): [Message!]
   }
   type Mutation {
+    ######### Appointments ############
+    createAppointment(appointmentInput: AppointmentInput): Appointment
+    updateAppointment(appointmentInput: AppointmentInput): Appointment
+    deleteAppointment(appointmentId: ID): String
+
+    ######### Users ###########
+
     register(registerInput: RegisterInput): User!
     login(username: String!, password: String!): User!
     updateUser(user: UserUpdateInput): User!
     forgotPassword(username: String!, password: String!): User!
+
+    ######### Artists ###########
+
     createArtist(
       firstName: String!
       lastName: String!
@@ -377,6 +439,9 @@ module.exports = gql`
     ): Artist!
     deleteArtist(artistId: ID!): String!
     updateArtist(artist: ArtistInput): Artist
+    
+    ######### Shops ###########
+
     createShop(
       name: String!
       email: String!
@@ -396,6 +461,9 @@ module.exports = gql`
     ): Shop!
     deleteShop(shopId: ID!): String!
     updateShop(shop: ShopInput): Shop
+
+    ######### Staff ###########
+
     createStaff(
       firstName: String!
       lastName: String!
@@ -413,6 +481,9 @@ module.exports = gql`
     ): Staff!
     deleteStaff(staffId: ID!): String!
     updateStaff(staff: StaffInput): Staff
+
+    ######### Clients ###########
+
     createClient(
       firstName: String!
       lastName: String!
@@ -429,6 +500,9 @@ module.exports = gql`
     ): Client!
     deleteClient(clientId: ID!): String!
     updateClient(client: ClientInput): Client
+
+    ######### Projects ###########
+
     createProject(
       title: String!
       description: String!
@@ -443,13 +517,15 @@ module.exports = gql`
       materialsUsed: [String]
       notes: [IBNoteInput]
       tags: [String]
-      status: Int!
+      status: String!
       depositAmount: Int
     ): Project!
     deleteProject(projectId: ID!): String!
     updateProject(project: ProjectInput): Project
     updateProjectNotes(notes: [IBNoteInput], projectId: ID!): Project
     updateProjectTags(tags: [String], projectId: ID!): Project
+
+    ######### Conversations ###########
 
     createConversation(
       members: [ID!]
@@ -458,6 +534,8 @@ module.exports = gql`
     ): Conversation!
     deleteConversation(conversationId: ID!): String!
     updateConversation(conversation: ConversationInput): Conversation
+
+    ######### Messages ###########
 
     createMessage(
       conversationId: ID!

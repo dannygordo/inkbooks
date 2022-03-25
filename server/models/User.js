@@ -8,7 +8,8 @@ const UserSchema = new mongoose.Schema({
     userType: {type: String, required: true},
     firstName: {type: String},
     lastName: {type: String},
-    avatar: {type: String}
+    avatar: {type: String},
+    tagColor: {type: String}
 
 }, {
     timestamps: true

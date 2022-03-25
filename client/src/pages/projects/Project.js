@@ -348,11 +348,13 @@ const Project = (props) => {
 							inputRef={depositAmountRef}
 							defaultValue={data.getProject.depositAmount}
 						/>
-						<IBProjectPalettesSelect
-							inputRef={selectPaletteRef}
-							selectValue={data.getProject.palette}
-							defaultValue={data.getProject.palette}
-						/>
+						<div>
+							<IBProjectPalettesSelect
+								inputRef={selectPaletteRef}
+								selectValue={data.getProject.palette}
+								defaultValue={data.getProject.palette}
+							/>
+						</div>
 					</IBCardWrapper>
 				</div>
 				<div className="projectContainer" style={{ display: "flex" }}>

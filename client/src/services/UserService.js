@@ -15,6 +15,7 @@ const UserService = (() => {
             role
             accessToken
             userType
+            tagColor
             userInfo {
                 firstName
                 lastName
@@ -37,6 +38,7 @@ const UserService = (() => {
             role
             accessToken
             userType
+            tagColor
             userInfo {
                 id
                 firstName
@@ -48,9 +50,25 @@ const UserService = (() => {
     }
     `;
 
+    const _FETCH_TAG_COLORS_BY_SHOP = gql`
+        query GetUserTagColors($shopId: ID!) {
+            getUserTagColors(shopId: $shopId) {
+                tagColor
+            }
+        }
+    `;
+    const _getTagColorsByShop = (shopId) => {
+        return useQuery(_FETCH_TAG_COLORS_BY_SHOP, {
+			variables: {
+				shopId,
+			},
+		});
+    }
+
     return {
         UPDATE_USER_MUTATION: _UPDATE_USER_MUTATION,
-        FORGOT_PASSWORD_MUTATION: _FORGOT_PASSWORD_MUTATION
+        FORGOT_PASSWORD_MUTATION: _FORGOT_PASSWORD_MUTATION,
+        getTagColorsByShop: _getTagColorsByShop
     }
 })();
 

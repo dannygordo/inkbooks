@@ -50,6 +50,7 @@
 }
 .projectContainer {
 	margin-top: 10px;
+	flex-wrap: wrap;
 }
 .projectUList {
 	margin: 0;

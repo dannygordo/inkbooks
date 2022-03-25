@@ -16,6 +16,7 @@
 .profileContainer {
 	margin-top: 10px;
     display: flex;
+	flex-wrap: wrap;
 }
 .profileActions {
 	padding: 20px;

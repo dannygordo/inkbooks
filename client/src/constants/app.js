@@ -58,12 +58,30 @@ export const APP_SETTINGS_CONSTANTS = {
 	PROJECT_STATUS: [
 		{ value: 'open', label: 'Open'},
 		{ value: 'in_progress', label: 'In Progress'},
+		{ value: 'waitlist', label: 'Waitlist'},
 		{ value: 'cancelled', label: 'Cancelled'},
 		{ value: 'completed', label: 'Completed'}
 	],
 	PROJECT_PALETTE_OPTIONS: [
 		{ value: "black", label: "Black and Grey" },
 		{ value: "color", label: "Color" },
+	],
+	TAG_COLORS: [
+		{ value: '#c69818', label: 'Goldfinger' },
+		{ value: '#861d15', label: 'Brick Red' },
+		{ value: '#122152', label: 'Deep Blue' },
+		{ value: '#2ea2dc', label: 'Robin Blue' },
+		{ value: '#8E24AA', label: 'Royal Purple' },
+		{ value: '#e1591f', label: 'Pumpkin' },
+		{ value: '#e2d355', label: 'Banana' },
+		{ value: '#4c4b40', label: 'Olive Green' },
+		{ value: '#73f0b6', label: 'Seafoam' },
+		{ value: '#90674a', label: 'Mocha' },
+		{ value: '#bdc647', label: 'Tennis Ball' },
+		{ value: '#84b100', label: 'Bright Green' },
+		{ value: '#f49198', label: 'Pink' },
+		{ value: '#d9a6f5', label: 'Lavander' },
+		{ value: '#c57b00', label: 'Terracotta' },
 	],
 	PROJECT_IMAGE_TYPES: {
 		REFERENCE: "reference",
@@ -89,7 +107,7 @@ export const APP_SETTINGS_CONSTANTS = {
 		ERROR: "error",
 		ROUTE_NOT_FOUND: "routenotfound",
 	},
-	DATE_FORMAT: "MMM Do YYYY",
+	DATE_FORMAT: "MMM Do YYYY"
 };
 
 export const ALERT_CONSTANTS = {

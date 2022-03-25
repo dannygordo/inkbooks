@@ -126,5 +126,8 @@
 }
 .ibCalendarDateCellBody {
     flex: 1;
-    cursor: pointer;
+    white-space: nowrap;
+    overflow-x: hidden;
+    text-overflow: ellipsis;
+    overflow-y: scroll;
 }

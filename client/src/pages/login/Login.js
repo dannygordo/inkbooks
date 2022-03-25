@@ -24,6 +24,7 @@ const Login = () => {
 				role
 				accessToken
 				userType
+				tagColor
 				userInfo {
 					... on Artist {
 						avatar
