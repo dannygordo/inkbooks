@@ -9,17 +9,17 @@ import { Tooltip } from "@mui/material";
 
 const Day = ({ day, rowIdx }) => {
 	const [dayEvents, setDayEvents] = useState([]);
-	const { setDaySelected, savedEvents } = useCalendar();
+	const { setDaySelected, filteredEvents } = useCalendar();
 	const { setModal, user } = useAuth();
 
 	useEffect(() => {
-		const events = savedEvents.filter(
+		const events = filteredEvents.filter(
 			(evt) =>
 				moment(evt.appointmentDate).format("DD-MM-YY") ===
 				day.format("DD-MM-YY")
 		);
 		setDayEvents(events);
-	}, [savedEvents, day]);
+	}, [filteredEvents, day]);
 
 	const getCurrentDayClass = () => {
 		return day.format("DD-MM-YY") === moment().format("DD-MM-YY")

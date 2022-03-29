@@ -27,61 +27,85 @@ const CreateEventDialog = ({ selectedDay }) => {
 	const [startDateTime, setStartDateTime] = useState(moment.utc(selectedDay));
 	// const [endDateTime, setEndDateTime] = useState(selectedDay);
 	const { loading, data } = ProjectService.fetchProjectsByArtist(user.id);
-    const [createAppointment] = useMutation(AppointmentService.CREATE_APPOINTMENT);
+	const [createAppointment] = useMutation(
+		AppointmentService.CREATE_APPOINTMENT,
+        // {refetchQueries: [
+        //     {
+        //         query: AppointmentService.FETCH_APPOINTMENTS_BY_SHOP,
+        //         variables: { shopId: user.userInfo.shop.id },
+        //     },
+        // ]},
+	);
 
 	const handleSubmit = (e) => {
 		e.preventDefault();
-		console.log(startDateTime.format("LLL"));
-        console.log(user);
-        let newAppointment = {};
-        if(projectRef.current.value) {
-            newAppointment = {
-                projectId: projectRef.current.value,
-                userId: user.id,
-                shopId: user.userInfo.shop.id,
-                title: titleRef.current.value,
-                description: descriptionRef.current.value,
-                shopCutStatus: 'unpaid',
-                appointmentStatus: 'scheduled',
-                appointmentType: appointmentTypeRef.current.value.toLowerCase(),
-                createdAt: UtilsService.formatDateToISO(Date.now()),
-                updatedAt: UtilsService.formatDateToISO(Date.now()),
-                appointmentDate: UtilsService.formatDateToISO(startDateTime)
-            };
-        } else {
-            newAppointment = {
-                userId: user.id,
-                shopId: user.userInfo.shop.id,
-                title: titleRef.current.value,
-                description: descriptionRef.current.value,
-                shopCutStatus: 'unpaid',
-                appointmentStatus: 'scheduled',
-                appointmentType: appointmentTypeRef.current.value.toLowerCase(),
-                createdAt: UtilsService.formatDateToISO(Date.now()),
-                updatedAt: UtilsService.formatDateToISO(Date.now()),
-                appointmentDate: UtilsService.formatDateToISO(startDateTime)
-            };
-        }
-        
-        createAppointment({
+		let newAppointment = {};
+		if (projectRef.current.value) {
+			newAppointment = {
+				projectId: projectRef.current.value,
+				userId: user.id,
+				shopId: user.userInfo.shop.id,
+				title: titleRef.current.value,
+				description: descriptionRef.current.value,
+				shopCutStatus: "unpaid",
+				appointmentStatus: "scheduled",
+				appointmentType: appointmentTypeRef.current.value.toLowerCase(),
+				createdAt: UtilsService.formatDateToISO(Date.now()),
+				updatedAt: UtilsService.formatDateToISO(Date.now()),
+				appointmentDate: UtilsService.formatDateToISO(startDateTime),
+			};
+		} else {
+			newAppointment = {
+				userId: user.id,
+				shopId: user.userInfo.shop.id,
+				title: titleRef.current.value,
+				description: descriptionRef.current.value,
+				shopCutStatus: "unpaid",
+				appointmentStatus: "scheduled",
+				appointmentType: appointmentTypeRef.current.value.toLowerCase(),
+				createdAt: UtilsService.formatDateToISO(Date.now()),
+				updatedAt: UtilsService.formatDateToISO(Date.now()),
+				appointmentDate: UtilsService.formatDateToISO(startDateTime),
+			};
+		}
+
+		createAppointment({
 			variables: {
 				appointmentInput: {
-					...newAppointment
+					...newAppointment,
 				},
+			},
+            
+			update: (cache, { data }) => {
+				console.log(cache);
+				const cacheId = cache.identify(data.createAppointment);
+				console.log(cacheId);
+				cache.modify({
+				    fields: {
+				        getAppointmentsByShop: (existingFieldData, { toReference }) => {
+				            console.log(existingFieldData);
+				            console.log(toReference(cacheId));
+				            return [...existingFieldData, toReference(cacheId)];
+				        }
+				    }
+				});
+				console.log(cache);
 			},
 		});
 		setModal({ ...modal, isOpen: false });
 	};
 
-    const handleProjectChange = (e) =>  {
-        let proj = data.getProjectsByArtist.filter((proj) => proj.id === e.target.value);
-        console.log(e.target.value);
-        console.log(proj);
-        titleRef.current.value = proj[0].title;
-        descriptionRef.current.value = proj[0].description;
-        titleRef.current.focus();
-        projectRef.current.value = proj.id;
-    }
+	const handleProjectChange = (e) => {
+		let proj = data.getProjectsByArtist.filter(
+			(proj) => proj.id === e.target.value
+		);
+		console.log(e.target.value);
+		console.log(proj);
+		titleRef.current.value = proj[0].title;
+		descriptionRef.current.value = proj[0].description;
+		titleRef.current.focus();
+		projectRef.current.value = proj.id;
+	};
 	if (data) {
 		return (
 			<div className="ibCalendarAddEventContainer">
@@ -123,9 +147,9 @@ const CreateEventDialog = ({ selectedDay }) => {
 								data={data.getProjectsByArtist}
 								inputRef={projectRef}
 								label="Projects"
-                                value={data.getProjectsByArtist.id}
+								value={data.getProjectsByArtist.id}
 								defaultValue=""
-                                onChange={handleProjectChange}
+								onChange={handleProjectChange}
 							/>
 						</div>
 						<IBInput

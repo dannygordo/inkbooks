@@ -34,6 +34,28 @@ export const ArtistService = (() => {
 		});
 	};
 
+	const _FETCH_ARTISTS_BY_SHOP = gql`
+		query GetArtistsByShop($shopId: ID!) {
+			getArtistsByShop(shopId: $shopId) {
+				id
+				user {
+					firstName
+					lastName
+					id
+					tagColor
+				}
+			}
+		}
+	`;
+
+	const _fetchArtistsByShop = (shopId) => {
+		return useQuery(_FETCH_ARTISTS_BY_SHOP, {
+			variables: {
+				shopId,
+			},
+		});
+	}
+
 	const _fetchArtists = () => {
 		const FETCH_ARTISTS_QUERY = gql`
 			{
@@ -93,6 +115,8 @@ export const ArtistService = (() => {
 	return {
 		fetchArtist: _fetchArtist,
 		fetchArtists: _fetchArtists,
-        updateArtist: _updateArtist
+        updateArtist: _updateArtist,
+		FETCH_ARTISTS_BY_SHOP: _FETCH_ARTISTS_BY_SHOP,
+		fetchArtistsByShop: _fetchArtistsByShop
 	};
 })();

@@ -1,8 +1,8 @@
-import { Save, Update } from "@mui/icons-material";
+import { Delete, Save, Update } from "@mui/icons-material";
 import { DialogActions, DialogContent, DialogContentText } from "@mui/material";
 import moment from "moment";
 import React, { useEffect, useRef, useState } from "react";
-import { APP_SETTINGS_CONSTANTS } from "../../constants";
+import { ALERT_CONSTANTS, APP_SETTINGS_CONSTANTS } from "../../constants";
 import { useCalendar } from "../../context/calendar";
 import IBDateTimePicker from "../inputs/IBDateTimePicker";
 import IBInput from "../inputs/IBInput";
@@ -18,7 +18,7 @@ import { AppointmentService } from "../../services/AppointmentService";
 import UtilsService from "../../services/UtilsService";
 
 const UpdateEventDialog = ({ selectedDay, event }) => {
-	const { setModal, modal, user } = useAuth();
+	const { setModal, modal, user, setAlert } = useAuth();
 	const titleRef = useRef(event.title);
 	const appointmentTypeRef = useRef();
 	const projectRef = useRef(event.projectId);
@@ -28,6 +28,7 @@ const UpdateEventDialog = ({ selectedDay, event }) => {
     const [selectedEvent, setSelectedEvent] = useState(event);
 	const { loading, data } = ProjectService.fetchProjectsByArtist(user.id);
     const [updateAppointment] = useMutation(AppointmentService.UPDATE_APPOINTMENT);
+    const [deleteAppointment] = useMutation(AppointmentService.DELETE_APPOINTMENT);
     console.log(event);
 
    
@@ -71,10 +72,44 @@ const UpdateEventDialog = ({ selectedDay, event }) => {
         console.log(projectRef.current.value);
         console.log(proj);
     }
+
+    const handleDelete = (e) => {
+        e.preventDefault();
+        try{
+            console.log(event);
+            deleteAppointment({
+                variables: {
+                    appointmentId: event.id,
+                },
+            }).then((res) => {
+                setAlert({
+                    isAlert: true,
+                    severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
+                    message: res.data.deleteAppointment,
+                    timeout: ALERT_CONSTANTS.TIMEOUT,
+                    location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
+                });
+            });
+
+		    setModal({ ...modal, isOpen: false });
+
+        } catch(err) {
+            setAlert({
+                isAlert: true,
+				severity: ALERT_CONSTANTS.SEVERITY.ERROR,
+				message: err.message,
+				timeout: ALERT_CONSTANTS.TIMEOUT,
+				location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
+            });
+
+		    setModal({ ...modal, isOpen: false });
+        }
+
+    }
+
 	if (data) {
 		return (
 			<div className="ibCalendarAddEventContainer">
-				<form onSubmit={handleSubmit}>
 					<DialogContent dividers>
 						<div
 							style={{
@@ -131,9 +166,16 @@ const UpdateEventDialog = ({ selectedDay, event }) => {
 						/>
 					</DialogContent>
 					<DialogActions>
-						<IBSubmitButton endIcon={<Update />} text="Update" />
+                        {
+                            event.userId === user.id &&
+                            <button onClick={handleDelete} className="ibButton" >
+                                DELETE <Delete />
+                            </button>
+                        }
+                        <button onClick={handleSubmit} className="ibButton">
+                            Update <Update />
+                        </button>
 					</DialogActions>
-				</form>
 			</div>
 		);
 	}

@@ -29,7 +29,7 @@ const IBAlert = () => {
 		return () => clearTimeout(timer);
 	}, [timeout]);
 	return (
-		<Box sx={{ mb: 2 }} ref={alertRef}>
+		<Box sx={{ mb: 2, position: 'absolute', zIndex: 99999, width: '100%', textAlign: 'center' }} ref={alertRef}>
 			<Slide direction="down" in={isAlert} container={alertRef.current}>
 				<Alert
 					severity={severity}

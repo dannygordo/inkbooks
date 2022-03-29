@@ -37,6 +37,7 @@ export function CalendarProvider(props) {
 	const [smallCalendarMonth, setSmallCalendarMonth] = useState(null);
 	const [daySelected, setDaySelected] = useState(moment());
 	const [savedEvents, setSavedEvents] = useState([]);
+    const [filteredEvents, setFilteredEvents] = useState([]);
 
 	useEffect(() => {
 		if (smallCalendarMonth !== null) {
@@ -54,7 +55,9 @@ export function CalendarProvider(props) {
 				daySelected,
 				setDaySelected,
                 savedEvents,
-                setSavedEvents
+                setSavedEvents,
+                filteredEvents,
+                setFilteredEvents
 			}}
 			{...props}
 		/>

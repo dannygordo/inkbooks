@@ -8,17 +8,21 @@ export const AppointmentService = (() => {
                 projectId
                 userId
                 project {
+                    id
                     client {
+                        id
                         user {
-                        firstName
-                        lastName
-                        avatar
+                            id
+                            firstName
+                            lastName
+                            avatar
                         }
                     }
                     depositAmount
                 }
                 shopId
                 user {
+                    id
                     tagColor
                     lastName
                     firstName
@@ -45,6 +49,7 @@ export const AppointmentService = (() => {
                 projectId
                 userId
                 project {
+                    id
                     designImages {
                         url
                     }
@@ -90,10 +95,17 @@ export const AppointmentService = (() => {
         }
     `;
 
+    const _DELETE_APPOINTMENT = gql`
+        mutation DeleteAppointment($appointmentId: ID) {
+            deleteAppointment(appointmentId: $appointmentId)
+            }
+    `;
+
     return {
         FETCH_APPOINTMENTS_BY_SHOP: _FETCH_APPOINTMENTS_BY_SHOP,
         CREATE_APPOINTMENT: _CREATE_APPOINTMENT,
         UPDATE_APPOINTMENT: _UPDATE_APPOINTMENT,
+        DELETE_APPOINTMENT: _DELETE_APPOINTMENT,
         getAppointmentsByShop: _getAppointmentsByShop
     }
 

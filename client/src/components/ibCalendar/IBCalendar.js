@@ -12,7 +12,7 @@ import Sidebar from './Sidebar';
 const IBCalendar = () => {
     const { user } = useAuth();
     const [currentMonth, setCurrentMonth] = useState(UtilsService.getMonth());
-    const { monthIndex, setMonthIndex, savedEvents, setSavedEvents } = useCalendar();
+    const { monthIndex, setMonthIndex, savedEvents, setSavedEvents, setFilteredEvents } = useCalendar();
     const { data, loading } = AppointmentService.getAppointmentsByShop(user.userInfo.shop.id);
 
     useEffect(() => {
@@ -20,8 +20,9 @@ const IBCalendar = () => {
             console.log(data.getAppointmentsByShop[0]);
             console.log(moment.utc(data.getAppointmentsByShop[0].appointmentDate).format('h:mm'))
             setSavedEvents(data.getAppointmentsByShop);
+            setFilteredEvents(data.getAppointmentsByShop);
         }
-    }, [loading])
+    }, [data,loading])
     useEffect(() => {
         setCurrentMonth(UtilsService.getMonth(monthIndex));
     }, [monthIndex])
