@@ -75,21 +75,15 @@ const CreateEventDialog = ({ selectedDay }) => {
 					...newAppointment,
 				},
 			},
-            
 			update: (cache, { data }) => {
-				console.log(cache);
 				const cacheId = cache.identify(data.createAppointment);
-				console.log(cacheId);
 				cache.modify({
 				    fields: {
 				        getAppointmentsByShop: (existingFieldData, { toReference }) => {
-				            console.log(existingFieldData);
-				            console.log(toReference(cacheId));
 				            return [...existingFieldData, toReference(cacheId)];
 				        }
 				    }
 				});
-				console.log(cache);
 			},
 		});
 		setModal({ ...modal, isOpen: false });

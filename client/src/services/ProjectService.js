@@ -16,6 +16,9 @@ const ProjectService = (() => {
 					lastName
 					email
 					id
+					user {
+						id
+					}
 					shop {
 						id
 						name
@@ -65,6 +68,7 @@ const ProjectService = (() => {
 						firstName
 						lastName
 						avatar
+						id
 					}
 					tags
 					updatedAt
@@ -81,6 +85,7 @@ const ProjectService = (() => {
 						firstName
 						lastName
 						avatar
+						id
 					}
 					updatedAt
 					createdAt

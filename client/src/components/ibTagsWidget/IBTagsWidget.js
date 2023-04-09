@@ -13,9 +13,10 @@ const IBTagsWidget = ({ tags, onDelete }) => {
     //     setTagData(tags);
     // }, [tags]);
 
-	const handleDelete = (tagToDelete) => () => {
+	const handleDelete = (e, tagToDelete) => {
+		e.preventDefault();
 		if (onDelete) {
-			onDelete(tagToDelete);
+			onDelete(e, tagToDelete);
 		} else {
 			//console.log(tagToDelete);
 			//setTags((tags) => tags.filter((tag) => tag !== tagToDelete));
@@ -36,7 +37,7 @@ const IBTagsWidget = ({ tags, onDelete }) => {
 			{tags.map((tag) => {
 				return (
 					<ListItem key={`${tag}${Date.now()}`}>
-						<Chip label={tag} onDelete={handleDelete(tag)} />
+						<Chip label={tag} onDelete={(e) => {handleDelete(e, tag)}} />
 					</ListItem>
 				);
 			})}

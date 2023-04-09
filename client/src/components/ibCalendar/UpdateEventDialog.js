@@ -81,6 +81,17 @@ const UpdateEventDialog = ({ selectedDay, event }) => {
                 variables: {
                     appointmentId: event.id,
                 },
+                update: (cache, { data }) => {
+                    //const cacheId = cache.identify(data.createAppointment);
+                    cache.modify({
+                        fields: {
+                            getAppointmentsByShop: (existingFieldData, { DELETE }) => {
+                                return DELETE;
+                                //return [...existingFieldData, toReference(cacheId)];
+                            }
+                        }
+                    });
+                },
             }).then((res) => {
                 setAlert({
                     isAlert: true,

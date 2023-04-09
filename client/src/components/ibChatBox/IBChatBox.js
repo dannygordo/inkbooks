@@ -13,7 +13,7 @@ import { io } from "socket.io-client";
 import { APP_SETTINGS_CONSTANTS } from "../../constants";
 import { useSocket } from "../../context/SocketProvider";
 
-const IBChatBox = ({ widget, conversation, setActiveMessages, messages }) => {
+const IBChatBox = ({ widget, conversation, setActiveMessages, messages, isInputDisabled = false }) => {
 	const { user } = useAuth();
 	const messageRef = useRef();
 	//const scrollRef = useRef();
@@ -205,6 +205,7 @@ const IBChatBox = ({ widget, conversation, setActiveMessages, messages }) => {
 							id="addMessage"
 							variant="outlined"
 							inputRef={messageRef}
+							disabled={isInputDisabled}
 							className="chatMessageInput"
 							helperText="Type message and press enter"
 							onKeyDown={(e) => {

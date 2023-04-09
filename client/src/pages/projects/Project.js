@@ -9,7 +9,7 @@ import IBImagesList from "../../components/ibImagesList/IBImagesList";
 import { useMutation } from "@apollo/client";
 import IBCardWrapper from "../../components/card/ibCard/IBCardWrapper";
 import IBInput from "../../components/inputs/IBInput";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import IBMultilineInput from "../../components/inputs/IBMultilineInput";
 import { useAuth } from "../../context/auth";
 import moment from "moment";
@@ -38,9 +38,7 @@ const Project = (props) => {
 	let selectPaletteRef = useRef();
 	let depositAmountRef = useRef();
 	const [activeMessages, setActiveMessages] = useState([]);
-
-	// const { loading: loadingMsgs, data: dataMsgs } =
-	// 	MessengerService.fetchProjectConversation(user.id);
+	const [projectTags, setProjectTags] = useState([]);
 
 	/**
 	 * Gets project by id
@@ -49,49 +47,29 @@ const Project = (props) => {
 		params.projectId,
 		setActiveMessages
 	);
+
+	useEffect(() => {
+		console.log(user);
+		console.log('project data updated');
+	}, [data]);
+
 	const [updateProject] = useMutation(ProjectService.updateProject());
-	/**
-	 * Updates the project notes and then refetches the fetchProject mutation
-	 */
-	const [updateProjectNotes] = useMutation(
-		ProjectService.updateProjectNotes(),
-		{
-			refetchQueries: [
-				{
-					query: ProjectService.fetchProjectGQL,
-					variables: { projectId: params.projectId },
-				},
-			],
-		}
-	);
-	const [updateProjectTags] = useMutation(
-		ProjectService.updateProjectTags(),
-		{
-			refetchQueries: [
-				{
-					query: ProjectService.fetchProjectGQL,
-					variables: { projectId: params.projectId },
-				},
-			],
-		}
-	);
 
 	/**
 	 *  Takes a list of references images and updates project
 	 * @param {List of reference images to pass to useMutation} updatedImages
 	 */
 	const handleProjectReferencesUpdate = (updatedImages) => {
-		const notesToSave = data.getProject.notes.map(
-			({ __typename, ...keepAttrs }) => keepAttrs
-		);
-		console.log(updatedReferenceImages);
 		updateProject({
 			variables: {
 				project: {
-					...currentProject,
-					referenceImages: updatedImages,
-					designImages: updatedDesignImages,
-					notes: [...notesToSave],
+					id: params.projectId,
+					title: data.getProject.title,
+					description: data.getProject.description,
+					clientId: data.getProject.clientId,
+					artistId: data.getProject.artistId,
+					status: data.getProject.status,
+					referenceImages: updatedImages
 				},
 			},
 		});
@@ -102,18 +80,16 @@ const Project = (props) => {
 	 * @param {List of design images to pass to useMutation} updatedImages
 	 */
 	const handleProjectDesignsUpdate = (updatedImages) => {
-		const notesToSave = data.getProject.notes.map(
-			({ __typename, ...keepAttrs }) => keepAttrs
-		);
-
-		console.log(updatedReferenceImages);
 		updateProject({
 			variables: {
 				project: {
-					...currentProject,
-					designImages: updatedImages,
-					referenceImages: updatedReferenceImages,
-					notes: [...notesToSave],
+					id: params.projectId,
+					title: data.getProject.title,
+					description: data.getProject.description,
+					clientId: data.getProject.clientId,
+					artistId: data.getProject.artistId,
+					status: data.getProject.status,
+					designImages: updatedImages
 				},
 			},
 		});
@@ -135,11 +111,18 @@ const Project = (props) => {
 			({ __typename, ...keepAttrs }) => keepAttrs
 		);
 		const updatedNotes = [...notesToSave, newNote];
-		updateProjectNotes({
+		updateProject({
 			variables: {
-				projectId: data.getProject.id,
-				notes: updatedNotes,
-			},
+				project: {
+					id: params.projectId,
+					title: data.getProject.title,
+					description: data.getProject.description,
+					clientId: data.getProject.clientId,
+					artistId: data.getProject.artistId,
+					status: data.getProject.status,
+					notes: updatedNotes
+				},
+			}
 		});
 	};
 
@@ -147,26 +130,42 @@ const Project = (props) => {
 		e.preventDefault();
 		if (data.getProject.tags.lastIndexOf(tag) < 0) {
 			const updatedTags = [...data.getProject.tags, tag];
-			updateProjectTags({
+			updateProject({
 				variables: {
-					projectId: data.getProject.id,
-					tags: updatedTags,
-				},
+					project: {
+						id: params.projectId,
+						tags: updatedTags,
+						title: data.getProject.title,
+						description: data.getProject.description,
+						clientId: data.getProject.clientId,
+						artistId: data.getProject.artistId,
+						status: data.getProject.status
+					},
+				}
 			});
 		} else {
 			addTagRef.current.value = "";
 		}
 	};
 
-	const handleDeleteTag = (tagToDelete) => {
+	const handleDeleteTag = (e, tagToDelete) => {
+		e.preventDefault();
+		console.log(tagToDelete);
 		const updatedTags = data.getProject.tags.filter(
 			(tag) => tag !== tagToDelete
 		);
-		updateProjectTags({
+		updateProject({
 			variables: {
-				projectId: data.getProject.id,
-				tags: updatedTags,
-			},
+				project: {
+					id: params.projectId,
+					tags: updatedTags,
+					title: data.getProject.title,
+					description: data.getProject.description,
+					clientId: data.getProject.clientId,
+					artistId: data.getProject.artistId,
+					status: data.getProject.status
+				},
+			}
 		});
 	};
 
@@ -292,6 +291,7 @@ const Project = (props) => {
 						<h1 className="projectTitle">Messages</h1>
 						<IBChatBox
 							widget={true}
+							isInputDisabled={data.getProject.artistId !== user.id}
 							conversation={data.getProject.conversation}
 							messages={activeMessages}
 							setActiveMessages={setActiveMessages}
