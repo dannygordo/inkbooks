@@ -27,6 +27,7 @@ const Profile = () => {
 	const [openCrop, setOpenCrop] = useState(false);
 	const [updateUser] = useMutation(UserService.UPDATE_USER_MUTATION);
 	const [tagColors, setTagColors] = useState([]);
+	console.log(user);
 	const { data: availableTags, loading } = UserService.getTagColorsByShop(
 		user.userInfo.shop.id
 	);

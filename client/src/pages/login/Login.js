@@ -51,6 +51,7 @@ const Login = () => {
 						lastName
 						title
 						shop {
+							id
 							name
 							website
 						}
