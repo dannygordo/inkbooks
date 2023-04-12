@@ -226,7 +226,8 @@ const Profile = () => {
 						</div>
 						<IBUpdatePassword isPublic={false} />
 					</IBCardWrapper>
-					<IBCardWrapper>
+					{user.userInfo.userType !== "client" ?
+					(<IBCardWrapper>
 						<div>
 							<h1>Select Tag Color</h1>
 							<h6 style={{color: '#bbb', marginBottom: 15}}>Choose the color you'd like to represent you on the calendar</h6>
@@ -270,6 +271,8 @@ const Profile = () => {
 							})}
 						</div>
 					</IBCardWrapper>
+					) : null}
+					
 				</div>
 			</div>
 		) : (
