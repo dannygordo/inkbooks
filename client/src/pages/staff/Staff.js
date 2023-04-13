@@ -28,6 +28,9 @@ const Staff = () => {
         shop {
           name
         }
+        user{
+          avatar
+        }
       }
     }
   `;
@@ -39,6 +42,7 @@ const Staff = () => {
         <div className="staffContainer">
         {
           data.getStaff.map((client) => {
+            console.log(client);
             return (
               <IBCard cardData={client} key={client.id} cardType='staff' />
             )  

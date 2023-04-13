@@ -38,7 +38,7 @@ const IBCardHeader = (props) => {
       default:
         return (
           <div className="ibCardTop">
-              <img src={cardData.avatar  || APP_SETTINGS_CONSTANTS.NO_IMAGE_URL} alt="" className="ibCardImage"/>
+              <img src={cardData.user.avatar  || APP_SETTINGS_CONSTANTS.NO_IMAGE_URL} alt="" className="ibCardImage"/>
               <div className="ibCardTopTitle">
                   <span className="ibCardName">{cardData.firstName + ' ' + cardData.lastName}</span>
                   <span className="ibCardTitle">{cardData.title}</span>

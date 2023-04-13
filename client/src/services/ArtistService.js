@@ -78,6 +78,9 @@ export const ArtistService = (() => {
 					shopId
 					userId
 					status
+					user{
+						avatar
+					}
 				}
 			}
 		`;

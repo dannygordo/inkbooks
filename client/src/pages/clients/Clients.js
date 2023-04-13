@@ -22,6 +22,9 @@ const Clients = () => {
         facebook
         avatar
         userId
+        user{
+          avatar
+        }
       }
     }
   `;

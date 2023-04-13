@@ -17,6 +17,7 @@ import UtilsService from '../../../services/UtilsService';
 const IBCardStaffDetails = (props) => {
     const { user } = useContext(AuthContext);
     const { cardData: staff } = props;
+    console.log(user.userInfo);
   return (
     <div className="ibCardBottom">
         <span className="ibCardDetailsTitle">Contact Details</span>

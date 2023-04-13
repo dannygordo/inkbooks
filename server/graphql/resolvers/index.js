@@ -52,7 +52,7 @@ module.exports = {
   },
   Project: {
     artist: async(project, args, context, info) => {
-      return (await Artist.findOne({id: project.artistId}));
+      return (await Artist.findOne({userId: project.artistId}));
     },
     client: async(project, args, context, info) => {
       return (await Client.findOne({id: project.clientId}));

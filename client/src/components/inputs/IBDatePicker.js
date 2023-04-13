@@ -1,7 +1,10 @@
 import TextField from '@mui/material/TextField';
-import AdapterMoment from '@mui/lab/AdapterMoment';
-import LocalizationProvider from '@mui/lab/LocalizationProvider';
-import MobileDatePicker from '@mui/lab/MobileDatePicker';
+//import AdapterMoment from '@mui/lab/AdapterMoment';
+import {AdapterMoment} from '@mui/x-date-pickers/AdapterMoment';
+//import LocalizationProvider from '@mui/lab/LocalizationProvider';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+//import MobileDatePicker from '@mui/lab/MobileDatePicker';
+import {MobileDatePicker} from '@mui/x-date-pickers/MobileDatePicker'
 
 const IBDatePicker = ({label, val, setVal}) => {
     const onChange = (newVal) => {

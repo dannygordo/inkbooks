@@ -18,6 +18,9 @@ const ClientService = (() => {
 					facebook
 					avatar
 					userId
+					user{
+						avatar
+					}
 				}
 			}
 		`;

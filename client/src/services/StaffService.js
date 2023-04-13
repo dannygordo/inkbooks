@@ -51,6 +51,7 @@ const StaffService = (() => {
                     title
                     status
                     shopId
+					user
 				}
 			}
 		`;

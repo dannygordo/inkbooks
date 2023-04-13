@@ -11,7 +11,6 @@ import UtilsService from "../../../services/UtilsService";
 const IBCardProjectDetails = (props) => {
 	const { user } = useContext(AuthContext);
 	const { cardData: project } = props;
-	console.log(project.client);
 
 	return (
 		<div className="ibCardBottom">
