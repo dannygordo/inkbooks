@@ -6,6 +6,7 @@ const ibTypeDefs = require('./graphql/typeDefs');
 const resolvers = require('./graphql/resolvers');
 const { Constants } = require('./utils/constants');
 const users = require('./graphql/resolvers/users');
+const dotenv = require('dotenv');
 const io = require('socket.io')(4000, {
   cors: {
     origin: [Constants.URLS.INKBOOKS_WEBAPP]
@@ -60,7 +61,7 @@ io.on('connection', (socket) => {
 
 });
 
-//---------- End Socket.io setup --------------//
+//---------- End Socket.io setup -------------//
 
 const typeDefs = [ibTypeDefs, DateTypeDefs];
 
@@ -70,10 +71,22 @@ const server = new ApolloServer({
   context: ({ req }) => ({ req }),
 });
 
+if (process.env.NODE_ENV !== 'PRODUCTION') {
+  dotenv.config({ path: '.env.development' });
+} else {
+  dotenv.config({ path: '.env.production' });
+}
+ console.log(process.env.NODE_ENV);
+ console.log(process.env.MONGODB);
+ console.log(process.env.MONGODB.replace(',',''));
+ // look into fixing the mongodb connection string including a comma at the end of the value
 mongoose
-  .connect(MONGODB, { useNewUrlParser: true })
+  .connect(process.env.MONGODB.replace(',',''), { useNewUrlParser: true })
   .then(() => {
     console.log('MongoDB Connected!');
+    console.log(MONGODB);
+    console.log("----");
+    console.log(process.env.MONGODB);
     return server.listen({ port: 5500 });
   })
   .then((res) => {

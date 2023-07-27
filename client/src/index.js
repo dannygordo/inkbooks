@@ -16,7 +16,7 @@ import { APP_SETTINGS_CONSTANTS } from "./constants";
 import { AuthProvider } from "./context/auth";
 
 const httpLink = createHttpLink({
-	uri: APP_SETTINGS_CONSTANTS.GRAPHQL_SERVER_URL,
+	uri: APP_SETTINGS_CONSTANTS[`${process.env.NODE_ENV.toUpperCase()}`].GRAPHQL_SERVER_URL,
 });
 const authLink = setContext((_, { headers }) => {
 	// get the authentication token from local storage if it exists

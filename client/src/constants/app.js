@@ -27,8 +27,16 @@ export const ROUTE_CONSTANTS = {
 };
 
 export const APP_SETTINGS_CONSTANTS = {
-	GRAPHQL_SERVER_URL: 'http://localhost:5500/',
-	SOCKET_IO_SERVER_URL: 'http://localhost:4000/',
+	PRODUCTION: {
+		GRAPHQL_SERVER_URL: 'http://www.inkbooks.net/',
+		SOCKET_IO_SERVER_URL: 'http://www.inkbooks.net/',
+	},
+	DEVELOPMENT: {
+		GRAPHQL_SERVER_URL: 'http://localhost:5500/',
+		SOCKET_IO_SERVER_URL: 'http://localhost:4000/',
+	},
+	// GRAPHQL_SERVER_URL: 'http://localhost:5500/',
+	// SOCKET_IO_SERVER_URL: 'http://localhost:4000/',
 	NO_IMAGE_URL:
 		"https://thumbs.dreamstime.com/b/tattoo-machine-icon-sign-symbol-design-tattoo-machine-icon-sign-symbol-149524394.jpg",
 	LOADING_TEXT: "Loading...",

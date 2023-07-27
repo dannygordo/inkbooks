@@ -4,6 +4,7 @@ import "./editClient.css";
 import ClientService from "../../../services/ClientService";
 import IBPageLoader from "../../../components/ibPageLoader/IBPageLoader";
 import { useMutation } from "@apollo/client";
+import IBInput from "../../inputs/IBInput";
 
 const EditClient = (props) => {
 	const navigate = useNavigate();
@@ -86,7 +87,7 @@ const EditClient = (props) => {
 					</div> */}
 					<div className="clientItem">
 						<label>First Name</label>
-						<input
+						<IBInput
 							type="text"
 							ref={firstName}
 							defaultValue={data.getClient.firstName}
@@ -95,7 +96,7 @@ const EditClient = (props) => {
 					</div>
 					<div className="clientItem">
 						<label>Last Name</label>
-						<input
+						<IBInput
 							type="text"
 							ref={lastName}
 							defaultValue={data.getClient.lastName}
@@ -104,7 +105,7 @@ const EditClient = (props) => {
 					</div>
 					<div className="clientItem">
 						<label>email</label>
-						<input
+						<IBInput
 							ref={email}
 							defaultValue={data.getClient.email}
 							type="email"
@@ -113,7 +114,7 @@ const EditClient = (props) => {
 					</div>
 					<div className="clientItem">
 						<label>Phone</label>
-						<input
+						<IBInput
 							type="tel"
 							ref={phone}
 							defaultValue={data.getClient.phone}
@@ -122,7 +123,7 @@ const EditClient = (props) => {
 					</div>
 					<div className="clientItem">
 						<label>Address</label>
-						<input
+						<IBInput
 							ref={address}
 							defaultValue={data.getClient.address}
 							type="text"
@@ -131,7 +132,7 @@ const EditClient = (props) => {
 					</div>
 					<div className="clientItem">
 						<label>City</label>
-						<input
+						<IBInput
 							ref={city}
 							defaultValue={data.getClient.city}
 							type="text"
@@ -140,7 +141,7 @@ const EditClient = (props) => {
 					</div>
 					<div className="clientItem">
 						<label>State</label>
-						<input
+						<IBInput
 							ref={state}
 							defaultValue={data.getClient.state}
 							type="text"
@@ -149,7 +150,7 @@ const EditClient = (props) => {
 					</div>
 					<div className="clientItem">
 						<label>Zip</label>
-						<input
+						<IBInput
 							ref={zip}
 							defaultValue={data.getClient.zip}
 							type="text"
@@ -158,7 +159,7 @@ const EditClient = (props) => {
 					</div>
 					<div className="clientItem">
 						<label>Instagram</label>
-						<input
+						<IBInput
 							ref={instagram}
 							defaultValue={data.getClient.instagram}
 							type="text"
@@ -167,7 +168,7 @@ const EditClient = (props) => {
 					</div>
 					<div className="clientItem">
 						<label>Facebook</label>
-						<input
+						<IBInput
 							ref={facebook}
 							defaultValue={data.getClient.facebook}
 							type="text"

@@ -202,7 +202,7 @@ const Project = (props) => {
 	};
 
 	/**
-	 * A helper function to remove properies from the IBImage as well as filtering out image to delete.  Passes new referenceImages array to handleProjectReferencesUpdate for mutation.
+	 * A helper function to remove properties from the IBImage as well as filtering out image to delete.  Passes new referenceImages array to handleProjectReferencesUpdate for mutation.
 	 * @param {Image to delete from Project.referenceImages array} deletedImg
 	 * @param {List of current Project.referenceImages } imageList
 	 */

@@ -5,11 +5,13 @@ import IBPageActionBar from '../../components/ibPageActionBar/IBPageActionBar';
 import './projects.css';
 import ProjectService from '../../services/ProjectService';
 import IBPageLoader from '../../components/ibPageLoader/IBPageLoader';
+import { APP_SETTINGS_CONSTANTS } from '../../constants';
 
 const Projects = () => {
   const { loading, data } = ProjectService.fetchProjects();
   if(loading) return <IBPageLoader />;
-  
+  console.log(APP_SETTINGS_CONSTANTS[`${process.env.NODE_ENV.toUpperCase()}`].GRAPHQL_SERVER_URL);
+  console.log(process.env);
   return (
     <div className="projects">
         <IBPageActionBar pageType='projects' />
