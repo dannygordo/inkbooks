@@ -74,6 +74,12 @@ typings/
 .env
 .env.*
 
+# Firebase service account keys (Admin SDK credentials) - these grant full admin access to the
+# Firebase project and must never be committed. Matches Firebase's default download filename
+# pattern as well as the name suggested in server/utils/firebase-admin.js.
+*firebase-adminsdk*.json
+firebase-service-account*.json
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 

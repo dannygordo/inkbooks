@@ -1,8 +1,7 @@
 import React, { useReducer, createContext, useState, useContext } from "react";
 import jwtDecode from "jwt-decode";
 import { CacheService } from "../services/CacheService";
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { FIREBASE } from "../config";
+import { signInWithCustomToken, signOut } from "firebase/auth";
 import { auth } from "../firebase/firebase";
 import { AUTH_SETTINGS_CONSTANTS } from "../constants";
 
@@ -92,24 +91,32 @@ function AuthProvider(props) {
 			payload: userData,
 		});
 
-		//login with app level Firebase auth in order to manage images and files.
-		signInWithEmailAndPassword(auth, FIREBASE.EMAIL, FIREBASE.EMAIL_PWD)
-			.then((userCredential) => {
-				// Signed in
-				const fbUser = userCredential.user;
-				console.log(fbUser);
-				dispatch({
-					type: AUTH_SETTINGS_CONSTANTS.AUTH_REDUCER_TYPES
-						.FIREBASE_LOGIN,
-					payload: fbUser,
+		// Sign into Firebase as this specific user (for Storage access - project images, avatars,
+		// etc.), using a short-lived custom token the server minted for this exact account.
+		// This replaces the old pattern of every user signing into one shared, hardcoded
+		// firebase@inkbooks.net account - see server/utils/firebase-admin.js for why that was a
+		// real problem and what changed. If firebaseToken is missing (server's Firebase Admin
+		// SDK isn't configured yet), skip Firebase sign-in rather than crashing the login flow -
+		// app login/auth still works, only Firebase Storage features are affected.
+		if (userData.firebaseToken) {
+			signInWithCustomToken(auth, userData.firebaseToken)
+				.then((userCredential) => {
+					const fbUser = userCredential.user;
+					dispatch({
+						type: AUTH_SETTINGS_CONSTANTS.AUTH_REDUCER_TYPES
+							.FIREBASE_LOGIN,
+						payload: fbUser,
+					});
+				})
+				.catch((error) => {
+					console.log(error.code, error.message);
 				});
-			})
-			.catch((error) => {
-				const errorCode = error.code;
-				const errorMessage = error.message;
-				console.log(errorCode);
-				console.log(errorMessage);
-			});
+		} else {
+			console.warn(
+				"No firebaseToken returned at login - Firebase Storage features " +
+					"(image upload/delete) will not work until the server's Firebase Admin SDK is configured."
+			);
+		}
 	};
 	const updateCurrentUser = (userData) => {
 		CacheService.removeItem(AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE);
@@ -125,6 +132,11 @@ function AuthProvider(props) {
 
 	const logout = () => {
 		CacheService.removeItem(AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE);
+		// Now that each user gets their own real Firebase identity (rather than everyone sharing
+		// one static account), it matters that logging out of the app also ends that Firebase
+		// session - otherwise it lingers in the browser, which is a real concern on a shared
+		// front-desk device.
+		signOut(auth).catch((error) => console.log(error.code, error.message));
 		dispatch({ type: AUTH_SETTINGS_CONSTANTS.AUTH_REDUCER_TYPES.LOGOUT });
 	};
 

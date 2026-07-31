@@ -12,6 +12,7 @@ const {
 } = require('../../utils/validators');
 const checkAuth = require('../../utils/check-auth');
 const {Constants} = require('../../utils/constants');
+const { mintFirebaseToken } = require('../../utils/firebase-admin');
 
 function generateToken(user) {
   return jwt.sign(
@@ -57,6 +58,10 @@ module.exports = {
       }
       // user has been authenticated, generate token and return user object
       const token = generateToken(user);
+      const firebaseToken = await mintFirebaseToken(user.id, {
+        role: user.role,
+        userType: user.userType,
+      });
       let userInfo = {};
       switch(user.userType) {
         case Constants.USER_TYPE.ARTIST :
@@ -68,6 +73,7 @@ module.exports = {
             id: user._id,
             role: user.role,
             accessToken: token,
+            firebaseToken: firebaseToken,
             userType: user.userType
           };
         case Constants.USER_TYPE.CLIENT :
@@ -79,6 +85,7 @@ module.exports = {
               id: user._id,
               role: user.role,
               accessToken: token,
+              firebaseToken: firebaseToken,
               userType: user.userType
             };
         case Constants.USER_TYPE.STAFF :
@@ -90,10 +97,11 @@ module.exports = {
               id: user._id,
               role: user.role,
               accessToken: token,
+              firebaseToken: firebaseToken,
               userType: user.userType
             };
       }
-      
+
     },
     async register(
       _,
@@ -160,11 +168,16 @@ module.exports = {
       const res = await newUser.save();
 
       const token = generateToken(res);
+      const firebaseToken = await mintFirebaseToken(res.id, {
+        role: res.role,
+        userType: res.userType,
+      });
       // change _id to id and add access token to the user object the return to caller
       return {
         ...res._doc,
         id: res._id,
         accessToken: token,
+        firebaseToken: firebaseToken,
       };
     },
     async updateUser(_, args, context) {

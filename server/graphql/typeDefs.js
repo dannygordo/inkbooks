@@ -154,6 +154,10 @@ module.exports = gql`
     userType: String!
     userInfo: UserInfo
     tagColor: String
+    # Per-user Firebase custom token, used by the client to sign into Firebase Auth as this
+    # specific user (replaces the old shared firebase@inkbooks.net account). Null if the server's
+    # Firebase Admin SDK isn't configured yet - see server/utils/firebase-admin.js.
+    firebaseToken: String
   }
   type Client implements UserInfo {
     id: ID!

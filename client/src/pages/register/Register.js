@@ -53,6 +53,7 @@ const Register = () => {
         username
         role
         accessToken
+        firebaseToken
         userType
         tagColor
       }

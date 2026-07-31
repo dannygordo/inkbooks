@@ -23,6 +23,7 @@ const Login = () => {
 				avatar
 				role
 				accessToken
+				firebaseToken
 				userType
 				tagColor
 				userInfo {
