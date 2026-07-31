@@ -1,54 +1,103 @@
-import React, { useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import "./editClient.css";
 import ClientService from "../../../services/ClientService";
 import IBPageLoader from "../../../components/ibPageLoader/IBPageLoader";
 import { useMutation } from "@apollo/client";
+import { useAuth } from "../../../context/auth";
+import { ALERT_CONSTANTS, AUTH_SETTINGS_CONSTANTS } from "../../../constants";
 import IBInput from "../../inputs/IBInput";
 
 const EditClient = (props) => {
 	const navigate = useNavigate();
 	let updatedClient = {};
 	let params = useParams();
+	const { setAlert } = useAuth();
 	//#region Userefs
-	const firstName = useRef();
-	const lastName = useRef();
-	const email = useRef();
-	const phone = useRef();
-	const address = useRef();
-	const city = useRef();
-	const state = useRef();
-	const zip = useRef();
-	const instagram = useRef();
-	const facebook = useRef();
-	const avatar = useRef();
+	// const firstName = useRef();
+	// const lastName = useRef();
+	// const email = useRef();
+	// const phone = useRef();
+	// const address = useRef();
+	// const city = useRef();
+	// const state = useRef();
+	// const zip = useRef();
+	// const instagram = useRef();
+	// const facebook = useRef();
+	// const avatar = useRef();
 	//#endregion
+
+	//#region UseStates
+	const [firstName, setFirstName] = useState("");
+	const [lastName, setLastName] = useState("");
+	const [email, setEmail] = useState("");
+	const [phone, setPhone] = useState("");
+	const [address, setAddress] = useState("");
+	const [city, setCity] = useState("");
+	const [state, setState] = useState("");
+	const [zip, setZip] = useState("");
+	const [instagram, setInstagram] = useState("");
+	const [facebook, setFacebook] = useState("");
+	const [client, setClient] = useState({});
+	//#endregion
+
 
 	//Gets client data by id
 	const { loading, data } = ClientService.fetchClient(params.clientId);
 
+	useEffect(() => {
+		if(data) {
+			console.log(data);
+			setClient(data.getClient);
+		}
+	}, []);
+
 	//Gets update mutation gql and returns callback funtion to be used in event handler
-	const [updateTheClient] = useMutation(ClientService.updateClient());
+	const [updateTheClient] = useMutation(ClientService.updateClient(), {
+		onCompleted() {
+			setAlert({
+				isAlert: true,
+				severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
+				message:
+					AUTH_SETTINGS_CONSTANTS.RESPONSE_MESSAGES
+						.RECORD_UPDATE_SUCCESS,
+				timeout: ALERT_CONSTANTS.TIMEOUT,
+				location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
+			});
+		},
+	});
 
 	if (loading) {
 		return <IBPageLoader />;
 	}
 
+	const handleChange = (e) => {
+		console.log([e.target.id]);
+		console.log(e.target.value);
+		console.log(client);
+		setClient({
+			...client,
+			[e.target.id]: e.target.value
+		});
+		console.log(client);
+	}
+
 	const handleSave = (e) => {
+		
 		e.preventDefault();
 		//spreads intially fetched client object and updates fields by ref
 		updatedClient = {
 			...data.getClient,
-			firstName: firstName.current.value,
-			lastName: lastName.current.value,
-			email: email.current.value,
-			phone: phone.current.value,
-			address: address.current.value,
-			city: city.current.value,
-			state: state.current.value,
-			zip: zip.current.value,
-			instagram: instagram.current.value,
-			facebook: facebook.current.value,
+			firstName: client.firstName,
+			lastName: client.lastName,
+			email: client.email,
+			phone: client.phone,
+			address: client.address,
+			city: client.city,
+			state: client.state,
+			zip: client.zip,
+			instagram: client.instagram,
+			facebook: client.facebook,
 		};
 		//mutation function takes in updated values in the variables
 		updateTheClient({
@@ -89,7 +138,8 @@ const EditClient = (props) => {
 						<label>First Name</label>
 						<IBInput
 							type="text"
-							ref={firstName}
+							id="firstName"
+							onChange={handleChange}
 							defaultValue={data.getClient.firstName}
 							placeholder="Jon"
 						/>
@@ -98,7 +148,8 @@ const EditClient = (props) => {
 						<label>Last Name</label>
 						<IBInput
 							type="text"
-							ref={lastName}
+							onChange={handleChange}
+							id="lastName"
 							defaultValue={data.getClient.lastName}
 							placeholder="Snow"
 						/>
@@ -106,7 +157,8 @@ const EditClient = (props) => {
 					<div className="clientItem">
 						<label>email</label>
 						<IBInput
-							ref={email}
+							id="email"
+							onChange={handleChange}
 							defaultValue={data.getClient.email}
 							type="email"
 							placeholder="Jon@thecopperwolf.com"
@@ -116,7 +168,8 @@ const EditClient = (props) => {
 						<label>Phone</label>
 						<IBInput
 							type="tel"
-							ref={phone}
+							onChange={handleChange}
+							id="phone"
 							defaultValue={data.getClient.phone}
 							placeholder="555-555-5555"
 						/>
@@ -124,7 +177,8 @@ const EditClient = (props) => {
 					<div className="clientItem">
 						<label>Address</label>
 						<IBInput
-							ref={address}
+							onChange={handleChange}
+							id="address"
 							defaultValue={data.getClient.address}
 							type="text"
 							placeholder="123 Stark Dr"
@@ -133,7 +187,8 @@ const EditClient = (props) => {
 					<div className="clientItem">
 						<label>City</label>
 						<IBInput
-							ref={city}
+							id="city"
+							onChange={handleChange}
 							defaultValue={data.getClient.city}
 							type="text"
 							placeholder="Winterfell"
@@ -142,7 +197,8 @@ const EditClient = (props) => {
 					<div className="clientItem">
 						<label>State</label>
 						<IBInput
-							ref={state}
+							id="state"
+							onChange={handleChange}
 							defaultValue={data.getClient.state}
 							type="text"
 							placeholder="WA"
@@ -151,7 +207,8 @@ const EditClient = (props) => {
 					<div className="clientItem">
 						<label>Zip</label>
 						<IBInput
-							ref={zip}
+							id="zip"
+							onChange={handleChange}
 							defaultValue={data.getClient.zip}
 							type="text"
 							placeholder="98512"
@@ -160,7 +217,8 @@ const EditClient = (props) => {
 					<div className="clientItem">
 						<label>Instagram</label>
 						<IBInput
-							ref={instagram}
+							id="instagram"
+							onChange={handleChange}
 							defaultValue={data.getClient.instagram}
 							type="text"
 							placeholder="theDireWolf"
@@ -169,7 +227,8 @@ const EditClient = (props) => {
 					<div className="clientItem">
 						<label>Facebook</label>
 						<IBInput
-							ref={facebook}
+							id="facebook"
+							onChange={handleChange}
 							defaultValue={data.getClient.facebook}
 							type="text"
 							placeholder="kingOfTheNorth"
