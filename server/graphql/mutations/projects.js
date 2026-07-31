@@ -2,6 +2,7 @@ const Project = require('../../models/Project');
 const withAuth = require('../../utils/with-auth');
 const { AuthenticationError, UserInputError } = require('../../utils/errors');
 const { Constants } = require('../../utils/constants');
+const { updateProjectInputSchema, createProjectInputSchema, validate } = require('../../utils/validation');
 
 module.exports = {
   createProject: withAuth(async (
@@ -24,11 +25,14 @@ module.exports = {
         depositAmount,
     },
   ) => {
-    if(title.trim() === ''){
-        throw new UserInputError('Title cannot be empty');
-    }
-    if(description.trim() === ''){
-        throw new UserInputError('Description cannot be empty');
+    // Supersedes the old manual title/description empty-string checks - createProjectInputSchema
+    // covers those plus the enum/non-negative checks updateProject already had.
+    const { valid, errors } = validate(createProjectInputSchema, {
+      title, description, placement, size, palette, artistId, clientId, referenceImages,
+      bodyImages, designImages, materialsUsed, notes, tags, status, depositAmount,
+    });
+    if (!valid) {
+      throw new UserInputError('Errors', { errors });
     }
     const newProject = new Project({
         title,
@@ -69,8 +73,12 @@ module.exports = {
   // correctly identifies "is this the artist assigned to the project." This OR-ownership check
   // can't be expressed as a single withAuth minRole, so it stays inline.
   updateProject: withAuth(async (_, args, context, info, user) => {
+    const project = args.project;
+    const { valid, errors } = validate(updateProjectInputSchema, project);
+    if (!valid) {
+      throw new UserInputError('Errors', { errors });
+    }
     try{
-      const project = args.project;
       const existingProject = await Project.findById(project.id);
       if (
         existingProject &&

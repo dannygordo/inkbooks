@@ -1,6 +1,11 @@
 const jwt = require('jsonwebtoken');
 const { AuthenticationError } = require('./errors');
-const { SECRET_KEY } = require('../config');
+// Was require('../config') - server/config.js is gitignored (it holds the raw Mongo URI too)
+// and never gets committed, so this would throw MODULE_NOT_FOUND the instant it runs anywhere
+// that only has the git-tracked code, e.g. Render. SECRET_KEY is already in .env.development/
+// .env.production (loaded via dotenv in index.js) exactly like MONGODB - reading it the same way
+// closes that gap instead of leaving two parallel, inconsistent config mechanisms.
+const SECRET_KEY = process.env.SECRET_KEY;
 
 module.exports = (context) => {
   //console.log(context.req.headers.authorization);

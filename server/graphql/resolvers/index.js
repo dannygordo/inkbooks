@@ -15,10 +15,12 @@ const messageResolvers = require('./messages');
 const projectResolvers = require('./projects');
 const appointmentResolvers = require('./appointments');
 const appointmentMutations = require('../mutations/appointments');
+const bookingRequestResolvers = require('./bookingRequests');
+const bookingRequestMutations = require('../mutations/bookingRequests');
 const Artist = require('../../models/Artist');
 const Client = require('../../models/Client');
 const { DateResolver, DateTimeResolver } = require('graphql-scalars');
-const Shop = require('../../models/Shop'); 
+const Shop = require('../../models/Shop');
 const Conversation = require('../../models/Conversation');
 const Message = require('../../models/Message');
 const User = require('../../models/User');
@@ -37,7 +39,8 @@ module.exports = {
     ...conversationResolvers.Query,
     ...messageResolvers.Query,
     ...projectResolvers.Query,
-    ...appointmentResolvers.Query
+    ...appointmentResolvers.Query,
+    ...bookingRequestResolvers.Query
   },
   Mutation: {
     ...usersResolvers.Mutation,
@@ -48,7 +51,8 @@ module.exports = {
     ...conversationMutations,
     ...messageMutations,
     ...projectMutations,
-    ...appointmentMutations
+    ...appointmentMutations,
+    ...bookingRequestMutations
   },
   Project: {
     artist: async(project, args, context, info) => {
@@ -96,6 +100,17 @@ module.exports = {
   Client: {
     user: async(client, args, context, info) => {
       return (await User.findById(client.userId));
+    }
+  },
+  BookingRequest: {
+    client: async(bookingRequest, args, context, info) => {
+      return (await Client.findById(bookingRequest.clientId));
+    },
+    conversation: async(bookingRequest, args, context, info) => {
+      // Conversation.messages is already a resolved field below (Conversation.messages) - a
+      // client querying `booking { conversation { messages { ... } } }` gets the full thread
+      // for free, no separate booking-request-specific message resolver needed.
+      return (await Conversation.findById(bookingRequest.conversationId));
     }
   },
   Conversation: {

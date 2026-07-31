@@ -29,6 +29,10 @@ module.exports.Constants = {
         // used to scope the socket.io CORS origin (nothing enforced it in production), but now
         // that Express/Apollo's CORS also uses this value, a production deploy needs the real
         // production origin here or every browser request gets blocked by CORS.
-        INKBOOKS_WEBAPP: process.env.NODE_ENV === 'PRODUCTION' ? 'http://www.inkbooks.net' : 'http://localhost:3000',
+        // Must be https in production - Netlify serves the frontend over https, and the browser's
+        // real Origin header will be https://www.inkbooks.net. cors() and socket.io's cors option
+        // both do exact string matching, so an http:// mismatch here would get every production
+        // request/socket connection rejected as a CORS failure.
+        INKBOOKS_WEBAPP: process.env.NODE_ENV === 'PRODUCTION' ? 'https://www.inkbooks.net' : 'http://localhost:3000',
     }
 };

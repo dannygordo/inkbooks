@@ -28,8 +28,12 @@ export const ROUTE_CONSTANTS = {
 
 export const APP_SETTINGS_CONSTANTS = {
 	PRODUCTION: {
-		GRAPHQL_SERVER_URL: 'http://www.inkbooks.net/',
-		SOCKET_IO_SERVER_URL: 'http://www.inkbooks.net/',
+		// Backend lives on a separate host (Render/Railway) at the api.inkbooks.net subdomain,
+		// not on the same domain as the frontend - and must be https:// or the browser blocks
+		// it as mixed content once the frontend itself is served over https (Netlify enforces
+		// this by default).
+		GRAPHQL_SERVER_URL: 'https://api.inkbooks.net/',
+		SOCKET_IO_SERVER_URL: 'https://api.inkbooks.net/',
 	},
 	DEVELOPMENT: {
 		GRAPHQL_SERVER_URL: 'http://localhost:5500/',

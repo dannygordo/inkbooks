@@ -1,7 +1,8 @@
 const Appointment = require('../../models/Appointment');
 const withAuth = require('../../utils/with-auth');
-const { AuthenticationError } = require('../../utils/errors');
+const { AuthenticationError, UserInputError } = require('../../utils/errors');
 const { Constants } = require('../../utils/constants');
+const { updateAppointmentInputSchema, createAppointmentInputSchema, validate } = require('../../utils/validation');
 
 module.exports = {
     createAppointment: withAuth(async (
@@ -24,6 +25,13 @@ module.exports = {
         }
     },
      ) => {
+      const { valid, errors } = validate(createAppointmentInputSchema, {
+        appointmentDate, projectId, shopId, userId, title, description, total, tip,
+        shopCutStatus, appointmentType, appointmentStatus, createdAt, updatedAt,
+      });
+      if (!valid) {
+        throw new UserInputError('Errors', { errors });
+      }
       const newAppointment = new Appointment({
         appointmentDate,
         projectId,
@@ -58,8 +66,12 @@ module.exports = {
       }
     }),
     updateAppointment: withAuth(async (_, args, context, info, user) => {
+      const appointment = args.appointmentInput;
+      const { valid, errors } = validate(updateAppointmentInputSchema, appointment);
+      if (!valid) {
+        throw new UserInputError('Errors', { errors });
+      }
       try{
-        const appointment = args.appointmentInput;
         const existingAppointment = await Appointment.findById(appointment.id);
         if (
           existingAppointment &&

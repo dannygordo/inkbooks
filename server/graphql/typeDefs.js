@@ -266,6 +266,44 @@ module.exports = gql`
     createdAt: DateTime
     updatedAt: DateTime
   }
+  # See PRODUCTION_ROADMAP.md's "Booking request & guest correspondence" section for the full
+  # design. This is the structured intake content only - back-and-forth correspondence after
+  # submission lives in the linked Conversation's Messages, not duplicated here.
+  type BookingRequest {
+    id: ID!
+    artistId: ID!
+    clientId: ID!
+    conversationId: ID!
+    client: Client
+    conversation: Conversation
+    status: String!
+    description: String!
+    referenceImages: [IBImage]
+    placement: String
+    size: String
+    budget: String
+    availability: String
+    isCoverUp: Boolean
+    howHeard: String
+    resultingAppointmentId: ID
+    createdAt: DateTime
+    updatedAt: DateTime
+  }
+  input BookingRequestInput {
+    artistId: ID!
+    firstName: String!
+    lastName: String!
+    email: String!
+    phone: String
+    description: String!
+    referenceImages: [IBImageInput]
+    placement: String
+    size: String
+    budget: String
+    availability: String
+    isCoverUp: Boolean
+    howHeard: String
+  }
   type Project {
     id: ID!
     title: String!
@@ -406,6 +444,15 @@ module.exports = gql`
     getMessages: [Message]
     getMessage(messageId: ID!): Message
     getMessagesByConversationId(conversationId: ID!): [Message!]
+
+    ######### Booking Requests ###########
+
+    # Artist-only (withAuth) - the artist's own dashboard list, not the guest-facing side.
+    getBookingRequests(artistId: ID!): [BookingRequest]
+    getBookingRequest(bookingRequestId: ID!): BookingRequest
+    # Public, token-gated (not withAuth) - resolves a guest's magic link to their own request.
+    # See utils/guest-auth.js.
+    getBookingRequestByToken(token: String!): BookingRequest
   }
   type Mutation {
     ######### Appointments ############
@@ -554,5 +601,22 @@ module.exports = gql`
     ): Message!
     deleteMessage(messageId: ID!): String!
     updateMessage(message: MessageInput): Message
+
+    ######### Booking Requests ###########
+
+    # Public, unauthenticated by design - this is the intake form, submitted before any account
+    # exists. Rate-limiting lives at the resolver level, not the schema - see
+    # PRODUCTION_ROADMAP.md's "Still open" note on abuse prevention.
+    createBookingRequest(bookingRequestInput: BookingRequestInput!): BookingRequest!
+    # Public, token-gated (not withAuth) - a guest replying on their own booking request's page.
+    sendGuestMessage(token: String!, message: String!): Message!
+    # Artist-only (withAuth) - converts a pending request into a real Appointment (consult or
+    # session) or marks it declined. outcome must be one of: consult_booked, session_booked,
+    # declined.
+    convertBookingRequest(
+      bookingRequestId: ID!
+      outcome: String!
+      appointmentInput: AppointmentInput
+    ): BookingRequest!
   }
 `;

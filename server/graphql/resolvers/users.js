@@ -1,7 +1,10 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { UserInputError, AuthenticationError } = require('../../utils/errors');
-const { SECRET_KEY } = require('../../config');
+// See utils/check-auth.js - server/config.js is gitignored and never committed, so requiring it
+// crashes anywhere the file isn't manually present (e.g. Render). Read from process.env instead,
+// same mechanism MONGODB already uses.
+const SECRET_KEY = process.env.SECRET_KEY;
 const User = require('../../models/User');
 const Artist = require('../../models/Artist');
 const Client = require('../../models/Client');
