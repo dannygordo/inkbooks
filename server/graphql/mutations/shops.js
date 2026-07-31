@@ -1,11 +1,9 @@
-const { AuthenticationError } = require('apollo-server');
 const Shop = require('../../models/Shop');
-const checkAuth = require('../../utils/check-auth');
+const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 
-
 module.exports = {
-    async createShop(
+    createShop: withAuth(async (
       _,
       {
         name,
@@ -24,9 +22,7 @@ module.exports = {
         billingType,
         status,
       },
-      context,
-    ) {
-      const user = checkAuth(context);
+    ) => {
       const newShop = new Shop({
         name,
         email,
@@ -44,43 +40,29 @@ module.exports = {
         billingType,
         status,
       });
-  
-      console.log(user);
       const shop = await newShop.save();
       return shop;
-    },
-    async deleteShop(_, { shopId }, context) {
-      const user = checkAuth(context);
+    }, Constants.ROLES.SHOP_ADMIN),
+    deleteShop: withAuth(async (_, { shopId }) => {
       try {
         const shop = await Shop.findById(shopId);
         //TODO: revisit rule that allows a user to delete an shop.  Might want to inactive shop instead of delete in order to prevent historical documents from breaking
-
-        //if authenticated user is an admin then delete is permitted, otherwise an authentication error will be thrown
-        if (shop && user.role === Constants.ROLES.ADMIN) {
+        if (shop) {
           await Shop.deleteOne({ _id: shopId });
           return 'Shop deleted successfully';
         }
-        throw new AuthenticationError('Action not allowed');
+        throw new Error('Shop not found');
       } catch (err) {
         throw new Error(err);
       }
-    },async updateShop(_, args, context) {
-      const user = checkAuth(context);
+    }, Constants.ROLES.ADMIN),
+    updateShop: withAuth(async (_, args) => {
       try{
         const shop = args.shop;
-        console.log('user');
-        console.log(user);
-        if (user.role <= Constants.ROLES.SHOP_ADMIN) {
-  
-        console.log('fshop');
-        console.log(shop);
-          const res = await Shop.findByIdAndUpdate({_id: shop.id}, shop, {new: true});
-          return res;
-        }
-        throw new AuthenticationError('Action not allowed');
+        const res = await Shop.findByIdAndUpdate({_id: shop.id}, shop, {new: true});
+        return res;
       } catch (err) {
           throw new Error(err);
       }
-    }
+    }, Constants.ROLES.SHOP_ADMIN)
   };
-  

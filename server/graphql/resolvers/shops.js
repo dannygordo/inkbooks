@@ -1,19 +1,17 @@
 const Shop = require('../../models/Shop');
-const checkAuth = require('../../utils/check-auth');
+const withAuth = require('../../utils/with-auth');
 
 module.exports = {
     Query: {
-        getShops: async (_, args, context) => {
-            checkAuth(context);
+        getShops: withAuth(async () => {
             try {
                 const shops = await Shop.find().sort({ name: 1 });
                 return shops;
             } catch (err) {
                 throw new Error(err);
             }
-        },
-        getShop: async (_,{shopId}, context) => {
-            checkAuth(context);
+        }),
+        getShop: withAuth(async (_,{shopId}) => {
             try {
                 const shop = await Shop.findById(shopId);
                 if (shop) {
@@ -22,6 +20,6 @@ module.exports = {
               } catch (err) {
                 throw new Error(err);
             }
-        }
+        })
     }
 }

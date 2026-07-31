@@ -1,57 +1,53 @@
-const { AuthenticationError } = require('apollo-server');
 const Appointment = require('../../models/Appointment');
-const checkAuth = require('../../utils/check-auth');
+const withAuth = require('../../utils/with-auth');
+const { AuthenticationError } = require('../../utils/errors');
 const { Constants } = require('../../utils/constants');
 
-
 module.exports = {
-    async createAppointment(
+    createAppointment: withAuth(async (
       _,
       {
         appointmentInput: {
             appointmentDate,
-            projectId, 
-            shopId, 
-            userId, 
-            title, 
+            projectId,
+            shopId,
+            userId,
+            title,
             description,
-            total, 
-            tip, 
-            shopCutStatus, 
-            appointmentType, 
+            total,
+            tip,
+            shopCutStatus,
+            appointmentType,
             appointmentStatus,
             createdAt,
             updatedAt
         }
     },
-      context,
-     ) {
-      const user = checkAuth(context);
+     ) => {
       const newAppointment = new Appointment({
         appointmentDate,
-        projectId, 
-        shopId, 
-        userId, 
-        title, 
+        projectId,
+        shopId,
+        userId,
+        title,
         description,
-        total, 
-        tip, 
-        shopCutStatus, 
-        appointmentType, 
+        total,
+        tip,
+        shopCutStatus,
+        appointmentType,
         appointmentStatus,
         createdAt,
         updatedAt
       });
       const appt = await newAppointment.save();
       return appt;
-    },
-    async deleteAppointment(_, { appointmentId }, context) {
-      const user = checkAuth(context);
+    }),
+    // Ownership check here (Admin, or the appointment's own artist/user) can't be expressed as a
+    // single withAuth minRole, so it stays inline using the `user` withAuth provides.
+    deleteAppointment: withAuth(async (_, { appointmentId }, context, info, user) => {
       try {
         const appointment = await Appointment.findById(appointmentId);
         //TODO: revisit rule that allows a user to delete an appointment.  Might want to inactive appointment instead of delete in order to prevent historical documents from breaking
-
-        //if authenticated user is an admin, or the appointment's own artist/user, delete is permitted
         if (appointment && (user.role === Constants.ROLES.ADMIN || String(user.id) === String(appointment.userId))) {
           await Appointment.deleteOne({ _id: appointmentId });
           return 'Appointment deleted successfully';
@@ -60,8 +56,8 @@ module.exports = {
       } catch (err) {
         throw new Error(err);
       }
-    },async updateAppointment(_, args, context) {
-      const user = checkAuth(context);
+    }),
+    updateAppointment: withAuth(async (_, args, context, info, user) => {
       try{
         const appointment = args.appointmentInput;
         const existingAppointment = await Appointment.findById(appointment.id);
@@ -76,6 +72,5 @@ module.exports = {
       } catch (err) {
           throw new Error(err);
       }
-    }
+    })
   };
-  

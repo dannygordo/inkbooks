@@ -1,17 +1,19 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { UserInputError, AuthenticationError } = require('apollo-server');
+const { UserInputError, AuthenticationError } = require('../../utils/errors');
 const { SECRET_KEY } = require('../../config');
 const User = require('../../models/User');
 const Artist = require('../../models/Artist');
 const Client = require('../../models/Client');
 const Staff = require('../../models/Staff');
 const {
-  validateRegisterInput,
-  validateLoginInput,
-} = require('../../utils/validators');
-const checkAuth = require('../../utils/check-auth');
-const {Constants} = require('../../utils/constants');
+  loginInputSchema,
+  registerInputSchema,
+  changePasswordInputSchema,
+  validate,
+} = require('../../utils/validation');
+const withAuth = require('../../utils/with-auth');
+const { Constants } = require('../../utils/constants');
 const { mintFirebaseToken } = require('../../utils/firebase-admin');
 
 function generateToken(user) {
@@ -23,22 +25,24 @@ function generateToken(user) {
       role: user.role,
     },
     SECRET_KEY,
-    { expiresIn: '5d' },
+    // Explicit algorithm, not left to jsonwebtoken's default - see check-auth.js for why.
+    { expiresIn: '5d', algorithm: 'HS256' },
   );
 }
 
 module.exports = {
   Mutation: {
+    // login and register are the only two Mutations in this whole codebase that are
+    // intentionally NOT wrapped in withAuth - they're how a session gets created in the first
+    // place, so there's nothing to authenticate against yet.
     async login(_, { username, password }) {
-      // check to see if inputs are valid
-      const { errors, valid } = validateLoginInput(username, password);
+      const { errors, valid } = validate(loginInputSchema, { username, password });
       if (!valid) {
         throw new UserInputError('Errors', { errors });
       }
       // get user and if not found throw error
       const user = await User.findOne({ username });
       if (!user) {
-        errors.general = 'User not found';
         throw new UserInputError('User not found', {
           errors: {
             username: 'Username not found',
@@ -47,9 +51,7 @@ module.exports = {
       }
       // if user is found make sure password entered is the same as the saved hash
       const match = await bcrypt.compare(password, user.password);
-      console.log(match);
       if (!match) {
-        errors.general = 'Invalid username/password';
         throw new UserInputError('Invalid username/password', {
           errors: {
             password: 'Invalid username/password',
@@ -101,7 +103,6 @@ module.exports = {
               userType: user.userType
             };
       }
-
     },
     async register(
       _,
@@ -116,18 +117,10 @@ module.exports = {
     ) {
       const role = Constants.ROLES.CLIENT;
       const userType = Constants.USER_TYPE.CLIENT;
-      // validates user's input from registration form
-      const { valid, errors } = validateRegisterInput(
-        username,
-        email,
-        firstName,
-        lastName,
-        avatar,
-        password,
-        confirmPassword,
-        role,
-        userType
-      );
+
+      const { valid, errors } = validate(registerInputSchema, {
+        username, email, firstName, lastName, avatar, password, confirmPassword, tagColor,
+      });
       if (!valid) {
         throw new UserInputError('Errors', { errors });
       }
@@ -150,7 +143,7 @@ module.exports = {
         });
       }
       // hash password
-      password = await bcrypt.hash(password, 12);
+      const hashedPassword = await bcrypt.hash(password, 12);
 
       const newUser = new User({
         email,
@@ -158,7 +151,7 @@ module.exports = {
         lastName,
         avatar,
         username,
-        password,
+        password: hashedPassword,
         role,
         userType,
         tagColor
@@ -180,41 +173,19 @@ module.exports = {
         firebaseToken: firebaseToken,
       };
     },
-    async updateUser(_, args, context) {
-
-      console.log('and even here');
-      const user = checkAuth(context);
+    updateUser: withAuth(async (_, args, context, info, user) => {
       try {
         const usr = args.user;
-
-        console.log(usr);
         if (user.role <= Constants.ROLES.SHOP_ADMIN || user.id === usr.id) {
-          // validates user's input from registration form
-          // const { valid, errors } = validateRegisterInput(
-          //   usr.username,
-          //   usr.email,
-          //   usr.firstName,
-          //   usr.lastName,
-          //   usr.avatar,
-          //   usr.password,
-          //   usr.confirmPassword,
-          //   usr.role,
-          //   usr.userType
-          // );
-
-          // if (!valid) {
-          //   throw new UserInputError('Errors', { errors });
-          // }
           let res = await User.findByIdAndUpdate({_id: usr.id}, usr, {new: true});
           res.accessToken = 'temp_' + Date.now();
-          console.log(res);
           return res;
         }
         throw new AuthenticationError('Action not allowed');
       } catch (err) {
           throw new Error(err);
       }
-    },
+    }),
     // Renamed from forgotPassword. The original version reset any user's password given only
     // their username - no proof of ownership, no email, no token. Combined with the (now also
     // fixed) unauthenticated getUsers query, that was a complete, zero-credential account
@@ -223,13 +194,10 @@ module.exports = {
     // logged out - that requires a real email-based reset token flow, which needs a
     // transactional email provider that isn't set up yet (see PRODUCTION_ROADMAP.md Phase 1,
     // item 1). Don't loosen this back to a username-only reset.
-    async changePassword(_, { currentPassword, newPassword }, context) {
-      const authUser = checkAuth(context);
-
-      if (!newPassword || newPassword.trim() === '') {
-        throw new UserInputError('New password must not be empty', {
-          errors: { newPassword: 'New password must not be empty' },
-        });
+    changePassword: withAuth(async (_, { currentPassword, newPassword }, context, info, authUser) => {
+      const { valid, errors } = validate(changePasswordInputSchema, { currentPassword, newPassword });
+      if (!valid) {
+        throw new UserInputError('Errors', { errors });
       }
 
       const user = await User.findById(authUser.id);
@@ -237,7 +205,7 @@ module.exports = {
         throw new AuthenticationError('User not found');
       }
 
-      const match = await bcrypt.compare(currentPassword || '', user.password);
+      const match = await bcrypt.compare(currentPassword, user.password);
       if (!match) {
         throw new AuthenticationError('Current password is incorrect');
       }
@@ -255,20 +223,18 @@ module.exports = {
         id: res._id,
         accessToken: token,
       };
-    }
+    })
   },
   Query: {
-    async getUsers(_, args, context) {
-      checkAuth(context);
+    getUsers: withAuth(async () => {
       try {
         const users = await User.find().sort({ email: 1 });
         return users;
       } catch (err) {
         throw new Error(err);
       }
-    },
-    async getUser(_, { userId }, context) {
-      checkAuth(context);
+    }),
+    getUser: withAuth(async (_, { userId }) => {
       try {
         const user = await User.findById(userId);
         if (user) {
@@ -277,9 +243,8 @@ module.exports = {
       } catch (err) {
         throw new Error(err);
       }
-    },
-    async getUserTagColors(_, { shopId }, context) {
-      checkAuth(context);
+    }),
+    getUserTagColors: withAuth(async (_, { shopId }) => {
       try {
         let usrIds = [];
         let usrs = [];
@@ -296,11 +261,10 @@ module.exports = {
           });
           usrs = await User.find({ _id: { $in: usrIds } });
         }
-        console.log(usrs);
         return usrs;
       }catch(err) {
         throw new Error(err);
       }
-    }
+    })
   }
 };

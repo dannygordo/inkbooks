@@ -1,28 +1,25 @@
 const Appointment = require('../../models/Appointment');
-const checkAuth = require('../../utils/check-auth');
+const withAuth = require('../../utils/with-auth');
 
 module.exports = {
   Query: {
-    async getAppointmentsByShop(_, { shopId }, context) {
-      checkAuth(context);
+    getAppointmentsByShop: withAuth(async (_, { shopId }) => {
       try {
         const appointments = await Appointment.find({shopId: shopId}).sort({ appointmentDate: 1 });
         return appointments;
       } catch (err) {
         throw new Error(err);
       }
-    },
-    async getAppointmentsByArtist(_, { userId }, context) {
-        checkAuth(context);
+    }),
+    getAppointmentsByArtist: withAuth(async (_, { userId }) => {
         try {
             const appointments = await Appointment.find({userId: userId}).sort({ updatedAt: 1 });
             return appointments;
         } catch (err) {
           throw new Error(err);
         }
-      },
-    async getAppointment(_, { appointmentId }, context) {
-      checkAuth(context);
+      }),
+    getAppointment: withAuth(async (_, { appointmentId }) => {
       try {
         const appointment = await Appointment.findById(appointmentId);
         if (appointment) {
@@ -31,6 +28,6 @@ module.exports = {
       } catch (err) {
         throw new Error(err);
       }
-    },
+    }),
   },
 };

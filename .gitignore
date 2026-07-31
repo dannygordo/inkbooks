@@ -114,4 +114,8 @@ dist
 /.idea/
 .DS_Store
 
-config.js
+# server/config.js holds real secrets (Mongo URI with embedded password, JWT signing key) and
+# must never be committed. client/src/config.js is intentionally NOT covered by this - it only
+# holds public-safe values (Firebase web config, Square application/location IDs) and needs to
+# be committed for the Netlify build to have it at all.
+server/config.js

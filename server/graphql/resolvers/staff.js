@@ -1,19 +1,17 @@
 const Staff = require('../../models/Staff');
-const checkAuth = require('../../utils/check-auth');
+const withAuth = require('../../utils/with-auth');
 
 module.exports = {
   Query: {
-    async getStaff(_, args, context) {
-      checkAuth(context);
+    getStaff: withAuth(async () => {
       try {
         const staff = await Staff.find().sort({ lastName: 1 });
         return staff;
       } catch (err) {
         throw new Error(err);
       }
-    },
-    async getOneStaff(_, { staffId }, context) {
-      checkAuth(context);
+    }),
+    getOneStaff: withAuth(async (_, { staffId }) => {
       try {
         const staff = await Staff.findById(staffId);
         if (staff) {
@@ -22,6 +20,6 @@ module.exports = {
       } catch (err) {
         throw new Error(err);
       }
-    },
+    }),
   },
 };

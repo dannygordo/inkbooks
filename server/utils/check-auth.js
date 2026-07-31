@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { AuthenticationError } = require('apollo-server');
+const { AuthenticationError } = require('./errors');
 const { SECRET_KEY } = require('../config');
 
 module.exports = (context) => {
@@ -9,7 +9,11 @@ module.exports = (context) => {
     const token = authHeader.split('Bearer ')[1];
     if (token) {
       try {
-        const user = jwt.verify(token, SECRET_KEY);
+        // Explicitly pin the allowed algorithm rather than relying on jsonwebtoken's default
+        // (GHSA-qwph-4952-7xr6: older jsonwebtoken versions could accept a token signed with an
+        // algorithm the caller never intended). We only ever sign with HS256 (see generateToken
+        // in resolvers/users.js), so verify should only ever accept HS256, full stop.
+        const user = jwt.verify(token, SECRET_KEY, { algorithms: ['HS256'] });
         return user;
       } catch (err) {
         throw new AuthenticationError('Invalid/expired token');

@@ -1,19 +1,17 @@
 const Artist = require('../../models/Artist');
-const checkAuth = require('../../utils/check-auth');
+const withAuth = require('../../utils/with-auth');
 
 module.exports = {
   Query: {
-    async getArtists(_, args, context) {
-      checkAuth(context);
+    getArtists: withAuth(async () => {
       try {
         const artists = await Artist.find().sort({ startDate: 1 });
         return artists;
       } catch (err) {
         throw new Error(err);
       }
-    },
-    async getArtist(_, { artistId }, context) {
-      checkAuth(context);
+    }),
+    getArtist: withAuth(async (_, { artistId }) => {
       try {
         const artist = await Artist.findById(artistId);
         if (artist) {
@@ -22,9 +20,8 @@ module.exports = {
       } catch (err) {
         throw new Error(err);
       }
-    },
-    async getArtistsByShop(_, { shopId }, context) {
-      checkAuth(context);
+    }),
+    getArtistsByShop: withAuth(async (_, { shopId }) => {
       try {
         const artists = await Artist.find({ shopId: shopId }).sort({ firstName: 1 });
         if (artists) {
@@ -33,6 +30,6 @@ module.exports = {
       } catch (err) {
         throw new Error(err);
       }
-    },
+    }),
   },
 };

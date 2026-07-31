@@ -1,4 +1,8 @@
-const admin = require('firebase-admin');
+// firebase-admin 14.x dropped the legacy namespaced API (`admin.credential.cert`,
+// `admin.auth()`) from the default `require('firebase-admin')` export entirely - it's
+// modular-only now, same pattern the client SDK moved to a couple of majors ago.
+const { initializeApp, cert } = require('firebase-admin/app');
+const { getAuth } = require('firebase-admin/auth');
 const path = require('path');
 const fs = require('fs');
 
@@ -18,6 +22,7 @@ const fs = require('fs');
 //      e.g. FIREBASE_SERVICE_ACCOUNT_PATH=./firebase-service-account.json
 
 let initialized = false;
+let authInstance = null;
 
 function ensureInitialized() {
   if (initialized) {
@@ -41,9 +46,10 @@ function ensureInitialized() {
     return false;
   }
   try {
-    admin.initializeApp({
-      credential: admin.credential.cert(require(resolvedPath)),
+    const app = initializeApp({
+      credential: cert(require(resolvedPath)),
     });
+    authInstance = getAuth(app);
     initialized = true;
     return true;
   } catch (err) {
@@ -64,7 +70,7 @@ async function mintFirebaseToken(userId, claims = {}) {
     return null;
   }
   try {
-    return await admin.auth().createCustomToken(String(userId), claims);
+    return await authInstance.createCustomToken(String(userId), claims);
   } catch (err) {
     console.warn('[firebase-admin] Failed to mint custom token:', err.message);
     return null;

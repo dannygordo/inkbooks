@@ -13,7 +13,6 @@ import { FIREBASE } from "../config";
 const firebaseConfig = {
 	apiKey: FIREBASE.API_KEY,
 	authDomain: FIREBASE.AUTH_DOMAIN,
-	databaseURL: FIREBASE.DATABASE_URL,
 	projectId: FIREBASE.PROJECT_ID,
 	storageBucket: FIREBASE.STORAGE_BUCKET,
 	messagingSenderId: FIREBASE.MESSAGING_SENDER_ID,

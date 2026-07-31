@@ -1,10 +1,9 @@
-const { AuthenticationError } = require('apollo-server');
 const Client = require('../../models/Client');
-const checkAuth = require('../../utils/check-auth');
+const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 
 module.exports = {
-  async createClient(
+  createClient: withAuth(async (
     _,
     {
       firstName,
@@ -20,9 +19,7 @@ module.exports = {
       avatar,
       userId,
     },
-    context,
-  ) {
-    const user = checkAuth(context);
+  ) => {
     const newClient = new Client({
       firstName,
       lastName,
@@ -37,44 +34,29 @@ module.exports = {
       avatar,
       userId,
     });
-    if(user.role <= Constants.ROLES.CLIENT) {
-      const client = await newClient.save();
-      return client;
-    }
-    throw new AuthenticationError('Action not allowed');
-  },
-  async deleteClient(_, { clientId }, context) {
-    const user = checkAuth(context);
+    const client = await newClient.save();
+    return client;
+  }, Constants.ROLES.CLIENT),
+  deleteClient: withAuth(async (_, { clientId }) => {
     try {
       const client = await Client.findById(clientId);
       //TODO: revisit rule that allows a user to delete an client.  Might want to inactive client instead of delete in order to prevent historical documents from breaking
-
-      //if authenticated user is an admin then delete is permitted, otherwise an authentication error will be thrown
-      if (client && user.role === Constants.ROLES.ADMIN) {
+      if (client) {
         await Client.deleteOne({ _id: clientId });
         return 'Client deleted successfully';
       }
-      throw new AuthenticationError('Action not allowed');
+      throw new Error('Client not found');
     } catch (err) {
       throw new Error(err);
     }
-  },
-  async updateClient(_, args, context) {
-    const user = checkAuth(context);
+  }, Constants.ROLES.ADMIN),
+  updateClient: withAuth(async (_, args) => {
     try{
       const client = args.client;
-      console.log('user');
-      console.log(user);
-      if (user.role <= Constants.ROLES.SHOP_ADMIN) {
-
-      console.log('fclient');
-      console.log(client);
-        const res = await Client.findByIdAndUpdate({_id: client.id}, client, {new: true});
-        return res;
-      }
-      throw new AuthenticationError('Action not allowed');
+      const res = await Client.findByIdAndUpdate({_id: client.id}, client, {new: true});
+      return res;
     } catch (err) {
         throw new Error(err);
     }
-  }
+  }, Constants.ROLES.SHOP_ADMIN)
 };

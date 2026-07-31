@@ -1,19 +1,17 @@
 const Client = require('../../models/Client');
-const checkAuth = require('../../utils/check-auth');
+const withAuth = require('../../utils/with-auth');
 
 module.exports = {
   Query: {
-    async getClients(_, args, context) {
-      checkAuth(context);
+    getClients: withAuth(async () => {
       try {
         const clients = await Client.find().sort({ lastName: 1 });
         return clients;
       } catch (err) {
         throw new Error(err);
       }
-    },
-    async getClient(_, { clientId }, context) {
-      checkAuth(context);
+    }),
+    getClient: withAuth(async (_, { clientId }) => {
       try {
         const client = await Client.findById(clientId);
         if (client) {
@@ -22,6 +20,6 @@ module.exports = {
       } catch (err) {
         throw new Error(err);
       }
-    },
+    }),
   },
 };

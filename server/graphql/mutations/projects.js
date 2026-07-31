@@ -1,10 +1,10 @@
-const { AuthenticationError, UserInputError } = require('apollo-server');
 const Project = require('../../models/Project');
-const checkAuth = require('../../utils/check-auth');
+const withAuth = require('../../utils/with-auth');
+const { AuthenticationError, UserInputError } = require('../../utils/errors');
 const { Constants } = require('../../utils/constants');
 
 module.exports = {
-  async createProject(
+  createProject: withAuth(async (
     _,
     {
         title,
@@ -23,9 +23,7 @@ module.exports = {
         status,
         depositAmount,
     },
-    context,
-  ) {
-    const user = checkAuth(context);
+  ) => {
     if(title.trim() === ''){
         throw new UserInputError('Title cannot be empty');
     }
@@ -49,34 +47,28 @@ module.exports = {
         status,
         depositAmount,
     });
-    if(user.role <= Constants.ROLES.CLIENT) {
-      const project = await newProject.save();
-      return project;
-    }
-    throw new AuthenticationError('Action not allowed');
-  },
-  async deleteProject(_, { projectId }, context) {
-    const user = checkAuth(context);
+    const project = await newProject.save();
+    return project;
+  }, Constants.ROLES.CLIENT),
+  deleteProject: withAuth(async (_, { projectId }) => {
     try {
       const project = await Project.findById(projectId);
       //TODO: revisit rule that allows a user to delete an project.  Might want to inactive project instead of delete in order to prevent historical documents from breaking
-
-      //if authenticated user is an admin then delete is permitted, otherwise an authentication error will be thrown
-      if (project && user.role === Constants.ROLES.ADMIN) {
+      if (project) {
         await Project.deleteOne({ _id: projectId });
         return 'Project deleted successfully';
       }
-      throw new AuthenticationError('Action not allowed');
+      throw new Error('Project not found');
     } catch (err) {
       throw new Error(err);
     }
-  },
+  }, Constants.ROLES.ADMIN),
   // NOTE on project.artistId: per the Project resolver in resolvers/index.js
   // (Artist.findOne({ userId: project.artistId })), artistId stores the artist's *User* _id,
   // not the Artist collection's own _id - so comparing it directly against the JWT's user.id
-  // correctly identifies "is this the artist assigned to the project."
-  async updateProject(_, args, context) {
-    const user = checkAuth(context);
+  // correctly identifies "is this the artist assigned to the project." This OR-ownership check
+  // can't be expressed as a single withAuth minRole, so it stays inline.
+  updateProject: withAuth(async (_, args, context, info, user) => {
     try{
       const project = args.project;
       const existingProject = await Project.findById(project.id);
@@ -91,9 +83,8 @@ module.exports = {
     } catch (err) {
         throw new Error(err);
     }
-  },
-  async updateProjectNotes(_, { notes, projectId }, context) {
-    const user = checkAuth(context);
+  }),
+  updateProjectNotes: withAuth(async (_, { notes, projectId }, context, info, user) => {
     try {
       const existingProject = await Project.findById(projectId);
       if (
@@ -107,9 +98,8 @@ module.exports = {
     } catch( err ) {
       throw new Error(err);
     }
-  },
-  async updateProjectTags(_, { tags, projectId }, context) {
-    const user = checkAuth(context);
+  }),
+  updateProjectTags: withAuth(async (_, { tags, projectId }, context, info, user) => {
     try {
       const existingProject = await Project.findById(projectId);
       if (
@@ -123,5 +113,5 @@ module.exports = {
     } catch (err) {
       throw new Error(err);
     }
-  }
+  })
 };

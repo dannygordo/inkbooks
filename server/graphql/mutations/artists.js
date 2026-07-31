@@ -1,10 +1,9 @@
-const { AuthenticationError } = require('apollo-server');
 const Artist = require('../../models/Artist');
-const checkAuth = require('../../utils/check-auth');
+const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 
 module.exports = {
-  async createArtist(
+  createArtist: withAuth(async (
     _,
     {
       firstName,
@@ -26,9 +25,7 @@ module.exports = {
       userId,
       status,
     },
-    context,
-  ) {
-    const user = checkAuth(context);
+  ) => {
     const newArtist = new Artist({
       firstName,
       lastName,
@@ -49,44 +46,29 @@ module.exports = {
       userId,
       status,
     });
-    if(user.role <= Constants.ROLES.SHOP_ADMIN) {
-      const artist = await newArtist.save();
-      return artist;
-    }
-    throw new AuthenticationError('Action not allowed');
-  },
-  async deleteArtist(_, { artistId }, context) {
-    const user = checkAuth(context);
+    const artist = await newArtist.save();
+    return artist;
+  }, Constants.ROLES.SHOP_ADMIN),
+  deleteArtist: withAuth(async (_, { artistId }) => {
     try {
       const artist = await Artist.findById(artistId);
       //TODO: revisit rule that allows a user to delete an artist.  Might want to inactive artist instead of delete in order to prevent historical documents from breaking
-
-      //if authenticated user is an admin then delete is permitted, otherwise an authentication error will be thrown
-      if (artist && user.role === Constants.ROLES.ADMIN) {
+      if (artist) {
         await Artist.deleteOne({ _id: artistId });
         return 'Artist deleted successfully';
       }
-      throw new AuthenticationError('Action not allowed');
+      throw new Error('Artist not found');
     } catch (err) {
       throw new Error(err);
     }
-  },
-  async updateArtist(_, args, context) {
-    const user = checkAuth(context);
+  }, Constants.ROLES.ADMIN),
+  updateArtist: withAuth(async (_, args) => {
     try{
       const artist = args.artist;
-      console.log('user');
-      console.log(user);
-      if (user.role <= Constants.ROLES.SHOP_ADMIN) {
-
-      console.log('fartist');
-      console.log(artist);
-        const res = await Artist.findByIdAndUpdate({_id: artist.id}, artist, {new: true});
-        return res;
-      }
-      throw new AuthenticationError('Action not allowed');
+      const res = await Artist.findByIdAndUpdate({_id: artist.id}, artist, {new: true});
+      return res;
     } catch (err) {
         throw new Error(err);
     }
-  }
+  }, Constants.ROLES.SHOP_ADMIN)
 };

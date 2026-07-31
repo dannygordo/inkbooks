@@ -33,10 +33,10 @@ export const APP_SETTINGS_CONSTANTS = {
 	},
 	DEVELOPMENT: {
 		GRAPHQL_SERVER_URL: 'http://localhost:5500/',
-		SOCKET_IO_SERVER_URL: 'http://localhost:4000/',
+		// Was port 4000 - socket.io no longer has its own listener, it is attached to the
+		// same Express/HTTP server as GraphQL now, so both use port 5500.
+		SOCKET_IO_SERVER_URL: 'http://localhost:5500/',
 	},
-	// GRAPHQL_SERVER_URL: 'http://localhost:5500/',
-	// SOCKET_IO_SERVER_URL: 'http://localhost:4000/',
 	NO_IMAGE_URL:
 		"https://thumbs.dreamstime.com/b/tattoo-machine-icon-sign-symbol-design-tattoo-machine-icon-sign-symbol-149524394.jpg",
 	LOADING_TEXT: "Loading...",

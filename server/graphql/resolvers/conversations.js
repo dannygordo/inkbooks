@@ -1,19 +1,17 @@
 const Conversation = require('../../models/Conversation');
-const checkAuth = require('../../utils/check-auth');
+const withAuth = require('../../utils/with-auth');
 
 module.exports = {
   Query: {
-    async getConversations(_, args, context) {
-      checkAuth(context);
+    getConversations: withAuth(async () => {
       try {
         const conversation = await Conversation.find().sort({ updatedAt: 1 });
         return conversation;
       } catch (err) {
         throw new Error(err);
       }
-    },
-    async getConversationsByMemberId(_, { memberId }, context) {
-      checkAuth(context);
+    }),
+    getConversationsByMemberId: withAuth(async (_, { memberId }) => {
       try {
         const conversation = await Conversation.find({
             members: {
@@ -25,9 +23,8 @@ module.exports = {
         console.log(err);
         throw new Error(err);
       }
-    },
-    async getConversationsByShopId(_, { shopId }, context) {
-        checkAuth(context);
+    }),
+    getConversationsByShopId: withAuth(async (_, { shopId }) => {
         try {
           const conversation = await Conversation.find({
               members: {
@@ -39,9 +36,8 @@ module.exports = {
           console.log(err);
           throw new Error(err);
         }
-      },
-    async getConversation(_, { conversationId }, context) {
-      checkAuth(context);
+      }),
+    getConversation: withAuth(async (_, { conversationId }) => {
       try {
         const conversation = await Conversation.findById(conversationId);
         if (conversation) {
@@ -50,9 +46,8 @@ module.exports = {
       } catch (err) {
         throw new Error(err);
       }
-    },
-    async getProjectConversation(_, {artistId, clientId}, context) {
-      checkAuth(context);
+    }),
+    getProjectConversation: withAuth(async (_, {artistId, clientId}) => {
       try {
         const conversation = await Conversation.findOne({$and: [{artistId: artistId, clientId: clientId}]});
         if(conversation) {
@@ -61,6 +56,6 @@ module.exports = {
       } catch(err) {
         throw new Error(err);
       }
-    }
+    })
   },
 };

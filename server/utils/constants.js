@@ -25,7 +25,10 @@ module.exports.Constants = {
         AUTHENTICATION_ERROR: 'You are not authorized to perform this action'
     },
     URLS: {
-        INKBOOKS_WEBAPP: 'http://localhost:3000',
-
+        // Was hardcoded to localhost:3000 in every environment - harmless while this was only
+        // used to scope the socket.io CORS origin (nothing enforced it in production), but now
+        // that Express/Apollo's CORS also uses this value, a production deploy needs the real
+        // production origin here or every browser request gets blocked by CORS.
+        INKBOOKS_WEBAPP: process.env.NODE_ENV === 'PRODUCTION' ? 'http://www.inkbooks.net' : 'http://localhost:3000',
     }
 };

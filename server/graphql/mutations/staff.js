@@ -1,10 +1,9 @@
-const { AuthenticationError } = require('apollo-server');
 const Staff = require('../../models/Staff');
-const checkAuth = require('../../utils/check-auth');
+const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 
 module.exports = {
-  async createStaff(
+  createStaff: withAuth(async (
     _,
     {
       firstName,
@@ -23,9 +22,7 @@ module.exports = {
       title,
       shopId
     },
-    context,
-  ) {
-    const user = checkAuth(context);
+  ) => {
     const newStaff = new Staff({
       firstName,
       lastName,
@@ -43,44 +40,29 @@ module.exports = {
       title,
       shopId
     });
-    if(user.role <= Constants.ROLES.SHOP_ADMIN) {
-      const staff = await newStaff.save();
-      return staff;
-    }
-    throw new AuthenticationError('Action not allowed');
-  },
-  async deleteStaff(_, { staffId }, context) {
-    const user = checkAuth(context);
+    const staff = await newStaff.save();
+    return staff;
+  }, Constants.ROLES.SHOP_ADMIN),
+  deleteStaff: withAuth(async (_, { staffId }) => {
     try {
       const staff = await Staff.findById(staffId);
       //TODO: revisit rule that allows a user to delete an staff.  Might want to inactive staff instead of delete in order to prevent historical documents from breaking
-
-      //if authenticated user is an admin then delete is permitted, otherwise an authentication error will be thrown
-      if (staff && user.role === Constants.ROLES.ADMIN) {
+      if (staff) {
         await Staff.deleteOne({ _id: staffId });
         return 'Staff deleted successfully';
       }
-      throw new AuthenticationError('Action not allowed');
+      throw new Error('Staff not found');
     } catch (err) {
       throw new Error(err);
     }
-  },
-  async updateStaff(_, args, context) {
-    const user = checkAuth(context);
+  }, Constants.ROLES.ADMIN),
+  updateStaff: withAuth(async (_, args) => {
     try{
       const staff = args.staff;
-      console.log('user');
-      console.log(user);
-      if (user.role <= Constants.ROLES.SHOP_ADMIN) {
-
-      console.log('fstaff');
-      console.log(staff);
-        const res = await Staff.findByIdAndUpdate({_id: staff.id}, staff, {new: true});
-        return res;
-      }
-      throw new AuthenticationError('Action not allowed');
+      const res = await Staff.findByIdAndUpdate({_id: staff.id}, staff, {new: true});
+      return res;
     } catch (err) {
         throw new Error(err);
     }
-  }
+  }, Constants.ROLES.SHOP_ADMIN)
 };
