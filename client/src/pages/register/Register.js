@@ -42,7 +42,7 @@ const Register = () => {
           confirmPassword: $confirmPassword
           role: $role
           userType: $userType
-          tagColor; $tagColor
+          tagColor: $tagColor
         }
       ){
         id
@@ -78,6 +78,11 @@ const handleClick =  (e) => {
     console.log(password.current.value);
     confirmPassword.current.setCustomValidity("Passwords do not match!!");
   } else {
+    // role/userType are sent here for schema completeness, but the server now hardcodes both
+    // to Client for public self-registration regardless of what's sent (see
+    // server/graphql/resolvers/users.js register()) - this was a real vulnerability (client-
+    // supplied role let anyone register as Admin) and is fixed server-side, not by this
+    // client-side value. Don't rely on this being the security boundary.
     const user = {
       username: username.current.value,
       email: email.current.value,
@@ -85,9 +90,9 @@ const handleClick =  (e) => {
       lastName: lastName.current.value,
       avatar: avatar.current.value,
       password: password.current.value,
-      role: 30, //TODO remove this hardcoded value
-      userType: 'client', //TODO remove this
-      tagColor: '#fff' //TODO remove this
+      role: 30,
+      userType: 'client',
+      tagColor: '#fff'
     };
     registerUser({variables: {
       username: username.current.value,
@@ -97,9 +102,9 @@ const handleClick =  (e) => {
       avatar: avatar.current.value,
       password: password.current.value,
       confirmPassword: confirmPassword.current.value,
-      role: 30, //TODO remove this hardcoded value
-      userType: 'client', //TODO remove this
-      tagColor: '#fff' //TODO remove this
+      role: 30,
+      userType: 'client',
+      tagColor: '#fff'
     }
   });
   }

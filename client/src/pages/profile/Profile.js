@@ -224,7 +224,7 @@ const Profile = () => {
 						<div>
 							<h1>Update Password</h1>
 						</div>
-						<IBUpdatePassword isPublic={false} />
+						<IBUpdatePassword />
 					</IBCardWrapper>
 					{user.userInfo.userType !== "client" ?
 					(<IBCardWrapper>

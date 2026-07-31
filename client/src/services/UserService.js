@@ -26,9 +26,11 @@ const UserService = (() => {
     }
     `;
 
-    const _FORGOT_PASSWORD_MUTATION = gql`
-    mutation ForgotPassword($username: String!, $password: String!) {
-        forgotPassword(username: $username, password: $password) {
+    // Renamed from forgotPassword/FORGOT_PASSWORD_MUTATION: this now requires the caller's
+    // current password and a valid session - see server/graphql/resolvers/users.js for why.
+    const _CHANGE_PASSWORD_MUTATION = gql`
+    mutation ChangePassword($currentPassword: String!, $newPassword: String!) {
+        changePassword(currentPassword: $currentPassword, newPassword: $newPassword) {
             id
             email
             username
@@ -67,7 +69,7 @@ const UserService = (() => {
 
     return {
         UPDATE_USER_MUTATION: _UPDATE_USER_MUTATION,
-        FORGOT_PASSWORD_MUTATION: _FORGOT_PASSWORD_MUTATION,
+        CHANGE_PASSWORD_MUTATION: _CHANGE_PASSWORD_MUTATION,
         getTagColorsByShop: _getTagColorsByShop
     }
 })();

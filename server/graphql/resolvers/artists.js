@@ -1,8 +1,10 @@
 const Artist = require('../../models/Artist');
+const checkAuth = require('../../utils/check-auth');
 
 module.exports = {
   Query: {
-    async getArtists() {
+    async getArtists(_, args, context) {
+      checkAuth(context);
       try {
         const artists = await Artist.find().sort({ startDate: 1 });
         return artists;
@@ -10,7 +12,8 @@ module.exports = {
         throw new Error(err);
       }
     },
-    async getArtist(_, { artistId }) {
+    async getArtist(_, { artistId }, context) {
+      checkAuth(context);
       try {
         const artist = await Artist.findById(artistId);
         if (artist) {
@@ -20,7 +23,8 @@ module.exports = {
         throw new Error(err);
       }
     },
-    async getArtistsByShop(_, { shopId }) {
+    async getArtistsByShop(_, { shopId }, context) {
+      checkAuth(context);
       try {
         const artists = await Artist.find({ shopId: shopId }).sort({ firstName: 1 });
         if (artists) {

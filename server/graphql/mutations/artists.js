@@ -58,18 +58,18 @@ module.exports = {
   async deleteArtist(_, { artistId }, context) {
     const user = checkAuth(context);
     try {
-      const artist = Artist.findById(artistId);
+      const artist = await Artist.findById(artistId);
       //TODO: revisit rule that allows a user to delete an artist.  Might want to inactive artist instead of delete in order to prevent historical documents from breaking
 
       //if authenticated user is an admin then delete is permitted, otherwise an authentication error will be thrown
       if (artist && user.role === Constants.ROLES.ADMIN) {
-        await artist.deleteOne({ artistId });
+        await Artist.deleteOne({ _id: artistId });
         return 'Artist deleted successfully';
       }
       throw new AuthenticationError('Action not allowed');
     } catch (err) {
       throw new Error(err);
-    } 
+    }
   },
   async updateArtist(_, args, context) {
     const user = checkAuth(context);

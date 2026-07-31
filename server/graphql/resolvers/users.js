@@ -1,6 +1,6 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { UserInputError } = require('apollo-server');
+const { UserInputError, AuthenticationError } = require('apollo-server');
 const { SECRET_KEY } = require('../../config');
 const User = require('../../models/User');
 const Artist = require('../../models/Artist');
@@ -99,10 +99,15 @@ module.exports = {
       _,
       {
         registerInput: {
-          username, password, email, firstName, lastName, avatar, confirmPassword, role, userType
+          username, password, email, firstName, lastName, avatar, confirmPassword, tagColor
+          // NOTE: role and userType are intentionally NOT destructured from client input here.
+          // Public self-registration must never let the caller choose their own role - see
+          // PRODUCTION_ROADMAP.md Phase 1, item 3. Every self-registered account is a Client.
         },
       },
     ) {
+      const role = Constants.ROLES.CLIENT;
+      const userType = Constants.USER_TYPE.CLIENT;
       // validates user's input from registration form
       const { valid, errors } = validateRegisterInput(
         username,
@@ -113,8 +118,7 @@ module.exports = {
         password,
         confirmPassword,
         role,
-        userType,
-        tagColor
+        userType
       );
       if (!valid) {
         throw new UserInputError('Errors', { errors });
@@ -198,33 +202,41 @@ module.exports = {
           throw new Error(err);
       }
     },
-    async forgotPassword(_, { username, password }) {
-      console.log('we even here');
-      // check to see if inputs are valid
-      const { errors, valid } = validateLoginInput(username, password);
-      if (!valid) {
-        throw new UserInputError('Errors', { errors });
-      }
+    // Renamed from forgotPassword. The original version reset any user's password given only
+    // their username - no proof of ownership, no email, no token. Combined with the (now also
+    // fixed) unauthenticated getUsers query, that was a complete, zero-credential account
+    // takeover of every user in the system. This now requires a valid session AND the caller's
+    // current password. It intentionally does not help someone who is actually locked out and
+    // logged out - that requires a real email-based reset token flow, which needs a
+    // transactional email provider that isn't set up yet (see PRODUCTION_ROADMAP.md Phase 1,
+    // item 1). Don't loosen this back to a username-only reset.
+    async changePassword(_, { currentPassword, newPassword }, context) {
+      const authUser = checkAuth(context);
 
-      // get user and if not found throw error
-      const user = await User.findOne({ username });
-      if (!user) {
-        errors.general = 'User not found';
-        throw new UserInputError('User not found', {
-          errors: {
-            username: 'Username not found',
-          }
+      if (!newPassword || newPassword.trim() === '') {
+        throw new UserInputError('New password must not be empty', {
+          errors: { newPassword: 'New password must not be empty' },
         });
       }
 
-      // hash password
-      password = await bcrypt.hash(password, 12);
+      const user = await User.findById(authUser.id);
+      if (!user) {
+        throw new AuthenticationError('User not found');
+      }
 
-      // save new user to database and return user object
-      const res = await User.findByIdAndUpdate({_id: user.id}, {password: password}, {new: true});
+      const match = await bcrypt.compare(currentPassword || '', user.password);
+      if (!match) {
+        throw new AuthenticationError('Current password is incorrect');
+      }
+
+      const hashed = await bcrypt.hash(newPassword, 12);
+      const res = await User.findByIdAndUpdate(
+        { _id: user.id },
+        { password: hashed },
+        { new: true }
+      );
 
       const token = generateToken(res);
-      // change _id to id and add access token to the user object the return to caller
       return {
         ...res._doc,
         id: res._id,
@@ -233,7 +245,8 @@ module.exports = {
     }
   },
   Query: {
-    async getUsers() {
+    async getUsers(_, args, context) {
+      checkAuth(context);
       try {
         const users = await User.find().sort({ email: 1 });
         return users;
@@ -241,7 +254,8 @@ module.exports = {
         throw new Error(err);
       }
     },
-    async getUser(_, { userId }) {
+    async getUser(_, { userId }, context) {
+      checkAuth(context);
       try {
         const user = await User.findById(userId);
         if (user) {
@@ -251,7 +265,8 @@ module.exports = {
         throw new Error(err);
       }
     },
-    async getUserTagColors(_, { shopId }) {
+    async getUserTagColors(_, { shopId }, context) {
+      checkAuth(context);
       try {
         let usrIds = [];
         let usrs = [];

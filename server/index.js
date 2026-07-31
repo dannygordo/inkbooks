@@ -1,7 +1,6 @@
 const { DateTypeDefs } = require('graphql-scalars');
 const { ApolloServer } = require('apollo-server');
 const mongoose = require('mongoose');
-const { MONGODB } = require('./config');
 const ibTypeDefs = require('./graphql/typeDefs');
 const resolvers = require('./graphql/resolvers');
 const { Constants } = require('./utils/constants');
@@ -76,17 +75,23 @@ if (process.env.NODE_ENV !== 'PRODUCTION') {
 } else {
   dotenv.config({ path: '.env.production' });
 }
- console.log(process.env.NODE_ENV);
- console.log(process.env.MONGODB);
- console.log(process.env.MONGODB.replace(',',''));
- // look into fixing the mongodb connection string including a comma at the end of the value
+console.log('NODE_ENV:', process.env.NODE_ENV);
+// NOTE: never console.log(process.env.MONGODB) or the connection string anywhere - it contains
+// the database password in plaintext, and this project's server logs have historically ended up
+// in places (terminal scrollback, hosting provider logs) that aren't as private as they should be.
+
+// .env files here previously had a stray trailing comma on every value (an artifact of copying
+// from a JS object literal), which required a runtime .replace(',', '') hack to work around.
+// Trim it here instead so a correctly-formatted .env value (no trailing comma) also works.
+const mongoUri = (process.env.MONGODB || '').replace(/,\s*$/, '');
+if (!mongoUri) {
+  throw new Error('MONGODB environment variable is not set - check your .env file.');
+}
+
 mongoose
-  .connect(process.env.MONGODB.replace(',',''), { useNewUrlParser: true })
+  .connect(mongoUri, { useNewUrlParser: true })
   .then(() => {
     console.log('MongoDB Connected!');
-    console.log(MONGODB);
-    console.log("----");
-    console.log(process.env.MONGODB);
     return server.listen({ port: 5500 });
   })
   .then((res) => {

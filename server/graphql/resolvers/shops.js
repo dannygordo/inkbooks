@@ -1,8 +1,10 @@
 const Shop = require('../../models/Shop');
+const checkAuth = require('../../utils/check-auth');
 
 module.exports = {
     Query: {
-        getShops: async () => {
+        getShops: async (_, args, context) => {
+            checkAuth(context);
             try {
                 const shops = await Shop.find().sort({ name: 1 });
                 return shops;
@@ -11,6 +13,7 @@ module.exports = {
             }
         },
         getShop: async (_,{shopId}, context) => {
+            checkAuth(context);
             try {
                 const shop = await Shop.findById(shopId);
                 if (shop) {

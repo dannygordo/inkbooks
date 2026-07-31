@@ -5,58 +5,63 @@ import { useNavigate } from "react-router-dom";
 import { ALERT_CONSTANTS, ROUTE_CONSTANTS } from "../../constants";
 import { useAuth } from "../../context/auth";
 import UserService from "../../services/UserService";
-import IBInput from "../inputs/IBInput";
 import IBPasswordField from "../inputs/IBPasswordField";
 import "./ibUpdatePassword.css";
 
-const IBUpdatePassword = ({isPublic = false}) => {
+// NOTE: this used to support an `isPublic` mode for a logged-out "forgot password" flow that
+// only asked for a username - no proof of account ownership. That was a full account-takeover
+// vulnerability (see server/graphql/resolvers/users.js changePassword for details) and has been
+// removed. Changing a password now always requires an authenticated session and the current
+// password. A real logged-out reset flow needs an email-based token and isn't built yet.
+const IBUpdatePassword = () => {
 	const currentPasswordRef = useRef();
 	const newPasswordRef = useRef();
 	const confirmNewPasswordRef = useRef();
-	const usernameRef = useRef();
-    const loading = false;
-    const { user, updateCurrentUser, logout, setAlert } = useAuth();
-    const [forgotPassword] = useMutation(UserService.FORGOT_PASSWORD_MUTATION);
-    const navigate = useNavigate();
+    const [loading, setLoading] = useState(false);
+    const { updateCurrentUser, setAlert } = useAuth();
+    const [changePassword] = useMutation(UserService.CHANGE_PASSWORD_MUTATION);
     const [errors, setErrors] = useState({});
 
-    
     const doPasswordsMatch = (password, confirmPassword) => {
+        const newErrors = {};
         if (password.trim() === "") {
-            errors.password = "Password must not be empty";
-            setErrors(errors);
-            return false
-          } else if (password !== confirmPassword) {
-            errors.confirmPassword = "Passwords must match";
-            setErrors(errors);
-            return false;
-          }
-          return true;
+            newErrors.password = "Password must not be empty";
+        } else if (password !== confirmPassword) {
+            newErrors.confirmPassword = "Passwords must match";
+        }
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
     }
 
-    const resetPasswordMutation = (username, password) => {
-        forgotPassword({
-            variables: {
-                username: username,
-                password: password
-            },
-        }).then(({ data: { forgotPassword: usr } }) => {
-            logout();
-            navigate(ROUTE_CONSTANTS.LOGIN);
-        });
-    }
-
-	const handleResetPassword = (e) => {
+	const handleChangePassword = (e) => {
         e.preventDefault();
         if(doPasswordsMatch(newPasswordRef.current.value, confirmNewPasswordRef.current.value)) {
-            if(isPublic) {
-                resetPasswordMutation(usernameRef.current.value, confirmNewPasswordRef.current.value);
-            } else {
-                if(user) {
-                    const test = user.username;
-                    resetPasswordMutation(test, confirmNewPasswordRef.current.value);
-                }
-            }
+            setLoading(true);
+            changePassword({
+                variables: {
+                    currentPassword: currentPasswordRef.current.value,
+                    newPassword: newPasswordRef.current.value,
+                },
+            }).then(({ data: { changePassword: usr } }) => {
+                setLoading(false);
+                updateCurrentUser(usr);
+                setAlert({
+                    isAlert: true,
+                    severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
+                    message: 'Password updated successfully',
+                    timeout: ALERT_CONSTANTS.TIMEOUT,
+                    location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE
+                });
+            }).catch((err) => {
+                setLoading(false);
+                setAlert({
+                    isAlert: true,
+                    severity: ALERT_CONSTANTS.SEVERITY.ERROR,
+                    message: err.message,
+                    timeout: ALERT_CONSTANTS.TIMEOUT,
+                    location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE
+                });
+            });
         } else {
             setAlert({
                 isAlert: true,
@@ -69,26 +74,17 @@ const IBUpdatePassword = ({isPublic = false}) => {
     };
 
 	return (
-        <div className={isPublic ? "resetPassword public" : "resetPassword"}>
+        <div className="resetPassword">
 			<form className="resetPasswordForm">
                 <div className="resetPasswordInputContainer">
                     <div>
-                        {isPublic ?
-                            <IBInput
-                                inputRef={usernameRef}
-                                id='username'
-                                label='Username'
-                                autoFocus={true}
-                                required={false}
-                            /> : 
-                            <IBPasswordField
-                                passwordRef={currentPasswordRef}
-                                label="Current Password"
-                                required={false}
-                                autoFocus={true}
-                                id="password"
-                            />
-                        }
+                        <IBPasswordField
+                            passwordRef={currentPasswordRef}
+                            label="Current Password"
+                            required={false}
+                            autoFocus={true}
+                            id="password"
+                        />
                         <IBPasswordField
                             passwordRef={newPasswordRef}
                             label="New Password"
@@ -104,11 +100,11 @@ const IBUpdatePassword = ({isPublic = false}) => {
                     </div>
                 </div>
                 <div className="resetPasswordButton">
-                    <button type="submit" onClick={handleResetPassword}>
+                    <button type="submit" onClick={handleChangePassword}>
                         {loading ? (
                             <CircularProgress color="inherit" size="20px" />
                         ) : (
-                            "Reset Password"
+                            "Update Password"
                         )}
                     </button>
                 </div>

@@ -46,12 +46,12 @@ module.exports = {
   async deleteClient(_, { clientId }, context) {
     const user = checkAuth(context);
     try {
-      const client = Client.findById(clientId);
+      const client = await Client.findById(clientId);
       //TODO: revisit rule that allows a user to delete an client.  Might want to inactive client instead of delete in order to prevent historical documents from breaking
 
       //if authenticated user is an admin then delete is permitted, otherwise an authentication error will be thrown
       if (client && user.role === Constants.ROLES.ADMIN) {
-        await client.deleteOne({ clientId });
+        await Client.deleteOne({ _id: clientId });
         return 'Client deleted successfully';
       }
       throw new AuthenticationError('Action not allowed');

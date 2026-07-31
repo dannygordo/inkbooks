@@ -1,17 +1,19 @@
 const Project = require('../../models/Project');
+const checkAuth = require('../../utils/check-auth');
 
 const resolvers = {
   Query: {
-    async getProjects(parent, args, context, info ) {
+    async getProjects(parent, args, context) {
+      checkAuth(context);
       try {
-          console.log(info);
         const projects = await Project.find().sort({ createdAt: -1 });
         return projects;
       } catch (err) {
         throw new Error(err);
       }
     },
-    async getProject(_, { projectId }) {
+    async getProject(_, { projectId }, context) {
+      checkAuth(context);
       try {
         const project = await Project.findById(projectId).sort({ 'notes.createdAt': -1});
         if (project) {
@@ -21,9 +23,8 @@ const resolvers = {
         throw new Error(err);
       }
     },
-    async getProjectsByArtist(_, { artistId }) {
-
-      console.log(artistId);
+    async getProjectsByArtist(_, { artistId }, context) {
+      checkAuth(context);
       try {
         const projects = await Project.find({artistId: artistId}).sort({createdAt: -1});
         const results = projects.filter((proj) => {

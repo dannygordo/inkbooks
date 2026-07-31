@@ -1,8 +1,10 @@
 const Message = require('../../models/Message');
+const checkAuth = require('../../utils/check-auth');
 
 module.exports = {
   Query: {
-    async getMessages() {
+    async getMessages(_, args, context) {
+      checkAuth(context);
       try {
         const message = await Message.find().sort({ updatedAt: 1 });
         return message;
@@ -10,7 +12,8 @@ module.exports = {
         throw new Error(err);
       }
     },
-    async getMessagesByConversationId(_, { conversationId }) {
+    async getMessagesByConversationId(_, { conversationId }, context) {
+        checkAuth(context);
         try {
           const message = await Message.find({
               conversationId: conversationId
@@ -20,7 +23,8 @@ module.exports = {
           throw new Error(err);
         }
       },
-    async getMessage(_, { messageId }) {
+    async getMessage(_, { messageId }, context) {
+      checkAuth(context);
       try {
         const message = await Message.findById(messageId);
         if (message) {

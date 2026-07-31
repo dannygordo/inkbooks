@@ -52,12 +52,12 @@ module.exports = {
     async deleteShop(_, { shopId }, context) {
       const user = checkAuth(context);
       try {
-        const shop = Shop.findById(shopId);
+        const shop = await Shop.findById(shopId);
         //TODO: revisit rule that allows a user to delete an shop.  Might want to inactive shop instead of delete in order to prevent historical documents from breaking
-  
+
         //if authenticated user is an admin then delete is permitted, otherwise an authentication error will be thrown
         if (shop && user.role === Constants.ROLES.ADMIN) {
-          await shop.deleteOne({ shopId });
+          await Shop.deleteOne({ _id: shopId });
           return 'Shop deleted successfully';
         }
         throw new AuthenticationError('Action not allowed');

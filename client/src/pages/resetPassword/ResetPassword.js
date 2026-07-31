@@ -1,100 +1,39 @@
 import "./resetPassword.css";
 
 import IBUpdatePassword from "../../components/ibUpdatePassword/IBUpdatePassword";
-import { useRef, useState } from "react";
-import { CircularProgress } from "@mui/material";
 import { useAuth } from "../../context/auth";
-import { useMutation } from "@apollo/client";
-import UserService from "../../services/UserService";
-import IBErrorsList from "../../components/ibErrorsList/IBErrorsList";
-import { useNavigate } from "react-router-dom";
-import { ALERT_CONSTANTS, ROUTE_CONSTANTS } from "../../constants";
+import { Link } from "react-router-dom";
+import { ROUTE_CONSTANTS } from "../../constants";
 
+// This page used to offer a logged-out "forgot password" form that only asked for a username -
+// no email, no token, no proof of ownership. That was a full account-takeover vulnerability
+// (see server/graphql/resolvers/users.js changePassword for the write-up) and has been removed.
+// There is currently no self-service way to reset a password without being logged in - that
+// needs a real email-based reset token flow, which needs a transactional email provider that
+// isn't set up yet (see PRODUCTION_ROADMAP.md Phase 1, item 1). Until then, a logged-in user can
+// change their own password here (or from their Profile page); a logged-out user is directed to
+// contact their shop admin, who can reset it for them via an authenticated updateUser call.
 const ResetPassword = () => {
-	// const currentPasswordRef = useRef();
-	// const newPasswordRef = useRef();
-	// const confirmNewPasswordRef = useRef();
-	// const usernameRef = useRef();
-	// const loading = false;
-    // const { user, updateCurrentUser, logout, setAlert } = useAuth();
-    // const [forgotPassword] = useMutation(UserService.FORGOT_PASSWORD_MUTATION);
-    // const navigate = useNavigate();
-    // const [errors, setErrors] = useState({});
+	const { user } = useAuth();
 
-
-    // const doPasswordsMatch = (password, confirmPassword) => {
-    //     if (password.trim() === "") {
-    //         errors.password = "Password must not be empty";
-    //         setErrors(errors);
-    //         return false
-    //       } else if (password !== confirmPassword) {
-    //         errors.confirmPassword = "Passwords must match";
-    //         setErrors(errors);
-    //         return false;
-    //       }
-    //       return true;
-    // }
-
-    // const resetPasswordMutation = (username, password) => {
-    //     forgotPassword({
-    //         variables: {
-    //             username: username,
-    //             password: password
-    //         },
-    //     }).then(({ data: { forgotPassword: usr } }) => {
-    //         logout();
-    //         navigate(ROUTE_CONSTANTS.LOGIN);
-    //     });
-    // }
-
-	// const handleResetPassword = (e) => {
-    //     e.preventDefault();
-    //     if(doPasswordsMatch(newPasswordRef.current.value, confirmNewPasswordRef.current.value)) {
-    //         if(usernameRef.current.value) {
-    //             resetPasswordMutation(usernameRef.current.value, confirmNewPasswordRef.current.value);
-    //         } else {
-    //             if(user) {
-    //                 const test = user.username;
-    //                 resetPasswordMutation(test, confirmNewPasswordRef.current.value);
-    //             }
-    //         }
-    //     } else {
-    //         setAlert({
-    //             isAlert: true,
-	// 			severity: ALERT_CONSTANTS.SEVERITY.ERROR,
-	// 			message: 'Invalid data',
-	// 			timeout: ALERT_CONSTANTS.TIMEOUT,
-	// 			location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE
-    //         });
-    //     }
-    // };
+	if (!user) {
+		return (
+			<div className="resetPassword public">
+				<p style={{ maxWidth: 400, textAlign: "center" }}>
+					Self-service password reset by email isn't available yet.
+					Please contact your shop administrator to have your
+					password reset, or{" "}
+					<Link to={ROUTE_CONSTANTS.LOGIN}>log in</Link> if you
+					remember it.
+				</p>
+			</div>
+		);
+	}
 
 	return (
-		// <div className="resetPassword">
-		// 	<form className="resetPasswordForm">
-        //         <div className="resetPasswordInputContainer">
-                    <IBUpdatePassword isPublic={true} />
-        //         </div>
-        //         <div className="resetPasswordButton">
-        //             <button type="submit" onClick={handleResetPassword}>
-        //                 {loading ? (
-        //                     <CircularProgress color="inherit" size="20px" />
-        //                 ) : (
-        //                     "Reset Password"
-        //                 )}
-        //             </button>
-        //         </div>
-        //         { Object.keys(errors).length > 0 && (
-        //             <div className="errors">
-        //             <ul className="list">
-        //             {Object.values(errors).map((value) => (
-        //                 <li key={value}>{value}</li>
-        //                 ))}
-        //             </ul>
-        //             </div>
-        //         )}
-		// 	</form>
-		// </div>
+		<div className="resetPassword">
+			<IBUpdatePassword />
+		</div>
 	);
 };
 

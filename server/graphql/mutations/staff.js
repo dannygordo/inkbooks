@@ -52,12 +52,12 @@ module.exports = {
   async deleteStaff(_, { staffId }, context) {
     const user = checkAuth(context);
     try {
-      const staff = Staff.findById(staffId);
+      const staff = await Staff.findById(staffId);
       //TODO: revisit rule that allows a user to delete an staff.  Might want to inactive staff instead of delete in order to prevent historical documents from breaking
 
       //if authenticated user is an admin then delete is permitted, otherwise an authentication error will be thrown
       if (staff && user.role === Constants.ROLES.ADMIN) {
-        await staff.deleteOne({ staffId });
+        await Staff.deleteOne({ _id: staffId });
         return 'Staff deleted successfully';
       }
       throw new AuthenticationError('Action not allowed');

@@ -68,9 +68,11 @@ typings/
 # Yarn Integrity file
 .yarn-integrity
 
-# dotenv environment variables file
+# dotenv environment variables file - ignore all of them, not just .env/.env.test.
+# .env.production and .env.development were previously tracked in git with live credentials
+# in them; that's why this pattern is broader now than the default CRA/create-react-app template.
 .env
-.env.test
+.env.*
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache

@@ -48,12 +48,12 @@ module.exports = {
     async deleteAppointment(_, { appointmentId }, context) {
       const user = checkAuth(context);
       try {
-        const appointment = Appointment.findById(appointmentId);
+        const appointment = await Appointment.findById(appointmentId);
         //TODO: revisit rule that allows a user to delete an appointment.  Might want to inactive appointment instead of delete in order to prevent historical documents from breaking
-  
-        //if authenticated user is an admin then delete is permitted, otherwise an authentication error will be thrown
-        if (appointment && (user.role === Constants.ROLES.ADMIN || user.id === appointment.userId)) {
-          await appointment.deleteOne({ appointmentId });
+
+        //if authenticated user is an admin, or the appointment's own artist/user, delete is permitted
+        if (appointment && (user.role === Constants.ROLES.ADMIN || String(user.id) === String(appointment.userId))) {
+          await Appointment.deleteOne({ _id: appointmentId });
           return 'Appointment deleted successfully';
         }
         throw new AuthenticationError('Action not allowed');
@@ -64,12 +64,11 @@ module.exports = {
       const user = checkAuth(context);
       try{
         const appointment = args.appointmentInput;
-        console.log('user');
-        console.log(user);
-        if (user.role <= Constants.ROLES.SHOP_ADMIN || user.id === appointment.userId) {
-  
-        console.log('fappointment');
-        console.log(appointment);
+        const existingAppointment = await Appointment.findById(appointment.id);
+        if (
+          existingAppointment &&
+          (user.role <= Constants.ROLES.SHOP_ADMIN || String(user.id) === String(existingAppointment.userId))
+        ) {
           const res = await Appointment.findByIdAndUpdate({_id: appointment.id}, appointment, {new: true});
           return res;
         }

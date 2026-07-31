@@ -32,12 +32,12 @@ module.exports = {
     async deleteMessage(_, { messageId }, context) {
       const user = checkAuth(context);
       try {
-        const message = Message.findById(messageId);
+        const message = await Message.findById(messageId);
         //TODO: revisit rule that allows a user to delete an message.  Might want to inactive message instead of delete in order to prevent historical documents from breaking
-  
+
         //if authenticated user is an admin then delete is permitted, otherwise an authentication error will be thrown
         if (message && user.role === Constants.ROLES.ADMIN) {
-          await message.deleteOne({ messageId });
+          await Message.deleteOne({ _id: messageId });
           return 'Message deleted successfully';
         }
         throw new AuthenticationError('Action not allowed');

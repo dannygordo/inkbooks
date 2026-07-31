@@ -311,6 +311,7 @@ module.exports = gql`
     confirmPassword: String!
     role: Int!
     userType: String!
+    tagColor: String
   }
   input AppointmentInput {
     id: ID
@@ -413,7 +414,10 @@ module.exports = gql`
     register(registerInput: RegisterInput): User!
     login(username: String!, password: String!): User!
     updateUser(user: UserUpdateInput): User!
-    forgotPassword(username: String!, password: String!): User!
+    # Renamed from forgotPassword: this now requires an authenticated session and the caller's
+    # current password. A true logged-out "forgot password" flow needs an email-based reset
+    # token and isn't implemented yet (see PRODUCTION_ROADMAP.md Phase 1, item 1).
+    changePassword(currentPassword: String!, newPassword: String!): User!
 
     ######### Artists ###########
 
