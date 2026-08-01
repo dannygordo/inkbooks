@@ -1,0 +1,150 @@
+.guestConversation {
+    width: 100vw;
+    min-height: 100vh;
+    background-color: #f0f2f5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 0;
+    box-sizing: border-box;
+}
+
+.guestConversationWrapper {
+    width: 100%;
+    max-width: 560px;
+    background-color: white;
+    border-radius: 10px;
+    padding: 30px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.guestConversationHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.guestConversationLogo {
+    font-size: 22px;
+    font-weight: 800;
+    color: #1775ee;
+    margin: 0;
+}
+
+.guestConversationStatus {
+    font-size: 13px;
+    font-weight: 600;
+    color: #666;
+    background-color: #f0f2f5;
+    padding: 4px 10px;
+    border-radius: 12px;
+}
+
+.guestConversationSummary {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+    color: #555;
+    background-color: #f8f9fb;
+    border-radius: 8px;
+    padding: 12px 14px;
+}
+
+.guestConversationSummary p {
+    margin: 0 0 6px 0;
+    color: #222;
+    font-size: 14px;
+}
+
+.guestConversationMessages {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 360px;
+    overflow-y: auto;
+    padding: 4px 2px;
+}
+
+.guestConversationEmpty {
+    font-size: 13px;
+    color: #999;
+    text-align: center;
+    padding: 20px 0;
+}
+
+.guestMessage {
+    display: flex;
+}
+
+.guestMessageMine {
+    justify-content: flex-end;
+}
+
+.guestMessageTheirs {
+    justify-content: flex-start;
+}
+
+.guestMessageBubble {
+    max-width: 75%;
+    padding: 10px 14px;
+    border-radius: 14px;
+    font-size: 14px;
+    line-height: 1.4;
+    word-wrap: break-word;
+}
+
+.guestMessageMine .guestMessageBubble {
+    background-color: #1775ee;
+    color: white;
+}
+
+.guestMessageTheirs .guestMessageBubble {
+    background-color: #f0f2f5;
+    color: #222;
+}
+
+.guestConversationInputRow {
+    display: flex;
+    gap: 8px;
+}
+
+.guestConversationInput {
+    flex: 1;
+    height: 44px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: 15px;
+    padding: 0 14px;
+    font-family: inherit;
+}
+
+.guestConversationInput:focus {
+    outline: none;
+    border-color: #1775ee;
+}
+
+.guestConversationSendButton {
+    height: 44px;
+    padding: 0 20px;
+    border-radius: 8px;
+    border: none;
+    background-color: #1775ee;
+    color: white;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.guestConversationSendButton:disabled {
+    background-color: #90b8e8;
+    cursor: not-allowed;
+}
+
+.guestConversationError {
+    font-size: 13px;
+    color: #d32f2f;
+}

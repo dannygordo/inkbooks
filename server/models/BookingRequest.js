@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const IBImageSchema = require('./IBImage');
 
 // See PRODUCTION_ROADMAP.md's "Booking request & guest correspondence" section for the full
 // design this implements.
@@ -30,7 +29,10 @@ const BookingRequestSchema = new mongoose.Schema(
       enum: ['pending', 'consult_booked', 'session_booked', 'declined'],
     },
     description: { type: String, required: true },
-    referenceImages: { type: [IBImageSchema] },
+    // Plain URL strings, not [IBImageSchema] - see the matching comment in graphql/typeDefs.js
+    // (BookingRequest.referenceImages) for why: IBImage requires a real userId, which doesn't
+    // exist yet at the point a guest uploads these, before their User/Client record is created.
+    referenceImages: { type: [String] },
     placement: { type: String },
     size: { type: String },
     budget: { type: String },

@@ -17,6 +17,7 @@ import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import InboxIcon from "@mui/icons-material/MoveToInbox";
 import MailIcon from "@mui/icons-material/Mail";
+import PriceCheckIcon from "@mui/icons-material/PriceCheck";
 import { AuthContext } from "../../context/auth";
 import { APP_SETTINGS_CONSTANTS, ROUTE_CONSTANTS } from "../../constants";
 import InputBase from "@mui/material/InputBase";
@@ -715,6 +716,58 @@ export default function Sidebar() {
 						</ListItemIcon>
 						<ListItemText
 							primary="Shops"
+							sx={{ opacity: open ? 1 : 0 }}
+						/>
+					</ListItemButton>
+					<ListItemButton
+						selected={selectedIndex === 9}
+						onClick={(event) =>
+							handleListItemClick(event, 9, "booking-requests")
+						}
+						key="BookingRequests"
+						sx={{
+							minHeight: 48,
+							justifyContent: open ? "initial" : "center",
+							px: 2.5,
+						}}
+					>
+						<ListItemIcon
+							sx={{
+								minWidth: 0,
+								mr: open ? 3 : "auto",
+								justifyContent: "center",
+							}}
+						>
+							<InboxIcon />
+						</ListItemIcon>
+						<ListItemText
+							primary="Booking Requests"
+							sx={{ opacity: open ? 1 : 0 }}
+						/>
+					</ListItemButton>
+					<ListItemButton
+						selected={selectedIndex === 10}
+						onClick={(event) =>
+							handleListItemClick(event, 10, "shop-cut-confirmations")
+						}
+						key="ShopCutConfirmations"
+						sx={{
+							minHeight: 48,
+							justifyContent: open ? "initial" : "center",
+							px: 2.5,
+						}}
+					>
+						<ListItemIcon
+							sx={{
+								minWidth: 0,
+								mr: open ? 3 : "auto",
+								justifyContent: "center",
+							}}
+						>
+							<PriceCheckIcon />
+						</ListItemIcon>
+						<ListItemText
+							primary="Shop Cut Confirmations"
 							sx={{ opacity: open ? 1 : 0 }}
 						/>
 					</ListItemButton>

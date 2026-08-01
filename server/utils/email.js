@@ -114,9 +114,43 @@ async function sendNewMessageNotificationToArtist({ to, artistFirstName, clientN
   });
 }
 
+// Sent to the shop's own contact email (Shop.email) - not a specific Staff/SHOP_ADMIN user's
+// inbox, since Shop has no owning-User field yet (see resolvers/artistShopConnections.js's
+// comment on the same gap). This is the notification half of the manual mark-paid/confirm
+// dual-control flow (see mutations/shopCutPayments.js) - the shop still has to log in and call
+// confirmShopCutPaid themselves; this email is just the ping that something needs their action.
+async function sendShopCutMarkedPaidNotificationToShop({ to, shopName, artistName, amount }) {
+  const formattedAmount = typeof amount === 'number' ? `$${amount.toFixed(2)}` : 'their shop cut';
+  return sendEmail({
+    to,
+    subject: `${artistName} marked a shop cut as paid`,
+    htmlBody:
+      `<p>Hi ${shopName},</p>` +
+      `<p>${artistName} marked ${formattedAmount} as paid outside the app (e.g. cash). Log in to ` +
+      `InkBooks to review and confirm you received it before it's marked complete.</p>`,
+    textBody:
+      `Hi ${shopName},\n\n${artistName} marked ${formattedAmount} as paid outside the app (e.g. ` +
+      `cash). Log in to InkBooks to review and confirm you received it before it's marked complete.`,
+  });
+}
+
+// Courtesy confirmation back to the artist once the shop has independently confirmed - not part
+// of the security-relevant half of the flow (that's confirmShopCutPaid's own role check), just
+// closes the loop for the artist.
+async function sendShopCutConfirmedNotificationToArtist({ to, artistFirstName, shopName }) {
+  return sendEmail({
+    to,
+    subject: `${shopName} confirmed your payment`,
+    htmlBody: `<p>Hi ${artistFirstName},</p><p>${shopName} confirmed they received your shop-cut payment. This is now marked paid.</p>`,
+    textBody: `Hi ${artistFirstName},\n\n${shopName} confirmed they received your shop-cut payment. This is now marked paid.`,
+  });
+}
+
 module.exports = {
   sendBookingRequestReceivedEmail,
   sendNewMessageNotificationToGuest,
   sendNewBookingRequestNotificationToArtist,
   sendNewMessageNotificationToArtist,
+  sendShopCutMarkedPaidNotificationToShop,
+  sendShopCutConfirmedNotificationToArtist,
 };

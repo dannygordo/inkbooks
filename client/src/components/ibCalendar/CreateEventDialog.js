@@ -24,6 +24,7 @@ const CreateEventDialog = ({ selectedDay }) => {
 	const appointmentTypeRef = useRef();
 	const projectRef = useRef();
 	const descriptionRef = useRef();
+	const shopCutAmountRef = useRef();
 	const [startDateTime, setStartDateTime] = useState(moment.utc(selectedDay));
 	// const [endDateTime, setEndDateTime] = useState(selectedDay);
 	const { loading, data } = ProjectService.fetchProjectsByArtist(user.id);
@@ -39,6 +40,11 @@ const CreateEventDialog = ({ selectedDay }) => {
 
 	const handleSubmit = (e) => {
 		e.preventDefault();
+		// Whole dollars only - matches the existing convention for every other money field in this
+		// schema (total, tip, shopMinimum, hourlyRate are all Int, not Float - see typeDefs.js).
+		const shopCutAmount = shopCutAmountRef.current.value
+			? parseInt(shopCutAmountRef.current.value, 10)
+			: null;
 		let newAppointment = {};
 		if (projectRef.current.value) {
 			newAppointment = {
@@ -48,6 +54,7 @@ const CreateEventDialog = ({ selectedDay }) => {
 				title: titleRef.current.value,
 				description: descriptionRef.current.value,
 				shopCutStatus: "unpaid",
+				shopCutAmount,
 				appointmentStatus: "scheduled",
 				appointmentType: appointmentTypeRef.current.value.toLowerCase(),
 				createdAt: UtilsService.formatDateToISO(Date.now()),
@@ -61,6 +68,7 @@ const CreateEventDialog = ({ selectedDay }) => {
 				title: titleRef.current.value,
 				description: descriptionRef.current.value,
 				shopCutStatus: "unpaid",
+				shopCutAmount,
 				appointmentStatus: "scheduled",
 				appointmentType: appointmentTypeRef.current.value.toLowerCase(),
 				createdAt: UtilsService.formatDateToISO(Date.now()),
@@ -156,6 +164,12 @@ const CreateEventDialog = ({ selectedDay }) => {
 							helperText="Description"
 							inputRef={descriptionRef}
 							// defaultValue={data.getProject.description}
+						/>
+						<IBInput
+							inputRef={shopCutAmountRef}
+							helperText="Shop Cut Amount ($, optional)"
+							placeholder="e.g. 200"
+							type="number"
 						/>
 					</DialogContent>
 					<DialogActions>

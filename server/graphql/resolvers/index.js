@@ -17,6 +17,9 @@ const appointmentResolvers = require('./appointments');
 const appointmentMutations = require('../mutations/appointments');
 const bookingRequestResolvers = require('./bookingRequests');
 const bookingRequestMutations = require('../mutations/bookingRequests');
+const artistShopConnectionResolvers = require('./artistShopConnections');
+const artistShopConnectionMutations = require('../mutations/artistShopConnections');
+const shopCutPaymentMutations = require('../mutations/shopCutPayments');
 const Artist = require('../../models/Artist');
 const Client = require('../../models/Client');
 const { DateResolver, DateTimeResolver } = require('graphql-scalars');
@@ -40,7 +43,8 @@ module.exports = {
     ...messageResolvers.Query,
     ...projectResolvers.Query,
     ...appointmentResolvers.Query,
-    ...bookingRequestResolvers.Query
+    ...bookingRequestResolvers.Query,
+    ...artistShopConnectionResolvers.Query
   },
   Mutation: {
     ...usersResolvers.Mutation,
@@ -52,7 +56,9 @@ module.exports = {
     ...messageMutations,
     ...projectMutations,
     ...appointmentMutations,
-    ...bookingRequestMutations
+    ...bookingRequestMutations,
+    ...artistShopConnectionMutations,
+    ...shopCutPaymentMutations
   },
   Project: {
     artist: async(project, args, context, info) => {

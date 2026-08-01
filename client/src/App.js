@@ -36,6 +36,10 @@ import Profile from "./pages/profile/Profile";
 import ResetPassword from "./pages/resetPassword/ResetPassword";
 import { CalendarProvider } from "./context/calendar";
 import IBModal from "./components/ibModal/IBModal";
+import BookingRequest from "./pages/booking/BookingRequest";
+import GuestConversation from "./pages/booking/GuestConversation";
+import ArtistBookingRequests from "./pages/booking/ArtistBookingRequests";
+import ShopCutConfirmations from "./pages/shopCutConfirmations/ShopCutConfirmations";
 
 function App() {
 	const { user } = useAuth();
@@ -235,6 +239,22 @@ function App() {
 							}
 						/>
 						<Route
+							path="/booking-requests"
+							element={
+								<AuthRoute>
+									<ArtistBookingRequests />
+								</AuthRoute>
+							}
+						/>
+						<Route
+							path="/shop-cut-confirmations"
+							element={
+								<AuthRoute>
+									<ShopCutConfirmations />
+								</AuthRoute>
+							}
+						/>
+						<Route
 							path="/profile"
 							element={
 								<AuthRoute>
@@ -245,6 +265,14 @@ function App() {
 						<Route path="/resetPassword" element={<ResetPassword />} />
 						<Route path="/login" element={user?.id ? <Home /> : <Login />} />
 						<Route path="/register" element={user?.id ? <Home /> : <Register />} />
+						{/* Public, unauthenticated by design - no AuthRoute wrapper, same as
+						/login, /register, /resetPassword above. This is the public intake form a
+						prospective client fills out before any account exists. */}
+						<Route path="/book/:artistId" element={<BookingRequest />} />
+						{/* Token-gated, not auth-gated - see utils/guest-auth.js server-side.
+						Intentionally public/no AuthRoute: the whole point is a guest with no
+						account can reach this. */}
+						<Route path="/booking/:token" element={<GuestConversation />} />
 						<Route
 							path="*"
 							element={

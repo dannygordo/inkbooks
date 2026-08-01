@@ -6,10 +6,11 @@ const Appointment = require('../../models/Appointment');
 const Client = require('../../models/Client');
 const User = require('../../models/User');
 const withAuth = require('../../utils/with-auth');
-const { AuthenticationError, UserInputError } = require('../../utils/errors');
+const { AuthenticationError, UserInputError, RateLimitError } = require('../../utils/errors');
 const { Constants } = require('../../utils/constants');
 const { findOrCreateGuestClient } = require('../../utils/guest-client');
 const { resolveGuestToken } = require('../../utils/guest-auth');
+const { checkRateLimit, getClientIp } = require('../../utils/rate-limit');
 const {
   createBookingRequestInputSchema,
   guestMessageInputSchema,
@@ -26,10 +27,22 @@ const {
 
 module.exports = {
   // Public and unauthenticated by design - this is the intake form, submitted before any
-  // account exists. See PRODUCTION_ROADMAP.md's "Still open" note - rate-limiting/abuse
-  // prevention on this endpoint is tracked separately (task: add rate-limiting to public
-  // booking-request endpoints) and isn't implemented here yet.
-  async createBookingRequest(_, { bookingRequestInput }) {
+  // account exists. Rate-limited by IP: 5 submissions/hour is generous for a real prospective
+  // client (nobody legitimately submits the same intake form five times in an hour) but blocks
+  // scripted spam before it reaches Mongo, floods an artist's inbox, or burns Resend's free
+  // 3,000-email/month quota.
+  async createBookingRequest(_, { bookingRequestInput }, context) {
+    const ip = getClientIp(context.req);
+    const { allowed, retryAfterSeconds } = checkRateLimit(`${ip}:createBookingRequest`, {
+      windowMs: 60 * 60 * 1000,
+      max: 5,
+    });
+    if (!allowed) {
+      throw new RateLimitError(
+        `Too many booking requests from this address. Try again in ${retryAfterSeconds} seconds.`,
+      );
+    }
+
     const { valid, errors, data } = validate(createBookingRequestInputSchema, bookingRequestInput);
     if (!valid) {
       throw new UserInputError('Errors', { errors });
@@ -92,7 +105,28 @@ module.exports = {
   },
 
   // Public, token-gated (not withAuth) - a guest replying on their own booking request's page.
-  async sendGuestMessage(_, { token, message }) {
+  // Rate-limited two ways: by IP (30/hour - generous for a real back-and-forth conversation,
+  // still blocks a script hammering the endpoint) and by the token itself (same limit), since a
+  // token could in principle be replayed from a different IP - the per-token check catches that
+  // even though the 32-byte random token isn't realistically guessable.
+  async sendGuestMessage(_, { token, message }, context) {
+    const ip = getClientIp(context.req);
+    const ipCheck = checkRateLimit(`${ip}:sendGuestMessage`, { windowMs: 60 * 60 * 1000, max: 30 });
+    if (!ipCheck.allowed) {
+      throw new RateLimitError(
+        `Too many messages from this address. Try again in ${ipCheck.retryAfterSeconds} seconds.`,
+      );
+    }
+    const tokenCheck = checkRateLimit(`token:${token}:sendGuestMessage`, {
+      windowMs: 60 * 60 * 1000,
+      max: 30,
+    });
+    if (!tokenCheck.allowed) {
+      throw new RateLimitError(
+        `Too many messages sent. Try again in ${tokenCheck.retryAfterSeconds} seconds.`,
+      );
+    }
+
     const { valid, errors } = validate(guestMessageInputSchema, { message });
     if (!valid) {
       throw new UserInputError('Errors', { errors });

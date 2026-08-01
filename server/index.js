@@ -24,6 +24,9 @@ const { DateTypeDefs } = require('graphql-scalars');
 const ibTypeDefs = require('./graphql/typeDefs');
 const resolvers = require('./graphql/resolvers');
 const { Constants } = require('./utils/constants');
+const bookingUploadsRouter = require('./routes/bookingUploads');
+const { router: squareOAuthRouter } = require('./routes/squareOAuth');
+const squareWebhooksRouter = require('./routes/squareWebhooks');
 
 // NOTE: never console.log(process.env.MONGODB) or the connection string anywhere - it contains
 // the database password in plaintext, and this project's server logs have historically ended up
@@ -38,6 +41,26 @@ if (!mongoUri) {
 }
 
 const app = express();
+// Render (like most PaaS providers) terminates TLS and proxies requests to this app - without
+// this, req.ip returns Render's internal proxy address for every request instead of the real
+// caller's IP, which would silently break IP-based rate limiting (utils/rate-limit.js) by
+// putting every caller in the same bucket.
+app.set('trust proxy', 1);
+// Hoisted to app-level (was previously only applied inside the '/' GraphQL middleware chain
+// below) so the new /booking-uploads route - a plain Express route, not GraphQL - gets the same
+// CORS treatment without duplicating the origin config in two places. Safe to hoist: cors() only
+// sets response headers, it doesn't touch/consume the request body, so it can't interfere with
+// multer's multipart parsing on the upload route or express.json()'s parsing on the GraphQL one.
+app.use(cors({ origin: [Constants.URLS.INKBOOKS_WEBAPP] }));
+app.use(bookingUploadsRouter);
+// squareWebhooksRouter uses express.raw() internally (needs the raw, unparsed body for HMAC
+// signature verification - see routes/squareWebhooks.js) and squareOAuthRouter's callback is a
+// plain GET with no body at all - neither one is affected by the '/' route's express.json()
+// below, since Express only applies path-scoped middleware to matching paths, but registering
+// them here (before '/') keeps all non-GraphQL routes grouped in one place, same as
+// bookingUploadsRouter above.
+app.use(squareOAuthRouter);
+app.use(squareWebhooksRouter);
 // Apollo Server v5 has no standalone listener of its own (that was removed along with the
 // apollo-server package) - it now runs as Express middleware, sharing one HTTP server with
 // socket.io below instead of each having its own port.
@@ -93,10 +116,9 @@ async function start() {
 
   // Mounted at '/' (not '/graphql') to match the URL the client already points at
   // (APP_SETTINGS_CONSTANTS.GRAPHQL_SERVER_URL = 'http://localhost:5500/') - no client change
-  // needed for this part.
+  // needed for this part. cors() is applied app-wide above now, not repeated here.
   app.use(
     '/',
-    cors({ origin: [Constants.URLS.INKBOOKS_WEBAPP] }),
     express.json(),
     expressMiddleware(server, {
       context: async ({ req }) => ({ req }),

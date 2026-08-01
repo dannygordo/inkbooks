@@ -88,7 +88,10 @@ const updateAppointmentInputSchema = z.object({
   description: z.string().nullish(),
   total: z.number().nonnegative().nullish(),
   tip: z.number().nonnegative().nullish(),
-  shopCutStatus: z.enum(['unpaid', 'paid', 'received']).nullish(),
+  shopCutStatus: z
+    .enum(['none', 'unpaid', 'invoice_sent', 'pending_confirmation', 'paid', 'received'])
+    .nullish(),
+  shopCutAmount: z.number().nonnegative().nullish(),
   appointmentType: z.enum(['consult', 'session', 'other']).nullish(),
   appointmentStatus: z
     .enum(['scheduled', 'completed', 'rescheduled', 'cancelled', 'no_show'])
@@ -134,10 +137,13 @@ const createAppointmentInputSchema = z.object({
   description: z.string().nullish(),
   total: z.number().nonnegative().nullish(),
   tip: z.number().nonnegative().nullish(),
-  // Unlike the update schema, these three are required here - Appointment.js's Mongoose schema
-  // already marks all three `required: true`, so omitting them was always going to fail at
-  // `.save()` regardless. This just fails earlier with a clearer message.
-  shopCutStatus: z.enum(['unpaid', 'paid', 'received']),
+  // shopCutStatus is nullish here now, not required - Appointment.js's Mongoose schema itself
+  // dropped `required: true` on this field (see that file's comment) so independent artists with
+  // no shopId aren't forced to send a throwaway value. Defaults to 'none' at the Mongoose layer.
+  shopCutStatus: z
+    .enum(['none', 'unpaid', 'invoice_sent', 'pending_confirmation', 'paid', 'received'])
+    .nullish(),
+  shopCutAmount: z.number().nonnegative().nullish(),
   appointmentType: z.enum(['consult', 'session', 'other']),
   appointmentStatus: z.enum(['scheduled', 'completed', 'rescheduled', 'cancelled', 'no_show']),
   createdAt: dateLikeSchema,
@@ -200,7 +206,12 @@ const createBookingRequestInputSchema = z.object({
     .email('Email must be a valid email address'),
   phone: z.string().nullish(),
   description: z.string().trim().min(1, 'Please describe what you have in mind'),
-  referenceImages: z.array(z.any()).nullish(),
+  // Plain URL strings returned by POST /booking-uploads (routes/bookingUploads.js), not free-form
+  // objects - matches the [String] shape in typeDefs.js/BookingRequest.js. Capped at 5 to match
+  // that route's own MAX_FILES limit; enforced again here since this schema is the actual
+  // security boundary for the mutation, not the upload route (which only controls what a client
+  // *can* attach, not what this mutation *accepts*).
+  referenceImages: z.array(z.string().trim().url('Each reference image must be a valid URL')).max(5).nullish(),
   placement: z.string().nullish(),
   size: z.string().nullish(),
   budget: z.string().nullish(),
@@ -215,6 +226,26 @@ const guestMessageInputSchema = z.object({
 
 const convertBookingRequestInputSchema = z.object({
   outcome: z.enum(['consult_booked', 'session_booked', 'declined']),
+});
+
+// --- Artist-shop connection schema ---
+// See PRODUCTION_ROADMAP.md's "Artist-centric tenancy model" section - this is the minimal slice
+// needed to unblock Appointment.shopId authorization, not the full connection lifecycle.
+const artistShopConnectionInputSchema = z.object({
+  artistId: objectIdSchema,
+  shopId: objectIdSchema,
+});
+
+// --- Shop-cut ledger schemas ---
+// See PRODUCTION_ROADMAP.md's "Shop-cut ledger" section. paymentMethod defaults to 'ach' at the
+// resolver level (see mutations/shopCutPayments.js) - only validated here as an optional override.
+const createShopCutInvoiceInputSchema = z.object({
+  appointmentId: objectIdSchema,
+  paymentMethod: z.enum(['ach', 'card']).nullish(),
+});
+
+const appointmentIdInputSchema = z.object({
+  appointmentId: objectIdSchema,
 });
 
 module.exports = {
@@ -232,5 +263,8 @@ module.exports = {
   createBookingRequestInputSchema,
   guestMessageInputSchema,
   convertBookingRequestInputSchema,
+  artistShopConnectionInputSchema,
+  createShopCutInvoiceInputSchema,
+  appointmentIdInputSchema,
   validate,
 };

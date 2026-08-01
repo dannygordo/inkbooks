@@ -33,4 +33,11 @@ class ForbiddenError extends GraphQLError {
   }
 }
 
-module.exports = { AuthenticationError, UserInputError, ForbiddenError };
+class RateLimitError extends GraphQLError {
+  constructor(message, extensionsInput = {}) {
+    super(message, { extensions: { code: 'RATE_LIMITED', ...extensionsInput } });
+    this.name = 'RateLimitError';
+  }
+}
+
+module.exports = { AuthenticationError, UserInputError, ForbiddenError, RateLimitError };

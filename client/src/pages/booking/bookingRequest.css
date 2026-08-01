@@ -1,0 +1,106 @@
+.bookingRequest {
+    width: 100vw;
+    min-height: 100vh;
+    background-color: #f0f2f5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 0;
+    box-sizing: border-box;
+}
+
+.bookingRequestWrapper {
+    width: 100%;
+    max-width: 480px;
+    background-color: white;
+    border-radius: 10px;
+    padding: 30px;
+    box-sizing: border-box;
+}
+
+.bookingRequestLogo {
+    font-size: 28px;
+    font-weight: 800;
+    color: #1775ee;
+    margin: 0 0 10px 0;
+}
+
+.bookingRequestDesc {
+    font-size: 15px;
+    color: #444;
+    display: block;
+    margin-bottom: 20px;
+}
+
+.bookingRequestBox {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.bookingRequestInput,
+.bookingRequestTextarea {
+    height: 45px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: 15px;
+    padding: 0 14px;
+    font-family: inherit;
+}
+
+.bookingRequestTextarea {
+    height: 100px;
+    padding: 12px 14px;
+    resize: vertical;
+}
+
+.bookingRequestInput:focus,
+.bookingRequestTextarea:focus {
+    outline: none;
+    border-color: #1775ee;
+}
+
+.bookingRequestCheckbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #444;
+}
+
+.bookingRequestUpload {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.bookingRequestUploadLabel {
+    font-size: 13px;
+    color: #666;
+}
+
+.bookingRequestFileList {
+    font-size: 13px;
+    color: #1775ee;
+}
+
+.bookingRequestFieldError {
+    font-size: 13px;
+    color: #d32f2f;
+}
+
+.bookingRequestButton {
+    height: 46px;
+    border-radius: 8px;
+    border: none;
+    background-color: #1775ee;
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.bookingRequestButton:disabled {
+    background-color: #90b8e8;
+    cursor: not-allowed;
+}

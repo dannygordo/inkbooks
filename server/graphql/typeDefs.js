@@ -128,6 +128,11 @@ module.exports = gql`
     logo: String
     billingType: String
     status: Int
+    # Square connection status - deliberately exposes only non-secret fields. The encrypted
+    # access/refresh tokens (see models/Shop.js) never leave the server.
+    squareConnected: Boolean
+    squareLocationId: String
+    squareConnectedAt: DateTime
   }
   input UserUpdateInput {
     id: ID!
@@ -266,6 +271,26 @@ module.exports = gql`
     createdAt: DateTime
     updatedAt: DateTime
   }
+  # Minimal slice of the tenancy model - see models/ArtistShopConnection.js and
+  # PRODUCTION_ROADMAP.md's "Artist-centric tenancy model" section. No invite-link tokens, shop
+  # directory, or billing-tier fields yet - this exists to authorize Appointment.shopId.
+  type ArtistShopConnection {
+    id: ID!
+    artistId: ID!
+    shopId: ID!
+    status: String!
+    disconnectedAt: DateTime
+    createdAt: DateTime
+    updatedAt: DateTime
+  }
+  # Deliberately narrow - see getPublicArtistProfile in resolvers/bookingRequests.js for why this
+  # isn't just the full Artist/User type.
+  type PublicArtistProfile {
+    id: ID!
+    firstName: String!
+    lastName: String!
+    avatar: String
+  }
   # See PRODUCTION_ROADMAP.md's "Booking request & guest correspondence" section for the full
   # design. This is the structured intake content only - back-and-forth correspondence after
   # submission lives in the linked Conversation's Messages, not duplicated here.
@@ -278,7 +303,13 @@ module.exports = gql`
     conversation: Conversation
     status: String!
     description: String!
-    referenceImages: [IBImage]
+    # Plain URL strings, not [IBImage] like Project.referenceImages - IBImage requires a real
+    # userId, but a guest submitting this form has no User/Client record yet (that's only
+    # created inside the createBookingRequest resolver itself). Uploaded ahead of time via the
+    # separate POST /booking-uploads route (routes/bookingUploads.js), which returns plain URLs
+    # for exactly this reason. Project.bodyImages already establishes [String] as a valid
+    # pattern in this schema, so this isn't a new shape.
+    referenceImages: [String]
     placement: String
     size: String
     budget: String
@@ -296,7 +327,7 @@ module.exports = gql`
     email: String!
     phone: String
     description: String!
-    referenceImages: [IBImageInput]
+    referenceImages: [String]
     placement: String
     size: String
     budget: String
@@ -366,6 +397,7 @@ module.exports = gql`
     total: Int
     tip: Int
     shopCutStatus: String
+    shopCutAmount: Int
     appointmentType: String
     appointmentStatus: String
     createdAt: DateTime
@@ -377,7 +409,10 @@ module.exports = gql`
     appointmentDate: DateTime!
     projectId: ID
     project: Project
-    shopId: ID!
+    # Was ID! - broke serialization for independent artists (no shop, so no shopId at all).
+    # models/Appointment.js's Mongoose schema never required this; the GraphQL type just hadn't
+    # been fixed to match until now.
+    shopId: ID
     shop: Shop
     userId: ID
     user: User
@@ -386,10 +421,25 @@ module.exports = gql`
     total: Int
     tip: Int
     shopCutStatus: String!
+    # Shop-cut ledger fields - see PRODUCTION_ROADMAP.md's "Shop-cut ledger" section.
+    shopCutAmount: Int
+    shopCutPaymentMethod: String
+    shopCutSquareInvoiceId: String
+    shopCutMarkedPaidBy: ID
+    shopCutMarkedPaidAt: DateTime
+    shopCutConfirmedBy: ID
+    shopCutConfirmedAt: DateTime
     appointmentType: String!
     appointmentStatus: String!
     createdAt: DateTime
     updatedAt: DateTime
+  }
+  # Returned by createShopCutInvoice - the invoiceUrl is surfaced directly so the client can show
+  # a "pay now" link immediately without waiting on Square's own email/SMS delivery (see
+  # utils/square.js's createAndPublishShopCutInvoice).
+  type ShopCutInvoiceResult {
+    appointment: Appointment!
+    invoiceUrl: String!
   }
   type Query {
     ######### Appointments ############
@@ -398,17 +448,23 @@ module.exports = gql`
     getAppointmentsByArtist(userId: ID!): [Appointment]
     getAppointment(appointmentId: ID!): Appointment
 
+    ######### Shop-cut ledger ###########
+    # See PRODUCTION_ROADMAP.md's "Shop-cut ledger" section.
+
+    getSquareAuthorizationUrl(shopId: ID!): String!
+    getPendingShopCutConfirmations(shopId: ID!): [Appointment]
+
     ######### Artists ###########
-    
+
     getArtists: [Artist]
     getArtist(artistId: ID!): Artist
     getArtistsByShop(shopId: ID!): [Artist]
-    
+
     ######### Shops ###########
-    
+
     getShops:[Shop]
     getShop(shopId: ID!): Shop
-    
+
     ######### Staff ###########
     
     getStaff: [Staff]
@@ -447,18 +503,32 @@ module.exports = gql`
 
     ######### Booking Requests ###########
 
+    # Public, unauthenticated - see resolvers/bookingRequests.js for why this returns a narrow
+    # PublicArtistProfile rather than the full Artist/User type.
+    getPublicArtistProfile(artistId: ID!): PublicArtistProfile
     # Artist-only (withAuth) - the artist's own dashboard list, not the guest-facing side.
     getBookingRequests(artistId: ID!): [BookingRequest]
     getBookingRequest(bookingRequestId: ID!): BookingRequest
     # Public, token-gated (not withAuth) - resolves a guest's magic link to their own request.
     # See utils/guest-auth.js.
     getBookingRequestByToken(token: String!): BookingRequest
+
+    ######### Artist-Shop Connections ###########
+    # withAuth, ownership-checked - see resolvers/artistShopConnections.js. This is the minimal
+    # slice of the tenancy model needed to authorize Appointment.shopId - not the full
+    # invite-link/shop-directory lifecycle from PRODUCTION_ROADMAP.md.
+    getArtistShopConnections(artistId: ID!): [ArtistShopConnection]
+    getShopArtistConnections(shopId: ID!): [ArtistShopConnection]
   }
   type Mutation {
     ######### Appointments ############
     createAppointment(appointmentInput: AppointmentInput): Appointment
     updateAppointment(appointmentInput: AppointmentInput): Appointment
     deleteAppointment(appointmentId: ID): String
+
+    ######### Artist-Shop Connections ###########
+    connectArtistToShop(artistId: ID!, shopId: ID!): ArtistShopConnection!
+    disconnectArtistFromShop(artistId: ID!, shopId: ID!): ArtistShopConnection!
 
     ######### Users ###########
 
@@ -516,6 +586,15 @@ module.exports = gql`
     ): Shop!
     deleteShop(shopId: ID!): String!
     updateShop(shop: ShopInput): Shop
+    disconnectShopSquare(shopId: ID!): Shop!
+
+    ######### Shop-cut ledger ###########
+    # See PRODUCTION_ROADMAP.md's "Shop-cut ledger" section for the full design: Square Invoices
+    # for the automated path (InkBooks never touches the money), a manual mark-paid/confirm
+    # dual-control path for cash or other off-platform payment.
+    createShopCutInvoice(appointmentId: ID!, paymentMethod: String): ShopCutInvoiceResult!
+    markShopCutPaidManually(appointmentId: ID!): Appointment!
+    confirmShopCutPaid(appointmentId: ID!): Appointment!
 
     ######### Staff ###########
 

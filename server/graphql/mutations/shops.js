@@ -64,5 +64,24 @@ module.exports = {
       } catch (err) {
           throw new Error(err);
       }
-    }, Constants.ROLES.SHOP_ADMIN)
+    }, Constants.ROLES.SHOP_ADMIN),
+    // Clears the stored Square connection - doesn't touch any Appointment already invoiced under
+    // it (an in-flight Square invoice stays payable even after this; only *new* createShopCutInvoice
+    // calls are blocked until the shop reconnects). Doesn't call Square's RevokeToken endpoint -
+    // simplest correct behavior for this minimal slice is "InkBooks forgets this token"; the
+    // seller can also revoke it directly from their own Square dashboard if they want it fully dead.
+    disconnectShopSquare: withAuth(async (_, { shopId }) => {
+      const shop = await Shop.findById(shopId);
+      if (!shop) {
+        throw new Error('Shop not found');
+      }
+      shop.squareConnected = false;
+      shop.squareMerchantId = undefined;
+      shop.squareLocationId = undefined;
+      shop.squareAccessTokenEncrypted = undefined;
+      shop.squareRefreshTokenEncrypted = undefined;
+      shop.squareTokenExpiresAt = undefined;
+      await shop.save();
+      return shop;
+    }, Constants.ROLES.SHOP_ADMIN),
   };
