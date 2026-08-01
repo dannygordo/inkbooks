@@ -82,8 +82,27 @@ const UpdateEventDialog = ({ selectedDay, event }) => {
 					...newAppointment
 				},
 			},
-		});
-		setModal({ ...modal, isOpen: false });
+		})
+			.then(() => {
+				setModal({ ...modal, isOpen: false });
+			})
+			.catch((err) => {
+				// Previously: this mutation's promise was never awaited/caught, and the dialog
+				// closed unconditionally right after firing it - a failed updateAppointment (e.g.
+				// the assertHasShopConnection tenancy check in server/graphql/mutations/
+				// appointments.js rejecting a shopId change, or the same-shop-only immutability
+				// check) failed completely silently, with no error shown and the dialog closing
+				// as if it worked. Now: the modal stays open on failure so the user can see what
+				// went wrong, matching the same fix applied to CreateEventDialog.js and the
+				// convention this file's own invoice/mark-paid handlers already use below.
+				setAlert({
+					isAlert: true,
+					severity: ALERT_CONSTANTS.SEVERITY.ERROR,
+					message: err.message,
+					timeout: ALERT_CONSTANTS.TIMEOUT,
+					location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
+				});
+			});
 	};
 
     const handleProjectChange = (e) =>  {

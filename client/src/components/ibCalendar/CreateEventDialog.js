@@ -2,7 +2,7 @@ import { Save } from "@mui/icons-material";
 import { DialogActions, DialogContent, DialogContentText } from "@mui/material";
 import moment from "moment";
 import React, { useRef, useState } from "react";
-import { APP_SETTINGS_CONSTANTS } from "../../constants";
+import { ALERT_CONSTANTS, APP_SETTINGS_CONSTANTS } from "../../constants";
 import { useCalendar } from "../../context/calendar";
 import IBDateTimePicker from "../inputs/IBDateTimePicker";
 import IBInput from "../inputs/IBInput";
@@ -19,7 +19,7 @@ import UtilsService from "../../services/UtilsService";
 import { letterSpacing } from "@mui/system";
 
 const CreateEventDialog = ({ selectedDay }) => {
-	const { setModal, modal, user } = useAuth();
+	const { setModal, modal, user, setAlert } = useAuth();
 	const titleRef = useRef();
 	const appointmentTypeRef = useRef();
 	const projectRef = useRef();
@@ -93,8 +93,27 @@ const CreateEventDialog = ({ selectedDay }) => {
 				    }
 				});
 			},
-		});
-		setModal({ ...modal, isOpen: false });
+		})
+			.then(() => {
+				setModal({ ...modal, isOpen: false });
+			})
+			.catch((err) => {
+				// Previously: this mutation's promise was never awaited/caught, and the dialog
+				// closed unconditionally right after firing it - a failed createAppointment (e.g.
+				// the assertHasShopConnection tenancy check in server/graphql/mutations/
+				// appointments.js rejecting an artist who isn't connected to the shop yet) failed
+				// completely silently, with no error shown and the dialog closing as if it worked.
+				// Now: the modal stays open on failure so the user can see what went wrong and
+				// correct it, matching the error-alert convention already used by
+				// UpdateEventDialog.js's invoice/mark-paid handlers.
+				setAlert({
+					isAlert: true,
+					severity: ALERT_CONSTANTS.SEVERITY.ERROR,
+					message: err.message,
+					timeout: ALERT_CONSTANTS.TIMEOUT,
+					location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
+				});
+			});
 	};
 
 	const handleProjectChange = (e) => {
