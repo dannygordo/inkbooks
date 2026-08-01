@@ -16,7 +16,11 @@ import { APP_SETTINGS_CONSTANTS } from "./constants";
 import { AuthProvider } from "./context/auth";
 
 const httpLink = createHttpLink({
-	uri: APP_SETTINGS_CONSTANTS[`${process.env.NODE_ENV.toUpperCase()}`].GRAPHQL_SERVER_URL,
+	// Vite doesn't polyfill Node's process.env - it exposes mode via import.meta.env.MODE
+	// instead, which is "development" under the dev server and "production" for a real build,
+	// matching CRA's process.env.NODE_ENV values exactly, so this uppercased lookup still works
+	// unchanged against APP_SETTINGS_CONSTANTS's PRODUCTION/DEVELOPMENT keys.
+	uri: APP_SETTINGS_CONSTANTS[`${import.meta.env.MODE.toUpperCase()}`].GRAPHQL_SERVER_URL,
 });
 const authLink = setContext((_, { headers }) => {
 	// get the authentication token from local storage if it exists

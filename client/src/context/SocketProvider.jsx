@@ -17,7 +17,9 @@ export function SocketProvider({ id, children }) {
 		// with undefined, which defaults to same-origin. In dev that meant it never reached the
 		// real socket.io server on port 5500 at all. Matches the NODE_ENV-scoped lookup already
 		// used for GRAPHQL_SERVER_URL in index.js.
-		const newSocket = io(APP_SETTINGS_CONSTANTS[process.env.NODE_ENV.toUpperCase()].SOCKET_IO_SERVER_URL, {
+		// import.meta.env.MODE (Vite) replaces process.env.NODE_ENV (CRA/webpack) - see index.js's
+		// comment on the same swap. Values match exactly ("development"/"production").
+		const newSocket = io(APP_SETTINGS_CONSTANTS[import.meta.env.MODE.toUpperCase()].SOCKET_IO_SERVER_URL, {
 			query: { id },
 		});
         setSocket(newSocket);

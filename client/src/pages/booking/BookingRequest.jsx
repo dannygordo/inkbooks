@@ -5,11 +5,12 @@ import { gql, useMutation, useQuery } from "@apollo/client";
 import "./bookingRequest.css";
 import { APP_SETTINGS_CONSTANTS } from "../../constants";
 
-// Same NODE_ENV-scoped lookup index.js/SocketProvider.js already use for the GraphQL endpoint -
-// /booking-uploads is a plain Express route on that same server, not a separate host, so it
-// reuses GRAPHQL_SERVER_URL rather than introducing a second env-specific constant.
+// Same import.meta.env.MODE-scoped lookup index.js/SocketProvider.js already use for the
+// GraphQL endpoint (see index.js's comment on why this replaced process.env.NODE_ENV under
+// Vite) - /booking-uploads is a plain Express route on that same server, not a separate host,
+// so it reuses GRAPHQL_SERVER_URL rather than introducing a second env-specific constant.
 const UPLOAD_URL =
-  APP_SETTINGS_CONSTANTS[process.env.NODE_ENV.toUpperCase()].GRAPHQL_SERVER_URL + "booking-uploads";
+  APP_SETTINGS_CONSTANTS[import.meta.env.MODE.toUpperCase()].GRAPHQL_SERVER_URL + "booking-uploads";
 
 const GET_PUBLIC_ARTIST_PROFILE = gql`
   query getPublicArtistProfile($artistId: ID!) {
