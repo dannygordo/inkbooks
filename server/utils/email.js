@@ -56,7 +56,7 @@ async function sendEmail({ to, subject, htmlBody, textBody }) {
 }
 
 // Constants.URLS.INKBOOKS_WEBAPP is already environment-aware (localhost:3000 in dev,
-// www.inkbooks.net in production) from the Phase 2 CORS work - reused here rather than adding a
+// inkbooks.net in production) from the Phase 2 CORS work - reused here rather than adding a
 // second env-specific URL constant.
 function buildGuestConversationLink(guestToken) {
   return `${Constants.URLS.INKBOOKS_WEBAPP}/booking/${guestToken}`;
