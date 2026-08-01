@@ -125,7 +125,12 @@ async function start() {
     }),
   );
 
-  await mongoose.connect(mongoUri, { useNewUrlParser: true });
+  // useNewUrlParser was a MongoDB driver-3.x option that became a permanent no-op once
+  // Mongoose moved to driver 4.x years ago (Mongoose 6 already bundled driver 4) - it did
+  // nothing under 6.x either, but Mongoose 8+ bundles driver 6.x and validates connect()
+  // options more strictly, so a genuinely dead legacy option is worth dropping now rather
+  // than carrying it forward on faith.
+  await mongoose.connect(mongoUri);
   console.log('MongoDB Connected!');
 
   const PORT = process.env.PORT || 5500;
