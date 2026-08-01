@@ -1,4 +1,4 @@
-import { CheckCircleOutline } from "@mui/icons-material";
+import { CheckCircleOutlined } from "@mui/icons-material";
 import { Box, ImageListItem } from "@mui/material";
 import React, { useEffect, useState, useContext } from "react";
 import IBUploadFileWithProgress from "../../../../firebase/IBUploadFileWithProgress";
@@ -66,7 +66,7 @@ const IBProgressItemProject = ({ file, project, title, setUrlList }) => {
 					{progress < 100 ? (
 						<IBCircularProgressWithLabel value={progress} />
 					) : (
-						<CheckCircleOutline
+						<CheckCircleOutlined
 							sx={{ width: 60, height: 60, color: "lightgreen" }}
 						/>
 					)}

@@ -5,7 +5,7 @@ import {
 	Facebook,
 	HomeOutlined,
 	Instagram,
-	MailOutline, 
+	MailOutlined, 
     PhoneAndroidOutlined,
 	PlaceOutlined,
     Money,
@@ -30,7 +30,7 @@ const IBCardShopDetails = (props) => {
         </div>
         <span className="ibCardDetailsTitle">Contact Details</span>
         <div className="ibCardInfoContainer">
-            <MailOutline className="ibCardIcon"/>
+            <MailOutlined className="ibCardIcon"/>
             <span className="ibCardInfoTitle">{shop.email}</span>
         </div>
         <div className="ibCardInfoContainer">

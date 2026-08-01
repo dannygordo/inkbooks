@@ -1,5 +1,5 @@
 import React from "react";
-import ReactDOM from "react-dom";
+import { createRoot } from "react-dom/client";
 import App from "./App";
 import {
 	ApolloClient,
@@ -10,7 +10,6 @@ import {
 import { setContext } from "@apollo/client/link/context";
 import { BrowserRouter } from "react-router-dom";
 import { CacheService } from "./services/CacheService";
-import SimpleReactLightbox from "simple-react-lightbox";
 import { io } from "socket.io-client";
 import { APP_SETTINGS_CONSTANTS } from "./constants";
 import { AuthProvider } from "./context/auth";
@@ -45,15 +44,18 @@ const client = new ApolloClient({
 //   console.log(`You connected with id: ${socket.id}`);
 // });
 
-ReactDOM.render(
+// ReactDOM.render was removed in React 18 in favor of createRoot - this also switches the app
+// onto React 18's concurrent renderer (automatic batching of state updates across timeouts/
+// promises/native event handlers, not just React event handlers as in React 17). No code here
+// relied on synchronous update flushing between state updates, so this is a behind-the-scenes
+// upgrade, not a rewrite.
+const root = createRoot(document.getElementById("root"));
+root.render(
 	<ApolloProvider client={client}>
 		<BrowserRouter>
 			<AuthProvider>
-				<SimpleReactLightbox>
-					<App />
-				</SimpleReactLightbox>
+				<App />
 			</AuthProvider>
 		</BrowserRouter>
-	</ApolloProvider>,
-	document.getElementById("root")
+	</ApolloProvider>
 );

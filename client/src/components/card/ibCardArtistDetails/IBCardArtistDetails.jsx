@@ -3,7 +3,10 @@ import { AuthContext } from "../../../context/auth";
 import {
 	Facebook,
 	Instagram,
-	MailOutline,
+	// MailOutline (bare/default-style export) was removed from @mui/icons-material's current
+	// major - MailOutlined (the outlined-style rendering of the base Mail icon) is the current
+	// export with the same visual look.
+	MailOutlined,
 	PhoneAndroidOutlined
 } from "@mui/icons-material";
 import UtilsService from "../../../services/UtilsService";
@@ -29,7 +32,7 @@ const IBCardArtistDetails = (props) => {
 			</div> */}
 			<span className="ibCardDetailsTitle">Contact Details</span>
 			<div className="ibCardInfoContainer">
-				<MailOutline className="ibCardIcon" />
+				<MailOutlined className="ibCardIcon" />
 				<span className="ibCardInfoTitle">{artist.email}</span>
 			</div>
 			<div className="ibCardInfoContainer">

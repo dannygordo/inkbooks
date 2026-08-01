@@ -1,7 +1,17 @@
 import * as React from "react";
+import { useState } from "react";
 import ImageList from "@mui/material/ImageList";
 import ImageListItem from "@mui/material/ImageListItem";
-import { SRLWrapper } from "simple-react-lightbox";
+// simple-react-lightbox was replaced - it pinned its peer dependency to React 17.0.2 exactly
+// (never updated past version 3.6.9-0, effectively abandoned) and forcing it to install
+// alongside React 18/19 also pulled in a critical vulnerability from its own old dependencies
+// (framer-motion/nano-css). yet-another-react-lightbox is actively maintained and has no React
+// version pin. Its API is a real architectural difference, not a drop-in swap: SRLWrapper
+// declaratively scanned the DOM for <img> tags inside it and built the lightbox automatically;
+// yet-another-react-lightbox instead needs an explicit slides array plus controlled
+// open/index state, with each thumbnail's onClick setting that index - see below.
+import Lightbox from "yet-another-react-lightbox";
+import "yet-another-react-lightbox/styles.css";
 import { Avatar, Tooltip, Typography } from "@mui/material";
 import moment from "moment";
 import { APP_SETTINGS_CONSTANTS } from "../../constants";
@@ -17,8 +27,12 @@ function srcset(image, size, rows = 1, cols = 1) {
 }
 
 const IBImagesList = ({ imageData, updateCallback, imageType }) => {
+	// -1 means closed - yet-another-react-lightbox's own convention (index is which slide to
+	// open on, not just a boolean), reused here rather than a separate open/close flag.
+	const [lightboxIndex, setLightboxIndex] = useState(-1);
+
 	return (
-		<SRLWrapper>
+		<React.Fragment>
 			<ImageList
 				sx={{ height: 275 }}
 				variant="quilted"
@@ -79,6 +93,7 @@ const IBImagesList = ({ imageData, updateCallback, imageType }) => {
 							)}
 							alt={item.title}
 							loading="lazy"
+							onClick={() => setLightboxIndex(index)}
 						/>
 						<Typography
 							variant="body2"
@@ -114,7 +129,16 @@ const IBImagesList = ({ imageData, updateCallback, imageType }) => {
 					</ImageListItem>
 				))}
 			</ImageList>
-		</SRLWrapper>
+			<Lightbox
+				open={lightboxIndex >= 0}
+				close={() => setLightboxIndex(-1)}
+				index={lightboxIndex}
+				slides={imageData.map((item) => ({
+					src: item.url,
+					alt: item.title,
+				}))}
+			/>
+		</React.Fragment>
 	);
 };
 

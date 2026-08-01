@@ -4,7 +4,7 @@ import {
 	Facebook,
 	HomeOutlined,
 	Instagram,
-	MailOutline, 
+	MailOutlined, 
     PhoneAndroidOutlined,
 	PlaceOutlined 
 } from '@mui/icons-material';
@@ -20,7 +20,7 @@ const IBCardClientDetails = (props) => {
         
         <span className="ibCardDetailsTitle">Contact Details</span>
         <div className="ibCardInfoContainer">
-            <MailOutline className="ibCardIcon"/>
+            <MailOutlined className="ibCardIcon"/>
             <span className="ibCardInfoTitle">{client.email}</span>
         </div>
         <div className="ibCardInfoContainer">

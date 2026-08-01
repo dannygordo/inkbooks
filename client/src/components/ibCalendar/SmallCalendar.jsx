@@ -1,5 +1,7 @@
 import { ChevronLeft, ChevronRight } from "@mui/icons-material";
-import { experimentalStyled as styled } from "@mui/material/styles";
+// experimentalStyled was an alpha-era alias for styled() from early MUI 5 - removed in later
+// majors, styled() itself has been the stable name the whole time.
+import { styled } from "@mui/material/styles";
 import { Fab, Grid, Box, Paper } from "@mui/material";
 import moment from "moment";
 import React, { useEffect, useState } from "react";
@@ -100,8 +102,10 @@ const SmallCalendar = () => {
 						spacing={{ xs: 1, md: 1 }}
 						columns={{ xs: 7, sm: 7, md: 7 }}
 					>
+						{/* MUI 6+'s Grid replaced the old item+xs/sm/md breakpoint props with a single
+						    size prop - every non-container Grid is implicitly an "item" now. */}
 						{currentMonth[0].map((day, index) => (
-							<Grid item xs={1} key={index}>
+							<Grid size={1} key={index}>
 								<Item elevation={0}>
 									{day.format("dd").charAt(0)}
 								</Item>
@@ -110,7 +114,7 @@ const SmallCalendar = () => {
 						{currentMonth.map((row, index) => (
 							<React.Fragment key={Date.now() + index}>
 								{row.map((day, idx) => (
-									<Grid item xs={1} key={idx}>
+									<Grid size={1} key={idx}>
 										<Item
 											elevation={0}
 											sx={{ cursor: "pointer" }}

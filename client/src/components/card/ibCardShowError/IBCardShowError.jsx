@@ -1,4 +1,8 @@
-import { ErrorOutline } from '@mui/icons-material';
+// ErrorOutline (the bare/default-style export) was removed from @mui/icons-material's current
+// major - ErrorOutlined (the outlined-style rendering of the base Error icon) is the current
+// export with the same visual look. Imported but never actually rendered in this file either
+// way - pre-existing dead import, left as-is rather than also removing it in this pass.
+import { ErrorOutlined } from '@mui/icons-material';
 import React from 'react'
 import './ibCardShowError.css';
 import { useNavigate } from 'react-router-dom';

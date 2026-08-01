@@ -1,5 +1,7 @@
 import "./ibCalendar.css";
-import { experimentalStyled as styled } from "@mui/material/styles";
+// experimentalStyled was an alpha-era alias for styled() from early MUI 5 - removed in later
+// majors, styled() itself has been the stable name the whole time.
+import { styled } from "@mui/material/styles";
 import Day from "./Day";
 import Box from "@mui/material/Box";
 import Paper from "@mui/material/Paper";
@@ -28,8 +30,10 @@ const Month = ({ month }) => {
 			>
 				{month.map((row, index) => (
 					<React.Fragment key={Date.now() + index}>
+						{/* MUI 6+'s Grid replaced the old item+xs/sm/md breakpoint props with a single
+						    size prop - every non-container Grid is implicitly an "item" now. */}
 						{row.map((day, idx) => (
-							<Grid item xs={1} key={idx}>
+							<Grid size={1} key={idx}>
 								<Item>
 									<Day day={day} rowIdx={index}/>
 								</Item>
