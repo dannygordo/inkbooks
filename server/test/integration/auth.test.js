@@ -316,9 +316,16 @@ describe('withAuth: unauthenticated / malformed / expired tokens', () => {
 		expect(errors[0].message).toMatch(/Invalid\/expired token/);
 	});
 
-	it('accepts a valid token for any authenticated resolver (no minRole)', async () => {
-		const { user } = await createArtistUser();
-		const token = signTestToken(user);
+	it('accepts a valid token for an authenticated resolver whose role check it satisfies', async () => {
+		// GET_USERS_QUERY (getUsers) is also this suite's stand-in for "any withAuth-wrapped
+		// resolver" in the token-rejection tests above - that's still valid there, since a missing/
+		// malformed/expired/wrong-secret token is rejected by withAuth before any role check runs.
+		// But getUsers itself is ADMIN-only (see resolvers/users.js - tightened after this test was
+		// first written, since it returned every user account on the platform to any authenticated
+		// caller), so proving "a valid token is accepted" specifically through getUsers now needs
+		// an Admin-role token, not just any authenticated user.
+		const admin = await createUser({ role: Constants.ROLES.ADMIN, userType: Constants.USER_TYPE.STAFF });
+		const token = signTestToken(admin);
 
 		const server = createTestServer();
 		const response = await server.executeOperation(
