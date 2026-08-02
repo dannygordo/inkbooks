@@ -437,17 +437,19 @@ async function seed() {
 
   console.log('\nSeed complete. All accounts share the same password:\n');
   console.log(`  Password: ${DEV_PASSWORD}\n`);
-  console.log('Accounts:');
-  console.log(`  Platform Admin  platformadmin@copperwolf.dev  (no dedicated UI - backend-only role)`);
-  console.log(`  Shop Admin   shopadmin@copperwolf.dev`);
-  console.log(`  Shop Staff   frontdesk@copperwolf.dev`);
-  console.log(`  Artist       maya@copperwolf.dev      (shop-affiliated)`);
-  console.log(`  Artist       jonas@copperwolf.dev      (shop-affiliated)`);
-  console.log(`  Artist       indie@copperwolf.dev      (independent, no shop)`);
-  console.log(`  Client       alex.kim@example.dev`);
-  console.log(`  Client       jordan.lee@example.dev`);
-  console.log(`  Client       taylor.brooks@example.dev`);
-  console.log(`  Client       morgan.diaz@example.dev`);
+  // The login mutation takes USERNAME, not email (see resolvers/users.js's login) - listing
+  // username first here since that's the field that actually matters at the login screen.
+  console.log('Accounts (log in with username + password, not email):');
+  console.log(`  Platform Admin  username: platformadmin  (${'platformadmin@copperwolf.dev'}) - no dedicated UI, backend-only role`);
+  console.log(`  Shop Admin      username: shopadmin       (shopadmin@copperwolf.dev)`);
+  console.log(`  Shop Staff      username: frontdesk       (frontdesk@copperwolf.dev)`);
+  console.log(`  Artist          username: artist.maya     (maya@copperwolf.dev)  - shop-affiliated`);
+  console.log(`  Artist          username: artist.jonas    (jonas@copperwolf.dev) - shop-affiliated`);
+  console.log(`  Artist          username: artist.indie    (indie@copperwolf.dev) - independent, no shop`);
+  console.log(`  Client          username: client.alex     (alex.kim@example.dev)`);
+  console.log(`  Client          username: client.jordan   (jordan.lee@example.dev)`);
+  console.log(`  Client          username: client.taylor   (taylor.brooks@example.dev)`);
+  console.log(`  Client          username: client.morgan   (morgan.diaz@example.dev)`);
   console.log(`\nShop: Copper Wolf Tattoo Co. (${shop._id})`);
 }
 

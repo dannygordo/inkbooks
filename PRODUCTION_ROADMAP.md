@@ -518,8 +518,8 @@ that prompted looking at this at all.
   panels have real threads to display, not empty states).
 
   Every seeded account shares one password (`devpass123`, printed to the console at the end of the
-  run along with every account's email) — this is throwaway local data, not anything security-
-  sensitive.
+  run along with each account's username and email) — this is throwaway local data, not anything
+  security-sensitive. Log in with the username, not the email - see the runbook below.
 
 **Validation performed and its actual limit.** The script was reviewed line-by-line against every
 real Mongoose schema and the real zod enum values in `utils/validation.js` (not the unrelated
@@ -548,8 +548,12 @@ not silently.
 6. `npm run dev` (from `client/`) — no changes needed here at all.
    `client/src/constants/app.js` already auto-selects `http://localhost:5500/` as the GraphQL
    server URL whenever Vite's dev mode is active, which it always is under `npm run dev`.
-7. Log into the running app at `localhost:3000` (or whatever port Vite prints) with any seeded
-   email above and the password `devpass123`.
+7. Log into the running app at `localhost:3000` (or whatever port Vite prints). The login screen
+   takes **username, not email** (`resolvers/users.js`'s `login` looks up `User.findOne({
+   username })`) - use one of: `platformadmin`, `shopadmin`, `frontdesk`, `artist.maya`,
+   `artist.jonas`, `artist.indie`, `client.alex`, `client.jordan`, `client.taylor`, `client.morgan`
+   - password `devpass123` for all of them. `npm run seed`'s own console output lists these same
+   usernames alongside each account's email at the end of the run.
 
 None of this touches Render or Netlify — the point is that ordinary day-to-day development and
 manual testing now happens entirely on your machine, against a database that only you can affect,
