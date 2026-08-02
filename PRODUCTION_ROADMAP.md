@@ -633,9 +633,13 @@ testing pass that turned it from a documented risk into a confirmed, reproduced 
 **Fixed:** `Client.findOne({id: project.clientId})` → `Client.findById(project.clientId)`, matching
 the pattern already used correctly two lines below in the same file's `conversation` resolver. The
 exact same bug pattern (`User.findOne({id: ibImage.userId})`) also existed in the unrelated
-`IBImage.userInfo` resolver in the same file - fixed too, though confirmed via grep that no real
-client query currently selects that field, so it had been silently dead rather than actively
-crashing anything. Added a regression test to `projects.test.js`
+`IBImage.userInfo` resolver in the same file - fixed too. **Correction to the note originally
+written here:** this was first (wrongly) described as dead/unused code based on a grep that turned
+out to be malformed (a stray argument accidentally became part of the search pattern, so it
+silently matched nothing) - `ProjectService.js`'s real `_FETCH_PROJECT_QUERY` (used by the single-
+project detail page, feeding `IBImagesList.jsx`) does select `userInfo { firstName lastName avatar
+id }` on both `referenceImages` and `designImages`. This was a real, live bug, not a dead one - see
+the next entry below, where it actually surfaced. Added a regression test to `projects.test.js`
 (`Project.client field resolver: resolves the actual Client sub-document, not null`) that selects
 `client { id firstName lastName }` on a real `getProjects` response - the same shape
 `ProjectService.js`'s real query already uses, which is exactly what would have caught this from
@@ -684,6 +688,20 @@ appointments), not an edge case specific to independent artists at all. Fixed by
 lines - they added no functional value; the following `setSavedEvents`/`setFilteredEvents` calls
 already use the full array correctly and never depended on them. Also removed the now-unused
 `moment` import this left behind.
+
+**Sixth report - not a new bug, a dev-workflow gap that made an already-fixed bug look unfixed.**
+Saving an image on a project crashed in `IBImagesList.jsx` reading `item.userInfo.firstName` on a
+`null` `userInfo` - which is exactly the `IBImage.userInfo` resolver bug already fixed above
+(`User.findOne({id: ...})` → `User.findById(...)`). The likely explanation: `server/package.json`'s
+`start` script ran plain `node index.js`, not `nodemon` - so a `git pull` alone never picks up
+server-side changes, the process has to be manually stopped and restarted every time. If that
+restart is missed after a pull, every already-fixed server bug looks like it's still broken.
+
+**Fixed the workflow gap, not just this one instance:** `start` now runs `nodemon index.js`
+(nodemon was already a dependency - used only by the oddly-named `start:prod` script before this)
+so the dev server auto-restarts on every file change, the same way `npm run dev` already does for
+the client via Vite. This should prevent this whole class of "did the fix actually not work" false
+alarm from recurring, not just resolve this one report.
 
 **Cleanup done the same day:** `server/config.js` - a dead, gitignored file holding a stale
 hardcoded Atlas connection string with a different (never-rotated) plaintext password - has been
