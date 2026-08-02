@@ -1,3 +1,9 @@
+// Explicit React import - the real `vite build`/`vite dev` pipeline uses @vitejs/plugin-react's
+// automatic JSX runtime and never needed this, but Vitest renders this component via a transform
+// path that doesn't pick up the automatic runtime the same way (same issue already hit and fixed
+// on Login.jsx/Register.jsx) - it's rendered here because CreateEventDialog/UpdateEventDialog's
+// tests actually mount it. See CreateEventDialog.test.jsx/UpdateEventDialog.test.jsx.
+import React from 'react';
 import TextField from '@mui/material/TextField';
 //import AdapterMoment from '@mui/lab/AdapterMoment';
 import {AdapterMoment} from '@mui/x-date-pickers/AdapterMoment';

@@ -1,3 +1,6 @@
+// Explicit React import - see the note in IBDateTimePicker.jsx. Rendered by
+// CreateEventDialog/UpdateEventDialog's tests, which is what surfaced this.
+import React from "react";
 import InputLabel from "@mui/material/InputLabel";
 import MenuItem from "@mui/material/MenuItem";
 import FormHelperText from "@mui/material/FormHelperText";
