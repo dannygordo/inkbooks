@@ -366,7 +366,48 @@ Coverage:
 - Client-side: React 19's automatic JSX runtime (relied on throughout the app with zero explicit `React` imports) isn't picked up the same way by Vitest's test-execution transform - `Login.jsx`/`Register.jsx` needed an explicit `import React from "react"` since they're the two components actually rendered under a test. An `esbuild.jsx: 'automatic'` config attempt didn't fix this (`@vitejs/plugin-react` transforms JSX via Babel, not esbuild) - reverted in favor of the direct import.
 - Also cleaned up: `@apollo/client` 3.14.1's `MockedProvider` deprecation warning on `addTypename={false}` (removed, with matching `__typename` fields added to the affected mocks).
 
-**Still open:** the other `IB*` form input components beyond the calendar dialogs (noted above) remain untested.
+**Closed (August 2, 2026):** all twelve `client/src/components/inputs/*` components now have tests
+- `IBInput`, `IBMultilineInput`, `IBEmailField`, `IBPasswordField`, `IBButton`, `IBSubmitButton`,
+`IBSelect`, `IBProjectPalettesSelect`, `IBProjectsByArtistSelect`, `IBAvatar`, `IBDatePicker`,
+`IBDateTimePicker`. Writing these surfaced three more real, previously-undiscovered bugs, the same
+pattern as the two bugs the auth/CRUD test pass caught:
+
+- **`IBSelect.jsx`'s `handleOnChange`** did `return onChange;` instead of `onChange(e)` - returned
+  the function reference itself rather than calling it, so a caller passing a real `onChange`
+  handler (to drive `selectedVal` as the genuinely controlled value the prop names advertise) had
+  it silently never invoked. Low real-world impact today - every current caller
+  (`IBProjectPalettesSelect`/`CreateEventDialog`/`UpdateEventDialog`) actually reads the selected
+  value at submit time via `inputRef`, not through `onChange` - but it's a real, confirmed defect
+  in a prop contract this component explicitly advertises, and its near-identical sibling
+  `IBProjectsByArtistSelect.jsx` already gets this right, so it was a one-off mistake, not the
+  established pattern. Fixed; regression test added to `IBSelect.test.jsx`.
+- **`IBAvatar.jsx`'s `isOnline` branch** sized its `Avatar` with `sx={{ width: { size }, height:
+  { size } }}` - the `{ size }` shorthand wraps the value in an object (`{ size: size }`), which
+  `sx` interprets as a responsive-breakpoint map with an invalid key (`size` isn't `xs/sm/md/lg/xl`)
+  and silently ignores. The non-`isOnline` branch right below it does this correctly
+  (`width: size, height: size`). Meant the online-status-badge variant of this component never
+  actually respected the `size` prop, always falling back to Avatar's default size. Fixed.
+- **`IBDatePicker.jsx`/`IBDateTimePicker.jsx`'s `renderInput` prop** - removed from MUI X Date
+  Pickers' API in v6 (replaced by `slots`/`slotProps`); this project is on v9.10.1. Confirmed via
+  the installed type definitions that the prop no longer exists at all. It rendered its own default
+  `TextField` regardless, so this was silently ignored rather than crashing (unlike the `Avatar`
+  `imgProps` fix earlier, which leaked onto a real DOM node and warned) - same root cause as that
+  fix, missed during the same MUI 5→9 upgrade. Removed the dead prop from both files.
+
+Also noted, not fixed: `IBButton.jsx` and `IBDatePicker.jsx` are both dead code - neither is
+imported anywhere else in the client (confirmed via grep). `IBButton` additionally has no `onClick`
+prop at all, unlike its sibling `IBSubmitButton`, so it can only ever function as a plain
+`type="submit"` button inside a form. Tested as-is rather than expanding scope to fix or remove
+unused code that wasn't reported broken.
+
+**Verification caveat:** this sandbox cannot execute the client's real Vitest suite (missing
+`@rollup/rollup-linux-x64-gnu` native binary, `npm install` blocked by the same registry
+restriction noted elsewhere in this doc) - every new test file was verified via `@babel/parser`
+(JSX-aware syntax parse) only, plus careful manual tracing against each component's actual
+behavior. The two date-picker tests deliberately assert only that a formatted value contains the
+expected day/year rather than pinning an exact display-format string, since that exact string
+couldn't be confirmed by executing the suite here. **User should run `npm test` after pulling to
+confirm all new tests actually pass, not just parse.**
 
 - **CI:** ✅ Done — `.github/workflows/ci.yml` runs on every push/PR to `main`: a `server` job (`npm ci` + `npm test`, no other setup needed since `test/globalSetup.js` provisions its own in-memory MongoDB and dummy `SECRET_KEY`) and a `client` job (`npm ci` + `npm test` + `npm run build`, confirming the app still actually compiles, not just that tests pass). No lint step yet — there's no ESLint config anywhere in the repo to run; worth adding a real lint setup (and wiring it into this same workflow) as a follow-up, not bundled into this pass.
 - **Error monitoring:** Sentry (or similar) on both client and server — right now errors just go to `console.log`, including some that log full user objects, which you'll want to stop doing before this touches real client PII.

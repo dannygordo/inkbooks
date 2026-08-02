@@ -45,7 +45,7 @@ const IBAvatar = ({ imgUrl, isOnline = false, size, label, cursor = "" }) => {
 					<Avatar
 						alt={label}
 						src={imgUrl}
-						sx={{ width: { size }, height: { size } }}
+						sx={{ width: size, height: size }}
 					/>
 				</StyledBadge>
 			</Stack>
