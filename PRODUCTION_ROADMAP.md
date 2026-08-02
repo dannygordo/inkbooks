@@ -501,15 +501,17 @@ that prompted looking at this at all.
   with `mongodb://localhost` or `mongodb://127.0.0.1` — a deliberate guard against ever pointing
   this destructive script at Atlas by accident.
 
-  Seeded data: one shop (Copper Wolf Tattoo Co.), a Shop Admin, a Shop Staff member, two
-  shop-affiliated Artists (each with a real `ArtistShopConnection`), one independent Artist with no
-  shop connection at all (exercises the artist-centric tenancy path — see that section above), four
-  Clients, four Projects (correctly using the `Project.clientId` = Client sub-document `_id` /
-  `Project.artistId` = artist's own `User._id` convention documented elsewhere in this file),
-  Appointments covering the full `shopCutStatus` lifecycle (`none`/`unpaid`/`pending_confirmation`/
-  `paid`), and two Conversations with real Messages between an artist/client pair each (built via
-  the same `findOrCreateConversationForMembers` logic the app itself uses, so the Messenger and
-  Project-chat panels have real threads to display, not empty states).
+  Seeded data covers every real role: a platform Admin (`Constants.ROLES.ADMIN` - no dedicated
+  client-side UI, but a real login for exercising Admin-only backend behavior like `getUsers`), one
+  shop (Copper Wolf Tattoo Co.), a Shop Admin, a Shop Staff member, two shop-affiliated Artists
+  (each with a real `ArtistShopConnection`), one independent Artist with no shop connection at all
+  (exercises the artist-centric tenancy path — see that section above), four Clients, four Projects
+  (correctly using the `Project.clientId` = Client sub-document `_id` / `Project.artistId` =
+  artist's own `User._id` convention documented elsewhere in this file), Appointments covering the
+  full `shopCutStatus` lifecycle (`none`/`unpaid`/`pending_confirmation`/`paid`), and two
+  Conversations with real Messages between an artist/client pair each (built via the same
+  `findOrCreateConversationForMembers` logic the app itself uses, so the Messenger and Project-chat
+  panels have real threads to display, not empty states).
 
   Every seeded account shares one password (`devpass123`, printed to the console at the end of the
   run along with every account's email) — this is throwaway local data, not anything security-

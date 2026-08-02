@@ -110,6 +110,23 @@ async function seed() {
     status: 1,
   }).save();
 
+  // --- Platform Admin (User only - no Staff/Shop tie, matches the convention already used in
+  // test/integration/users.test.js: Constants.ROLES.ADMIN is a distinct, more-privileged role from
+  // SHOP_ADMIN, with no client-side UI of its own today (no ROLES.ADMIN references anywhere in
+  // client/src) - it exists purely as the backend's top role for things like getUsers. Seeded
+  // anyway so every real role in the system has a real login, not just the ones with dedicated
+  // pages. ---
+  await new User({
+    username: 'platformadmin',
+    email: 'platformadmin@copperwolf.dev',
+    password: hashedPassword,
+    role: Constants.ROLES.ADMIN,
+    userType: Constants.USER_TYPE.STAFF,
+    firstName: 'Alex',
+    lastName: 'Admin',
+    hasSetPassword: true,
+  }).save();
+
   // --- Shop Admin (User + Staff) -------------------------------------------
   const shopAdminUser = await new User({
     username: 'shopadmin',
@@ -421,6 +438,7 @@ async function seed() {
   console.log('\nSeed complete. All accounts share the same password:\n');
   console.log(`  Password: ${DEV_PASSWORD}\n`);
   console.log('Accounts:');
+  console.log(`  Platform Admin  platformadmin@copperwolf.dev  (no dedicated UI - backend-only role)`);
   console.log(`  Shop Admin   shopadmin@copperwolf.dev`);
   console.log(`  Shop Staff   frontdesk@copperwolf.dev`);
   console.log(`  Artist       maya@copperwolf.dev      (shop-affiliated)`);
