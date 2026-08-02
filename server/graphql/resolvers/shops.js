@@ -3,13 +3,27 @@ const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 const square = require('../../utils/square');
 const { signState } = require('../../routes/squareOAuth');
+const { getShopIdsForUser } = require('../../utils/shop-membership');
 
 module.exports = {
     Query: {
-        getShops: withAuth(async () => {
+        // Was withAuth with no restriction at all - any authenticated user, including a Client
+        // with no relationship to any shop, could list every shop on the platform (name, email,
+        // phone, address, Square connection status). SHOP_ADMIN-or-better still sees every shop -
+        // matching the existing, already-documented "no owning-User field on Shop yet to scope a
+        // SHOP_ADMIN to just their own shop" limitation noted in resolvers/artistShopConnections.js,
+        // not a new gap introduced here. Everyone else only sees the shop(s) they're actually
+        // affiliated with, via Staff/Artist/ArtistShopConnection - see utils/shop-membership.js.
+        getShops: withAuth(async (_, __, context, info, user) => {
             try {
-                const shops = await Shop.find().sort({ name: 1 });
-                return shops;
+                if (user.role <= Constants.ROLES.SHOP_ADMIN) {
+                    return await Shop.find().sort({ name: 1 });
+                }
+                const shopIds = await getShopIdsForUser(user.id);
+                if (shopIds.length === 0) {
+                    return [];
+                }
+                return await Shop.find({ _id: { $in: shopIds } }).sort({ name: 1 });
             } catch (err) {
                 throw new Error(err);
             }

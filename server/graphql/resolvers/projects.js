@@ -1,13 +1,42 @@
 const Project = require('../../models/Project');
+const Client = require('../../models/Client');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 const { AuthenticationError } = require('../../utils/errors');
+const { getShopIdsForUser, getArtistIdsForShops } = require('../../utils/shop-membership');
 
 const resolvers = {
   Query: {
-    getProjects: withAuth(async () => {
+    // Was withAuth with no restriction at all - any authenticated user, including a Client,
+    // could list every project (client name/email, artist, notes, reference images, deposit
+    // amount) on the entire platform. SHOP_ADMIN-or-better still sees everyone - see the matching
+    // comment in resolvers/shops.js. Artist sees only their own projects (same scope
+    // getProjectsByArtist already enforces below). Staff sees projects belonging to their own
+    // shop's artists. Client sees only their own projects - note Project.clientId is the Client
+    // sub-document's own _id, not the client's User._id (see resolvers/index.js's Project.client
+    // resolver), so this looks up the caller's own Client doc first.
+    getProjects: withAuth(async (_, __, context, info, user) => {
       try {
-        const projects = await Project.find().sort({ createdAt: -1 });
+        let filter = {};
+        if (user.role <= Constants.ROLES.SHOP_ADMIN) {
+          filter = {};
+        } else if (user.role === Constants.ROLES.ARTIST) {
+          filter = { artistId: user.id };
+        } else if (user.role === Constants.ROLES.SHOP_STAFF) {
+          const shopIds = await getShopIdsForUser(user.id);
+          const artistIds = await getArtistIdsForShops(shopIds);
+          if (artistIds.length === 0) {
+            return [];
+          }
+          filter = { artistId: { $in: artistIds } };
+        } else {
+          const myClient = await Client.findOne({ userId: user.id }).select('_id');
+          if (!myClient) {
+            return [];
+          }
+          filter = { clientId: myClient.id };
+        }
+        const projects = await Project.find(filter).sort({ createdAt: -1 });
         return projects;
       } catch (err) {
         throw new Error(err);
