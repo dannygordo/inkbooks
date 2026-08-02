@@ -746,6 +746,26 @@ on the `IBImage.userInfo` resolver in `resolvers/index.js` that still claimed th
 dead/unused code (an earlier, wrong conclusion from a malformed grep this session, corrected in
 the roadmap at the time but never fixed at the source).
 
+**Ninth report - the identical eighth-bug crash recurred verbatim after the fix above.** Two
+non-exclusive possibilities, both addressed:
+
+1. *Likely, unconfirmed:* Apollo Client's `InMemoryCache` is a plain JS object living in the
+   browser tab's memory for the life of that tab - a `git pull` plus a server/Vite restart does
+   not clear it. If this report came from the same browser tab used for the pre-fix attempt, the
+   tab may still be holding the earlier broken `IBImage` cache entity from before the eighth fix
+   went in; nothing in the fixed code retroactively repairs data already sitting in an open tab's
+   cache. A hard reload (or a fresh tab) forces a real `getProject` network fetch and should not
+   reproduce this. Flagging this explicitly rather than guessing silently, since it changes what
+   "retest" needs to mean here - a `git pull` alone isn't enough for client-side state the way it
+   is for the server.
+2. *Confirmed, real, fixed regardless:* `IBProgressListProject.jsx` called `handleProjectUpdate()`
+   - which fires the `updateProject` mutation, a genuine side effect - directly in the JSX render
+   body, gated only by `urlList.length === files.length`. Calling a side effect during render
+   violates React's render-must-be-pure rule and had no guard against firing again on a later
+   re-render while that condition still happened to hold (e.g. a re-render triggered by the
+   mutation's own cache write completing elsewhere in the tree). Refactored into a `useEffect` with
+   a `hasSubmittedBatch` ref, so the mutation fires exactly once per completed upload batch.
+
 **Cleanup done the same day:** `server/config.js` - a dead, gitignored file holding a stale
 hardcoded Atlas connection string with a different (never-rotated) plaintext password - has been
 deleted. Nothing in the codebase still required it (confirmed via a full-codebase grep before
