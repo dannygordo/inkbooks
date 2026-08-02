@@ -16,4 +16,19 @@ export default defineConfig({
 	server: {
 		port: 3000,
 	},
+	// Vitest reads its config from this same file (no separate vitest.config.js needed) - it just
+	// looks for a top-level `test` key that plain `vite build`/`vite dev` ignore entirely, so this
+	// has zero effect on the real app bundle.
+	//
+	// Note: `esbuild: { jsx: 'automatic' }` was tried here to fix "React is not defined" errors
+	// when Login.jsx/Register.jsx render under Vitest, but had no effect - @vitejs/plugin-react
+	// transforms JSX via its own Babel pipeline, not esbuild, so esbuild's jsx option never gets a
+	// chance to apply to these files. Fixed instead with explicit `import React from "react"` in
+	// Login.jsx/Register.jsx themselves (see those files) - the only two real app components
+	// currently rendered under a test.
+	test: {
+		environment: "jsdom",
+		globals: true,
+		setupFiles: ["./src/test/setup.js"],
+	},
 });

@@ -163,6 +163,24 @@ module.exports = {
       // save new user to database and return user object
       const res = await newUser.save();
 
+      // Was missing entirely - every self-registered account is Constants.USER_TYPE.CLIENT (see
+      // the note above), and login()'s own switch statement unconditionally does
+      // `Client.findOne({ userId: user.id })` then dereferences the result for CLIENT-type users
+      // (`userInfo.id = userInfo._id`) with no null check. Without this, a self-registered user's
+      // *first* session worked (this resolver's own return value stands in for it), but the
+      // moment they tried to log in again for real - a new device, a cleared cache, the next day -
+      // login() crashed with "Cannot read properties of null (reading '_id')" and they could never
+      // get back into their own account. Found while writing a real end-to-end register-then-login
+      // integration test (see test/integration/auth.test.js) - nothing previously exercised both
+      // mutations back to back with a real (non-factory-seeded) Client record.
+      await new Client({
+        firstName,
+        lastName,
+        email,
+        avatar,
+        userId: res._id,
+      }).save();
+
       const token = generateToken(res);
       const firebaseToken = await mintFirebaseToken(res.id, {
         role: res.role,

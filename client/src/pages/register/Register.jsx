@@ -1,4 +1,10 @@
+// Explicit React import - the real `vite build`/`vite dev` pipeline uses @vitejs/plugin-react's
+// automatic JSX runtime and never needed this, but Vitest renders this component via a transform
+// path that doesn't pick up the automatic runtime the same way (confirmed: an esbuild.jsx config
+// override in vite.config.js had no effect, since plugin-react transforms JSX via Babel, not
+// esbuild), throwing "React is not defined" without this import. See Register.test.jsx.
 import { useRef, useState, useContext } from "react";
+import React from "react";
 import "./register.css";
 import { useNavigate } from "react-router-dom";
 import {CircularProgress} from "@mui/material";

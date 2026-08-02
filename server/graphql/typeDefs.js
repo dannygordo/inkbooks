@@ -612,6 +612,14 @@ module.exports = gql`
       avatar: String!
       userId: ID!
       status: Int!
+      # Was missing entirely - resolvers/staff.js's createStaff already destructures both title
+      # and shopId (and models/Staff.js's shopId is required: true), but neither was ever
+      # exposed as a mutation argument here. That meant this mutation could never actually
+      # succeed when called for real: shopId always arrived as undefined and Mongoose's
+      # required-field validation rejected every attempt. Found while writing integration tests
+      # for the Staff CRUD surface - see test/integration/crud.test.js.
+      title: String
+      shopId: ID!
     ): Staff!
     deleteStaff(staffId: ID!): String!
     updateStaff(staff: StaffInput): Staff

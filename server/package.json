@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "start": "NODE_ENV=DEVELOPMENT node index.js",
     "start:prod": "NODE_ENV=PRODUCTION nodemon index.js"
   },
@@ -37,5 +38,10 @@
     "@apollo/protobufjs@1.2.8": true,
     "@firebase/util@1.15.2": true,
     "protobufjs@7.6.5": true
+  },
+  "devDependencies": {
+    "mongodb-memory-server": "^10.2.4",
+    "supertest": "^7.1.4",
+    "vitest": "^3.2.4"
   }
 }

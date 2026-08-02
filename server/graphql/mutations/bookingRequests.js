@@ -196,7 +196,15 @@ module.exports = {
     const appointmentInput = {
       ...(args.appointmentInput || {}),
       appointmentType,
-      userId: clientForAppointment.userId,
+      // .toString() matters here - clientForAppointment.userId is a real Mongoose ObjectId
+      // instance, not a string, and createAppointmentInputSchema's userId field is a zod string
+      // regex check (see utils/validation.js's objectIdSchema). Without this, validate() always
+      // rejected with "expected string, received ObjectId" - meaning converting a booking request
+      // into a real consult/session Appointment was completely broken in production; this bug was
+      // only found by exercising this path end-to-end in a real integration test (see
+      // test/integration/bookingRequests.test.js), since nothing else in this codebase ever
+      // called convertBookingRequest with a real Client record before.
+      userId: clientForAppointment.userId.toString(),
       createdAt: args.appointmentInput?.createdAt || now,
       updatedAt: args.appointmentInput?.updatedAt || now,
     };
