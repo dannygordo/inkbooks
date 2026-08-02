@@ -431,20 +431,19 @@ which already filters out completed/closed projects server-side). All math is co
 client-side from the full appointment list for this artist - fine at current data volume, worth
 revisiting as a dedicated server aggregation resolver if an artist's history grows large.
 
-**Real authorization gap found while building this, not yet fixed:** `getAppointmentsByArtist` and
-`getProjectsByArtist` are wrapped in `withAuth` but have no ownership or role check beyond "is
-logged in" - any authenticated Client can currently query any artist's full appointment history
-(including `total`/`tip`/`shopCutAmount`) or active project list just by passing an arbitrary
-`userId`/`artistId`. This predates the dashboard work (both resolvers already existed), but the new
-dashboard is the first thing that actually surfaces this financial data prominently in the UI,
-which is exactly why it's worth calling out now rather than letting it sit quietly. Needs an
-ownership check (the artist themselves, or shop-admin-or-better) before this ships to real users.
+**Real authorization gap found while building this - fixed August 2, 2026, in the broader
+ownership-check audit below.** `getAppointmentsByArtist` and `getProjectsByArtist` were wrapped in
+`withAuth` but had no ownership or role check beyond "is logged in" - any authenticated Client
+could query any artist's full appointment history (including `total`/`tip`/`shopCutAmount`) or
+active project list just by passing an arbitrary `userId`/`artistId`. Both now enforce "the artist
+themselves, or shop-admin-or-better," with regression tests in `appointments.test.js`/
+`projects.test.js`.
 
-**Also found, not fixed:** `resolvers/index.js`'s `Message.user` resolver references `Staff` (to
-build `userInfo` for a Staff-type message sender) but never imports the `Staff` model in that file
-- a latent `ReferenceError: Staff is not defined` waiting for the first message sent by a Staff
-user. Pre-existing, unrelated to today's changes, found incidentally while adding the avatar field
-resolvers to the same file.
+**Also found - fixed the same day.** `resolvers/index.js`'s `Message.user` resolver referenced
+`Staff` (to build `userInfo` for a Staff-type message sender) without importing the `Staff` model
+in that file - a latent `ReferenceError: Staff is not defined` waiting for the first message sent
+by a Staff user. Fixed as part of the Conversation/Message repair pass below, alongside two other
+bugs in the same resolver (see that section for detail).
 
 **Architecture finding: the UI has no role-aware navigation at all.** `Sidebar.jsx` shows the
 identical nav (Shops, Staff, Artists, Clients, Shop Cut Confirmations, etc.) to every logged-in
@@ -546,13 +545,14 @@ manual testing now happens entirely on your machine, against a database that onl
 with zero Netlify build minutes spent. Netlify usage should now only come from real deploys
 (pushing to `main`), which is what its free tier is actually meant to cover.
 
-**Still open:** `server/config.js` is a dead, gitignored file containing a stale hardcoded Atlas
-connection string with a different (also-should-be-rotated) password — nothing in the codebase
-still requires it (confirmed via a full-codebase grep), so it's a safe delete whenever you want to
-clear it out; flagged here rather than deleted unilaterally since it's your call. The
-`mongodb-memory-server`-based test suite (`npm test`) is completely separate from this local-dev
-database and needs no changes — it already provisions and tears down its own ephemeral `mongod`
-per test run, real local Mongo or not.
+**Cleanup done the same day:** `server/config.js` - a dead, gitignored file holding a stale
+hardcoded Atlas connection string with a different (never-rotated) plaintext password - has been
+deleted. Nothing in the codebase still required it (confirmed via a full-codebase grep before
+removing it); it was gitignored and untracked, so this needed no commit.
+
+The `mongodb-memory-server`-based test suite (`npm test`) is completely separate from this
+local-dev database and needs no changes — it already provisions and tears down its own ephemeral
+`mongod` per test run, real local Mongo or not.
 
 ---
 
