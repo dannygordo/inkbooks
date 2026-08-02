@@ -675,6 +675,16 @@ appointments. Making an independent artist's calendar actually show their own sc
 null-check, and lines up with the "no shop-context switcher anywhere" gap already noted above in
 the UI/UX consistency section - worth a dedicated pass together with that, not guessed at here.
 
+**Fifth real bug found via manual testing, a different mechanism from the `shop`-optional class
+above.** Clicking into Appointments crashed with `Cannot read properties of undefined (reading
+'appointmentDate')` at `IBCalendar.jsx`. Root cause: two leftover debug `console.log` statements
+hard-indexed `data.getAppointmentsByShop[0]` unconditionally, which throws the instant a shop has
+zero appointments - an entirely normal, common state (a brand-new shop, or any shop between
+appointments), not an edge case specific to independent artists at all. Fixed by deleting both
+lines - they added no functional value; the following `setSavedEvents`/`setFilteredEvents` calls
+already use the full array correctly and never depended on them. Also removed the now-unused
+`moment` import this left behind.
+
 **Cleanup done the same day:** `server/config.js` - a dead, gitignored file holding a stale
 hardcoded Atlas connection string with a different (never-rotated) plaintext password - has been
 deleted. Nothing in the codebase still required it (confirmed via a full-codebase grep before

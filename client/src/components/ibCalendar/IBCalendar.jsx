@@ -1,4 +1,3 @@
-import moment from 'moment';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../context/auth';
 import { useCalendar } from '../../context/calendar';
@@ -24,9 +23,13 @@ const IBCalendar = () => {
     const { data, loading } = AppointmentService.getAppointmentsByShop(user.userInfo?.shop?.id);
 
     useEffect(() => {
+        // Was two debug console.log statements hard-indexing data.getAppointmentsByShop[0] -
+        // crashed with "Cannot read properties of undefined (reading 'appointmentDate')" the
+        // instant a shop had zero appointments (an entirely normal, common state - a brand new
+        // shop, or any shop between appointments), not just an independent-artist edge case.
+        // Found via manual testing. Removed - they added no functional value; setSavedEvents/
+        // setFilteredEvents below already use the full array correctly and don't depend on them.
         if(data) {
-            console.log(data.getAppointmentsByShop[0]);
-            console.log(moment.utc(data.getAppointmentsByShop[0].appointmentDate).format('h:mm'))
             setSavedEvents(data.getAppointmentsByShop);
             setFilteredEvents(data.getAppointmentsByShop);
         }
