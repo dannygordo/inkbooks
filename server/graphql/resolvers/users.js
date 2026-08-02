@@ -18,6 +18,7 @@ const {
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 const { mintFirebaseToken } = require('../../utils/firebase-admin');
+const { getShopIdsForUser } = require('../../utils/shop-membership');
 
 function generateToken(user) {
   return jwt.sign(
@@ -247,6 +248,10 @@ module.exports = {
     })
   },
   Query: {
+    // Was withAuth with no restriction at all - any authenticated user, including a Client,
+    // could list every user account on the platform (email, username, role, tagColor). Not
+    // called anywhere in the client (grepped - no caller). Flat-gating to ADMIN closes the hole
+    // without resurrecting a feature nobody uses.
     getUsers: withAuth(async () => {
       try {
         const users = await User.find().sort({ email: 1 });
@@ -254,19 +259,39 @@ module.exports = {
       } catch (err) {
         throw new Error(err);
       }
-    }),
-    getUser: withAuth(async (_, { userId }) => {
+    }, Constants.ROLES.ADMIN),
+    // Was withAuth with no restriction at all - any authenticated user could pass an arbitrary
+    // userId and read that account's full record. Not called anywhere in the client (grepped -
+    // every place that needs "the user behind this Staff/Artist/Client/Message" already resolves
+    // it internally via its own field resolver, e.g. Staff.user in resolvers/index.js, rather
+    // than going through this top-level query). Allowed: shop-admin-or-better, or the user
+    // themselves.
+    getUser: withAuth(async (_, { userId }, context, info, user) => {
       try {
-        const user = await User.findById(userId);
-        if (user) {
-          return user;
+        if (user.role > Constants.ROLES.SHOP_ADMIN && String(user.id) !== String(userId)) {
+          throw new AuthenticationError('Action not allowed');
+        }
+        const foundUser = await User.findById(userId);
+        if (foundUser) {
+          return foundUser;
         } throw new Error('User not found');
       } catch (err) {
         throw new Error(err);
       }
     }),
-    getUserTagColors: withAuth(async (_, { shopId }) => {
+    // Was withAuth with no restriction at all - any authenticated user could pass an arbitrary
+    // shopId and get back the user ids/tag colors of every artist and staff member there. Real
+    // caller (Profile.jsx) always passes the caller's own shop id, so this now requires the
+    // caller actually be affiliated with that shop (or shop-admin-or-better) - same pattern as
+    // getArtistsByShop/getConversationsByShopId.
+    getUserTagColors: withAuth(async (_, { shopId }, context, info, user) => {
       try {
+        if (user.role > Constants.ROLES.SHOP_ADMIN) {
+          const shopIds = await getShopIdsForUser(user.id);
+          if (!shopIds.map(String).includes(String(shopId))) {
+            throw new AuthenticationError('Action not allowed');
+          }
+        }
         let usrIds = [];
         let usrs = [];
         const artists = await Artist.find({shopId: shopId});

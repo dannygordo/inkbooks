@@ -37,6 +37,14 @@ const GET_APPOINTMENTS_BY_SHOP = `
 	}
 `;
 
+const GET_APPOINTMENT = `
+	query GetAppointment($appointmentId: ID!) {
+		getAppointment(appointmentId: $appointmentId) {
+			id
+		}
+	}
+`;
+
 const CREATE_APPOINTMENT = `
 	mutation CreateAppointment($appointmentInput: AppointmentInput) {
 		createAppointment(appointmentInput: $appointmentInput) {
@@ -505,5 +513,94 @@ describe('getAppointmentsByShop: ownership', () => {
 		const { errors, data } = response.body.singleResult;
 		expect(data.getAppointmentsByShop).toBeNull();
 		expect(errors[0].message).toMatch(/Action not allowed/);
+	});
+});
+
+describe('getAppointment: ownership', () => {
+	it('allows the assigned artist to read their own appointment', async () => {
+		const { user: artistUser } = await createArtistUser();
+		const appointment = await createAppointment(artistUser.id);
+		const token = signTestToken(artistUser);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_APPOINTMENT, variables: { appointmentId: appointment.id } },
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.getAppointment.id).toBe(appointment.id);
+	});
+
+	it('allows a Staff member of the appointment\'s shop', async () => {
+		const { shop } = await createShopAdminUser();
+		const { user: artistUser } = await createArtistUser();
+		await connectArtistToShop(artistUser.id, shop.id);
+		const { user: staffUser } = await createStaffUser(shop.id);
+		const appointment = await createAppointment(artistUser.id, { shopId: shop.id });
+		const token = signTestToken(staffUser);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_APPOINTMENT, variables: { appointmentId: appointment.id } },
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.getAppointment.id).toBe(appointment.id);
+	});
+
+	it('rejects a different artist with no connection to this appointment\'s shop', async () => {
+		const { shop } = await createShopAdminUser();
+		const { user: artistUser } = await createArtistUser();
+		const { user: otherArtist } = await createArtistUser();
+		const appointment = await createAppointment(artistUser.id, { shopId: shop.id });
+		const token = signTestToken(otherArtist);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_APPOINTMENT, variables: { appointmentId: appointment.id } },
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(data.getAppointment).toBeNull();
+		expect(errors[0].message).toMatch(/Action not allowed/);
+	});
+
+	it('rejects a Client with no relationship to this appointment', async () => {
+		const { user: artistUser } = await createArtistUser();
+		const { user: clientUser } = await createClientUser();
+		const appointment = await createAppointment(artistUser.id);
+		const token = signTestToken(clientUser);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_APPOINTMENT, variables: { appointmentId: appointment.id } },
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(data.getAppointment).toBeNull();
+		expect(errors[0].message).toMatch(/Action not allowed/);
+	});
+
+	it('allows a Shop Admin regardless of connection', async () => {
+		const { user: artistUser } = await createArtistUser();
+		const appointment = await createAppointment(artistUser.id);
+		const admin = await createUser({ role: Constants.ROLES.ADMIN, userType: Constants.USER_TYPE.STAFF });
+		const token = signTestToken(admin);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_APPOINTMENT, variables: { appointmentId: appointment.id } },
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.getAppointment.id).toBe(appointment.id);
 	});
 });

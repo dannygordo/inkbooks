@@ -66,12 +66,26 @@ module.exports = {
           throw new Error(err);
         }
       }),
-    getAppointment: withAuth(async (_, { appointmentId }) => {
+    // Was withAuth with no restriction at all - any authenticated user could pass an arbitrary
+    // appointmentId and read its full detail, including total/tip/shopCutAmount. Allowed:
+    // shop-admin-or-better, the assigned artist (Appointment.userId, matching
+    // getAppointmentsByArtist's convention), or anyone affiliated with the appointment's shop -
+    // reusing callerBelongsToShop above rather than a flat gate, for the same reason
+    // getAppointmentsByShop can't be one.
+    getAppointment: withAuth(async (_, { appointmentId }, context, info, user) => {
       try {
         const appointment = await Appointment.findById(appointmentId);
-        if (appointment) {
-          return appointment;
-        } throw new Error('Appointment not found');
+        if (!appointment) {
+          throw new Error('Appointment not found');
+        }
+        if (
+          user.role > Constants.ROLES.SHOP_ADMIN &&
+          String(user.id) !== String(appointment.userId) &&
+          !(await callerBelongsToShop(user, appointment.shopId))
+        ) {
+          throw new AuthenticationError('Action not allowed');
+        }
+        return appointment;
       } catch (err) {
         throw new Error(err);
       }
