@@ -66,14 +66,14 @@ module.exports = gql`
     startDate: Date!
     endDate: Date
     hourlyRate: Int
-    // Was ID! - broke the moment any independent artist (no shop connection at all, the
-    // headline scenario of the artist-centric tenancy redesign - see PRODUCTION_ROADMAP.md) got
-    // serialized in a list query: Artist.js's Mongoose schema already allows shopId to be unset,
-    // and ArtistInput.shopId below is already nullable, but this output type never got updated to
-    // match. The mismatch meant "Cannot return null for non-nullable field Artist.shopId" the
-    // instant one existed, which nulls the entire response under Apollo Client's default error
-    // policy - not just that one artist. Same fix already applied to Appointment.shopId during
-    // the shop-cut ledger work; this field was simply missed at the time.
+    # Was ID! - broke the moment any independent artist (no shop connection at all, the
+    # headline scenario of the artist-centric tenancy redesign - see PRODUCTION_ROADMAP.md) got
+    # serialized in a list query: Artist.js's Mongoose schema already allows shopId to be unset,
+    # and ArtistInput.shopId below is already nullable, but this output type never got updated to
+    # match. The mismatch meant "Cannot return null for non-nullable field Artist.shopId" the
+    # instant one existed, which nulls the entire response under Apollo Client's default error
+    # policy - not just that one artist. Same fix already applied to Appointment.shopId during
+    # the shop-cut ledger work; this field was simply missed at the time.
     shopId: ID
     shop: Shop
     userId: ID!
