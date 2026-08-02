@@ -486,9 +486,13 @@ could collide with production. That's now fixed, separately from the Netlify-cre
 that prompted looking at this at all.
 
 **What changed:**
-- `docker-compose.yml` (repo root, new) — a single `mongo:7` service, port `27017`, data in a
-  named volume (`mongo-data`) so it survives restarts. Nothing else in the stack needs
-  containerizing — the Node server and Vite client both already run fine directly on the host.
+- Local MongoDB, installed natively via Homebrew — `brew install mongodb-community` (requires
+  tapping MongoDB's own Homebrew repo first, since it's not in `homebrew-core`: `brew tap
+  mongodb/brew`), running as a lightweight `brew services` background daemon on port `27017`. An
+  initial `docker-compose.yml` was drafted first, then dropped in favor of this - Docker Desktop's
+  VM/container overhead isn't worth it for running exactly one service with nothing else in the
+  stack to containerize; the Node server and Vite client both already run fine directly on the
+  host.
 - `server/.env.development` — `MONGODB` repointed to `mongodb://localhost:27017/inkbooks-dev`. The
   old Atlas connection string is commented out directly below it (not deleted) in case you ever
   need to point back at real data temporarily to debug something — don't leave it uncommented
@@ -530,16 +534,21 @@ fail loudly on that first run (Mongoose validation errors are specific about whi
 not silently.
 
 **How to actually use this, end to end, on your own machine:**
-1. `docker compose up -d` (repo root) — starts local Mongo on `27017`. Confirm it's running with
-   `docker compose ps`.
-2. `cd server && npm run seed` — wipes and repopulates `inkbooks-dev`. Re-run any time you want a
+1. One-time setup: `brew tap mongodb/brew && brew install mongodb-community`.
+2. `brew services start mongodb-community` — starts local Mongo on `27017` as a background
+   service. Runs `brew services list` to confirm `mongodb-community` shows `started`. This is a
+   real background service (like any other `brew services` daemon), not a one-shot command - once
+   started it stays running across terminal sessions and reboots until you `brew services stop
+   mongodb-community` yourself, so you generally only need this step once per machine, not once per
+   session.
+4. `cd server && npm run seed` — wipes and repopulates `inkbooks-dev`. Re-run any time you want a
    clean slate; it's fully repeatable.
-3. `npm start` (from `server/`) — same command as always; `NODE_ENV=DEVELOPMENT` already makes
+5. `npm start` (from `server/`) — same command as always; `NODE_ENV=DEVELOPMENT` already makes
    `index.js` load `.env.development`, which now points at local Mongo instead of Atlas.
-4. `npm run dev` (from `client/`) — no changes needed here at all.
+6. `npm run dev` (from `client/`) — no changes needed here at all.
    `client/src/constants/app.js` already auto-selects `http://localhost:5500/` as the GraphQL
    server URL whenever Vite's dev mode is active, which it always is under `npm run dev`.
-5. Log into the running app at `localhost:3000` (or whatever port Vite prints) with any seeded
+7. Log into the running app at `localhost:3000` (or whatever port Vite prints) with any seeded
    email above and the password `devpass123`.
 
 None of this touches Render or Netlify — the point is that ordinary day-to-day development and
