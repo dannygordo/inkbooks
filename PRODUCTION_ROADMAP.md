@@ -560,6 +560,34 @@ manual testing now happens entirely on your machine, against a database that onl
 with zero Netlify build minutes spent. Netlify usage should now only come from real deploys
 (pushing to `main`), which is what its free tier is actually meant to cover.
 
+**Real bug found via manual testing against this seeded data - fixed.** Clicking into Artists as
+the seeded Shop Admin crashed the whole page (`Cannot read properties of undefined (reading
+'getArtists')`). Root cause: `typeDefs.js`'s `Artist` type marked `shopId`/`userId` as `ID!`
+(non-null), but the seeded independent artist (no shop, by design - the headline scenario of the
+artist-centric tenancy redesign above) had neither set. The instant that record serialized in
+`getArtists`' response, GraphQL threw "Cannot return null for non-nullable field Artist.shopId",
+and Apollo Client's default error policy drops `data` entirely when any error is present - not
+just that one field - which is what actually crashed `Artists.jsx` (it never checked for `error`
+before reading `data.getArtists`, a separate, pre-existing client robustness gap worth a look
+someday, but not the root cause here).
+
+This isn't just a seed-script problem - it's a real, previously-undiscovered schema/design mismatch
+that predates this session's local-dev work. `Artist.js`'s Mongoose schema already allows `shopId`
+to be unset, `ArtistInput.shopId` in the same file is already nullable, and `Appointment.shopId`
+already got this exact fix during the shop-cut ledger work - `Artist.shopId` was simply missed at
+the time. No existing test caught it because no test ever selected `shopId` on a `getArtists`
+response alongside a shopId-less artist - `crud.test.js`'s own `CREATE_ARTIST` mutation only ever
+selected `id`/`firstName`. Any real independent artist created once the invite-link flow (still
+"still open" above) ships would have hit this same crash in production.
+
+**Fixed:** `Artist.shopId: ID!` → `Artist.shopId: ID` in `typeDefs.js` (`userId` stays non-null -
+every artist has a real user account regardless of shop affiliation, that part of the model is a
+real invariant, and the seed script's independent artist was also missing `userId` - a separate,
+straightforward seed-script bug, also fixed). Added a regression test to `crud.test.js`'s Artist
+CRUD block (`getArtists: does not error on an independent artist with no shopId`) that explicitly
+selects `shopId`/`userId` on a `createArtistUser()` fixture (which is itself shopId-less by
+default) - this is the test shape that would have caught this originally.
+
 **Cleanup done the same day:** `server/config.js` - a dead, gitignored file holding a stale
 hardcoded Atlas connection string with a different (never-rotated) plaintext password - has been
 deleted. Nothing in the codebase still required it (confirmed via a full-codebase grep before

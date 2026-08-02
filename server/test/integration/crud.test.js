@@ -248,6 +248,35 @@ describe('Artist CRUD', () => {
 		expect(errors).toBeUndefined();
 		expect(data.deleteArtist).toMatch(/deleted successfully/);
 	});
+
+	// Regression test for a real bug found via manual testing against seeded local data: Artist.
+	// shopId/userId were typed `ID!` (non-null) in typeDefs.js, but createArtistUser() here (and
+	// any genuinely independent artist - the headline scenario of the artist-centric tenancy
+	// redesign, see PRODUCTION_ROADMAP.md) has no shopId set at all. No existing test caught this
+	// because none of them selected `shopId` in a getArtists response alongside a shopId-less
+	// artist - CREATE_ARTIST above only ever selects `id`/`firstName`. The instant a real query
+	// selected `shopId` on a shopId-less artist, GraphQL threw "Cannot return null for non-nullable
+	// field Artist.shopId", which nulls the entire response under Apollo Client's default error
+	// policy - not just that one artist - breaking the whole Artists page. Fixed by making
+	// Artist.shopId nullable in the schema (userId stays non-null - every artist has a real user
+	// account regardless of shop affiliation, that part of the model is a real invariant).
+	it('getArtists: does not error on an independent artist with no shopId', async () => {
+		const { user: shopAdmin } = await createShopAdminUser();
+		await createArtistUser(); // shopId-less by default - see factories.js's createArtistUser
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: '{ getArtists { id shopId userId } }' },
+			{ contextValue: contextWithToken(signTestToken(shopAdmin)) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(Array.isArray(data.getArtists)).toBe(true);
+		const independentArtist = data.getArtists.find((a) => a.shopId === null);
+		expect(independentArtist).toBeDefined();
+		expect(independentArtist.userId).not.toBeNull();
+	});
 });
 
 describe('Shop CRUD', () => {

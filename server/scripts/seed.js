@@ -231,6 +231,12 @@ async function seed() {
     firstName: 'Robin',
     lastName: 'Ashby',
     email: independentArtistUser.email,
+    // Deliberately no shopId - that's the whole point of this fixture. userId is NOT optional
+    // though (every Artist has a real User account regardless of shop affiliation - see
+    // Artist.userId: ID! in typeDefs.js) - this was missing in an earlier version of this script,
+    // which crashed getArtists for every Shop-Admin-or-better caller the moment it ran (Mongoose
+    // allows userId to be unset, but nothing in this app's real data model ever should).
+    userId: independentArtistUser._id,
     title: 'Guest Spot / Illustrative',
     hourlyRate: 140,
     status: Constants.ARTIST_STATUS.ACTIVE,
