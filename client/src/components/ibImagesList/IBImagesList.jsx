@@ -111,7 +111,11 @@ const IBImagesList = ({ imageData, updateCallback, imageType }) => {
 							{moment(item.createdAt).fromNow()}
 						</Typography>
 						<Tooltip
-							title={`${item.userInfo.firstName} ${item.userInfo.lastName}`}
+							title={
+								item.userInfo
+									? `${item.userInfo.firstName} ${item.userInfo.lastName}`
+									: "Unknown uploader"
+							}
 							sx={{
 								position: "absolute",
 								bottom: "3px",
@@ -120,7 +124,7 @@ const IBImagesList = ({ imageData, updateCallback, imageType }) => {
 						>
 							<Avatar
 								src={
-									item.userInfo.avatar ||
+									(item.userInfo && item.userInfo.avatar) ||
 									APP_SETTINGS_CONSTANTS.NO_IMAGE_URL
 								}
 								imgProps={{ "aria-hidden": true }}

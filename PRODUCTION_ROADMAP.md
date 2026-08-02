@@ -555,6 +555,17 @@ not silently.
    - password `devpass123` for all of them. `npm run seed`'s own console output lists these same
    usernames alongside each account's email at the end of the run.
 
+**Important gotcha, found via manual testing (see the tenth report below): re-running `npm run
+seed` while you're still logged in from a previous seed run will silently break things.** The seed
+script wipes and recreates every user with brand-new `_id`s. Your browser keeps its login session
+(JWT + cached user object) in `localStorage` independent of the database - that session stays
+"valid" (same JWT secret, still passes auth) even after the user it points to no longer exists,
+because nothing currently checks whether the referenced user is still real, only that the token's
+signature and expiry are good. Anything you do while in that state - most notably uploading an
+image, which stamps `userId` from your cached session onto the new record - silently writes a
+dangling reference to a deleted user. **Log out and log back in any time you reseed**, before doing
+anything else.
+
 None of this touches Render or Netlify — the point is that ordinary day-to-day development and
 manual testing now happens entirely on your machine, against a database that only you can affect,
 with zero Netlify build minutes spent. Netlify usage should now only come from real deploys
@@ -765,6 +776,25 @@ non-exclusive possibilities, both addressed:
    re-render while that condition still happened to hold (e.g. a re-render triggered by the
    mutation's own cache write completing elsewhere in the tree). Refactored into a `useEffect` with
    a `hasSubmittedBatch` ref, so the mutation fires exactly once per completed upload batch.
+
+**Tenth report - the identical crash persisted through a hard reload and a fresh tab, ruling out
+cache staleness and the render-body-effect theory.** Rather than keep guessing from code, asked
+for ground truth directly: a `mongosh` query against the actual `inkbooks-dev` data showed the
+uploaded image's `userId` was a well-formed ObjectId that matched no document in `users`
+(`userExists=false`). Root cause: `npm run seed` wipes and recreates every user with fresh `_id`s
+on each run; the browser's cached login session (JWT + user object in `localStorage`) survives a
+reseed untouched, since nothing currently validates that the JWT's embedded user id still refers to
+a real document, only that the signature/expiry are valid. If you're logged in as
+SHOP_ADMIN-or-better, `updateProject`'s ownership check doesn't even require `user.id` to match
+anything real, so the save "succeeds" while quietly writing a dangling `userId` onto the new image.
+Not a code bug in the reported-crash sense - a real, previously-undocumented operational gotcha of
+this session's own reseed-while-testing workflow. Documented in the runbook above: log out and back
+in after every reseed.
+
+**Fixed defensively anyway, since a deleted/dangling uploader reference is a real (if rare) case a
+production app should survive too:** `IBImagesList.jsx` no longer assumes `item.userInfo` is
+present - falls back to "Unknown uploader" for the tooltip and the default no-image avatar, instead
+of crashing the entire gallery over one image with a missing uploader.
 
 **Cleanup done the same day:** `server/config.js` - a dead, gitignored file holding a stale
 hardcoded Atlas connection string with a different (never-rotated) plaintext password - has been
