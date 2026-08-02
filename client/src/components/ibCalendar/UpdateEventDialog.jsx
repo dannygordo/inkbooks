@@ -61,7 +61,12 @@ const UpdateEventDialog = ({ selectedDay, event }) => {
             id: event.id,
             projectId: projectRef.current.value,
             userId: user.id,
-            shopId: user.userInfo.shop.id,
+            // user.userInfo.shop is legitimately absent for an independent artist (no shop
+            // connection - see PRODUCTION_ROADMAP.md's artist-centric tenancy section).
+            // Appointment.shopId is nullable for exactly this reason - sending undefined here is
+            // correct, not a workaround. Optional-chained since the old unconditional access
+            // crashed this whole dialog for such an artist, found via manual testing.
+            shopId: user.userInfo?.shop?.id,
             title: titleRef.current.value,
             description: descriptionRef.current.value,
             shopCutStatus: event.shopCutStatus,

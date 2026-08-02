@@ -11,8 +11,11 @@ const Sidebar = () => {
 	const { user } = useAuth();
 	const { savedEvents, setSavedEvents, filteredEvents, setFilteredEvents } = useCalendar();
   const { visibleEvents, setVisibleEvents } = useState([]);
+	// See IBCalendar.jsx's matching comment - user.userInfo.shop is legitimately absent for an
+	// independent artist. Optional-chained to undefined, which fetchArtistsByShop's own skip
+	// guard now treats as "nothing to fetch" instead of crashing.
 	const { data, loading } = ArtistService.fetchArtistsByShop(
-		user.userInfo.shop.id
+		user.userInfo?.shop?.id
 	);
 	let events = [];
 

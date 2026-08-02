@@ -48,11 +48,16 @@ export const ArtistService = (() => {
 		}
 	`;
 
+	// skip when there's no shopId - an independent artist (no shop connection at all, see
+	// PRODUCTION_ROADMAP.md's artist-centric tenancy section) has no shop artist roster to fetch.
+	// Without this, ibCalendar/Sidebar.jsx crashed outright reading user.userInfo.shop.id before
+	// this even ran (see that file's own fix) - found via manual testing.
 	const _fetchArtistsByShop = (shopId) => {
 		return useQuery(_FETCH_ARTISTS_BY_SHOP, {
 			variables: {
 				shopId,
 			},
+			skip: !shopId,
 		});
 	}
 

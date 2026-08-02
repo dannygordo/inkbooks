@@ -18,7 +18,15 @@ const IBProgressItemProject = ({ file, project, title, setUrlList }) => {
 				.split(".")
 				.pop()}`;
 
-			const imgPath = `${project.artist.shop.id}/${project.artistId}/${project.id}/${title}`;
+			// project.artist.shop is legitimately null for an independent artist (no shop
+			// connection at all - a first-class supported case, see PRODUCTION_ROADMAP.md's
+			// artist-centric tenancy section), not just a data-quality gap - Artist.shopId is
+			// optional by design. The old unconditional `.shop.id` crashed with "Cannot read
+			// properties of null" the moment anyone tried to upload an image on such an artist's
+			// project - found via manual testing. Falls back to a stable 'independent' path
+			// segment instead of a shop id when there isn't one.
+			const shopPathSegment = project.artist.shop ? project.artist.shop.id : 'independent';
+			const imgPath = `${shopPathSegment}/${project.artistId}/${project.id}/${title}`;
 			try {
 				const url = await IBUploadFileWithProgress(
 					file,

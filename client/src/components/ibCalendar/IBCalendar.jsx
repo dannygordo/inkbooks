@@ -13,7 +13,15 @@ const IBCalendar = () => {
     const { user } = useAuth();
     const [currentMonth, setCurrentMonth] = useState(UtilsService.getMonth());
     const { monthIndex, setMonthIndex, savedEvents, setSavedEvents, setFilteredEvents } = useCalendar();
-    const { data, loading } = AppointmentService.getAppointmentsByShop(user.userInfo.shop.id);
+    // user.userInfo.shop is legitimately absent for an independent artist (no shop connection -
+    // see PRODUCTION_ROADMAP.md's artist-centric tenancy section). Optional-chained to undefined,
+    // which getAppointmentsByShop's own skip guard (see AppointmentService.js) now treats as
+    // "nothing to fetch" instead of crashing the whole Calendar page - found via manual testing.
+    // Known gap, not fixed here: this means an independent artist's calendar currently shows no
+    // appointments at all rather than their own (getAppointmentsByArtist would be the right query
+    // for that case) - a real product decision about what an independent artist's calendar should
+    // show, not just a null-check, and out of scope for a crash fix.
+    const { data, loading } = AppointmentService.getAppointmentsByShop(user.userInfo?.shop?.id);
 
     useEffect(() => {
         if(data) {

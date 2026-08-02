@@ -59,11 +59,18 @@ const UserService = (() => {
             }
         }
     `;
+    // skip when there's no shopId at all - a Client (no `shop` field on that type) or an
+    // independent Artist (no shop connection - a real, supported case, not a data gap) has no
+    // shop-scoped tag colors to fetch. Without this, Apollo still fires the query with an
+    // undefined variable against a schema field typed `shopId: ID!` (non-null) - found via manual
+    // testing crashing Profile.jsx before this call even ran (see that file's own fix), so this
+    // guard is what actually stops the query from ever being attempted for those users.
     const _getTagColorsByShop = (shopId) => {
         return useQuery(_FETCH_TAG_COLORS_BY_SHOP, {
 			variables: {
 				shopId,
 			},
+			skip: !shopId,
 		});
     }
 

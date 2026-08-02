@@ -39,11 +39,18 @@ export const AppointmentService = (() => {
             }
         }
     `;
+    // skip when there's no shopId - an independent artist (no shop connection at all, a real
+    // supported case, see PRODUCTION_ROADMAP.md's artist-centric tenancy section) has no shop
+    // calendar to fetch. Without this, IBCalendar.jsx crashed outright trying to read
+    // user.userInfo.shop.id before this even ran (see that file's own fix) - this guard is what
+    // actually stops the query from firing with an undefined shopId against a resolver that
+    // expects a real one.
     const _getAppointmentsByShop = (shopId) => {
         return useQuery(_FETCH_APPOINTMENTS_BY_SHOP, {
 			variables: {
 				shopId,
 			},
+			skip: !shopId,
 		});
     }
 

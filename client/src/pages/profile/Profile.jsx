@@ -28,8 +28,15 @@ const Profile = () => {
 	const [updateUser] = useMutation(UserService.UPDATE_USER_MUTATION);
 	const [tagColors, setTagColors] = useState([]);
 	console.log(user);
+	// user.userInfo.shop is legitimately absent for a Client (no `shop` field on that type at
+	// all) or null for an independent Artist (no shop connection - a real, supported case, not a
+	// data gap - see PRODUCTION_ROADMAP.md's artist-centric tenancy section). The old
+	// unconditional `.shop.id` crashed the entire Profile page - not just the avatar upload below
+	// - for any Client or independent Artist the instant they navigated here, found via manual
+	// testing. Optional-chained to undefined instead, which getTagColorsByShop's own `skip: !shopId`
+	// (see UserService.js) now treats as "nothing to fetch" rather than firing a doomed query.
 	const { data: availableTags, loading } = UserService.getTagColorsByShop(
-		user.userInfo.shop.id
+		user.userInfo?.shop?.id
 	);
 
 	useEffect(() => {
@@ -90,7 +97,10 @@ const Profile = () => {
 					.split(".")
 					.pop()}`;
 				//creates the image path, formats the path for storage in Firebase
-				const imgPath = `${user.userInfo.shop.id}/${user.id}/profile`;
+				// Same shop-less fallback as IBProgressItemProject.jsx's project-image upload -
+				// see that file's comment for the full explanation.
+				const shopPathSegment = user.userInfo?.shop?.id || 'independent';
+				const imgPath = `${shopPathSegment}/${user.id}/profile`;
 				url = await IBUploadFile(
 					file,
 					`${UtilsService.formatImagePathForFirebaseStorage(

@@ -641,6 +641,40 @@ crashing anything. Added a regression test to `projects.test.js`
 `ProjectService.js`'s real query already uses, which is exactly what would have caught this from
 day one.
 
+**Fourth real bug found via manual testing - the widest blast radius of the four, a whole class of
+unguarded `user.userInfo.shop.id` access across the client.** Uploading images on a project crashed
+in `IBProgressItemProject.jsx` (`Cannot read properties of null (reading 'id')`) - it built the
+Firebase Storage path as `` `${project.artist.shop.id}/...` `` with no null check. Investigating
+turned up the same unguarded pattern in five more places once grepped for across the client:
+`Profile.jsx` (twice - once unconditionally on every render, before the avatar-upload code even
+runs, meaning **the entire Profile page was broken for every Client and every independent artist**,
+not just the avatar-upload feature), `IBCalendar.jsx`, `ibCalendar/Sidebar.jsx`, and both
+`CreateEventDialog.jsx`/`UpdateEventDialog.jsx` (building the appointment payload). All six shared
+the same root cause: `project.artist.shop` is legitimately `null` for an independent artist (no
+shop connection at all - the headline scenario of the artist-centric tenancy redesign, not a data
+gap), and `user.userInfo.shop` is legitimately absent entirely for a `Client` (that type has no
+`shop` field at all) - nothing in this code ever accounted for either case.
+
+**Fixed:** every occurrence now uses optional chaining (`user.userInfo?.shop?.id`) rather than
+crashing. The two upload-path builders (`IBProgressItemProject.jsx`, `Profile.jsx`) fall back to a
+literal `'independent'` path segment when there's no shop, since Firebase Storage paths need
+*some* segment there. The three data-fetching hooks that take a `shopId` as a query variable
+(`AppointmentService.getAppointmentsByShop`, `ArtistService.fetchArtistsByShop`,
+`UserService.getTagColorsByShop`) each gained a `skip: !shopId` guard, so an undefined `shopId`
+means "don't fire this query" rather than a doomed request against a resolver typed to expect a
+real one. `CreateEventDialog.jsx`/`UpdateEventDialog.jsx` needed no fallback at all - sending
+`shopId: undefined` in an appointment payload is already correct, unmodified behavior, since
+`Appointment.shopId` has been nullable in the schema since the shop-cut ledger work specifically to
+support shop-less appointments.
+
+**Known gap, deliberately not fixed here - flagged rather than guessed at:** `IBCalendar.jsx` and
+`ibCalendar/Sidebar.jsx` now degrade gracefully instead of crashing for an independent artist, but
+they still show an empty calendar and an empty artist filter, respectively - not that artist's own
+appointments. Making an independent artist's calendar actually show their own schedule (via
+`getAppointmentsByArtist` instead of `getAppointmentsByShop`) is a real feature decision, not a
+null-check, and lines up with the "no shop-context switcher anywhere" gap already noted above in
+the UI/UX consistency section - worth a dedicated pass together with that, not guessed at here.
+
 **Cleanup done the same day:** `server/config.js` - a dead, gitignored file holding a stale
 hardcoded Atlas connection string with a different (never-rotated) plaintext password - has been
 deleted. Nothing in the codebase still required it (confirmed via a full-codebase grep before
