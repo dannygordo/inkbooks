@@ -29,6 +29,8 @@ const Message = require('../../models/Message');
 const User = require('../../models/User');
 const Appointment = require('../../models/Appointment');
 const Project = require('../../models/Project');
+const Staff = require('../../models/Staff');
+const { findOrCreateConversationForMembers } = require('../../utils/conversations');
 
 module.exports = {
   Date: DateResolver,
@@ -67,8 +69,22 @@ module.exports = {
     client: async(project, args, context, info) => {
       return (await Client.findOne({id: project.clientId}));
     },
+    // Was Conversation.findOne({artistId, clientId}) - Conversation's schema (models/Conversation.js)
+    // only ever stores members/createdAt/updatedAt, so artistId/clientId never actually exist on a
+    // stored document and this always returned null. The Project detail page's "Messages" panel
+    // (client/src/pages/projects/Project.jsx) reads this field for real, so that panel has likely
+    // never shown an actual conversation. Fixed to find-or-create by membership instead - project.
+    // clientId is the Client sub-document's own _id (see the `client` resolver above), so this
+    // resolves the client's actual User._id first to build the right member set. This also means
+    // an artist/client pair who already have a conversation from a prior BookingRequest (see
+    // mutations/bookingRequests.js) get that same thread here too, instead of a disconnected
+    // duplicate.
     conversation: async(project, args, context, info) => {
-      return (await Conversation.findOne({$and: [{artistId: project.artistId, clientId: project.clientId}]}));
+      const client = await Client.findById(project.clientId).select('userId');
+      if (!client) {
+        return null;
+      }
+      return findOrCreateConversationForMembers([project.artistId, client.userId]);
     }
   },
   IBImage: {
@@ -148,36 +164,46 @@ module.exports = {
     }
   },
   Message: {
+    // Had three real bugs: (1) `Staff` was never imported in this file, so any message from a
+    // staff-type sender threw a ReferenceError the moment this resolver ran; (2) the fallback
+    // path returned `userObject`, a variable that doesn't exist anywhere in this file - also a
+    // guaranteed ReferenceError, hit whenever the sender's User doc is missing or has a userType
+    // outside artist/client/staff; (3) `userInfo.id = userInfo._id` was called unconditionally,
+    // which throws if the matching Artist/Client/Staff sub-document doesn't exist (e.g. it was
+    // deleted after the message was sent) - all three would have crashed the whole
+    // getProject/getConversationsByMemberId query, not just this one field, since a thrown field
+    // resolver error propagates up through GraphQL's response.
     user: async(message, args, context, info) => {
-      let usr =  (await User.findById(message.senderId));
-      if(usr) {
-        let userInfo = {};
-        switch(usr.userType) {
-          case 'artist':
-            userInfo = await Artist.findOne({userId: usr.id}).select('-user');
-            userInfo.id = userInfo._id;
-            return {
-              ...usr._doc,
-              userInfo: userInfo
-            };
-          case 'client':
-            userInfo = await Client.findOne({userId: usr.id}).select('-user');
-            userInfo.id = userInfo._id;
-            return {
-              ...usr._doc,
-              userInfo: userInfo
-            }
-          case 'staff':
-            userInfo = await Staff.findOne({userId: usr.id}).select('-user');
-            userInfo.id = userInfo._id;
-            return {
-              ...usr._doc,
-              userInfo: userInfo
-            }
-        }
-        
+      const usr = await User.findById(message.senderId);
+      if (!usr) {
+        return null;
       }
-      return userObject;
+      let userInfo = null;
+      switch (usr.userType) {
+        case 'artist':
+          userInfo = await Artist.findOne({ userId: usr.id }).select('-user');
+          break;
+        case 'client':
+          userInfo = await Client.findOne({ userId: usr.id }).select('-user');
+          break;
+        case 'staff':
+          userInfo = await Staff.findOne({ userId: usr.id }).select('-user');
+          break;
+      }
+      if (userInfo) {
+        userInfo.id = userInfo._id;
+      }
+      // Spreading usr._doc (the raw Mongoose internal document) loses Mongoose's `id` virtual -
+      // the copy only has `_id`, not `id`. User.id is `ID!` (non-null) in the schema, so any
+      // query that selects `message.user.id` (not previously exercised by any existing client
+      // query, but a completely reasonable one to add) would fail with "Cannot return null for
+      // non-nullable field User.id". Setting it explicitly from the real document's `id` virtual
+      // fixes this without changing anything else about the returned shape.
+      return {
+        ...usr._doc,
+        id: usr.id,
+        userInfo,
+      };
     }
   },
   UserInfo: {

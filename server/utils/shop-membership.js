@@ -49,4 +49,22 @@ async function getArtistIdsForShops(shopIds) {
   return Array.from(artistIds);
 }
 
-module.exports = { getShopIdsForUser, getArtistIdsForShops };
+// Returns every User._id affiliated with the given shopId - both Staff and Artists (via the same
+// two relationships as getArtistIdsForShops). Used to answer "which conversations belong to this
+// shop" - a Conversation has no shopId of its own (see models/Conversation.js), so "belongs to
+// this shop" means "at least one member is someone who works there."
+async function getMemberUserIdsForShop(shopId) {
+  const [staffRows, artistIds] = await Promise.all([
+    Staff.find({ shopId }).select('userId'),
+    getArtistIdsForShops([shopId]),
+  ]);
+  const memberIds = new Set(artistIds);
+  staffRows.forEach((s) => {
+    if (s.userId) {
+      memberIds.add(String(s.userId));
+    }
+  });
+  return Array.from(memberIds);
+}
+
+module.exports = { getShopIdsForUser, getArtistIdsForShops, getMemberUserIdsForShop };

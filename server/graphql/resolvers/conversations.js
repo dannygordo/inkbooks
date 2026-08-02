@@ -1,7 +1,10 @@
 const Conversation = require('../../models/Conversation');
+const Client = require('../../models/Client');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 const { AuthenticationError } = require('../../utils/errors');
+const { getShopIdsForUser, getArtistIdsForShops, getMemberUserIdsForShop } = require('../../utils/shop-membership');
+const { findOrCreateConversationForMembers } = require('../../utils/conversations');
 
 module.exports = {
   Query: {
@@ -41,18 +44,31 @@ module.exports = {
         throw new Error(err);
       }
     }),
-    // Was withAuth with no restriction at all. Also appears to be dead/broken already:
-    // Conversation.members only ever holds user ids (see mutations/bookingRequests.js's
-    // `members: [artist.id, clientUser.id]` - the one place a Conversation gets created), so a
-    // shopId will never actually appear in a conversation's members array, and there's no caller
-    // of this query anywhere in the client (grepped). Flat-gating to SHOP_ADMIN-or-better closes
-    // the authorization hole without trying to resurrect or redesign the underlying (currently
-    // non-functional) query logic in the same change.
-    getConversationsByShopId: withAuth(async (_, { shopId }) => {
+    // Was matching `members: {$in: [shopId]}` - Conversation.members only ever holds real User
+    // ids (see mutations/bookingRequests.js's `members: [artist.id, clientUser.id]`), so a shopId
+    // never actually appeared there and this always returned an empty list, regardless of
+    // permissions. Not called anywhere in the client (grepped), so there's no live UI feature
+    // this could have broken - but "fix the Conversation logic" means making this actually work,
+    // not just gating a query that silently did nothing. Fixed to match any conversation with at
+    // least one member who is Staff or an Artist at this shop (see
+    // utils/shop-membership.js's getMemberUserIdsForShop). Ownership: shop-admin-or-better, or a
+    // caller who is themselves affiliated with this specific shop - same "not a flat gate"
+    // reasoning as getArtistsByShop (resolvers/artists.js).
+    getConversationsByShopId: withAuth(async (_, { shopId }, context, info, user) => {
         try {
+          if (user.role > Constants.ROLES.SHOP_ADMIN) {
+            const shopIds = await getShopIdsForUser(user.id);
+            if (!shopIds.map(String).includes(String(shopId))) {
+              throw new AuthenticationError('Action not allowed');
+            }
+          }
+          const memberIds = await getMemberUserIdsForShop(shopId);
+          if (memberIds.length === 0) {
+            return [];
+          }
           const conversation = await Conversation.find({
               members: {
-                  $in:[shopId]
+                  $in: memberIds
               }
           }).sort({ updatedAt: 1 });
           return conversation;
@@ -60,7 +76,7 @@ module.exports = {
           console.log(err);
           throw new Error(err);
         }
-      }, Constants.ROLES.SHOP_ADMIN),
+      }),
     // Was withAuth with no restriction at all - any authenticated user could pass an arbitrary
     // conversationId and read someone else's private message thread. Allowed: shop-admin-or-
     // better, or a real member of that conversation (Conversation.members is the only field that
@@ -83,20 +99,37 @@ module.exports = {
         throw new Error(err);
       }
     }),
-    // Was withAuth with no restriction at all. Also appears to be dead/broken already: the
-    // Conversation schema (models/Conversation.js) only has members/createdAt/updatedAt - there
-    // is no artistId/clientId field on a Conversation document for this filter to ever match, and
-    // there's no caller of this query anywhere in the client (grepped). Same minimal approach as
-    // getConversationsByShopId above - flat-gate rather than rebuild dead logic in this change.
-    getProjectConversation: withAuth(async (_, {artistId, clientId}) => {
+    // Was Conversation.findOne({artistId, clientId}) - same broken filter as the old
+    // Project.conversation resolver (see resolvers/index.js's Project.conversation for the full
+    // explanation of why those fields never exist on a stored Conversation document). Fixed to
+    // find-or-create by membership, matching Project.conversation's fix and reusing the same
+    // shared helper - the two should always agree on "the conversation for this artist/client
+    // pair" since they resolve to the identical member set. `clientId` here follows the same
+    // convention as Project.clientId (the Client sub-document's own _id, not the client's User.
+    // _id - see MessengerService.js's docstring on this query), so this resolves the client's
+    // real User._id first, same as Project.conversation does. Allowed: shop-admin-or-better, the
+    // artist themselves, the client themselves, or a staff member of the artist's shop.
+    getProjectConversation: withAuth(async (_, { artistId, clientId }, context, info, user) => {
       try {
-        const conversation = await Conversation.findOne({$and: [{artistId: artistId, clientId: clientId}]});
-        if(conversation) {
-          return conversation;
-        } throw new Error('Conversation not found');
+        const client = await Client.findById(clientId).select('userId');
+        if (!client) {
+          throw new Error('Client not found');
+        }
+        if (
+          user.role > Constants.ROLES.SHOP_ADMIN &&
+          String(user.id) !== String(artistId) &&
+          String(user.id) !== String(client.userId)
+        ) {
+          const shopIds = await getShopIdsForUser(user.id);
+          const artistIds = await getArtistIdsForShops(shopIds);
+          if (!artistIds.map(String).includes(String(artistId))) {
+            throw new AuthenticationError('Action not allowed');
+          }
+        }
+        return await findOrCreateConversationForMembers([artistId, client.userId]);
       } catch(err) {
         throw new Error(err);
       }
-    }, Constants.ROLES.SHOP_ADMIN)
+    })
   },
 };

@@ -1,10 +1,17 @@
 const Conversation = require('../../models/Conversation');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
-const { UserInputError } = require('../../utils/errors');
+const { UserInputError, AuthenticationError } = require('../../utils/errors');
 const { updateConversationInputSchema, createConversationInputSchema, validate } = require('../../utils/validation');
 
 module.exports = {
+    // Not called anywhere in the client (grepped - real conversations are created directly via
+    // the Conversation model, either by mutations/bookingRequests.js or by
+    // utils/conversations.js's findOrCreateConversationForMembers). Had no restriction preventing
+    // a caller from creating a conversation they aren't even part of, which would show up as a
+    // new, unsolicited thread in two unrelated users' Messenger inboxes. Added a minimal
+    // safeguard even though this mutation currently has no real caller - "fix the Conversation
+    // logic" shouldn't mean "except the parts nothing uses yet."
     createConversation: withAuth(async (
       _,
       {
@@ -12,10 +19,16 @@ module.exports = {
         createdAt,
         updatedAt
       },
+      context,
+      info,
+      user,
     ) => {
       const { valid, errors } = validate(createConversationInputSchema, { members, createdAt, updatedAt });
       if (!valid) {
         throw new UserInputError('Errors', { errors });
+      }
+      if (!(members || []).some((memberId) => String(memberId) === String(user.id))) {
+        throw new AuthenticationError('Action not allowed');
       }
       const newConversation = new Conversation({
         members,

@@ -1,14 +1,23 @@
 const Message = require('../../models/Message');
+const Conversation = require('../../models/Conversation');
 const BookingRequest = require('../../models/BookingRequest');
 const Client = require('../../models/Client');
 const User = require('../../models/User');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
-const { UserInputError } = require('../../utils/errors');
+const { UserInputError, AuthenticationError } = require('../../utils/errors');
 const { updateMessageInputSchema, createMessageInputSchema, validate } = require('../../utils/validation');
 const { sendNewMessageNotificationToGuest } = require('../../utils/email');
 
 module.exports = {
+    // Had no ownership check at all - any authenticated user could pass an arbitrary
+    // conversationId and senderId, posting a message as any user into any conversation
+    // (impersonation), regardless of whether they had any real connection to it. Every real
+    // caller (IBChatBox.jsx, ArtistBookingRequests.jsx) always passes the caller's own user.id as
+    // senderId, so this now requires that, plus real membership in the target conversation - no
+    // shop-admin-or-better bypass, since sending as someone else is a step further than reading
+    // (see getConversationsByMemberId's comment on the same "no message-oversight feature to
+    // preserve" reasoning).
     createMessage: withAuth(async (
       _,
       {
@@ -18,7 +27,20 @@ module.exports = {
         createdAt,
         updatedAt
       },
+      context,
+      info,
+      user,
     ) => {
+      if (String(user.id) !== String(senderId)) {
+        throw new AuthenticationError('Action not allowed');
+      }
+      const conversation = await Conversation.findById(conversationId).select('members');
+      const isMember = conversation && (conversation.members || []).some(
+        (memberId) => String(memberId) === String(user.id),
+      );
+      if (!isMember) {
+        throw new AuthenticationError('Action not allowed');
+      }
       const { valid, errors } = validate(createMessageInputSchema, { conversationId, senderId, message, createdAt, updatedAt });
       if (!valid) {
         throw new UserInputError('Errors', { errors });
