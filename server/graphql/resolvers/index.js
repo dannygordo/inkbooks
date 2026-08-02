@@ -97,10 +97,11 @@ module.exports = {
   },
   IBImage: {
     // Same bug as Project.client above, same fix - `id` is a virtual, never a real stored field,
-    // so this always returned null. Lower-urgency than the Project.client fix: confirmed via grep
-    // that no real client query currently selects IBImage.userInfo (ProjectService.js's queries
-    // never ask for it), so this has been silently dead/unused rather than actively crashing
-    // anything - still worth fixing so it's correct if/when something does start using it.
+    // so this always returned null. CORRECTION to an earlier version of this comment: this was
+    // wrongly assumed to be dead/unused code based on a malformed grep that missed real call
+    // sites - ProjectService.js's _FETCH_PROJECT_QUERY/GQL_FETCH_PROJECT_QUERY both select this
+    // field, and IBImagesList.jsx reads item.userInfo.firstName unconditionally. This resolver
+    // being broken is exactly what crashed that component - found via manual testing.
     userInfo: async(ibImage, arts, context, info) => {
       return (await User.findById(ibImage.userId));
     }

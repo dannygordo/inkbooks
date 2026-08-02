@@ -225,8 +225,16 @@ const ProjectService = (() => {
 						id
 						url
 						avatar
+						title
 						uploadedByDisplayName
 						userId
+						userInfo {
+							firstName
+							lastName
+							avatar
+							id
+						}
+						tags
 						updatedAt
 						createdAt
 					}
@@ -237,6 +245,12 @@ const ProjectService = (() => {
 						avatar
 						uploadedByDisplayName
 						userId
+						userInfo {
+							firstName
+							lastName
+							avatar
+							id
+						}
 						updatedAt
 						createdAt
 					}

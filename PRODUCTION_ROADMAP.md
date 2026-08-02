@@ -722,6 +722,30 @@ palette value (`'Black and grey'`) with the same generic `Errors` message, one a
 enum value (`'black'`) is accepted — so this exact label/value mismatch can't silently return in
 either the seed script or a future schema change without a test failing.
 
+**Eighth real bug found via manual testing - a stale-cache bug hiding behind the seventh's fix.**
+Once the palette bug above was fixed and an image upload could actually complete, saving it
+crashed `IBImagesList.jsx:114` reading `item.userInfo.firstName` on a `null` `userInfo` - the exact
+same symptom the `IBImage.userInfo` resolver bug produced earlier, which raised the question of
+whether that fix had actually regressed. It hadn't: the resolver (`User.findById(ibImage.userId)`)
+is correct and was confirmed unchanged. The real cause was one level up, in the client:
+`ProjectService.js`'s `_updateProject` mutation response never selected `userInfo` (or `title`) on
+`referenceImages`/`designImages`, unlike the `getProject` fetch queries, which do. For a brand-new
+image - freshly uploaded, never before written to Apollo's normalized cache - the mutation
+response is the *first* write for that entity, so the cache entity ends up with no `userInfo` field
+at all. The actively-watched `getProject` query (which `Project.jsx` renders `IBImagesList` from)
+then reads that same entity expecting `userInfo` and gets an incomplete/broken result instead.
+Existing images already cached from a prior full `getProject` fetch weren't affected, since a
+partial mutation write doesn't erase fields it doesn't mention - only the very first save of a new
+image hit this.
+
+Fixed by adding `title`/`userInfo { firstName lastName avatar id }` to `referenceImages` and
+`userInfo { firstName lastName avatar id }` to `designImages` in the `UPDATE_PROJECT_MUTATION`
+response selection, matching what `_FETCH_PROJECT_QUERY` already selects - so every write to this
+normalized cache entity is complete, not just the first read. Also corrected a stale comment left
+on the `IBImage.userInfo` resolver in `resolvers/index.js` that still claimed the field was
+dead/unused code (an earlier, wrong conclusion from a malformed grep this session, corrected in
+the roadmap at the time but never fixed at the source).
+
 **Cleanup done the same day:** `server/config.js` - a dead, gitignored file holding a stale
 hardcoded Atlas connection string with a different (never-rotated) plaintext password - has been
 deleted. Nothing in the codebase still required it (confirmed via a full-codebase grep before
