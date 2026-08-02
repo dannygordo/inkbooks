@@ -2,8 +2,25 @@ import parsePhoneNumber from "libphonenumber-js";
 import moment from "moment";
 
 const UtilsService = (() => {
+	// Real crash, found via manual testing against seeded data: every IBCard*Details component
+	// (Artist/Client/Staff/Shop) calls this unconditionally, and phone is optional everywhere it
+	// comes from (Mongoose defaults it to "" on Artist/Client/Staff/Shop - nothing requires a
+	// caller to have one on file). parsePhoneNumber("+1") (empty digits) or any string it can't
+	// parse as a real number returns undefined rather than throwing, so the old
+	// `.formatNational()` call crashed with "Cannot read properties of undefined" the moment any
+	// entity with no phone on file rendered - not an edge case, the default state for a freshly
+	// created record. Now returns "" for empty/falsy input, and falls back to the raw stored value
+	// (rather than crashing) if the library can't parse it as a valid number at all.
 	const _formatPhone = (phoneNumber) => {
-		return parsePhoneNumber(`+1${phoneNumber}`).formatNational();
+		if (!phoneNumber) {
+			return "";
+		}
+		try {
+			const parsed = parsePhoneNumber(`+1${phoneNumber}`);
+			return parsed ? parsed.formatNational() : phoneNumber;
+		} catch (err) {
+			return phoneNumber;
+		}
 	};
 
 	const _prettyConstantsListValue = (list, val) => {

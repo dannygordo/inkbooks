@@ -588,6 +588,37 @@ CRUD block (`getArtists: does not error on an independent artist with no shopId`
 selects `shopId`/`userId` on a `createArtistUser()` fixture (which is itself shopId-less by
 default) - this is the test shape that would have caught this originally.
 
+**Self-inflicted follow-up, caught by the user's own `npm test` run.** The `shopId` fix above was
+first written with a `//` JS-style comment inside `typeDefs.js`'s `gql\`...\`` template literal -
+that literal *is* the GraphQL SDL, which only supports `#` comments, not `//`. `node --check` only
+validates JavaScript syntax (the template literal itself is valid JS regardless of its string
+contents), so this passed that check but broke schema parsing at runtime the instant anything
+built the schema - all 9 server integration test files failed immediately with `GraphQLError:
+Syntax Error: Unexpected character: "/"`. Fixed by converting to `#` comments. Verified two
+stronger ways this time, not just `node --check`: `require('./graphql/typeDefs')` directly (proves
+`graphql-tag` parses it), and building/starting a real `ApolloServer({ typeDefs, resolvers })` -
+the same construction `test/helpers/testServer.js` uses - end to end.
+
+**Second real bug found via manual testing - a broadly-applicable one, not artist-specific.**
+Clicking into a artist's card still crashed after the schema fix above, this time client-side, in
+`IBCardArtistDetails`. Root cause: `UtilsService.formatPhone(phoneNumber)` did
+`parsePhoneNumber(\`+1${phoneNumber}\`).formatNational()` with no guard at all. `phone` defaults to
+`""` on `Artist`/`Client`/`Staff`/`Shop` at the Mongoose layer - nothing requires a caller to have
+one on file - and the seed script hadn't set one for anybody yet. `parsePhoneNumber("+1")` (or any
+string it can't parse as a real number) returns `undefined` rather than throwing, so
+`.formatNational()` on that crashed with "Cannot read properties of undefined." This isn't an
+edge case - it's the *default* state of a freshly created record, and `formatPhone` is called
+unconditionally from all four `IBCard*Details` components (Artist/Client/Staff/Shop), so any real
+person who hasn't filled in a phone number would crash their own card the same way in production.
+
+**Fixed:** `UtilsService._formatPhone` now returns `""` for empty/falsy input, and falls back to
+the raw stored value (instead of crashing) if the library can't parse it as a valid number at all.
+Added `client/src/services/UtilsService.test.js` (new file - no prior test coverage existed for
+this service) locking in all four cases: empty string, null/undefined, a real 10-digit number, and
+an unparseable string. Also gave every seeded person in `scripts/seed.js` a real-looking phone
+number, both for realism and so the seed data actually exercises the fixed code path instead of
+just avoiding it.
+
 **Cleanup done the same day:** `server/config.js` - a dead, gitignored file holding a stale
 hardcoded Atlas connection string with a different (never-rotated) plaintext password - has been
 deleted. Nothing in the codebase still required it (confirmed via a full-codebase grep before

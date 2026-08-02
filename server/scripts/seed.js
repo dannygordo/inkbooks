@@ -142,6 +142,7 @@ async function seed() {
     firstName: 'Dana',
     lastName: 'Wolfe',
     email: shopAdminUser.email,
+    phone: '555-010-0101',
     userId: shopAdminUser._id,
     shopId: shop._id,
     status: 1,
@@ -163,6 +164,7 @@ async function seed() {
     firstName: 'Sam',
     lastName: 'Rivera',
     email: staffUser.email,
+    phone: '555-010-0102',
     userId: staffUser._id,
     shopId: shop._id,
     status: 1,
@@ -184,6 +186,7 @@ async function seed() {
     firstName: 'Maya',
     lastName: 'Chen',
     email: artist1User.email,
+    phone: '555-010-0103',
     userId: artist1User._id,
     shopId: shop._id,
     title: 'Fine Line / Botanical',
@@ -207,6 +210,7 @@ async function seed() {
     firstName: 'Jonas',
     lastName: 'Petrov',
     email: artist2User.email,
+    phone: '555-010-0104',
     userId: artist2User._id,
     shopId: shop._id,
     title: 'Traditional / Blackwork',
@@ -237,6 +241,7 @@ async function seed() {
     // which crashed getArtists for every Shop-Admin-or-better caller the moment it ran (Mongoose
     // allows userId to be unset, but nothing in this app's real data model ever should).
     userId: independentArtistUser._id,
+    phone: '555-010-0105',
     title: 'Guest Spot / Illustrative',
     hourlyRate: 140,
     status: Constants.ARTIST_STATUS.ACTIVE,
@@ -245,10 +250,10 @@ async function seed() {
 
   // --- Clients ---------------------------------------------------------------
   const clientDefs = [
-    { firstName: 'Alex', lastName: 'Kim', email: 'alex.kim@example.dev' },
-    { firstName: 'Jordan', lastName: 'Lee', email: 'jordan.lee@example.dev' },
-    { firstName: 'Taylor', lastName: 'Brooks', email: 'taylor.brooks@example.dev' },
-    { firstName: 'Morgan', lastName: 'Diaz', email: 'morgan.diaz@example.dev' },
+    { firstName: 'Alex', lastName: 'Kim', email: 'alex.kim@example.dev', phone: '555-010-0201' },
+    { firstName: 'Jordan', lastName: 'Lee', email: 'jordan.lee@example.dev', phone: '555-010-0202' },
+    { firstName: 'Taylor', lastName: 'Brooks', email: 'taylor.brooks@example.dev', phone: '555-010-0203' },
+    { firstName: 'Morgan', lastName: 'Diaz', email: 'morgan.diaz@example.dev', phone: '555-010-0204' },
   ];
   const clients = [];
   for (const def of clientDefs) {
@@ -266,6 +271,7 @@ async function seed() {
       firstName: def.firstName,
       lastName: def.lastName,
       email: def.email,
+      phone: def.phone,
       userId: clientUser._id,
     }).save();
     clients.push({ user: clientUser, client: clientDoc });
