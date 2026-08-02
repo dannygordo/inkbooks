@@ -19,7 +19,7 @@ import InboxIcon from "@mui/icons-material/MoveToInbox";
 import MailIcon from "@mui/icons-material/Mail";
 import PriceCheckIcon from "@mui/icons-material/PriceCheck";
 import { AuthContext } from "../../context/auth";
-import { APP_SETTINGS_CONSTANTS, ROUTE_CONSTANTS } from "../../constants";
+import { APP_SETTINGS_CONSTANTS, ROUTE_CONSTANTS, ROLES } from "../../constants";
 import InputBase from "@mui/material/InputBase";
 import { useNavigate } from "react-router-dom";
 import IBAvatar from "../inputs/IBAvatar";
@@ -171,6 +171,19 @@ export default function Sidebar() {
 
 	const { user, logout } = useContext(AuthContext);
 	let navigate = useNavigate();
+
+	// Nav-item visibility by role/userType. This is UI-only - it hides items a given user has no
+	// real reason to click, it does NOT replace server-side authorization. Several of the
+	// underlying queries these items link to (getShops, getStaff, getClients, getArtists,
+	// getProjects, getConversations*) still have no ownership/role check beyond "logged in" -
+	// unlike getAppointmentsByArtist/getAppointmentsByShop/getProjectsByArtist, which were just
+	// locked down (see resolvers/appointments.js, resolvers/projects.js). A Client hitting those
+	// other queries directly through the API, or typing the route URL, would still get the data.
+	// Hiding the nav entry is a real UX improvement but not a security fix - flagging this
+	// distinction rather than letting "no visible link" read as "actually restricted".
+	const isShopAdminOrBetter = user.role <= ROLES.SHOP_ADMIN;
+	const isStaffOrBetter = user.role <= ROLES.STAFF;
+	const isClient = user.userType === "client";
 	const [anchorEl, setAnchorEl] = useState(null);
 	const openProfile = Boolean(anchorEl);
 
@@ -523,84 +536,90 @@ export default function Sidebar() {
 							sx={{ opacity: open ? 1 : 0 }}
 						/>
 					</ListItemButton>
-					<ListItemButton
-						selected={selectedIndex === 2}
-						onClick={(event) =>
-							handleListItemClick(event, 2, "artists")
-						}
-						key="Artists"
-						sx={{
-							minHeight: 48,
-							justifyContent: open ? "initial" : "center",
-							px: 2.5,
-						}}
-					>
-						<ListItemIcon
+					{!isClient && (
+						<ListItemButton
+							selected={selectedIndex === 2}
+							onClick={(event) =>
+								handleListItemClick(event, 2, "artists")
+							}
+							key="Artists"
 							sx={{
-								minWidth: 0,
-								mr: open ? 3 : "auto",
-								justifyContent: "center",
+								minHeight: 48,
+								justifyContent: open ? "initial" : "center",
+								px: 2.5,
 							}}
 						>
-							<Palette />
-						</ListItemIcon>
-						<ListItemText
-							primary="Artists"
-							sx={{ opacity: open ? 1 : 0 }}
-						/>
-					</ListItemButton>
-					<ListItemButton
-						selected={selectedIndex === 3}
-						onClick={(event) =>
-							handleListItemClick(event, 3, "staff")
-						}
-						key="Staff"
-						sx={{
-							minHeight: 48,
-							justifyContent: open ? "initial" : "center",
-							px: 2.5,
-						}}
-					>
-						<ListItemIcon
+							<ListItemIcon
+								sx={{
+									minWidth: 0,
+									mr: open ? 3 : "auto",
+									justifyContent: "center",
+								}}
+							>
+								<Palette />
+							</ListItemIcon>
+							<ListItemText
+								primary="Artists"
+								sx={{ opacity: open ? 1 : 0 }}
+							/>
+						</ListItemButton>
+					)}
+					{isStaffOrBetter && (
+						<ListItemButton
+							selected={selectedIndex === 3}
+							onClick={(event) =>
+								handleListItemClick(event, 3, "staff")
+							}
+							key="Staff"
 							sx={{
-								minWidth: 0,
-								mr: open ? 3 : "auto",
-								justifyContent: "center",
+								minHeight: 48,
+								justifyContent: open ? "initial" : "center",
+								px: 2.5,
 							}}
 						>
-							<People />
-						</ListItemIcon>
-						<ListItemText
-							primary="Staff"
-							sx={{ opacity: open ? 1 : 0 }}
-						/>
-					</ListItemButton>
-					<ListItemButton
-						selected={selectedIndex === 4}
-						onClick={(event) =>
-							handleListItemClick(event, 4, "clients")
-						}
-						key="Clients"
-						sx={{
-							minHeight: 48,
-							justifyContent: open ? "initial" : "center",
-							px: 2.5,
-						}}
-					>
-						<ListItemIcon
+							<ListItemIcon
+								sx={{
+									minWidth: 0,
+									mr: open ? 3 : "auto",
+									justifyContent: "center",
+								}}
+							>
+								<People />
+							</ListItemIcon>
+							<ListItemText
+								primary="Staff"
+								sx={{ opacity: open ? 1 : 0 }}
+							/>
+						</ListItemButton>
+					)}
+					{!isClient && (
+						<ListItemButton
+							selected={selectedIndex === 4}
+							onClick={(event) =>
+								handleListItemClick(event, 4, "clients")
+							}
+							key="Clients"
 							sx={{
-								minWidth: 0,
-								mr: open ? 3 : "auto",
-								justifyContent: "center",
+								minHeight: 48,
+								justifyContent: open ? "initial" : "center",
+								px: 2.5,
 							}}
 						>
-							<AccountBox />
-						</ListItemIcon>
-						<ListItemText
-							primary="Clients"
-							sx={{ opacity: open ? 1 : 0 }}
-						/>
-					</ListItemButton>
+							<ListItemIcon
+								sx={{
+									minWidth: 0,
+									mr: open ? 3 : "auto",
+									justifyContent: "center",
+								}}
+							>
+								<AccountBox />
+							</ListItemIcon>
+							<ListItemText
+								primary="Clients"
+								sx={{ opacity: open ? 1 : 0 }}
+							/>
+						</ListItemButton>
+					)}
 					<ListItemButton
 						selected={selectedIndex === 5}
 						onClick={(event) =>
@@ -627,32 +646,34 @@ export default function Sidebar() {
 							sx={{ opacity: open ? 1 : 0 }}
 						/>
 					</ListItemButton>
-					<ListItemButton
-						selected={selectedIndex === 6}
-						onClick={(event) =>
-							handleListItemClick(event, 6, "reports")
-						}
-						key="Reports"
-						sx={{
-							minHeight: 48,
-							justifyContent: open ? "initial" : "center",
-							px: 2.5,
-						}}
-					>
-						<ListItemIcon
+					{!isClient && (
+						<ListItemButton
+							selected={selectedIndex === 6}
+							onClick={(event) =>
+								handleListItemClick(event, 6, "reports")
+							}
+							key="Reports"
 							sx={{
-								minWidth: 0,
-								mr: open ? 3 : "auto",
-								justifyContent: "center",
+								minHeight: 48,
+								justifyContent: open ? "initial" : "center",
+								px: 2.5,
 							}}
 						>
-							<Assessment />
-						</ListItemIcon>
-						<ListItemText
-							primary="Reports"
-							sx={{ opacity: open ? 1 : 0 }}
-						/>
-					</ListItemButton>
+							<ListItemIcon
+								sx={{
+									minWidth: 0,
+									mr: open ? 3 : "auto",
+									justifyContent: "center",
+								}}
+							>
+								<Assessment />
+							</ListItemIcon>
+							<ListItemText
+								primary="Reports"
+								sx={{ opacity: open ? 1 : 0 }}
+							/>
+						</ListItemButton>
+					)}
 					<ListItemButton
 						selected={selectedIndex === 7}
 						onClick={(event) =>
@@ -680,87 +701,100 @@ export default function Sidebar() {
 						/>
 					</ListItemButton>
 				</List>
+				{/* Every item in this group (Shops, Booking Requests, Shop Cut Confirmations) is
+				    hidden from Clients - wrap the whole group (Divider + List) in !isClient so a
+				    Client doesn't see a dangling divider above an empty list. */}
+				{!isClient && (
+				<>
 				<Divider />
 				<List>
-					<ListItemButton
-						selected={selectedIndex === 8}
-						onClick={(event) =>
-							handleListItemClick(event, 8, "shops")
-						}
-						key="Shops"
-						sx={{
-							minHeight: 48,
-							justifyContent: open ? "initial" : "center",
-							px: 2.5,
-						}}
-					>
-						<ListItemIcon
+					{isShopAdminOrBetter && (
+						<ListItemButton
+							selected={selectedIndex === 8}
+							onClick={(event) =>
+								handleListItemClick(event, 8, "shops")
+							}
+							key="Shops"
 							sx={{
-								minWidth: 0,
-								mr: open ? 3 : "auto",
-								justifyContent: "center",
+								minHeight: 48,
+								justifyContent: open ? "initial" : "center",
+								px: 2.5,
 							}}
 						>
-							<House />
-						</ListItemIcon>
-						<ListItemText
-							primary="Shops"
-							sx={{ opacity: open ? 1 : 0 }}
-						/>
-					</ListItemButton>
-					<ListItemButton
-						selected={selectedIndex === 9}
-						onClick={(event) =>
-							handleListItemClick(event, 9, "booking-requests")
-						}
-						key="BookingRequests"
-						sx={{
-							minHeight: 48,
-							justifyContent: open ? "initial" : "center",
-							px: 2.5,
-						}}
-					>
-						<ListItemIcon
+							<ListItemIcon
+								sx={{
+									minWidth: 0,
+									mr: open ? 3 : "auto",
+									justifyContent: "center",
+								}}
+							>
+								<House />
+							</ListItemIcon>
+							<ListItemText
+								primary="Shops"
+								sx={{ opacity: open ? 1 : 0 }}
+							/>
+						</ListItemButton>
+					)}
+					{!isClient && (
+						<ListItemButton
+							selected={selectedIndex === 9}
+							onClick={(event) =>
+								handleListItemClick(event, 9, "booking-requests")
+							}
+							key="BookingRequests"
 							sx={{
-								minWidth: 0,
-								mr: open ? 3 : "auto",
-								justifyContent: "center",
+								minHeight: 48,
+								justifyContent: open ? "initial" : "center",
+								px: 2.5,
 							}}
 						>
-							<InboxIcon />
-						</ListItemIcon>
-						<ListItemText
-							primary="Booking Requests"
-							sx={{ opacity: open ? 1 : 0 }}
-						/>
-					</ListItemButton>
-					<ListItemButton
-						selected={selectedIndex === 10}
-						onClick={(event) =>
-							handleListItemClick(event, 10, "shop-cut-confirmations")
-						}
-						key="ShopCutConfirmations"
-						sx={{
-							minHeight: 48,
-							justifyContent: open ? "initial" : "center",
-							px: 2.5,
-						}}
-					>
-						<ListItemIcon
+							<ListItemIcon
+								sx={{
+									minWidth: 0,
+									mr: open ? 3 : "auto",
+									justifyContent: "center",
+								}}
+							>
+								<InboxIcon />
+							</ListItemIcon>
+							<ListItemText
+								primary="Booking Requests"
+								sx={{ opacity: open ? 1 : 0 }}
+							/>
+						</ListItemButton>
+					)}
+					{isShopAdminOrBetter && (
+						<ListItemButton
+							selected={selectedIndex === 10}
+							onClick={(event) =>
+								handleListItemClick(event, 10, "shop-cut-confirmations")
+							}
+							key="ShopCutConfirmations"
 							sx={{
-								minWidth: 0,
-								mr: open ? 3 : "auto",
-								justifyContent: "center",
+								minHeight: 48,
+								justifyContent: open ? "initial" : "center",
+								px: 2.5,
 							}}
 						>
-							<PriceCheckIcon />
-						</ListItemIcon>
-						<ListItemText
-							primary="Shop Cut Confirmations"
-							sx={{ opacity: open ? 1 : 0 }}
-						/>
-					</ListItemButton>
+							<ListItemIcon
+								sx={{
+									minWidth: 0,
+									mr: open ? 3 : "auto",
+									justifyContent: "center",
+								}}
+							>
+								<PriceCheckIcon />
+							</ListItemIcon>
+							<ListItemText
+								primary="Shop Cut Confirmations"
+								sx={{ opacity: open ? 1 : 0 }}
+							/>
+						</ListItemButton>
+					)}
 				</List>
+				</>
+				)}
 				{/* <List>
 					{["All mail", "Trash", "Spam"].map((text, index) => (
 						<ListItemButton

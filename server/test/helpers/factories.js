@@ -80,6 +80,28 @@ async function createShopAdminUser(overrides = {}) {
 	return { user, staff, shop };
 }
 
+// Unlike createShopAdminUser (which creates its own new Shop), this attaches to a shopId the
+// caller already has - needed for tests that check "a genuine SHOP_STAFF-role staff member of
+// *this* shop", not "a SHOP_ADMIN, who's already privileged enough to pass any shop-admin-or-
+// better check regardless of which shop is involved".
+async function createStaffUser(shopId, overrides = {}) {
+	const user = await createUser({
+		role: Constants.ROLES.SHOP_STAFF,
+		userType: Constants.USER_TYPE.STAFF,
+		...overrides,
+	});
+	const staff = await new Staff({
+		firstName: user.firstName,
+		lastName: user.lastName,
+		email: user.email,
+		userId: user._id,
+		shopId,
+		status: 1,
+		...overrides.staff,
+	}).save();
+	return { user, staff };
+}
+
 async function createClientUser(overrides = {}) {
 	const user = await createUser({
 		role: Constants.ROLES.CLIENT,
@@ -140,6 +162,7 @@ module.exports = {
 	createUser,
 	createArtistUser,
 	createShopAdminUser,
+	createStaffUser,
 	createClientUser,
 	connectArtistToShop,
 	createProject,

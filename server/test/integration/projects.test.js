@@ -43,6 +43,12 @@ const DELETE_PROJECT = `
 	}
 `;
 
+const GET_PROJECTS_BY_ARTIST = `
+	query GetProjectsByArtist($artistId: ID!) {
+		getProjectsByArtist(artistId: $artistId) { id }
+	}
+`;
+
 describe('createProject', () => {
 	it('rejects an unauthenticated call', async () => {
 		const { artist } = await createArtistUser();
@@ -242,5 +248,77 @@ describe('deleteProject: Admin-only', () => {
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeUndefined();
 		expect(data.deleteProject).toMatch(/deleted successfully/);
+	});
+});
+
+describe('getProjectsByArtist: ownership', () => {
+	it('allows an artist to read their own project list', async () => {
+		const { user: artistUser } = await createArtistUser();
+		const { client } = await createClientUser();
+		await createProject(artistUser.id, client.id);
+		const token = signTestToken(artistUser);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_PROJECTS_BY_ARTIST, variables: { artistId: artistUser.id } },
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.getProjectsByArtist).toHaveLength(1);
+	});
+
+	it('rejects a different artist reading someone else\'s project list', async () => {
+		const { user: ownerArtist } = await createArtistUser();
+		const { user: otherArtist } = await createArtistUser();
+		const { client } = await createClientUser();
+		await createProject(ownerArtist.id, client.id);
+		const token = signTestToken(otherArtist);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_PROJECTS_BY_ARTIST, variables: { artistId: ownerArtist.id } },
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(data.getProjectsByArtist).toBeNull();
+		expect(errors[0].message).toMatch(/Action not allowed/);
+	});
+
+	it('rejects a Client guessing an artist id to read their financials/project list', async () => {
+		const { user: ownerArtist } = await createArtistUser();
+		const { user: clientUser, client } = await createClientUser();
+		await createProject(ownerArtist.id, client.id);
+		const token = signTestToken(clientUser);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_PROJECTS_BY_ARTIST, variables: { artistId: ownerArtist.id } },
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(data.getProjectsByArtist).toBeNull();
+		expect(errors[0].message).toMatch(/Action not allowed/);
+	});
+
+	it('allows a SHOP_ADMIN-or-better user to read any artist\'s project list', async () => {
+		const { user: ownerArtist } = await createArtistUser();
+		const { client } = await createClientUser();
+		await createProject(ownerArtist.id, client.id);
+		const admin = await createUser({ role: Constants.ROLES.ADMIN, userType: Constants.USER_TYPE.STAFF });
+		const token = signTestToken(admin);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_PROJECTS_BY_ARTIST, variables: { artistId: ownerArtist.id } },
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.getProjectsByArtist).toHaveLength(1);
 	});
 });

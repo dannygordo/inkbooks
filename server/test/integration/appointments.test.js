@@ -14,10 +14,28 @@ const {
 	createUser,
 	createArtistUser,
 	createShopAdminUser,
+	createStaffUser,
+	createClientUser,
 	connectArtistToShop,
 	createAppointment,
 } = require('../helpers/factories');
 const { Constants } = require('../../utils/constants');
+
+const GET_APPOINTMENTS_BY_ARTIST = `
+	query GetAppointmentsByArtist($userId: ID!) {
+		getAppointmentsByArtist(userId: $userId) {
+			id
+		}
+	}
+`;
+
+const GET_APPOINTMENTS_BY_SHOP = `
+	query GetAppointmentsByShop($shopId: ID!) {
+		getAppointmentsByShop(shopId: $shopId) {
+			id
+		}
+	}
+`;
 
 const CREATE_APPOINTMENT = `
 	mutation CreateAppointment($appointmentInput: AppointmentInput) {
@@ -323,5 +341,169 @@ describe('deleteAppointment: ownership', () => {
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeUndefined();
 		expect(data.deleteAppointment).toMatch(/deleted successfully/);
+	});
+});
+
+// Regression coverage for a real gap found while building the artist dashboard (see
+// PRODUCTION_ROADMAP.md): getAppointmentsByArtist/getAppointmentsByShop were withAuth-wrapped
+// with no ownership check at all - any authenticated user could pass an arbitrary userId/shopId
+// and read that artist's or shop's full appointment/financial history.
+describe('getAppointmentsByArtist: ownership', () => {
+	it('allows an artist to read their own appointments', async () => {
+		const { user } = await createArtistUser();
+		await createAppointment(user.id);
+		const token = signTestToken(user);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_APPOINTMENTS_BY_ARTIST, variables: { userId: user.id } },
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.getAppointmentsByArtist).toHaveLength(1);
+	});
+
+	it("rejects a different artist reading someone else's appointments", async () => {
+		const { user: owner } = await createArtistUser();
+		const { user: otherArtist } = await createArtistUser();
+		await createAppointment(owner.id);
+		const token = signTestToken(otherArtist);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_APPOINTMENTS_BY_ARTIST, variables: { userId: owner.id } },
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(data.getAppointmentsByArtist).toBeNull();
+		expect(errors[0].message).toMatch(/Action not allowed/);
+	});
+
+	it("rejects a Client reading an artist's appointments", async () => {
+		const { user: owner } = await createArtistUser();
+		const { user: client } = await createClientUser();
+		await createAppointment(owner.id);
+		const token = signTestToken(client);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_APPOINTMENTS_BY_ARTIST, variables: { userId: owner.id } },
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(data.getAppointmentsByArtist).toBeNull();
+		expect(errors[0].message).toMatch(/Action not allowed/);
+	});
+
+	it('allows a Shop Admin to read any artist\'s appointments', async () => {
+		const { user: owner } = await createArtistUser();
+		const { user: shopAdmin } = await createShopAdminUser();
+		await createAppointment(owner.id);
+		const token = signTestToken(shopAdmin);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_APPOINTMENTS_BY_ARTIST, variables: { userId: owner.id } },
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.getAppointmentsByArtist).toHaveLength(1);
+	});
+});
+
+describe('getAppointmentsByShop: ownership', () => {
+	it("allows that shop's own Shop Admin to read its calendar", async () => {
+		const { user: shopAdmin, shop } = await createShopAdminUser();
+		await createAppointment(shopAdmin.id, { shopId: shop.id });
+		const token = signTestToken(shopAdmin);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_APPOINTMENTS_BY_SHOP, variables: { shopId: shop.id } },
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.getAppointmentsByShop).toHaveLength(1);
+	});
+
+	// This is the real regression case: client/src/components/ibCalendar/IBCalendar.jsx calls
+	// getAppointmentsByShop(user.userInfo.shop.id) for a genuine SHOP_STAFF-role staff member
+	// viewing their own shop's calendar, not just a Shop Admin - a flat SHOP_ADMIN role gate would
+	// have broken that real, already-shipped usage.
+	it('allows a genuine SHOP_STAFF staff member of that shop to read its calendar', async () => {
+		const { user: shopAdmin, shop } = await createShopAdminUser();
+		const { user: staffMember } = await createStaffUser(shop.id);
+		await createAppointment(shopAdmin.id, { shopId: shop.id });
+		const token = signTestToken(staffMember);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_APPOINTMENTS_BY_SHOP, variables: { shopId: shop.id } },
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.getAppointmentsByShop).toHaveLength(1);
+	});
+
+	it('allows an artist connected to that shop to read its calendar', async () => {
+		const { user: shopAdmin, shop } = await createShopAdminUser();
+		const { user: artist } = await createArtistUser();
+		await connectArtistToShop(artist.id, shop.id);
+		await createAppointment(shopAdmin.id, { shopId: shop.id });
+		const token = signTestToken(artist);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_APPOINTMENTS_BY_SHOP, variables: { shopId: shop.id } },
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.getAppointmentsByShop).toHaveLength(1);
+	});
+
+	it('rejects an artist with no connection to that shop', async () => {
+		const { user: shopAdmin, shop } = await createShopAdminUser();
+		const { user: unconnectedArtist } = await createArtistUser();
+		await createAppointment(shopAdmin.id, { shopId: shop.id });
+		const token = signTestToken(unconnectedArtist);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_APPOINTMENTS_BY_SHOP, variables: { shopId: shop.id } },
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(data.getAppointmentsByShop).toBeNull();
+		expect(errors[0].message).toMatch(/Action not allowed/);
+	});
+
+	it('rejects a Client with no relationship to that shop at all', async () => {
+		const { user: shopAdmin, shop } = await createShopAdminUser();
+		const { user: client } = await createClientUser();
+		await createAppointment(shopAdmin.id, { shopId: shop.id });
+		const token = signTestToken(client);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_APPOINTMENTS_BY_SHOP, variables: { shopId: shop.id } },
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(data.getAppointmentsByShop).toBeNull();
+		expect(errors[0].message).toMatch(/Action not allowed/);
 	});
 });

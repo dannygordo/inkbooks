@@ -1,5 +1,7 @@
 const Project = require('../../models/Project');
 const withAuth = require('../../utils/with-auth');
+const { Constants } = require('../../utils/constants');
+const { AuthenticationError } = require('../../utils/errors');
 
 const resolvers = {
   Query: {
@@ -21,7 +23,14 @@ const resolvers = {
         throw new Error(err);
       }
     }),
-    getProjectsByArtist: withAuth(async (_, { artistId }) => {
+    // Was withAuth with no ownership check at all - any authenticated user could pass an
+    // arbitrary artistId and read that artist's active project list. Same "the artist
+    // themselves, or shop-admin-or-better" convention as getAppointmentsByArtist
+    // (see resolvers/appointments.js) and getArtistShopConnections/getBookingRequests.
+    getProjectsByArtist: withAuth(async (_, { artistId }, context, info, user) => {
+      if (user.role > Constants.ROLES.SHOP_ADMIN && String(user.id) !== String(artistId)) {
+        throw new AuthenticationError('Action not allowed');
+      }
       try {
         const projects = await Project.find({artistId: artistId}).sort({createdAt: -1});
         const results = projects.filter((proj) => {
