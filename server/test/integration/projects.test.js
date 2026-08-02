@@ -280,6 +280,133 @@ describe('updateProject / updateProjectNotes ownership', () => {
 	});
 });
 
+// Regression tests for a real (non-crashing, but real) data-integrity bug found while debugging
+// the image-upload crashes above: IBImageInput/IBNoteInput's `id` field is GraphQL's name, but
+// Mongoose subdocuments use `_id` as their actual identity - `id` is only a computed virtual, never
+// a settable schema path. Every updateProject call sent `id` straight through unchanged, which
+// Mongoose's strict-mode casting silently dropped, auto-generating a brand new `_id` for every
+// image/note on every single save, not just newly-added ones. Fixed in mutations/projects.js via
+// remapIdToMongoId(). These tests save a project twice in a row, exactly the way the real client
+// does (re-sending existing images/notes unchanged alongside anything new), and confirm identity
+// survives across saves.
+describe('updateProject: image/note identity preservation across saves', () => {
+	const UPDATE_PROJECT_WITH_IMAGES = `
+		mutation UpdateProject($project: ProjectInput) {
+			updateProject(project: $project) {
+				id
+				referenceImages { id url }
+				notes { id author note }
+			}
+		}
+	`;
+
+	it('preserves an existing referenceImage\'s id across a second, unrelated save', async () => {
+		const { user: artistUser } = await createArtistUser();
+		const { client } = await createClientUser();
+		const project = await createProject(artistUser.id, client.id);
+		const token = signTestToken(artistUser);
+		const server = createTestServer();
+
+		const baseVariables = {
+			id: project.id,
+			title: project.title,
+			description: project.description,
+			artistId: artistUser.id,
+			clientId: client.id,
+			status: 'in_progress',
+		};
+
+		const firstSave = await server.executeOperation(
+			{
+				query: UPDATE_PROJECT_WITH_IMAGES,
+				variables: {
+					project: {
+						...baseVariables,
+						referenceImages: [
+							{ id: '000000000000000000000001', url: 'https://example.com/a.png', userId: artistUser.id },
+						],
+					},
+				},
+			},
+			{ contextValue: contextWithToken(token) },
+		);
+		const firstResult = firstSave.body.singleResult;
+		expect(firstResult.errors).toBeUndefined();
+		const savedImageId = firstResult.data.updateProject.referenceImages[0].id;
+
+		// Re-send the same image unchanged, plus a title tweak - exactly what
+		// IBProgressListProject.jsx does on every save (strips __typename/userInfo, resends the
+		// rest of the array as-is).
+		const secondSave = await server.executeOperation(
+			{
+				query: UPDATE_PROJECT_WITH_IMAGES,
+				variables: {
+					project: {
+						...baseVariables,
+						title: 'A different title',
+						referenceImages: [
+							{ id: savedImageId, url: 'https://example.com/a.png', userId: artistUser.id },
+						],
+					},
+				},
+			},
+			{ contextValue: contextWithToken(token) },
+		);
+		const secondResult = secondSave.body.singleResult;
+		expect(secondResult.errors).toBeUndefined();
+		expect(secondResult.data.updateProject.referenceImages[0].id).toBe(savedImageId);
+	});
+
+	it('preserves an existing note\'s id across a second, unrelated save', async () => {
+		const { user: artistUser } = await createArtistUser();
+		const { client } = await createClientUser();
+		const project = await createProject(artistUser.id, client.id);
+		const token = signTestToken(artistUser);
+		const server = createTestServer();
+
+		const baseVariables = {
+			id: project.id,
+			title: project.title,
+			description: project.description,
+			artistId: artistUser.id,
+			clientId: client.id,
+			status: 'in_progress',
+		};
+
+		const firstSave = await server.executeOperation(
+			{
+				query: UPDATE_PROJECT_WITH_IMAGES,
+				variables: {
+					project: {
+						...baseVariables,
+						notes: [{ id: '000000000000000000000002', author: 'Maya Chen', note: 'First note' }],
+					},
+				},
+			},
+			{ contextValue: contextWithToken(token) },
+		);
+		const firstResult = firstSave.body.singleResult;
+		expect(firstResult.errors).toBeUndefined();
+		const savedNoteId = firstResult.data.updateProject.notes[0].id;
+
+		const secondSave = await server.executeOperation(
+			{
+				query: UPDATE_PROJECT_WITH_IMAGES,
+				variables: {
+					project: {
+						...baseVariables,
+						notes: [{ id: savedNoteId, author: 'Maya Chen', note: 'First note' }],
+					},
+				},
+			},
+			{ contextValue: contextWithToken(token) },
+		);
+		const secondResult = secondSave.body.singleResult;
+		expect(secondResult.errors).toBeUndefined();
+		expect(secondResult.data.updateProject.notes[0].id).toBe(savedNoteId);
+	});
+});
+
 describe('deleteProject: Admin-only', () => {
 	it('rejects a non-Admin caller, even the assigned artist', async () => {
 		const { user: artistUser } = await createArtistUser();

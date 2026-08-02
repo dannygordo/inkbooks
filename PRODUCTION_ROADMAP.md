@@ -817,21 +817,19 @@ distinct bugs, both real, both in `IBImagesList.jsx`:
    longer exists on the component at all - grepped the rest of the client for other stale
    `imgProps` call sites; this was the only one.
 
-**Known gap, found but deliberately not fixed today:** confirmed empirically (via
-`Project.schema.path('referenceImages').cast(...)` against the real Mongoose schema, no DB needed)
-that every `updateProject` call mints a brand-new `_id` for every image in `referenceImages`/
-`designImages`, not just newly-added ones. The client always sends the GraphQL virtual `id` field
-back, never the real `_id`, and `IBImageSchema` doesn't treat `id` as an alias for `_id` - so each
-save silently discards the old identity and Mongoose auto-generates a fresh one for every element,
-old and new alike. Doesn't crash anything today (nothing currently holds onto an image's `id`
-across a save), but it's a real data-integrity smell: any future feature that references a specific
-image by id (a "jump to this image" link, a delete-by-id call issued from stale client state, an
-activity log) would break silently after the next unrelated edit to the same project. Two options:
-(1) have the client send `id` as `_id` in the mutation payload so Mongoose preserves existing
-subdocument identity, or (2) switch `updateProject` to a targeted array-element update
-(`$push`/positional `$` operators) instead of replacing the whole array on every save - option 2
-also happens to be the real fix for the image-identity-churn issue and is more efficient besides.
-Worth a dedicated pass, not a quick patch alongside an unrelated crash fix.
+**Backlog item, now fixed (August 2, 2026):** the image/note `_id`-churn bug noted above (every
+`updateProject` call minted a brand-new `_id` for every element of `referenceImages`/
+`designImages`/`notes`, not just newly-added ones, since the client always sends GraphQL's virtual
+`id` field back and none of `IBImageSchema`/`IBNoteSchema` treat `id` as an alias for `_id`) is
+fixed. `mutations/projects.js` now has a `remapIdToMongoId()` helper, applied to
+`referenceImages`/`designImages`/`notes` in both `createProject` and `updateProject` before the
+Mongoose write: it maps each item's `id` onto the real `_id` key it needs to be for Mongoose to
+recognize and preserve existing subdocument identity (and to give a genuinely new item's
+client-generated id - see `IBProgressItemProject.jsx`'s `new ObjectID()` - a stable real identity
+instead of a random one). Verified empirically (`Project.schema.path('referenceImages').cast(...)`
+against the real schema, before vs. after the fix) and via two new regression tests in
+`projects.test.js` that save a project twice in a row - exactly how the real client re-sends
+existing images/notes unchanged alongside new ones - and confirm the id survives.
 
 **Cleanup done the same day:** `server/config.js` - a dead, gitignored file holding a stale
 hardcoded Atlas connection string with a different (never-rotated) plaintext password - has been
