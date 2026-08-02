@@ -15,15 +15,17 @@ import { useAuth } from "../../context/auth";
 import moment from "moment";
 import IBProjectPalettesSelect from "../../components/inputs/IBProjectPalettesSelect";
 import IBTagsWidget from "../../components/ibTagsWidget/IBTagsWidget";
-import { Chip, Fab, ListItem, Paper } from "@mui/material";
+import { Button, Chip, Fab, ListItem, Paper } from "@mui/material";
 import { Save } from "@mui/icons-material";
 import IBChatBox from "../../components/ibChatBox/IBChatBox";
 import { ObjectID } from "bson";
 import MessengerService from "../../services/MessengerService";
+import IBSquarePaymentForm from "../../components/IBSquarePayments/IBSquarePaymentForm";
+import { ALERT_CONSTANTS } from "../../constants";
 
 const Project = (props) => {
 	const navigate = useNavigate();
-	const { user } = useAuth();
+	const { user, setModal, modal, setAlert } = useAuth();
 	let params = useParams();
 	const errors = {};
 	let updatedReferenceImages = [];
@@ -193,6 +195,46 @@ const Project = (props) => {
 	};
 
 	/**
+	 * Opens the global IBModal with a Square payment form pre-filled to this project's current
+	 * depositAmount (whatever was last saved via handleUpdateDetails - not the unsaved ref value,
+	 * so this always charges the amount actually on record). Sandbox-only right now, see
+	 * IBSquarePaymentForm.jsx and server/routes/squarePayments.js for why.
+	 */
+	const handlePayDepositClick = (e) => {
+		e.preventDefault();
+		const amountCents = Math.round(data.getProject.depositAmount * 100);
+		setModal({
+			isOpen: true,
+			title: "Pay Deposit",
+			content: (
+				<IBSquarePaymentForm
+					amountCents={amountCents}
+					note={`Deposit for project ${data.getProject.title}`}
+					onSuccess={() => {
+						setModal({ ...modal, isOpen: false });
+						setAlert({
+							isAlert: true,
+							severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
+							message: "Deposit paid successfully.",
+							timeout: ALERT_CONSTANTS.TIMEOUT,
+							location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
+						});
+					}}
+					onError={(message) => {
+						setAlert({
+							isAlert: true,
+							severity: ALERT_CONSTANTS.SEVERITY.ERROR,
+							message: `Payment failed: ${message}`,
+							timeout: ALERT_CONSTANTS.TIMEOUT,
+							location: ALERT_CONSTANTS.DISPLAY_MODAL,
+						});
+					}}
+				/>
+			),
+		});
+	};
+
+	/**
 	 * Handles the edit click event
 	 */
 	const handleEdit = (e) => {
@@ -348,6 +390,17 @@ const Project = (props) => {
 							inputRef={depositAmountRef}
 							defaultValue={data.getProject.depositAmount}
 						/>
+						<Button
+							variant="outlined"
+							sx={{ m: 1 }}
+							onClick={handlePayDepositClick}
+							disabled={
+								!data.getProject.depositAmount ||
+								data.getProject.depositAmount <= 0
+							}
+						>
+							Pay Deposit
+						</Button>
 						<div>
 							<IBProjectPalettesSelect
 								inputRef={selectPaletteRef}

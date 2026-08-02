@@ -260,13 +260,34 @@ Also bumped `@date-io/moment` (was years-stale at `^2.16.1` while `@mui/x-date-p
 
 ## Phase 4 — Payments
 
-Square isn't actually wired up: `squareConfig.js` posts to `http://localhost:4000/process-payment`, but that port only runs the socket.io server — there's no route handling that path anywhere in `server/index.js`. The "production" Square config in `client/src/config.js` is a copy-paste of the sandbox app ID, not real production credentials.
+**Status as of August 2, 2026: built and wired up end-to-end, sandbox only. Not yet production-ready — see the go-live checklist below before touching real credentials.**
 
-To finish this:
-1. Build the actual Express route (this ties into the Phase 2 "consolidate listeners" work — you'll have an Express app to add a route to) using Square's Node SDK to create a payment from the nonce.
-2. Test the full sandbox flow end-to-end.
-3. Apply for Square production access, get real production credentials, and store them as environment variables — never hardcoded, this time with the lesson from Phase 0 applied from day one.
-4. You're already using Square's hosted card fields, which keeps you out of most PCI DSS scope — don't change that; don't ever let raw card numbers touch your server.
+The original finding here (`squareConfig.js` posting to a `http://localhost:4000/process-payment` that no route anywhere ever handled, built against Square's own `SqPaymentForm` API, which Square had already retired) is fixed. What actually shipped:
+
+**Server side:**
+- `server/utils/square.js` gained `createSandboxPayment({sourceId, amountCents, idempotencyKey, note})` — a plain `fetch` POST to Square's sandbox `/v2/payments` REST endpoint (`Square-Version: 2026-07-15`), consistent with this file's existing philosophy of not adding the `square` npm SDK as a dependency. Deliberately independent of the `SQUARE_ENVIRONMENT` env var used by the shop-cut-ledger OAuth/Invoices flow above — the sandbox host (`https://connect.squareupsandbox.com`) is hardcoded, so changing that setting for the other feature can never accidentally point this one at real money.
+- `server/utils/validation.js` gained `processSquarePaymentInputSchema` (zod: `sourceId` non-empty string, `amountCents` positive integer, `note` optional).
+- New route: `server/routes/squarePayments.js` — `POST /square/process-payment`, authenticated (`checkAuth`, any logged-in user), rate-limited (10/min per caller IP via the existing `utils/rate-limit.js`, same pattern as the public booking-request routes), zod-validated, wired into `server/index.js` alongside the existing `squareOAuthRouter`/`squareWebhooksRouter`.
+- `server/test/integration/squarePayments.test.js` covers 401 (no auth), 400 (missing/invalid fields), 200 (success + exact Square API call shape asserted via a mocked `global.fetch`), 402 (Square decline passthrough), 500 (missing `SQUARE_SANDBOX_ACCESS_TOKEN`), and 429 (rate limit).
+
+**Client side:**
+- `client/src/components/IBSquarePayments/loadSquareSdk.js` (new) — injects Square's current Web Payments SDK script (`https://sandbox.web.squarecdn.com/v1/square.js`) on demand and resolves `window.Square`, memoized so repeated opens of the payment form reuse one load.
+- `client/src/components/IBSquarePayments/squareConfig.js` — rewritten from the old `SqPaymentForm`-style config object to just `{applicationId, locationId}` sourced from `client/src/config.js`'s `SQUARE.SANDBOX` block.
+- `client/src/components/IBSquarePayments/IBSquarePaymentForm.jsx` — fully rebuilt against `Square.payments()` → `payments.card()` → `card.attach()`/`card.tokenize()`, then an authenticated `fetch` (using `useAuth()`'s `user.accessToken`, the same field Apollo's own `authLink` reads) to the new server route.
+- `client/src/config.js` — dropped the dead `PROCESS_URL` entries; `SQUARE.PRODUCTION` still deliberately points at the same sandbox app/location IDs as `SQUARE.SANDBOX` (commented, so this isn't mistaken for real prod config later).
+- `client/src/pages/projects/Project.jsx` — added a "Pay Deposit" button next to the `depositAmount` field (disabled when there's no deposit amount saved), which opens the existing global `IBModal` (`setModal({isOpen, title, content})`) with `IBSquarePaymentForm`, wired to the existing `AuthContext` alert system on success/failure.
+
+**Verification caveat:** this sandbox environment cannot execute the real Vitest suite for either `client/` or `server/` (`Cannot find module @rollup/rollup-linux-x64-gnu`, and installing it is blocked by a `403` from the npm registry in this environment) — the same limitation noted in the Phase 6 test-suite entry below. `squarePayments.test.js` was syntax-checked (`node --check`) but not run via Vitest here. As stronger-than-syntax verification, the actual route logic was exercised directly: a real Express server was started in this sandbox with the route mounted and `global.fetch` mocked, and real HTTP requests were sent against it — confirming the 401/400/402/200 paths all behave exactly as the test file asserts, including the outgoing call to Square (`https://connect.squareupsandbox.com/v2/payments`, correct headers, correct body shape). **Run `npm test` in `server/` yourself to get an authoritative pass/fail**, and manually click through a real "Pay Deposit" flow in the browser once you've filled in the two env vars below — that manual click-through has not been done by me at all, since it requires a real Square sandbox account and a browser.
+
+**Two things you need to do before this works end-to-end:**
+1. Get a Sandbox Access Token and Location ID from `developer.squareup.com/apps` → your app → Sandbox tab, and set `SQUARE_SANDBOX_ACCESS_TOKEN`/`SQUARE_SANDBOX_LOCATION_ID` in `server/.env.development` (and, if you want to test this on the live Render deploy, in Render's env var dashboard too — placeholders with instructions are already in both `.env.development` and `.env.production`).
+2. Restart the server after setting those, then open a project with a deposit amount saved and click "Pay Deposit." Square publishes sandbox test card numbers (e.g. a Visa ending in specific test digits) in their docs for exercising both approve and decline paths — use one of those, not a real card.
+
+**Go-live checklist (do not skip any of this before switching to real production credentials):**
+1. Apply for Square production access and get real production credentials.
+2. Remove the hardcoded sandbox host from `createSandboxPayment()`/`loadSquareSdk.js` and make both environment-aware (mirroring how the OAuth flow already reads `SQUARE_ENVIRONMENT`) — right now this is intentionally impossible to flip by accident, which means it also needs a deliberate code change, not just an env var change, to go live.
+3. Test the full production flow end-to-end with a real (small-dollar) card charge before relying on it for actual client deposits.
+4. You're using Square's hosted Web Payments SDK card field, which keeps raw card numbers off your server entirely (they go straight from the browser to Square, you only ever see a token) — this keeps you out of most PCI DSS scope; don't change that.
 
 ---
 

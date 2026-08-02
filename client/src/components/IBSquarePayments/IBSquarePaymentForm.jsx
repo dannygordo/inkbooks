@@ -1,24 +1,149 @@
-import React from 'react';
-import config from './squareConfig';
+import React, { useEffect, useRef, useState } from "react";
+import { Alert, Box, Button, CircularProgress } from "@mui/material";
+import { useAuth } from "../../context/auth";
+import { loadSquareSdk } from "./loadSquareSdk";
+import squareConfig from "./squareConfig";
+import { APP_SETTINGS_CONSTANTS } from "../../constants";
 
-const IBSquarePaymentForm = ({ paymentForm }) => {
+// Real, working replacement for the previous version of this component, which was built against
+// Square's SqPaymentForm API - retired by Square years before this was ever written - and was
+// never actually imported/rendered by any page in this app (confirmed via a full-codebase grep).
+// This one uses Square's current Web Payments SDK (Square.payments()/card()/tokenize(), loaded
+// dynamically via loadSquareSdk.js) and posts the resulting token to the real server route this
+// session added at routes/squarePayments.js. Sandbox-only, matching that route - see its own
+// comment for why.
+//
+// Props:
+// - amountCents: integer - the exact amount to charge, e.g. a project's depositAmount * 100.
+// - note: optional string describing what this charge is for (shown on the Square sandbox
+//   dashboard, not to the payer).
+// - onSuccess(paymentId): called once the server confirms the charge succeeded.
+// - onError(message): called on any failure - card declined, network error, SDK load failure.
+const IBSquarePaymentForm = ({ amountCents, note, onSuccess, onError }) => {
+	const { user } = useAuth();
+	const cardRef = useRef(null);
+	const containerRef = useRef(null);
+	// idle -> loading the SDK/attaching the card field; ready -> can tap Pay; submitting -> charge
+	// in flight; error -> the card field itself never mounted (SDK/network failure, not a decline).
+	const [status, setStatus] = useState("loading");
+	const [errorMessage, setErrorMessage] = useState("");
 
-    paymentForm = new paymentForm(config);
-    paymentForm.build();
-    const requestCardNonce = () =>{
-        paymentForm.requestCardNonce();
-    }
+	useEffect(() => {
+		let cancelled = false;
 
-    return (
-        <div id="form-container">
-            <div id="sq-card-number"></div>
-            <div className="third" id="sq-expiration-date"></div>
-            <div className="third" id="sq-cvv"></div>
-            <div className="third" id="sq-postal-code"></div>
-            <button id="sq-creditcard" className="button-credit-card" onClick={requestCardNonce}> Pay $1.00</button>
-        </div>
-      
-    )
-}
+		async function setup() {
+			try {
+				const Square = await loadSquareSdk();
+				if (cancelled) {
+					return;
+				}
+				const payments = Square.payments(
+					squareConfig.applicationId,
+					squareConfig.locationId
+				);
+				const card = await payments.card();
+				if (cancelled) {
+					return;
+				}
+				await card.attach(containerRef.current);
+				cardRef.current = card;
+				setStatus("ready");
+			} catch (err) {
+				if (!cancelled) {
+					setErrorMessage(err.message);
+					setStatus("error");
+					if (onError) {
+						onError(err.message);
+					}
+				}
+			}
+		}
+
+		setup();
+
+		return () => {
+			cancelled = true;
+			if (cardRef.current) {
+				// destroy() detaches the card field's iframes - not calling this on unmount would
+				// leak them if this form is opened/closed repeatedly (e.g. inside IBModal).
+				cardRef.current.destroy().catch(() => {});
+			}
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
+
+	const handlePay = async () => {
+		if (!cardRef.current) {
+			return;
+		}
+		setStatus("submitting");
+		setErrorMessage("");
+		try {
+			const tokenResult = await cardRef.current.tokenize();
+			if (tokenResult.status !== "OK") {
+				const message =
+					(tokenResult.errors &&
+						tokenResult.errors.map((e) => e.message).join("; ")) ||
+					"Could not process this card.";
+				throw new Error(message);
+			}
+
+			// Same host as GraphQL/socket.io - this is a plain Express route, not a GraphQL
+			// mutation, same pattern BookingRequest.jsx already uses for its own non-GraphQL
+			// upload endpoint.
+			const processUrl =
+				APP_SETTINGS_CONSTANTS[import.meta.env.MODE.toUpperCase()]
+					.GRAPHQL_SERVER_URL + "square/process-payment";
+			const response = await fetch(processUrl, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${user.accessToken}`,
+				},
+				body: JSON.stringify({
+					sourceId: tokenResult.token,
+					amountCents,
+					note,
+				}),
+			});
+			const data = await response.json().catch(() => null);
+			if (!response.ok) {
+				throw new Error((data && data.error) || "Payment failed.");
+			}
+
+			setStatus("ready");
+			if (onSuccess) {
+				onSuccess(data.paymentId);
+			}
+		} catch (err) {
+			setErrorMessage(err.message);
+			setStatus("ready");
+			if (onError) {
+				onError(err.message);
+			}
+		}
+	};
+
+	return (
+		<Box sx={{ minWidth: 320, p: 1 }}>
+			<Box ref={containerRef} id="sq-card-container" sx={{ minHeight: 90, mb: 2 }} />
+			{status === "loading" && <CircularProgress size={24} />}
+			{errorMessage && (
+				<Alert severity="error" sx={{ mb: 2 }}>
+					{errorMessage}
+				</Alert>
+			)}
+			<Button
+				variant="contained"
+				disabled={status === "loading" || status === "submitting" || status === "error"}
+				onClick={handlePay}
+			>
+				{status === "submitting"
+					? "Processing..."
+					: `Pay $${(amountCents / 100).toFixed(2)}`}
+			</Button>
+		</Box>
+	);
+};
 
 export default IBSquarePaymentForm;

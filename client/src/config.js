@@ -29,24 +29,33 @@ export const FIREBASE = {
 // ACCESS_TOKEN removed - it was sitting here as a plain string, which means it was being
 // bundled into the compiled client JS and shipped to every browser that loaded the app,
 // extractable via devtools by anyone. Same class of bug as the shared Firebase credential
-// fixed above. Square's ACCESS_TOKEN is a real secret and must only ever live server-side
-// (env var), used to call Square's Payments API after the client sends up a card nonce.
-// APPLICATION_ID and LOCATION_ID are safe to keep here - Square's own Web Payments SDK
-// requires them client-side and treats them as public identifiers, not secrets.
-// PROCESS_URL still points at a localhost:4000 endpoint that doesn't exist in this
-// codebase yet - this Square integration is unfinished and won't work in production
-// regardless of this fix. Flagging, not building it out - that's a separate task.
+// fixed above. Square's real access token is a secret and only ever lives server-side (env
+// var - see server/utils/square.js's SQUARE_SANDBOX_ACCESS_TOKEN), used to call Square's
+// Payments API after the client sends up a card nonce/token. APPLICATION_ID and LOCATION_ID
+// are safe to keep here - Square's own Web Payments SDK requires them client-side and treats
+// them as public identifiers, not secrets.
+//
+// PROCESS_URL removed (it pointed at a localhost:4000 endpoint that never existed anywhere in
+// this codebase - the whole reason this integration didn't work at all, see
+// PRODUCTION_ROADMAP.md's Phase 4 write-up). The real route now lives at
+// routes/squarePayments.js, on the same host/port as everything else
+// (APP_SETTINGS_CONSTANTS[...].GRAPHQL_SERVER_URL + 'square/process-payment' - see
+// IBSquarePaymentForm.jsx), the same pattern BookingRequest.jsx already uses for its own
+// non-GraphQL upload endpoint, rather than a separate hardcoded URL here.
+//
+// PRODUCTION block deliberately still points at the same sandbox app/location ids as SANDBOX -
+// this whole feature is sandbox-only right now, on purpose (see routes/squarePayments.js and
+// server/utils/square.js's createSandboxPayment). Do not swap these for real production
+// credentials until Phase 4's full checklist in PRODUCTION_ROADMAP.md is done.
 export const SQUARE = {
     SANDBOX: {
         APPLICATION_NAME: 'inkbooks',
         APPLICATION_ID: 'sandbox-sq0idb-jP6MNHK_aUZtUZgYMYc0RA',
         LOCATION_ID: 'L8YSXGA7M0B9X',
-        PROCESS_URL: 'http://localhost:4000/process-payment'
     },
     PRODUCTION: {
         APPLICATION_NAME: 'inkbooks',
         APPLICATION_ID: 'sandbox-sq0idb-jP6MNHK_aUZtUZgYMYc0RA',
         LOCATION_ID: 'L8YSXGA7M0B9X',
-        PROCESS_URL: 'http://localhost:4000/process-payment'
     }
 };

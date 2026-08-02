@@ -248,6 +248,18 @@ const appointmentIdInputSchema = z.object({
   appointmentId: objectIdSchema,
 });
 
+// --- Direct card payment (deposit checkout) schema ---
+// See PRODUCTION_ROADMAP.md's Phase 4 section and routes/squarePayments.js. sourceId is the
+// nonce/token the client's Web Payments SDK produces (tokenizeCard()'s token field) - a plain
+// string, not a Mongo ObjectId, so it doesn't reuse objectIdSchema. amountCents mirrors how
+// Square's own amount_money.amount field works (an integer number of the currency's smallest
+// unit) rather than a float dollar amount, to avoid floating-point rounding entirely.
+const processSquarePaymentInputSchema = z.object({
+  sourceId: z.string().trim().min(1, 'sourceId must not be empty'),
+  amountCents: z.number().int().positive('amountCents must be a positive integer'),
+  note: z.string().trim().max(500).nullish(),
+});
+
 module.exports = {
   loginInputSchema,
   registerInputSchema,
@@ -266,5 +278,6 @@ module.exports = {
   artistShopConnectionInputSchema,
   createShopCutInvoiceInputSchema,
   appointmentIdInputSchema,
+  processSquarePaymentInputSchema,
   validate,
 };

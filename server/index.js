@@ -27,6 +27,7 @@ const { Constants } = require('./utils/constants');
 const bookingUploadsRouter = require('./routes/bookingUploads');
 const { router: squareOAuthRouter } = require('./routes/squareOAuth');
 const squareWebhooksRouter = require('./routes/squareWebhooks');
+const squarePaymentsRouter = require('./routes/squarePayments');
 
 // NOTE: never console.log(process.env.MONGODB) or the connection string anywhere - it contains
 // the database password in plaintext, and this project's server logs have historically ended up
@@ -61,6 +62,7 @@ app.use(bookingUploadsRouter);
 // bookingUploadsRouter above.
 app.use(squareOAuthRouter);
 app.use(squareWebhooksRouter);
+app.use(squarePaymentsRouter);
 // Apollo Server v5 has no standalone listener of its own (that was removed along with the
 // apollo-server package) - it now runs as Express middleware, sharing one HTTP server with
 // socket.io below instead of each having its own port.
