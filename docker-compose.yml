@@ -1,0 +1,16 @@
+services:
+  # Local MongoDB for development - completely separate from the production Atlas cluster
+  # referenced in server/.env.production. Data lives in a named Docker volume (mongo-data) so it
+  # survives `docker compose down`/restarts, but `docker compose down -v` wipes it if you ever
+  # want a truly clean slate before re-running the seed script.
+  mongo:
+    image: mongo:7
+    container_name: inkbooks-mongo-dev
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+volumes:
+  mongo-data:

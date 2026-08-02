@@ -7,7 +7,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "start": "NODE_ENV=DEVELOPMENT node index.js",
-    "start:prod": "NODE_ENV=PRODUCTION nodemon index.js"
+    "start:prod": "NODE_ENV=PRODUCTION nodemon index.js",
+    "seed": "node scripts/seed.js"
   },
   "keywords": [],
   "author": "",

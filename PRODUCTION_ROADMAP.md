@@ -475,6 +475,87 @@ user to work through in Square's own dashboard, not an engineering record of wha
 
 ---
 
+## Local development environment (August 2, 2026)
+
+Prompted by a real cost signal, not a hypothetical one: Netlify build-minute usage hit 50% of the
+free-tier allotment from ordinary local development/testing, not real traffic. Investigating
+turned up a bigger problem than the credit usage itself — `server/.env.development`'s `MONGODB`
+was pointed at the same shared Atlas cluster (`cluster0.6sz1d.mongodb.net/inkbook`) used
+elsewhere. "Local" development had actually been reading and writing a shared cloud database this
+whole time, not a real local one — every manual test, every bug repro, was mutating data that
+could collide with production. That's now fixed, separately from the Netlify-credits question
+that prompted looking at this at all.
+
+**What changed:**
+- `docker-compose.yml` (repo root, new) — a single `mongo:7` service, port `27017`, data in a
+  named volume (`mongo-data`) so it survives restarts. Nothing else in the stack needs
+  containerizing — the Node server and Vite client both already run fine directly on the host.
+- `server/.env.development` — `MONGODB` repointed to `mongodb://localhost:27017/inkbooks-dev`. The
+  old Atlas connection string is commented out directly below it (not deleted) in case you ever
+  need to point back at real data temporarily to debug something — don't leave it uncommented
+  day-to-day. This file is gitignored, always was, so this change needs no commit/push — it only
+  needs to exist on your own machine.
+- `server/scripts/seed.js` (new) + `npm run seed` (from `server/`) — wipes every collection this
+  script touches, then creates a full realistic dataset with real bcrypt hashes (12 rounds, same
+  as `register`/`login` use) so you can actually log into the running app, not just inspect
+  documents in a database client. Refuses to run against anything whose `MONGODB` doesn't start
+  with `mongodb://localhost` or `mongodb://127.0.0.1` — a deliberate guard against ever pointing
+  this destructive script at Atlas by accident.
+
+  Seeded data: one shop (Copper Wolf Tattoo Co.), a Shop Admin, a Shop Staff member, two
+  shop-affiliated Artists (each with a real `ArtistShopConnection`), one independent Artist with no
+  shop connection at all (exercises the artist-centric tenancy path — see that section above), four
+  Clients, four Projects (correctly using the `Project.clientId` = Client sub-document `_id` /
+  `Project.artistId` = artist's own `User._id` convention documented elsewhere in this file),
+  Appointments covering the full `shopCutStatus` lifecycle (`none`/`unpaid`/`pending_confirmation`/
+  `paid`), and two Conversations with real Messages between an artist/client pair each (built via
+  the same `findOrCreateConversationForMembers` logic the app itself uses, so the Messenger and
+  Project-chat panels have real threads to display, not empty states).
+
+  Every seeded account shares one password (`devpass123`, printed to the console at the end of the
+  run along with every account's email) — this is throwaway local data, not anything security-
+  sensitive.
+
+**Validation performed and its actual limit.** The script was reviewed line-by-line against every
+real Mongoose schema and the real zod enum values in `utils/validation.js` (not the unrelated
+numeric `Constants.PROJECT_STATUS`/`ARTIST_STATUS` constants a first draft mistakenly reached for
+— `status: 'in_progress'`/`'completed'` and `appointmentStatus: 'scheduled'`/`'completed'` are the
+actual accepted values), and syntax-checked. A full run against a real `mongod` was attempted from
+this sandbox using `mongodb-memory-server` (already a dev dependency, used by the real test suite)
+but failed — this sandbox's network access blocks `fastdl.mongodb.org`, the same class of outbound
+restriction that already blocks the npm registry here. That means the very first real run of this
+script needs to happen on your machine, not mine — see the steps below. If anything's wrong, it'll
+fail loudly on that first run (Mongoose validation errors are specific about which field and why),
+not silently.
+
+**How to actually use this, end to end, on your own machine:**
+1. `docker compose up -d` (repo root) — starts local Mongo on `27017`. Confirm it's running with
+   `docker compose ps`.
+2. `cd server && npm run seed` — wipes and repopulates `inkbooks-dev`. Re-run any time you want a
+   clean slate; it's fully repeatable.
+3. `npm start` (from `server/`) — same command as always; `NODE_ENV=DEVELOPMENT` already makes
+   `index.js` load `.env.development`, which now points at local Mongo instead of Atlas.
+4. `npm run dev` (from `client/`) — no changes needed here at all.
+   `client/src/constants/app.js` already auto-selects `http://localhost:5500/` as the GraphQL
+   server URL whenever Vite's dev mode is active, which it always is under `npm run dev`.
+5. Log into the running app at `localhost:3000` (or whatever port Vite prints) with any seeded
+   email above and the password `devpass123`.
+
+None of this touches Render or Netlify — the point is that ordinary day-to-day development and
+manual testing now happens entirely on your machine, against a database that only you can affect,
+with zero Netlify build minutes spent. Netlify usage should now only come from real deploys
+(pushing to `main`), which is what its free tier is actually meant to cover.
+
+**Still open:** `server/config.js` is a dead, gitignored file containing a stale hardcoded Atlas
+connection string with a different (also-should-be-rotated) password — nothing in the codebase
+still requires it (confirmed via a full-codebase grep), so it's a safe delete whenever you want to
+clear it out; flagged here rather than deleted unilaterally since it's your call. The
+`mongodb-memory-server`-based test suite (`npm test`) is completely separate from this local-dev
+database and needs no changes — it already provisions and tears down its own ephemeral `mongod`
+per test run, real local Mongo or not.
+
+---
+
 ## Suggested sequencing
 
 Phase 0 today. Phase 1 this week — it's the part where real damage is currently possible. Phase 2 the following 1-2 weeks, since it's what keeps Phase 1 fixed. Phase 3 (modernization, including the monorepo/TypeScript scaffolding that Phase 5 needs) can run in parallel with Phase 2 once the auth wrapper pattern is settled. Phase 4 (real payments) whenever you're ready to actually take deposits. Phase 5 (mobile) starts once Phase 0-2 are done and the monorepo shape from Phase 3 exists — don't build a mobile UI against an API that's still wide open. Phase 6 items — tests, CI, monitoring — should be stood up incrementally starting in Phase 1, not bolted on at the end; retrofitting tests onto already-migrated code (or two clients instead of one) is much more expensive than writing them alongside the fixes.
