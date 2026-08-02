@@ -238,8 +238,11 @@ describe('createMessage: no impersonation, membership required', () => {
 			},
 			{ contextValue: contextWithToken(signTestToken(artistUser)) },
 		);
+		// createMessage(...): Message! is non-null in the schema, so a thrown resolver error nulls
+		// out `data` itself, not just `data.createMessage` - see the equivalent note in
+		// test/integration/auth.test.js.
 		const { errors, data } = response.body.singleResult;
-		expect(data.createMessage).toBeNull();
+		expect(data).toBeNull();
 		expect(errors[0].message).toMatch(/Action not allowed/);
 	});
 
@@ -274,8 +277,11 @@ describe('createMessage: no impersonation, membership required', () => {
 			},
 			{ contextValue: contextWithToken(signTestToken(outsider)) },
 		);
+		// createMessage(...): Message! is non-null in the schema, so a thrown resolver error nulls
+		// out `data` itself, not just `data.createMessage` - see the equivalent note in
+		// test/integration/auth.test.js.
 		const { errors, data } = response.body.singleResult;
-		expect(data.createMessage).toBeNull();
+		expect(data).toBeNull();
 		expect(errors[0].message).toMatch(/Action not allowed/);
 	});
 });
@@ -298,8 +304,10 @@ describe('createConversation: caller must be a member', () => {
 			},
 			{ contextValue: contextWithToken(signTestToken(outsider)) },
 		);
+		// createConversation(...): Conversation! is non-null in the schema, so a thrown resolver
+		// error nulls out `data` itself, not just `data.createConversation`.
 		const { errors, data } = response.body.singleResult;
-		expect(data.createConversation).toBeNull();
+		expect(data).toBeNull();
 		expect(errors[0].message).toMatch(/Action not allowed/);
 	});
 

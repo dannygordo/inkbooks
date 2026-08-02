@@ -497,7 +497,14 @@ describe('getConversation: member-only', () => {
 		const { user: clientUser } = await createClientUser();
 		const server = createTestServer();
 		const createRes = await server.executeOperation(
-			{ query: CREATE_CONVERSATION, variables: { members: [artistUser.id, clientUser.id] } },
+			{
+				query: CREATE_CONVERSATION,
+				variables: {
+					members: [artistUser.id, clientUser.id],
+					createdAt: new Date().toISOString(),
+					updatedAt: new Date().toISOString(),
+				},
+			},
 			{ contextValue: contextWithToken(signTestToken(artistUser)) },
 		);
 		const conversationId = createRes.body.singleResult.data.createConversation.id;
@@ -518,7 +525,14 @@ describe('getConversation: member-only', () => {
 		const { user: outsider } = await createClientUser();
 		const server = createTestServer();
 		const createRes = await server.executeOperation(
-			{ query: CREATE_CONVERSATION, variables: { members: [artistUser.id, clientUser.id] } },
+			{
+				query: CREATE_CONVERSATION,
+				variables: {
+					members: [artistUser.id, clientUser.id],
+					createdAt: new Date().toISOString(),
+					updatedAt: new Date().toISOString(),
+				},
+			},
 			{ contextValue: contextWithToken(signTestToken(artistUser)) },
 		);
 		const conversationId = createRes.body.singleResult.data.createConversation.id;
