@@ -796,6 +796,29 @@ production app should survive too:** `IBImagesList.jsx` no longer assumes `item.
 present - falls back to "Unknown uploader" for the tooltip and the default no-image avatar, instead
 of crashing the entire gallery over one image with a missing uploader.
 
+**Eleventh report - the crash is gone, but the uploaded image doesn't actually appear.** Two
+distinct bugs, both real, both in `IBImagesList.jsx`:
+
+1. `srcset()` appended `?w=...&h=...&fit=crop&auto=format&dpr=2x` to every image URL - lifted
+   directly from MUI's own `ImageList` demo, which points at Unsplash (a CDN that supports dynamic
+   resize query params). Every real image URL here is a Firebase Storage download URL (see
+   `IBUploadFileWithProgress.js`'s `getDownloadURL()`), which already ends in its own
+   `?alt=media&token=...` query string and doesn't support resize params at all. Appending a second
+   `?w=...` produced a URL with two `?`s; Firebase parses everything after the real token as part
+   of the token value, corrupting it, so the image request fails and nothing renders. This wasn't
+   data-dependent or new-upload-specific - it would have broken every single project image this
+   whole session, the first time any image actually made it into `referenceImages`/`designImages`
+   for real (which, thanks to the seed-data palette bug and the stale-session bug above, hadn't
+   happened until just now). Fixed by dropping the fake resize params entirely and using the real
+   URL as-is for both `src` and `srcSet`.
+2. `Avatar`'s `imgProps` prop - console-warned "React does not recognize the `imgProps` prop on a
+   DOM element." `imgProps` was removed from MUI's `Avatar` API in favor of `slotProps.img` as part
+   of this project's own React 17→19/MUI 5→9 upgrade earlier this project; this one call site was
+   missed at the time. Fixed to `slotProps={{ img: { "aria-hidden": true } }}`. Confirmed via
+   `node_modules/@mui/material/Avatar/Avatar.js` (installed version 9.2.0) that `imgProps` no
+   longer exists on the component at all - grepped the rest of the client for other stale
+   `imgProps` call sites; this was the only one.
+
 **Cleanup done the same day:** `server/config.js` - a dead, gitignored file holding a stale
 hardcoded Atlas connection string with a different (never-rotated) plaintext password - has been
 deleted. Nothing in the codebase still required it (confirmed via a full-codebase grep before

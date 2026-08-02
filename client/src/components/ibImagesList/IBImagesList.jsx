@@ -17,12 +17,21 @@ import moment from "moment";
 import { APP_SETTINGS_CONSTANTS } from "../../constants";
 import IBImagesListOptions from "./IBImagesListOptions";
 
-function srcset(image, size, rows = 1, cols = 1) {
+// This used to append `?w=&h=&fit=crop&auto=format&dpr=2x` to every image URL - lifted straight
+// from MUI's own ImageList demo, which points at Unsplash (an image CDN that actually supports
+// those dynamic resize query params). image.url here is always a real Firebase Storage download
+// URL (see IBUploadFileWithProgress.js), which already ends in its own `?alt=media&token=...`
+// query string and doesn't support resize params at all. Appending a second `?w=...` produced a
+// malformed URL with two `?`s - Firebase parses everything after the first `&token=` as part of
+// the token itself, so the token gets corrupted and the image request 400s. Every uploaded image
+// was silently failing to load because of this, not just the newest one - found via manual
+// testing the instant an upload actually made it into the referenceImages array for the first time
+// this session. Fixed by just using the real URL as-is; sizing is already handled by the
+// surrounding ImageListItem/CSS, not a CDN query param.
+function srcset(image) {
 	return {
-		src: `${image}?w=${size * cols}&h=${size * rows}&fit=crop&auto=format`,
-		srcSet: `${image}?w=${size * cols}&h=${
-			size * rows
-		}&fit=crop&auto=format&dpr=2 2x`,
+		src: image,
+		srcSet: image,
 	};
 }
 
@@ -73,24 +82,7 @@ const IBImagesList = ({ imageData, updateCallback, imageType }) => {
                             imageType={imageType}
 						/>
 						<img
-							{...srcset(
-								item.url,
-								121,
-								imageLayoutPattern[
-									index -
-										Math.floor(
-											index / imageLayoutPattern.length
-										) *
-											imageLayoutPattern.length
-								].rows,
-								imageLayoutPattern[
-									index -
-										Math.floor(
-											index / imageLayoutPattern.length
-										) *
-											imageLayoutPattern.length
-								].cols
-							)}
+							{...srcset(item.url)}
 							alt={item.title}
 							loading="lazy"
 							onClick={() => setLightboxIndex(index)}
@@ -127,7 +119,13 @@ const IBImagesList = ({ imageData, updateCallback, imageType }) => {
 									(item.userInfo && item.userInfo.avatar) ||
 									APP_SETTINGS_CONSTANTS.NO_IMAGE_URL
 								}
-								imgProps={{ "aria-hidden": true }}
+								// imgProps was removed from MUI's Avatar API (replaced by
+								// slotProps.img) as of the React 17->19/MUI 5->9 upgrade earlier
+								// this project - this one call site was missed at the time. MUI
+								// silently let the unrecognized prop fall through to the DOM,
+								// which is what threw the "React does not recognize the
+								// `imgProps` prop" console warning - found via manual testing.
+								slotProps={{ img: { "aria-hidden": true } }}
 							/>
 						</Tooltip>
 					</ImageListItem>
