@@ -47,6 +47,33 @@ export const AppointmentService = (() => {
 		});
     }
 
+    // Used by ArtistPerformancePanel (see components/artistDashboard) to build both the "my
+    // dashboard" self view and the shop's per-artist view - one artist's full appointment history
+    // (any status, any date), with MTD/YTD revenue and shop-cut totals computed client-side rather
+    // than added as new server aggregation resolvers for this first pass.
+    const _FETCH_APPOINTMENTS_BY_ARTIST = gql`
+        query GetAppointmentsByArtist($userId: ID!) {
+            getAppointmentsByArtist(userId: $userId) {
+                id
+                title
+                appointmentDate
+                appointmentType
+                appointmentStatus
+                total
+                tip
+                shopCutStatus
+                shopCutAmount
+                shopId
+            }
+        }
+    `;
+    const _getAppointmentsByArtist = (userId) => {
+        return useQuery(_FETCH_APPOINTMENTS_BY_ARTIST, {
+            variables: { userId },
+            skip: !userId,
+        });
+    };
+
     const _CREATE_APPOINTMENT = gql`
         mutation CreateAppointment($appointmentInput: AppointmentInput) {
             createAppointment(appointmentInput: $appointmentInput) {
@@ -175,6 +202,8 @@ export const AppointmentService = (() => {
 
     return {
         FETCH_APPOINTMENTS_BY_SHOP: _FETCH_APPOINTMENTS_BY_SHOP,
+        FETCH_APPOINTMENTS_BY_ARTIST: _FETCH_APPOINTMENTS_BY_ARTIST,
+        getAppointmentsByArtist: _getAppointmentsByArtist,
         CREATE_APPOINTMENT: _CREATE_APPOINTMENT,
         UPDATE_APPOINTMENT: _UPDATE_APPOINTMENT,
         DELETE_APPOINTMENT: _DELETE_APPOINTMENT,

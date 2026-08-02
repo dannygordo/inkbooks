@@ -35,13 +35,10 @@ import {
 	Palette,
 	People,
 	Person,
-	Settings,
 } from "@mui/icons-material";
-import Avatar from "@mui/material/Avatar";
 import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
 import Tooltip from "@mui/material/Tooltip";
-import PersonAdd from "@mui/icons-material/PersonAdd";
 import Logout from "@mui/icons-material/Logout";
 
 import SearchIcon from "@mui/icons-material/Search";
@@ -442,22 +439,14 @@ export default function Sidebar() {
 							/>{" "}
 							Profile
 						</MenuItem>
-						<MenuItem>
-							<Avatar /> My account
-						</MenuItem>
 						<Divider />
-						<MenuItem>
-							<ListItemIcon>
-								<PersonAdd fontSize="small" />
-							</ListItemIcon>
-							Add another account
-						</MenuItem>
-						<MenuItem>
-							<ListItemIcon>
-								<Settings fontSize="small" />
-							</ListItemIcon>
-							Settings
-						</MenuItem>
+						{/* "My account"/"Add another account"/"Settings" removed - unmodified MUI
+						    template boilerplate with no onClick handler and no matching route, left
+						    over from scaffolding. "My account" also rendered a blank, unpopulated
+						    <Avatar /> right next to the correctly-working Profile item above -
+						    exactly the kind of inconsistency worth cutting rather than leaving as
+						    dead, confusing UI. Profile/Logout are the only two menu items that
+						    actually do anything. */}
 						<MenuItem onClick={handleLogout}>
 							<ListItemIcon>
 								<Logout fontSize="small" />

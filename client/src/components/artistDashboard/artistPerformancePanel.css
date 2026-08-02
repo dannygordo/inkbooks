@@ -1,0 +1,73 @@
+.artistPerformancePanel {
+	width: 100%;
+}
+
+.artistPerformanceStats {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 15px;
+	margin-bottom: 20px;
+}
+
+.artistStatCard {
+	background: #fff;
+	border-radius: 10px;
+	box-shadow: 0px 0px 15px -10px rgba(0, 0, 0, 0.75);
+	padding: 15px 20px;
+	min-width: 160px;
+	flex: 1 1 160px;
+}
+
+.artistStatLabel {
+	font-size: 13px;
+	color: #999;
+	margin-bottom: 6px;
+}
+
+.artistStatValue {
+	font-size: 22px;
+	font-weight: 600;
+}
+
+.artistPerformanceSectionTitle {
+	margin-bottom: 15px;
+}
+
+.artistPerformanceEmpty {
+	color: #999;
+	font-size: 14px;
+}
+
+.artistUpcomingList {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.artistUpcomingItem {
+	display: flex;
+	align-items: center;
+	gap: 15px;
+	padding: 10px 0;
+	border-bottom: 1px solid #eee;
+	font-size: 14px;
+}
+
+.artistUpcomingItem:last-child {
+	border-bottom: none;
+}
+
+.artistUpcomingDate {
+	color: #999;
+	min-width: 90px;
+}
+
+.artistUpcomingTitle {
+	flex: 1;
+	font-weight: 500;
+}
+
+.artistUpcomingType {
+	text-transform: capitalize;
+	color: #666;
+}

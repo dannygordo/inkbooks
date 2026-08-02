@@ -385,6 +385,96 @@ Coverage:
 
 ---
 
+## UI/UX consistency and the artist dashboard (August 2, 2026)
+
+Started from a specific complaint (avatars showing inconsistently across the app) and expanded
+into a real audit of the dashboard/reporting layer, since the two turned out to be related -
+neither the dashboard nor the artist detail page had any real content at all before this pass.
+
+**Avatar bug - root cause and fix.** `avatar` was stored as four independent copies: `User.avatar`,
+`Artist.avatar`, `Client.avatar`, `Staff.avatar`. `Profile.jsx`'s `updateUser` mutation only ever
+wrote `User.avatar` - nothing propagated the change to the matching Artist/Client/Staff record, so
+those three went stale the moment anyone changed their profile picture. Fixed with GraphQL field
+resolvers (`resolvers/index.js`'s `Artist.avatar`/`Client.avatar`/`Staff.avatar`) that always
+resolve from the linked `User.avatar`, ignoring the stored column - every existing query gets
+correct data with no client-side changes. Deliberately did not remove the now-dead columns from
+the Mongoose schemas or the `avatar: String!` required argument on `createArtist`/`createStaff`/
+`createClient` in this pass - that's a real cleanup worth doing, but it touches required GraphQL
+arguments and existing passing tests, which is a bigger, separate-decision change than the
+resolver fix itself.
+
+**Also cleaned up while in `Sidebar.jsx`/found in `Topbar.jsx`:** the account menu had unmodified
+MUI template boilerplate - "My account" (a blank, unpopulated avatar sitting right next to the
+correctly-working Profile item), "Add another account", and "Settings" menu items, none wired to
+an `onClick` or a real route. Removed from `Sidebar.jsx` (the component that's actually rendered -
+`Topbar.jsx` is dead code, never mounted anywhere in `App.jsx`, worth deleting or wiring in
+separately rather than polishing a component nobody sees).
+
+**Dashboard/artist-page gap - bigger than initially described.** `Home.jsx` (both `/` and
+`/dashboard`), `Reports.jsx`, `Payments.jsx`, `Account.jsx`, and `Artist.jsx` were all one-line
+stubs (`<div>Dashboard</div>`, etc.) - there was no analytics/reporting layer anywhere in the app
+to inconsistently fix, just nothing built yet.
+
+**Built: `ArtistPerformancePanel`** (`components/artistDashboard/ArtistPerformancePanel.jsx`), one
+reusable component mounted with different framing in two places rather than built twice:
+- `Home.jsx`: an artist's own view of their own numbers, shown when `user.userType === 'artist'`
+  (`isSelf=true`). Other roles (Client/Staff/Shop Admin) currently just see a greeting - a real
+  shop-wide dashboard (aggregate across all connected artists) is explicitly not built in this
+  pass.
+- `Artist.jsx`: a shop admin/staff's view into one specific artist, alongside real artist contact
+  info/avatar that the page never showed before (`isSelf=false`).
+
+Shows upcoming appointments (next 5, future-dated), MTD/YTD revenue (`total`+`tip` summed from
+`getAppointmentsByArtist`), MTD/YTD shop-cut owed (`shopCutAmount` summed where `shopCutStatus` is
+`unpaid`/`invoice_sent`/`pending_confirmation`), and active project count (`getProjectsByArtist`,
+which already filters out completed/closed projects server-side). All math is computed
+client-side from the full appointment list for this artist - fine at current data volume, worth
+revisiting as a dedicated server aggregation resolver if an artist's history grows large.
+
+**Real authorization gap found while building this, not yet fixed:** `getAppointmentsByArtist` and
+`getProjectsByArtist` are wrapped in `withAuth` but have no ownership or role check beyond "is
+logged in" - any authenticated Client can currently query any artist's full appointment history
+(including `total`/`tip`/`shopCutAmount`) or active project list just by passing an arbitrary
+`userId`/`artistId`. This predates the dashboard work (both resolvers already existed), but the new
+dashboard is the first thing that actually surfaces this financial data prominently in the UI,
+which is exactly why it's worth calling out now rather than letting it sit quietly. Needs an
+ownership check (the artist themselves, or shop-admin-or-better) before this ships to real users.
+
+**Also found, not fixed:** `resolvers/index.js`'s `Message.user` resolver references `Staff` (to
+build `userInfo` for a Staff-type message sender) but never imports the `Staff` model in that file
+- a latent `ReferenceError: Staff is not defined` waiting for the first message sent by a Staff
+user. Pre-existing, unrelated to today's changes, found incidentally while adding the avatar field
+resolvers to the same file.
+
+**Architecture finding: the UI has no role-aware navigation at all.** `Sidebar.jsx` shows the
+identical nav (Shops, Staff, Artists, Clients, Shop Cut Confirmations, etc.) to every logged-in
+user regardless of role or shop-connection status. This was tolerable when there was no real
+per-role content to route to; it stops being tolerable as real role-scoped views (like this
+dashboard) get built. It's also the concrete gap between the backend's already-correct
+artist-centric data model (an artist can be connected to zero, one, or several shops
+concurrently - see the `ArtistShopConnection` design earlier in this document) and what the
+frontend can currently express: there's no shop-context switcher anywhere, so a multi-shop-
+connected artist has no way to indicate "I mean my numbers at *this* shop" once shop-scoped
+reporting exists. Worth a dedicated pass (role-aware nav + a shop switcher) before building
+further shop-scoped analytics on top of the current flat nav.
+
+**Client test coverage added:** `CreateEventDialog.test.jsx`/`UpdateEventDialog.test.jsx` -
+rendering, submitting a new appointment with the right defaults (and the modal staying open on a
+failed mutation, not silently closing), and the shop-cut ledger panel's conditional rendering plus
+its Mark-as-Paid action. Also added a `window.matchMedia` polyfill to the shared client test
+setup (`src/test/setup.js`) - jsdom doesn't implement it at all, and MUI's `useMediaQuery`
+(used internally by Dialog/pickers) throws without it; needed for these two components' MUI X date
+picker, and will be needed by any future test touching an MUI Dialog or responsive component.
+
+**CI added:** see the "Test suite" section above and `.github/workflows/ci.yml` - not new work in
+this pass, cross-referenced here since it now also runs these new tests on every push/PR.
+
+**Square production-access:** researched and compiled into a separate checklist
+(`square-production-checklist.md`) rather than this document, since it's an action list for the
+user to work through in Square's own dashboard, not an engineering record of what was built.
+
+---
+
 ## Suggested sequencing
 
 Phase 0 today. Phase 1 this week — it's the part where real damage is currently possible. Phase 2 the following 1-2 weeks, since it's what keeps Phase 1 fixed. Phase 3 (modernization, including the monorepo/TypeScript scaffolding that Phase 5 needs) can run in parallel with Phase 2 once the auth wrapper pattern is settled. Phase 4 (real payments) whenever you're ready to actually take deposits. Phase 5 (mobile) starts once Phase 0-2 are done and the monorepo shape from Phase 3 exists — don't build a mobile UI against an API that's still wide open. Phase 6 items — tests, CI, monitoring — should be stood up incrementally starting in Phase 1, not bolted on at the end; retrofitting tests onto already-migrated code (or two clients instead of one) is much more expensive than writing them alongside the fixes.
