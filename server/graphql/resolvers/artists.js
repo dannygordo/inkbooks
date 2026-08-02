@@ -1,6 +1,7 @@
 const Artist = require('../../models/Artist');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
+const { AuthenticationError } = require('../../utils/errors');
 const { getShopIdsForUser } = require('../../utils/shop-membership');
 
 module.exports = {
@@ -26,18 +27,39 @@ module.exports = {
         throw new Error(err);
       }
     }),
-    getArtist: withAuth(async (_, { artistId }) => {
+    // Was withAuth with no restriction at all - any authenticated user could pass an arbitrary
+    // artistId and read that artist's contact info. Allowed: shop-admin-or-better, the artist
+    // themselves, or anyone affiliated with the same shop.
+    getArtist: withAuth(async (_, { artistId }, context, info, user) => {
       try {
         const artist = await Artist.findById(artistId);
-        if (artist) {
-          return artist;
-        } throw new Error('Artist not found');
+        if (!artist) {
+          throw new Error('Artist not found');
+        }
+        if (user.role > Constants.ROLES.SHOP_ADMIN && String(user.id) !== String(artist.userId)) {
+          const shopIds = await getShopIdsForUser(user.id);
+          if (!artist.shopId || !shopIds.map(String).includes(String(artist.shopId))) {
+            throw new AuthenticationError('Action not allowed');
+          }
+        }
+        return artist;
       } catch (err) {
         throw new Error(err);
       }
     }),
-    getArtistsByShop: withAuth(async (_, { shopId }) => {
+    // Was withAuth with no restriction at all - any authenticated user, including a Client,
+    // could pass an arbitrary shopId and list every artist there. Real caller:
+    // ibCalendar/Sidebar.jsx's shop calendar artist filter, used by Artist- and Staff-role users
+    // viewing their own shop - same "not a flat role gate" reasoning as
+    // resolvers/appointments.js's callerBelongsToShop.
+    getArtistsByShop: withAuth(async (_, { shopId }, context, info, user) => {
       try {
+        if (user.role > Constants.ROLES.SHOP_ADMIN) {
+          const shopIds = await getShopIdsForUser(user.id);
+          if (!shopIds.map(String).includes(String(shopId))) {
+            throw new AuthenticationError('Action not allowed');
+          }
+        }
         const artists = await Artist.find({ shopId: shopId }).sort({ firstName: 1 });
         if (artists) {
           return artists;

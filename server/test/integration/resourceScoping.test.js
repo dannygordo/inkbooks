@@ -29,6 +29,18 @@ const GET_CONVERSATIONS_BY_MEMBER_ID = `
 		getConversationsByMemberId(memberId: $memberId) { id }
 	}
 `;
+const GET_SHOP = `query GetShop($shopId: ID!) { getShop(shopId: $shopId) { id } }`;
+const GET_ONE_STAFF = `query GetOneStaff($staffId: ID!) { getOneStaff(staffId: $staffId) { id } }`;
+const GET_ARTIST = `query GetArtist($artistId: ID!) { getArtist(artistId: $artistId) { id } }`;
+const GET_ARTISTS_BY_SHOP = `query GetArtistsByShop($shopId: ID!) { getArtistsByShop(shopId: $shopId) { id } }`;
+const GET_CLIENT = `query GetClient($clientId: ID!) { getClient(clientId: $clientId) { id } }`;
+const GET_PROJECT = `query GetProject($projectId: ID!) { getProject(projectId: $projectId) { id } }`;
+const GET_CONVERSATION = `query GetConversation($conversationId: ID!) { getConversation(conversationId: $conversationId) { id } }`;
+const CREATE_CONVERSATION = `
+	mutation CreateConversation($members: [ID!], $createdAt: DateTime, $updatedAt: DateTime) {
+		createConversation(members: $members, createdAt: $createdAt, updatedAt: $updatedAt) { id }
+	}
+`;
 
 describe('getShops: shop-affiliation scoping', () => {
 	it('allows a SHOP_ADMIN to see every shop (matches the existing, documented no-per-shop-scoping-for-admins convention)', async () => {
@@ -258,6 +270,266 @@ describe('getConversationsByMemberId: self-only', () => {
 
 		const { errors, data } = response.body.singleResult;
 		expect(data.getConversationsByMemberId).toBeNull();
+		expect(errors[0].message).toMatch(/Action not allowed/);
+	});
+});
+
+describe('getShop: single-resource ownership', () => {
+	it('allows a Staff member to view their own shop', async () => {
+		const { shop: shopA } = await createShopAdminUser();
+		const { user: staffA } = await createStaffUser(shopA.id);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_SHOP, variables: { shopId: shopA.id } },
+			{ contextValue: contextWithToken(signTestToken(staffA)) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.getShop.id).toBe(shopA.id);
+	});
+
+	it('rejects a Staff member viewing a different shop', async () => {
+		const { shop: shopA } = await createShopAdminUser();
+		const { shop: shopB } = await createShopAdminUser();
+		const { user: staffA } = await createStaffUser(shopA.id);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_SHOP, variables: { shopId: shopB.id } },
+			{ contextValue: contextWithToken(signTestToken(staffA)) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(data.getShop).toBeNull();
+		expect(errors[0].message).toMatch(/Action not allowed/);
+	});
+});
+
+describe('getOneStaff: single-resource ownership', () => {
+	it('allows a Staff member to view a coworker at the same shop', async () => {
+		const { shop: shopA } = await createShopAdminUser();
+		const { user: staffA } = await createStaffUser(shopA.id);
+		const { staff: coworker } = await createStaffUser(shopA.id);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_ONE_STAFF, variables: { staffId: coworker.id } },
+			{ contextValue: contextWithToken(signTestToken(staffA)) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.getOneStaff.id).toBe(coworker.id);
+	});
+
+	it('rejects a Staff member at a different shop', async () => {
+		const { shop: shopA } = await createShopAdminUser();
+		const { shop: shopB } = await createShopAdminUser();
+		const { staff: staffAtA } = await createStaffUser(shopA.id);
+		const { user: staffAtB } = await createStaffUser(shopB.id);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_ONE_STAFF, variables: { staffId: staffAtA.id } },
+			{ contextValue: contextWithToken(signTestToken(staffAtB)) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(data.getOneStaff).toBeNull();
+		expect(errors[0].message).toMatch(/Action not allowed/);
+	});
+});
+
+describe('getArtist / getArtistsByShop: single-resource ownership', () => {
+	it('allows a Staff member to view an artist at their own shop', async () => {
+		const { shop: shopA } = await createShopAdminUser();
+		const { user: staffA } = await createStaffUser(shopA.id);
+		const { artist: artistA } = await createArtistUser({ artist: { shopId: shopA.id } });
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_ARTIST, variables: { artistId: artistA.id } },
+			{ contextValue: contextWithToken(signTestToken(staffA)) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.getArtist.id).toBe(artistA.id);
+	});
+
+	it('rejects an unrelated user viewing an artist at a different shop', async () => {
+		const { shop: shopA } = await createShopAdminUser();
+		const { shop: shopB } = await createShopAdminUser();
+		const { user: staffB } = await createStaffUser(shopB.id);
+		const { artist: artistA } = await createArtistUser({ artist: { shopId: shopA.id } });
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_ARTIST, variables: { artistId: artistA.id } },
+			{ contextValue: contextWithToken(signTestToken(staffB)) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(data.getArtist).toBeNull();
+		expect(errors[0].message).toMatch(/Action not allowed/);
+	});
+
+	it('getArtistsByShop: rejects a Staff member listing a different shop\'s artists', async () => {
+		const { shop: shopA } = await createShopAdminUser();
+		const { shop: shopB } = await createShopAdminUser();
+		const { user: staffA } = await createStaffUser(shopA.id);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_ARTISTS_BY_SHOP, variables: { shopId: shopB.id } },
+			{ contextValue: contextWithToken(signTestToken(staffA)) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(data.getArtistsByShop).toBeNull();
+		expect(errors[0].message).toMatch(/Action not allowed/);
+	});
+});
+
+describe('getClient: single-resource ownership', () => {
+	it('allows a Client to view their own record', async () => {
+		const { user: clientUser, client } = await createClientUser();
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_CLIENT, variables: { clientId: client.id } },
+			{ contextValue: contextWithToken(signTestToken(clientUser)) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.getClient.id).toBe(client.id);
+	});
+
+	it('allows an Artist who shares a Project with this client', async () => {
+		const { user: artistUser } = await createArtistUser();
+		const { client } = await createClientUser();
+		await createProject(artistUser.id, client.id);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_CLIENT, variables: { clientId: client.id } },
+			{ contextValue: contextWithToken(signTestToken(artistUser)) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.getClient.id).toBe(client.id);
+	});
+
+	it('rejects an unrelated Artist with no shared Project', async () => {
+		const { user: artistUser } = await createArtistUser();
+		const { client } = await createClientUser();
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_CLIENT, variables: { clientId: client.id } },
+			{ contextValue: contextWithToken(signTestToken(artistUser)) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(data.getClient).toBeNull();
+		expect(errors[0].message).toMatch(/Action not allowed/);
+	});
+});
+
+describe('getProject: single-resource ownership', () => {
+	it('allows the assigned artist', async () => {
+		const { user: artistUser } = await createArtistUser();
+		const { client } = await createClientUser();
+		const project = await createProject(artistUser.id, client.id);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_PROJECT, variables: { projectId: project.id } },
+			{ contextValue: contextWithToken(signTestToken(artistUser)) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.getProject.id).toBe(project.id);
+	});
+
+	it('allows the project\'s own client', async () => {
+		const { user: artistUser } = await createArtistUser();
+		const { user: clientUser, client } = await createClientUser();
+		const project = await createProject(artistUser.id, client.id);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_PROJECT, variables: { projectId: project.id } },
+			{ contextValue: contextWithToken(signTestToken(clientUser)) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.getProject.id).toBe(project.id);
+	});
+
+	it('rejects an unrelated artist with no connection to this project\'s shop', async () => {
+		const { user: artistUser } = await createArtistUser();
+		const { user: otherArtist } = await createArtistUser();
+		const { client } = await createClientUser();
+		const project = await createProject(artistUser.id, client.id);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_PROJECT, variables: { projectId: project.id } },
+			{ contextValue: contextWithToken(signTestToken(otherArtist)) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(data.getProject).toBeNull();
+		expect(errors[0].message).toMatch(/Action not allowed/);
+	});
+});
+
+describe('getConversation: member-only', () => {
+	it('allows a real member of the conversation', async () => {
+		const { user: artistUser } = await createArtistUser();
+		const { user: clientUser } = await createClientUser();
+		const server = createTestServer();
+		const createRes = await server.executeOperation(
+			{ query: CREATE_CONVERSATION, variables: { members: [artistUser.id, clientUser.id] } },
+			{ contextValue: contextWithToken(signTestToken(artistUser)) },
+		);
+		const conversationId = createRes.body.singleResult.data.createConversation.id;
+
+		const response = await server.executeOperation(
+			{ query: GET_CONVERSATION, variables: { conversationId } },
+			{ contextValue: contextWithToken(signTestToken(clientUser)) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.getConversation.id).toBe(conversationId);
+	});
+
+	it('rejects a non-member', async () => {
+		const { user: artistUser } = await createArtistUser();
+		const { user: clientUser } = await createClientUser();
+		const { user: outsider } = await createClientUser();
+		const server = createTestServer();
+		const createRes = await server.executeOperation(
+			{ query: CREATE_CONVERSATION, variables: { members: [artistUser.id, clientUser.id] } },
+			{ contextValue: contextWithToken(signTestToken(artistUser)) },
+		);
+		const conversationId = createRes.body.singleResult.data.createConversation.id;
+
+		const response = await server.executeOperation(
+			{ query: GET_CONVERSATION, variables: { conversationId } },
+			{ contextValue: contextWithToken(signTestToken(outsider)) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(data.getConversation).toBeNull();
 		expect(errors[0].message).toMatch(/Action not allowed/);
 	});
 });

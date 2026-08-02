@@ -42,12 +42,31 @@ const resolvers = {
         throw new Error(err);
       }
     }),
-    getProject: withAuth(async (_, { projectId }) => {
+    // Was withAuth with no restriction at all - any authenticated user could pass an arbitrary
+    // projectId and read that project's full detail (client PII, notes, reference images,
+    // deposit amount). Allowed: shop-admin-or-better, the assigned artist, the client the
+    // project belongs to, or a staff member of the assigned artist's shop - same scope as
+    // getProjects above, just for a single project instead of a list.
+    getProject: withAuth(async (_, { projectId }, context, info, user) => {
       try {
         const project = await Project.findById(projectId).sort({ 'notes.createdAt': -1});
-        if (project) {
-          return project;
-        } throw new Error('Project not found');
+        if (!project) {
+          throw new Error('Project not found');
+        }
+        if (user.role > Constants.ROLES.SHOP_ADMIN && String(user.id) !== String(project.artistId)) {
+          const myClient = await Client.findOne({ userId: user.id }).select('_id');
+          const isOwnClient = myClient && String(myClient.id) === String(project.clientId);
+          let isShopStaff = false;
+          if (!isOwnClient) {
+            const shopIds = await getShopIdsForUser(user.id);
+            const artistIds = await getArtistIdsForShops(shopIds);
+            isShopStaff = artistIds.map(String).includes(String(project.artistId));
+          }
+          if (!isOwnClient && !isShopStaff) {
+            throw new AuthenticationError('Action not allowed');
+          }
+        }
+        return project;
       } catch (err) {
         throw new Error(err);
       }

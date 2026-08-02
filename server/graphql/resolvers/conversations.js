@@ -61,12 +61,24 @@ module.exports = {
           throw new Error(err);
         }
       }, Constants.ROLES.SHOP_ADMIN),
-    getConversation: withAuth(async (_, { conversationId }) => {
+    // Was withAuth with no restriction at all - any authenticated user could pass an arbitrary
+    // conversationId and read someone else's private message thread. Allowed: shop-admin-or-
+    // better, or a real member of that conversation (Conversation.members is the only field that
+    // actually identifies who's in it - see the comment on getConversationsByShopId above for why
+    // there's no separate artistId/clientId/shopId field to check instead).
+    getConversation: withAuth(async (_, { conversationId }, context, info, user) => {
       try {
         const conversation = await Conversation.findById(conversationId);
-        if (conversation) {
-          return conversation;
-        } throw new Error('Conversation not found');
+        if (!conversation) {
+          throw new Error('Conversation not found');
+        }
+        if (
+          user.role > Constants.ROLES.SHOP_ADMIN &&
+          !(conversation.members || []).some((memberId) => String(memberId) === String(user.id))
+        ) {
+          throw new AuthenticationError('Action not allowed');
+        }
+        return conversation;
       } catch (err) {
         throw new Error(err);
       }

@@ -2,6 +2,7 @@ const Client = require('../../models/Client');
 const Project = require('../../models/Project');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
+const { AuthenticationError } = require('../../utils/errors');
 const { getShopIdsForUser, getArtistIdsForShops } = require('../../utils/shop-membership');
 
 module.exports = {
@@ -38,12 +39,33 @@ module.exports = {
         throw new Error(err);
       }
     }),
-    getClient: withAuth(async (_, { clientId }) => {
+    // Was withAuth with no restriction at all - any authenticated user could pass an arbitrary
+    // clientId and read that client's contact info. Allowed: shop-admin-or-better, the client
+    // themselves, or an artist/staff who shares a Project with this client (same join logic as
+    // getClients above).
+    getClient: withAuth(async (_, { clientId }, context, info, user) => {
       try {
         const client = await Client.findById(clientId);
-        if (client) {
-          return client;
-        } throw new Error('Client not found');
+        if (!client) {
+          throw new Error('Client not found');
+        }
+        if (user.role > Constants.ROLES.SHOP_ADMIN && String(user.id) !== String(client.userId)) {
+          let artistIds;
+          if (user.role === Constants.ROLES.ARTIST) {
+            artistIds = [user.id];
+          } else {
+            const shopIds = await getShopIdsForUser(user.id);
+            artistIds = await getArtistIdsForShops(shopIds);
+          }
+          const hasSharedProject = artistIds.length > 0 && await Project.exists({
+            clientId: client.id,
+            artistId: { $in: artistIds },
+          });
+          if (!hasSharedProject) {
+            throw new AuthenticationError('Action not allowed');
+          }
+        }
+        return client;
       } catch (err) {
         throw new Error(err);
       }

@@ -1,6 +1,7 @@
 const Staff = require('../../models/Staff');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
+const { AuthenticationError } = require('../../utils/errors');
 const { getShopIdsForUser } = require('../../utils/shop-membership');
 
 module.exports = {
@@ -23,12 +24,22 @@ module.exports = {
         throw new Error(err);
       }
     }),
-    getOneStaff: withAuth(async (_, { staffId }) => {
+    // Was withAuth with no restriction at all - any authenticated user could pass an arbitrary
+    // staffId and read that person's contact info. Allowed: shop-admin-or-better, the staff
+    // member themselves, or anyone affiliated with that same shop.
+    getOneStaff: withAuth(async (_, { staffId }, context, info, user) => {
       try {
         const staff = await Staff.findById(staffId);
-        if (staff) {
-          return staff;
-        } throw new Error('Staff not found');
+        if (!staff) {
+          throw new Error('Staff not found');
+        }
+        if (user.role > Constants.ROLES.SHOP_ADMIN && String(user.id) !== String(staff.userId)) {
+          const shopIds = await getShopIdsForUser(user.id);
+          if (!shopIds.map(String).includes(String(staff.shopId))) {
+            throw new AuthenticationError('Action not allowed');
+          }
+        }
+        return staff;
       } catch (err) {
         throw new Error(err);
       }

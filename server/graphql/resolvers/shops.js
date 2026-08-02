@@ -1,6 +1,7 @@
 const Shop = require('../../models/Shop');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
+const { AuthenticationError } = require('../../utils/errors');
 const square = require('../../utils/square');
 const { signState } = require('../../routes/squareOAuth');
 const { getShopIdsForUser } = require('../../utils/shop-membership');
@@ -28,8 +29,17 @@ module.exports = {
                 throw new Error(err);
             }
         }),
-        getShop: withAuth(async (_,{shopId}) => {
+        // Was withAuth with no restriction at all - any authenticated user could pass an
+        // arbitrary shopId and read that shop's full contact/Square-connection details. Same
+        // "own the resource, or shop-admin-or-better" convention as getShops above.
+        getShop: withAuth(async (_, { shopId }, context, info, user) => {
             try {
+                if (user.role > Constants.ROLES.SHOP_ADMIN) {
+                    const shopIds = await getShopIdsForUser(user.id);
+                    if (!shopIds.map(String).includes(String(shopId))) {
+                        throw new AuthenticationError('Action not allowed');
+                    }
+                }
                 const shop = await Shop.findById(shopId);
                 if (shop) {
                   return shop;
