@@ -182,8 +182,6 @@ Verified the same way as the other two pieces: `getBookingRequests`, `createMess
 
 **All three client-side pieces for booking request / guest correspondence are now built.** Full feature is otherwise complete per this section: data model, guest auth, email notifications, rate limiting, reference-image upload, and all three client surfaces (intake form, guest conversation, artist dashboard).
 
-**Still open:** the artist-side booking requests dashboard is not yet built.
-
 ### Dependency vulnerability audit (`npm audit`) — result
 
 Ran after the Apollo/Express/socket.io consolidation and the Node 16 → 24 upgrade. Started at 33 vulnerabilities, closed to 6, all deliberately:
@@ -818,6 +816,22 @@ distinct bugs, both real, both in `IBImagesList.jsx`:
    `node_modules/@mui/material/Avatar/Avatar.js` (installed version 9.2.0) that `imgProps` no
    longer exists on the component at all - grepped the rest of the client for other stale
    `imgProps` call sites; this was the only one.
+
+**Known gap, found but deliberately not fixed today:** confirmed empirically (via
+`Project.schema.path('referenceImages').cast(...)` against the real Mongoose schema, no DB needed)
+that every `updateProject` call mints a brand-new `_id` for every image in `referenceImages`/
+`designImages`, not just newly-added ones. The client always sends the GraphQL virtual `id` field
+back, never the real `_id`, and `IBImageSchema` doesn't treat `id` as an alias for `_id` - so each
+save silently discards the old identity and Mongoose auto-generates a fresh one for every element,
+old and new alike. Doesn't crash anything today (nothing currently holds onto an image's `id`
+across a save), but it's a real data-integrity smell: any future feature that references a specific
+image by id (a "jump to this image" link, a delete-by-id call issued from stale client state, an
+activity log) would break silently after the next unrelated edit to the same project. Two options:
+(1) have the client send `id` as `_id` in the mutation payload so Mongoose preserves existing
+subdocument identity, or (2) switch `updateProject` to a targeted array-element update
+(`$push`/positional `$` operators) instead of replacing the whole array on every save - option 2
+also happens to be the real fix for the image-identity-churn issue and is more efficient besides.
+Worth a dedicated pass, not a quick patch alongside an unrelated crash fix.
 
 **Cleanup done the same day:** `server/config.js` - a dead, gitignored file holding a stale
 hardcoded Atlas connection string with a different (never-rotated) plaintext password - has been
