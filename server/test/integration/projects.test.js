@@ -322,3 +322,35 @@ describe('getProjectsByArtist: ownership', () => {
 		expect(data.getProjectsByArtist).toHaveLength(1);
 	});
 });
+
+// Regression test for a real bug found via manual testing against seeded local data: clicking
+// Projects crashed client-side with "Cannot read properties of null (reading 'avatar')" in
+// IBCardProjectDetails.jsx, which reads `project.client.avatar` unconditionally. Root cause:
+// resolvers/index.js's Project.client resolver did `Client.findOne({id: project.clientId})` -
+// `id` is a Mongoose *virtual* getter, never a real stored field, so that filter matched nothing,
+// ever, for any project. Fixed to `Client.findById(project.clientId)`. This test selects `client`
+// on a real getProjects response and confirms it actually resolves to the real Client document,
+// not null - the exact shape that would have caught this originally (ProjectService.js's real
+// FETCH_PROJECTS_QUERY does select `client { ... }` the same way).
+describe('Project.client field resolver', () => {
+	const GET_PROJECTS = `{ getProjects { id client { id firstName lastName } } }`;
+
+	it('resolves the actual Client sub-document, not null', async () => {
+		const { user: artistUser } = await createArtistUser();
+		const { client } = await createClientUser();
+		const project = await createProject(artistUser.id, client.id);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_PROJECTS },
+			{ contextValue: contextWithToken(signTestToken(artistUser)) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		const found = data.getProjects.find((p) => p.id === project.id);
+		expect(found).toBeDefined();
+		expect(found.client).not.toBeNull();
+		expect(found.client.id).toBe(client.id);
+	});
+});

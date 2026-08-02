@@ -66,8 +66,16 @@ module.exports = {
     artist: async(project, args, context, info) => {
       return (await Artist.findOne({userId: project.artistId}));
     },
+    // Was Client.findOne({id: project.clientId}) - `id` is a Mongoose *virtual* getter, never a
+    // real stored field, so that query filter looked for a document with a literal field named
+    // `id` that no Client document has ever had. This always returned null, unconditionally, for
+    // every single project - not intermittent, not data-dependent. Confirmed the actual client
+    // impact via manual testing: IBCardProjectDetails.jsx reads `project.client.avatar`
+    // unconditionally (no null check), so the Projects page has crashed for every real project
+    // since this resolver was written. Fixed to the same findById pattern already used correctly
+    // two lines below in the `conversation` resolver.
     client: async(project, args, context, info) => {
-      return (await Client.findOne({id: project.clientId}));
+      return (await Client.findById(project.clientId));
     },
     // Was Conversation.findOne({artistId, clientId}) - Conversation's schema (models/Conversation.js)
     // only ever stores members/createdAt/updatedAt, so artistId/clientId never actually exist on a
@@ -88,8 +96,13 @@ module.exports = {
     }
   },
   IBImage: {
+    // Same bug as Project.client above, same fix - `id` is a virtual, never a real stored field,
+    // so this always returned null. Lower-urgency than the Project.client fix: confirmed via grep
+    // that no real client query currently selects IBImage.userInfo (ProjectService.js's queries
+    // never ask for it), so this has been silently dead/unused rather than actively crashing
+    // anything - still worth fixing so it's correct if/when something does start using it.
     userInfo: async(ibImage, arts, context, info) => {
-      return (await User.findOne({id: ibImage.userId}));
+      return (await User.findById(ibImage.userId));
     }
   },
   Staff: {

@@ -619,6 +619,28 @@ an unparseable string. Also gave every seeded person in `scripts/seed.js` a real
 number, both for realism and so the seed data actually exercises the fixed code path instead of
 just avoiding it.
 
+**Third real bug found via manual testing - this one affected every project, unconditionally.**
+Clicking into Projects crashed with `Cannot read properties of null (reading 'avatar')` in
+`IBCardProjectDetails.jsx`, which reads `project.client.avatar` with no null check. Root cause:
+`resolvers/index.js`'s `Project.client` field resolver did `Client.findOne({id: project.clientId})`
+- `id` is a Mongoose *virtual* getter, computed at the application layer, never a real stored field
+on the document. That query filter was looking for a literal field named `id` that no `Client`
+document has ever had, so it matched nothing - not intermittently, not depending on the data,
+*every single time*, for every project that has ever existed in this app. This was flagged as a
+known-but-unfixed latent bug earlier in this session's audit work and only now got the manual-
+testing pass that turned it from a documented risk into a confirmed, reproduced crash.
+
+**Fixed:** `Client.findOne({id: project.clientId})` → `Client.findById(project.clientId)`, matching
+the pattern already used correctly two lines below in the same file's `conversation` resolver. The
+exact same bug pattern (`User.findOne({id: ibImage.userId})`) also existed in the unrelated
+`IBImage.userInfo` resolver in the same file - fixed too, though confirmed via grep that no real
+client query currently selects that field, so it had been silently dead rather than actively
+crashing anything. Added a regression test to `projects.test.js`
+(`Project.client field resolver: resolves the actual Client sub-document, not null`) that selects
+`client { id firstName lastName }` on a real `getProjects` response - the same shape
+`ProjectService.js`'s real query already uses, which is exactly what would have caught this from
+day one.
+
 **Cleanup done the same day:** `server/config.js` - a dead, gitignored file holding a stale
 hardcoded Atlas connection string with a different (never-rotated) plaintext password - has been
 deleted. Nothing in the codebase still required it (confirmed via a full-codebase grep before
