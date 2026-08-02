@@ -703,6 +703,25 @@ so the dev server auto-restarts on every file change, the same way `npm run dev`
 the client via Vite. This should prevent this whole class of "did the fix actually not work" false
 alarm from recurring, not just resolve this one report.
 
+**Seventh real bug found via manual testing - a seed-data bug, not an app bug, but one that broke
+every project the moment anything touched it.** Saving an uploaded image on a project threw a
+generic `ApolloError: Errors` from `IBProgressListProject.jsx`'s `updateProject` call. Root cause:
+`server/utils/validation.js`'s `updateProjectInputSchema.palette` is `z.enum(['black', 'color'])`
+— the real dropdown values from `client/src/constants/app.js`'s `PROJECT_PALETTE_OPTIONS` (`{value:
+"black", label: "Black and Grey"}` / `{value: "color", label: "Color"}`). `seed.js` had set
+`palette` to the display *labels* instead (`'Black and grey'`, `'Full color'`, `'Black'`) on all
+four seeded projects. Every one of them failed `updateProject`'s zod validation unconditionally —
+not a null-safety issue or an edge case, just wrong seed data — the instant any code path called
+`updateProject`, which uploading an image does (it round-trips the whole project object through
+that mutation to persist the new image array). A project created through the UI's own dropdown
+would never hit this, since the dropdown only ever sends `"black"`/`"color"`.
+
+Fixed all four `palette` values in `seed.js` to the real enum values. Added two regression tests to
+`test/integration/projects.test.js`: one asserting `updateProject` still rejects a label-shaped
+palette value (`'Black and grey'`) with the same generic `Errors` message, one asserting the real
+enum value (`'black'`) is accepted — so this exact label/value mismatch can't silently return in
+either the seed script or a future schema change without a test failing.
+
 **Cleanup done the same day:** `server/config.js` - a dead, gitignored file holding a stale
 hardcoded Atlas connection string with a different (never-rotated) plaintext password - has been
 deleted. Nothing in the codebase still required it (confirmed via a full-codebase grep before

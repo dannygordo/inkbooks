@@ -210,6 +210,74 @@ describe('updateProject / updateProjectNotes ownership', () => {
 		expect(errors).toBeUndefined();
 		expect(data.updateProjectNotes.id).toBe(project.id);
 	});
+
+	// Regression test for a real bug found via manual testing (see PRODUCTION_ROADMAP.md): the seed
+	// script originally set Project.palette to a display label ('Black and grey', 'Full color',
+	// 'Black') rather than updateProjectInputSchema's real enum values ('black'/'color' - the same
+	// values client/src/constants/app.js's PROJECT_PALETTE_OPTIONS dropdown actually sends). That
+	// meant every seeded project failed updateProject validation - with the generic
+	// UserInputError('Errors', {...}) message - the instant anything touched it (e.g. saving an
+	// uploaded image, which round-trips the whole project through updateProject). Fixed in
+	// seed.js; this test guards against the enum itself ever drifting from the dropdown again.
+	it('rejects a palette value that is a display label instead of the real enum value', async () => {
+		const { user: artistUser } = await createArtistUser();
+		const { client } = await createClientUser();
+		const project = await createProject(artistUser.id, client.id);
+		const token = signTestToken(artistUser);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{
+				query: UPDATE_PROJECT,
+				variables: {
+					project: {
+						id: project.id,
+						title: project.title,
+						description: project.description,
+						artistId: artistUser.id,
+						clientId: client.id,
+						status: 'in_progress',
+						palette: 'Black and grey',
+					},
+				},
+			},
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(data.updateProject).toBeNull();
+		expect(errors[0].message).toBe('Errors');
+	});
+
+	it('accepts the real dropdown enum value for palette', async () => {
+		const { user: artistUser } = await createArtistUser();
+		const { client } = await createClientUser();
+		const project = await createProject(artistUser.id, client.id);
+		const token = signTestToken(artistUser);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{
+				query: UPDATE_PROJECT,
+				variables: {
+					project: {
+						id: project.id,
+						title: project.title,
+						description: project.description,
+						artistId: artistUser.id,
+						clientId: client.id,
+						status: 'in_progress',
+						palette: 'black',
+					},
+				},
+			},
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.updateProject.id).toBe(project.id);
+	});
 });
 
 describe('deleteProject: Admin-only', () => {
