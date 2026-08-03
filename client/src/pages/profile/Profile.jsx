@@ -39,16 +39,24 @@ const Profile = () => {
 		user.userInfo?.shop?.id
 	);
 
+	// Was gated on `if (availableTags)` - for an independent artist (no shop, see this file's own
+	// comment above on getTagColorsByShop's skip guard), that query never fires at all, so
+	// `availableTags` never becomes truthy and this effect silently never ran: no color swatches
+	// ever populated, and (see the render guard below) the *entire* Profile page got stuck showing
+	// a permanent loading spinner instead - not just the tag-color picker. There's no other shop
+	// artist to collide colors with when there's no shop, so an empty "already taken" list (instead
+	// of skipping the computation) correctly shows the full palette. Found via manual testing: an
+	// independent artist reported their calendar appointments rendering with no visible color label
+	// at all (only visible via the tooltip) - traced back to this, not the calendar rendering code -
+	// their tagColor was stuck at registration's default ('#fff') because they could never actually
+	// reach the picker to change it.
 	useEffect(() => {
-		if(availableTags) {
-			console.log('huh');
-			setTagColors(UtilsService.showAvailableColorTags(
-				APP_SETTINGS_CONSTANTS.TAG_COLORS,
-				availableTags.getUserTagColors,
-				user.tagColor
-			));
-		}
-	}, [loading]);
+		setTagColors(UtilsService.showAvailableColorTags(
+			APP_SETTINGS_CONSTANTS.TAG_COLORS,
+			availableTags?.getUserTagColors ?? [],
+			user.tagColor
+		));
+	}, [loading, availableTags]);
 
 	const handleChangeAvatar = (e) => {
 		const file = e.target.files[0];
@@ -153,7 +161,9 @@ const Profile = () => {
 
 	const handleTagColor = (tag) => {
 		console.log(tag);
-		let tempTags = availableTags.getUserTagColors.filter((tag) => tag.tagColor !== user.tagColor);
+		// availableTags is undefined for a shop-less artist (query always skipped, see above) -
+		// treat "no shop-mates to collide with" as an empty used-colors list rather than crashing.
+		let tempTags = (availableTags?.getUserTagColors ?? []).filter((tag) => tag.tagColor !== user.tagColor);
 		updateUser({
 			variables: {
 				user: {
@@ -186,7 +196,14 @@ const Profile = () => {
 		});
 	}
 
-	if (availableTags) {
+	// Was gated on `if (availableTags)` - since getTagColorsByShop is permanently skipped for a
+	// shop-less artist (see comment above), availableTags could never become truthy for them, and
+	// this whole page - avatar upload, password change, tag color, all of it, not just the color
+	// picker - got stuck on the else branch's <IBPageLoader /> forever. Gate on the query's actual
+	// `loading` flag instead: false immediately for a skipped query, so the page now renders right
+	// away for an independent artist, same as it always did for a shop artist once their real query
+	// resolved.
+	if (!loading) {
 		console.log(availableTags);
 		return !openCrop ? (
 			<div className="profile">

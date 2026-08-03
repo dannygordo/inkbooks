@@ -927,6 +927,52 @@ The `mongodb-memory-server`-based test suite (`npm test`) is completely separate
 local-dev database and needs no changes — it already provisions and tears down its own ephemeral
 `mongod` per test run, real local Mongo or not.
 
+**Twelfth report (August 3, 2026) - reported as "calendar appointment colors," actual root cause
+was much larger: Profile.jsx was completely inaccessible to every independent artist.** Reported
+symptom: appointments show up correctly on the calendar, but render with no visible color label -
+only the tooltip (which reads the same `evt.user.tagColor` data) shows anything on hover.
+
+`ibCalendar/Day.jsx` renders each label as `<div style={{ backgroundColor: evt.user.tagColor, color:
+'#fff', ... }}>` - if `tagColor` is falsy or white, that's literally white text on a transparent/
+white background: present in the DOM (so the `Tooltip` wrapping it still fires on hover) but
+invisible. That part of the theory was right, but `Day.jsx` itself needed no fix - the real question
+was why an artist's `tagColor` was ever stuck at that default in the first place. `Register.jsx`
+hardcodes every new user's `tagColor` to `'#fff'` at signup with no picker, and the *only* place to
+change it afterward is Profile.jsx's "Select Tag Color" section.
+
+Reading `Profile.jsx` found the actual root cause, well beyond the calendar: the component's entire
+render was gated behind `if (availableTags)` -  `availableTags` being the data from
+`UserService.getTagColorsByShop(user.userInfo?.shop?.id)`, a query that (per this same session's
+earlier shop-optional fix) is deliberately `skip`ped whenever there's no `shopId`. For a shop-less
+independent artist that query never fires, so `availableTags` never becomes truthy, and the `else`
+branch - a bare `<IBPageLoader />` - rendered forever. Not a color-picker-only bug: an independent
+artist could never reach *any* part of Profile.jsx this way - not the avatar upload, not the
+password form, nothing. They could never have set a real tag color, which is the actual reason
+their calendar labels were invisible.
+
+Fixed in `client/src/pages/profile/Profile.jsx`:
+- The render gate now checks the query's own `loading` flag (`if (!loading)`) instead of the data
+  (`if (availableTags)`) - `loading` resolves to `false` immediately for a skipped query, so the
+  page renders right away for a shop-less artist, the same as it already did for a shop artist once
+  their real query resolved.
+- The `useEffect` that builds the color-swatch list no longer gates its entire body on
+  `if (availableTags)` (which meant it silently never ran for a shop-less artist, leaving
+  `tagColors` permanently `[]`); it now always runs, using `availableTags?.getUserTagColors ?? []`
+  as the "colors already taken by shop-mates" list - correctly empty when there are no shop-mates,
+  so an independent artist sees and can pick from the full palette.
+- `handleTagColor`'s `availableTags.getUserTagColors.filter(...)` call - which would have thrown on
+  `undefined` the moment an independent artist could actually reach this code path - is now
+  `(availableTags?.getUserTagColors ?? []).filter(...)`.
+
+Verified via `@babel/parser` (this sandbox can't run the client's Vitest suite - a pre-existing,
+already-documented `@rollup/rollup-linux-x64-gnu` optional-dependency resolution failure, unrelated
+to this change). No dedicated component test added for this fix, matching the same render-tree-
+complexity tradeoff already noted for the `IBCalendar.jsx` gap above (`useAuth`, `useMutation`, and
+`UserService.getTagColorsByShop` would all need mocking to meaningfully test the loading/skip
+interaction). **Needs a manual click-through as an independent-artist test account:** confirm
+Profile now loads immediately (no spinner), confirm a tag color can be selected and persists, then
+confirm the calendar renders that artist's appointment labels in the chosen color instead of blank.
+
 ---
 
 ## Suggested sequencing
