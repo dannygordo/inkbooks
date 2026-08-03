@@ -140,10 +140,14 @@ const ArtistPerformancePanel = ({ artistUserId, isSelf = false }) => {
 								onClick={linkTo ? () => navigate(linkTo) : undefined}
 							>
 								<span className="artistUpcomingDate">
-									{new Date(appt.appointmentDate).toLocaleDateString(undefined, {
+									{/* Was toLocaleDateString (date only) - the time matters just as much as
+									    the date for an upcoming appointment, and wasn't shown here at all. */}
+									{new Date(appt.appointmentDate).toLocaleString(undefined, {
 										month: "short",
 										day: "numeric",
 										year: "numeric",
+										hour: "numeric",
+										minute: "2-digit",
 									})}
 								</span>
 								<span className="artistUpcomingTitle">
