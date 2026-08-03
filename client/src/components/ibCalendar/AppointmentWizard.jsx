@@ -295,20 +295,18 @@ const AppointmentWizard = ({ selectedDay }) => {
 
 	if (step === "type") {
 		return (
-			<DialogContent dividers>
-				<div className="ibCalendarAddEventContainer">
-					<p>What are you scheduling?</p>
-					<div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-						<button type="button" className="ibButton" onClick={() => handleTypeSelect("consult")}>
-							Consult
-						</button>
-						<button type="button" className="ibButton" onClick={() => handleTypeSelect("session")}>
-							Session
-						</button>
-						<button type="button" className="ibButton" onClick={() => handleTypeSelect("other")}>
-							Other
-						</button>
-					</div>
+			<DialogContent dividers className="appointmentWizardDialogContent">
+				<p>What are you scheduling?</p>
+				<div className="appointmentWizardTypeButtons">
+					<button type="button" className="ibButton" onClick={() => handleTypeSelect("consult")}>
+						Consult
+					</button>
+					<button type="button" className="ibButton" onClick={() => handleTypeSelect("session")}>
+						Session
+					</button>
+					<button type="button" className="ibButton" onClick={() => handleTypeSelect("other")}>
+						Other
+					</button>
 				</div>
 			</DialogContent>
 		);
@@ -317,7 +315,7 @@ const AppointmentWizard = ({ selectedDay }) => {
 	if (step === "other-form") {
 		return (
 			<form onSubmit={handleSubmitOther}>
-				<DialogContent dividers>
+				<DialogContent dividers className="appointmentWizardDialogContent">
 					<IBDateTimePicker label="Select Date" val={startDateTime} setVal={setStartDateTime} />
 					<IBInput
 						helperText="Title"
@@ -330,7 +328,7 @@ const AppointmentWizard = ({ selectedDay }) => {
 					/>
 					{error && <div className="bookingRequestError">{error}</div>}
 				</DialogContent>
-				<DialogActions>
+				<DialogActions className="appointmentWizardDialogActions">
 					<button type="button" className="ibButton" onClick={() => setStep("type")}>
 						Back
 					</button>
@@ -347,7 +345,7 @@ const AppointmentWizard = ({ selectedDay }) => {
 			return <IBPageLoader />;
 		}
 		return (
-			<DialogContent dividers>
+			<DialogContent dividers className="appointmentWizardDialogContent">
 				<IBInput
 					helperText="Client email"
 					type="email"
@@ -394,7 +392,7 @@ const AppointmentWizard = ({ selectedDay }) => {
 					)
 				)}
 				{error && <div className="bookingRequestError">{error}</div>}
-				<DialogActions>
+				<DialogActions className="appointmentWizardDialogActions">
 					<button
 						type="button"
 						className="ibButton"
@@ -432,7 +430,7 @@ const AppointmentWizard = ({ selectedDay }) => {
 
 	if (step === "intake-details") {
 		return (
-			<DialogContent dividers>
+			<DialogContent dividers className="appointmentWizardDialogContent">
 				{type === "session" && (
 					<IBInput
 						helperText="Project Title"
@@ -460,12 +458,12 @@ const AppointmentWizard = ({ selectedDay }) => {
 					defaultValue={intakeBudget}
 					onChange={(e) => setIntakeBudget(e.target.value)}
 				/>
-				<label style={{ display: "block", marginTop: 10 }}>
+				<label className="appointmentWizardCheckboxRow">
 					<input type="checkbox" checked={isCoverUp} onChange={(e) => setIsCoverUp(e.target.checked)} />{" "}
 					Cover-up / touch-up
 				</label>
 				{error && <div className="bookingRequestError">{error}</div>}
-				<DialogActions>
+				<DialogActions className="appointmentWizardDialogActions">
 					<button type="button" className="ibButton" onClick={() => setStep("client-email")}>
 						Back
 					</button>
@@ -495,11 +493,11 @@ const AppointmentWizard = ({ selectedDay }) => {
 	if (step === "datetime") {
 		return (
 			<form onSubmit={handleSubmitIntake}>
-				<DialogContent dividers>
+				<DialogContent dividers className="appointmentWizardDialogContent">
 					<IBDateTimePicker label="Select Date" val={startDateTime} setVal={setStartDateTime} />
 					{error && <div className="bookingRequestError">{error}</div>}
 				</DialogContent>
-				<DialogActions>
+				<DialogActions className="appointmentWizardDialogActions">
 					<button type="button" className="ibButton" onClick={() => setStep("intake-details")}>
 						Back
 					</button>
@@ -516,8 +514,8 @@ const AppointmentWizard = ({ selectedDay }) => {
 			return <IBPageLoader />;
 		}
 		return (
-			<DialogContent dividers>
-				<div style={{ display: "flex", gap: 15, marginBottom: 10 }}>
+			<DialogContent dividers className="appointmentWizardDialogContent">
+				<div className="appointmentWizardRadioRow">
 					<label>
 						<input
 							type="radio"
@@ -544,7 +542,7 @@ const AppointmentWizard = ({ selectedDay }) => {
 					/>
 				)}
 				{error && <div className="bookingRequestError">{error}</div>}
-				<DialogActions>
+				<DialogActions className="appointmentWizardDialogActions">
 					<button type="button" className="ibButton" onClick={() => setStep("type")}>
 						Back
 					</button>
@@ -575,11 +573,11 @@ const AppointmentWizard = ({ selectedDay }) => {
 	if (step === "session-existing-datetime") {
 		return (
 			<form onSubmit={handleSubmitExistingProjectSession}>
-				<DialogContent dividers>
+				<DialogContent dividers className="appointmentWizardDialogContent">
 					<IBDateTimePicker label="Select Date" val={startDateTime} setVal={setStartDateTime} />
 					{error && <div className="bookingRequestError">{error}</div>}
 				</DialogContent>
-				<DialogActions>
+				<DialogActions className="appointmentWizardDialogActions">
 					<button type="button" className="ibButton" onClick={() => setStep("session-project")}>
 						Back
 					</button>

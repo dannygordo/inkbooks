@@ -134,10 +134,14 @@
     padding-right: 2px;
 }
 
+/* Wraps <DialogContent> + <DialogActions> as siblings in UpdateEventDialog.jsx and
+   ViewEventDialog.jsx - flex-direction was previously "row", which laid the content and the
+   action buttons out side-by-side instead of stacked (content above, actions below). Changed to
+   "column" so it actually renders as a normal top-content/bottom-actions dialog. */
 .ibCalendarAddEventContainer{
     width: 600px;
-    flex-direction: row;
-    justify-content: space-between;
+    display: flex;
+    flex-direction: column;
     align-items: stretch;
     box-shadow: 0px 24px 38px 3px rgb(0 0 0 / 14%), 0px 9px 46px 8px rgb(0 0 0 / 12%), 0px 11px 15px -7px rgb(0 0 0 / 20%);
     border-radius: 8px;
@@ -203,19 +207,51 @@
     color: #666;
     font-style: italic;
 }
+/* AppointmentWizard.jsx - every step's <DialogContent> gets this class. MUI's own DialogContent
+   padding (20px/24px) was getting undercut in practice by children with no vertical spacing of
+   their own, and the "type" step used to force its own 600px width via a nested
+   .ibCalendarAddEventContainer wrapper laid out as a flex ROW (question text and buttons
+   side-by-side, buttons squeezed against the right edge) - the width now lives here instead,
+   applied consistently across every step so the dialog doesn't resize as you move through the
+   wizard, and the flex column + gap gives every field, note, and error line consistent breathing
+   room instead of relying on a pile of one-off inline margins. */
+.appointmentWizardDialogContent {
+    width: 560px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding: 24px 28px !important;
+}
+/* Matches .appointmentWizardDialogContent's horizontal padding so the action buttons line up
+   with the fields above them instead of sitting flush against the dialog's edge. */
+.appointmentWizardDialogActions {
+    padding: 16px 28px !important;
+    gap: 10px;
+}
+.appointmentWizardTypeButtons {
+    display: flex;
+    gap: 12px;
+}
+.appointmentWizardRadioRow {
+    display: flex;
+    gap: 24px;
+}
+.appointmentWizardCheckboxRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
 /* AppointmentWizard.jsx's email-lookup client step - see that file's own header comment on why
    the old dropdown-based client picker was replaced with this. */
 .clientEmailMatchCard {
-    margin-top: 10px;
-    padding: 10px 12px;
+    padding: 14px 16px;
     border: 1px solid #b6e6c3;
     background-color: #e6f6ea;
     border-radius: 6px;
     font-size: 14px;
 }
 .clientEmailNoMatchNote {
-    margin-top: 10px;
-    margin-bottom: 5px;
     font-size: 13px;
     color: #666;
     font-style: italic;
