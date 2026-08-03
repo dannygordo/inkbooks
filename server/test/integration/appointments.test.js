@@ -221,6 +221,42 @@ describe('updateAppointment: shopId immutability + first-time attribution', () =
 		expect(errors[0].message).toMatch(/shopId cannot be changed/);
 	});
 
+	// Regression: SessionDetail.jsx's minimal-payload save (see
+	// AppointmentService.UPDATE_SESSION_DETAILS - only ever sends id/appointmentDate/total/
+	// sessionNotes/appointmentStatus, deliberately never shopId) started throwing "shopId cannot
+	// be changed" the instant convertBookingRequest began correctly setting shopId on
+	// session/consult appointments - previously this never fired since shopId was never set to
+	// begin with, so the bug existed but had no way to surface. Omitting shopId from a partial
+	// update must leave it untouched, not be treated as an attempt to null it out.
+	it('allows a partial update that omits shopId entirely on a shop-attributed appointment', async () => {
+		const { user } = await createArtistUser();
+		const { shop } = await createShopAdminUser();
+		await connectArtistToShop(user.id, shop.id);
+		const appointment = await createAppointment(user.id, { shopId: shop.id, total: 0 });
+		const token = signTestToken(user);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{
+				query: UPDATE_APPOINTMENT,
+				variables: {
+					// No shopId key at all here - matches SessionDetail.jsx's real minimal payload
+					// shape, not just an "explicit null" case (already covered above).
+					appointmentInput: {
+						id: appointment.id,
+						appointmentDate: new Date().toISOString(),
+						total: 250,
+					},
+				},
+			},
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.updateAppointment.shopId).toBe(shop.id);
+	});
+
 	it('allows updating other fields on a shop-attributed appointment as long as shopId is unchanged', async () => {
 		const { user } = await createArtistUser();
 		const { shop } = await createShopAdminUser();

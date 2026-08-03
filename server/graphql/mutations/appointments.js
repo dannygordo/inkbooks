@@ -121,14 +121,26 @@ module.exports = {
           // "Known gap" note under the tenancy model. An appointment already tied to a shop can
           // never be re-tied to a different one (or un-tied) after the fact - that's exactly the
           // corruption-of-compliance-records scenario this whole check exists to prevent.
-          if (existingAppointment.shopId) {
+          //
+          // Only enforced when the caller's payload actually *includes* a shopId key - a plain
+          // JS `in` check, not just `appointment.shopId` being falsy, matters here: this mutation
+          // is also used for partial-field saves (see AppointmentService.UPDATE_SESSION_DETAILS,
+          // used by SessionDetail.jsx's timer/notes/total save, which deliberately never sends
+          // shopId/title/description/etc at all - see that query's own comment on why). Treating
+          // "the caller didn't send shopId this time" the same as "the caller is trying to null it
+          // out" broke every save on any appointment already attributed to a shop the instant
+          // convertBookingRequest started actually setting shopId correctly (see that resolver's
+          // own fix) - previously this never fired in practice because shopId was never set to
+          // begin with. FindById/findByIdAndUpdate below already only apply the keys actually
+          // present in `appointment`, so omitting shopId here correctly leaves it untouched.
+          if ('shopId' in appointment && existingAppointment.shopId) {
             const incomingShopId = appointment.shopId;
             if (String(incomingShopId || '') !== String(existingAppointment.shopId)) {
               throw new UserInputError(
                 'shopId cannot be changed once an appointment has been attributed to a shop.',
               );
             }
-          } else if (appointment.shopId) {
+          } else if ('shopId' in appointment && appointment.shopId) {
             // Being attributed to a shop for the first time - same authorization createAppointment
             // requires, since this is the same class of action.
             await assertHasShopConnection(user.id, appointment.shopId);
