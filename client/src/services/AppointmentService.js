@@ -82,10 +82,23 @@ export const AppointmentService = (() => {
             }
         }
     `;
+    // fetchPolicy: 'cache-and-network' - was left at Apollo's default 'cache-first'. This is a
+    // dashboard: an artist converting a consult to a session (ConsultDetail.jsx/
+    // BookSessionDatesForm.jsx), adding an extra session from a project
+    // (ProjectSessionsList.jsx), or creating one from the calendar wizard all land the new
+    // Appointment via mutations that have no reason to know this specific cached list query
+    // exists, let alone update it - so with 'cache-first', navigating to the dashboard right
+    // after any of those just re-served the stale array Apollo already had cached from the last
+    // time this query ran, and the new appointment was missing until a full page reload reset
+    // the in-memory cache entirely. 'cache-and-network' still shows the cached list instantly (no
+    // loading flash on a normal visit) but always fires a real network request behind it too, so
+    // a dashboard visit is guaranteed to reflect whatever was created elsewhere in the same
+    // session.
     const _getAppointmentsByArtist = (userId) => {
         return useQuery(_FETCH_APPOINTMENTS_BY_ARTIST, {
             variables: { userId },
             skip: !userId,
+            fetchPolicy: "cache-and-network",
         });
     };
 
