@@ -40,6 +40,7 @@ import BookingRequest from "./pages/booking/BookingRequest";
 import GuestConversation from "./pages/booking/GuestConversation";
 import ArtistBookingRequests from "./pages/booking/ArtistBookingRequests";
 import ShopCutConfirmations from "./pages/shopCutConfirmations/ShopCutConfirmations";
+import Settings from "./pages/settings/Settings";
 
 function App() {
 	const { user } = useAuth();
@@ -259,6 +260,14 @@ function App() {
 							element={
 								<AuthRoute>
 									<Profile />
+								</AuthRoute>
+							}
+						/>
+						<Route
+							path="/settings"
+							element={
+								<AuthRoute>
+									<Settings />
 								</AuthRoute>
 							}
 						/>

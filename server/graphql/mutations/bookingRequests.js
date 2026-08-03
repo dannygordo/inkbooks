@@ -5,19 +5,24 @@ const Message = require('../../models/Message');
 const Appointment = require('../../models/Appointment');
 const Client = require('../../models/Client');
 const User = require('../../models/User');
+const Project = require('../../models/Project');
 const withAuth = require('../../utils/with-auth');
 const { AuthenticationError, UserInputError, RateLimitError } = require('../../utils/errors');
 const { Constants } = require('../../utils/constants');
 const { findOrCreateGuestClient } = require('../../utils/guest-client');
 const { resolveGuestToken } = require('../../utils/guest-auth');
 const { checkRateLimit, getClientIp } = require('../../utils/rate-limit');
+const { tryCheckAuth } = require('../../utils/check-auth');
 const {
   createBookingRequestInputSchema,
   guestMessageInputSchema,
   convertBookingRequestInputSchema,
+  reassignBookingRequestInputSchema,
   createAppointmentInputSchema,
+  createProjectInputSchema,
   validate,
 } = require('../../utils/validation');
+const { getShopIdsForUser } = require('../../utils/shop-membership');
 const {
   sendBookingRequestReceivedEmail,
   sendNewMessageNotificationToGuest,
@@ -31,12 +36,26 @@ module.exports = {
   // client (nobody legitimately submits the same intake form five times in an hour) but blocks
   // scripted spam before it reaches Mongo, floods an artist's inbox, or burns Resend's free
   // 3,000-email/month quota.
+  //
+  // An authenticated caller (an artist using this same public form/mutation for a walk-in client
+  // at the studio - see PRODUCTION_ROADMAP.md's "Rates & settings" entry) gets a much higher
+  // limit instead of being lumped in with anonymous traffic - a busy shop's front desk submitting
+  // several walk-ins from one IP in an hour is real, legitimate use, not abuse. Still rate-limited
+  // (not exempted outright) since a compromised/malicious authenticated account shouldn't get an
+  // unlimited free pass either.
   async createBookingRequest(_, { bookingRequestInput }, context) {
     const ip = getClientIp(context.req);
-    const { allowed, retryAfterSeconds } = checkRateLimit(`${ip}:createBookingRequest`, {
-      windowMs: 60 * 60 * 1000,
-      max: 5,
-    });
+    const authenticatedCaller = tryCheckAuth(context);
+    // Keyed separately (not just a different `max` on the same key) so an anonymous visitor's
+    // count on this IP can never bleed into, or be inflated by, an authenticated staff member's
+    // usage of the same public form from the same shop network, and vice versa.
+    const rateLimitKey = authenticatedCaller
+      ? `${ip}:createBookingRequest:auth`
+      : `${ip}:createBookingRequest:anon`;
+    const rateLimitOptions = authenticatedCaller
+      ? { windowMs: 60 * 60 * 1000, max: 100 }
+      : { windowMs: 60 * 60 * 1000, max: 5 };
+    const { allowed, retryAfterSeconds } = checkRateLimit(rateLimitKey, rateLimitOptions);
     if (!allowed) {
       throw new RateLimitError(
         `Too many booking requests from this address. Try again in ${retryAfterSeconds} seconds.`,
@@ -160,9 +179,19 @@ module.exports = {
   convertBookingRequest: withAuth(async (_, args, context, info, user) => {
     const { valid, errors, data } = validate(convertBookingRequestInputSchema, {
       outcome: args.outcome,
+      projectTitle: args.projectTitle,
     });
     if (!valid) {
       throw new UserInputError('Errors', { errors });
+    }
+    // Cross-field requirement zod's object schema doesn't express cleanly on its own - a Project
+    // needs a title (required at both the Mongoose and zod layers), but BookingRequest never
+    // collects one, so the caller (the artist, via a small "Book Session" sub-form) has to supply
+    // it - only for this outcome, since consult_booked/declined never touch Project at all.
+    if (data.outcome === 'session_booked' && !data.projectTitle) {
+      throw new UserInputError('Errors', {
+        errors: { projectTitle: 'A project title is required to book a session' },
+      });
     }
 
     const bookingRequest = await BookingRequest.findById(args.bookingRequestId);
@@ -193,9 +222,50 @@ module.exports = {
     // createAppointment mutation this schema is shared with.
     const appointmentType = data.outcome === 'consult_booked' ? 'consult' : 'session';
     const now = new Date();
+
+    // Booking a session used to only ever create an Appointment, leaving Appointment.projectId
+    // unset - found while wiring up the "every session must have a project" rule for the
+    // appointment-creation wizard. A consult can (and usually does) happen before anyone knows if
+    // a project exists at all - that's the whole reason BookingRequest is a separate model from
+    // Project. But by the time an artist is booking a *session*, they've decided the work is
+    // happening, so this auto-creates the real Project from the request's own intake fields
+    // (description/placement/size/referenceImages) instead of leaving that as a manual follow-up
+    // step. referenceImages are plain URL strings on BookingRequest (see that model's own
+    // comment on why - no real userId existed yet when a guest uploaded them); Project needs
+    // [IBImage], so each URL is wrapped with the now-real client's userId as the attributed
+    // uploader.
+    let newProjectId;
+    if (data.outcome === 'session_booked') {
+      const projectInput = {
+        title: data.projectTitle,
+        description: bookingRequest.description,
+        placement: bookingRequest.placement,
+        size: bookingRequest.size,
+        artistId: bookingRequest.artistId.toString(),
+        clientId: bookingRequest.clientId.toString(),
+        referenceImages: (bookingRequest.referenceImages || []).map((url) => ({
+          url,
+          userId: clientForAppointment.userId,
+        })),
+        status: 'open',
+      };
+      const { valid: projValid, errors: projErrors, data: projData } = validate(
+        createProjectInputSchema,
+        projectInput,
+      );
+      if (!projValid) {
+        throw new UserInputError('Errors', { errors: projErrors });
+      }
+      const project = await new Project(projData).save();
+      newProjectId = project.id;
+    }
+
     const appointmentInput = {
       ...(args.appointmentInput || {}),
       appointmentType,
+      // Overrides whatever (if anything) the caller sent - same reasoning as appointmentType
+      // above, this is derived from the just-created Project, not trusted from the client.
+      ...(newProjectId ? { projectId: newProjectId } : {}),
       // .toString() matters here - clientForAppointment.userId is a real Mongoose ObjectId
       // instance, not a string, and createAppointmentInputSchema's userId field is a zod string
       // regex check (see utils/validation.js's objectIdSchema). Without this, validate() always
@@ -223,6 +293,61 @@ module.exports = {
     bookingRequest.resultingAppointmentId = appointment.id;
     await bookingRequest.save();
 
+    return bookingRequest;
+  }),
+
+  // Forwards a still-pending request to another artist - the "4th action" alongside Book
+  // Consult/Book Session/Decline on the artist dashboard, for a shop where the artist who
+  // originally got the request isn't the right fit (specialty, fully booked, etc.) but a
+  // shop-mate is. Only allowed between two artists actively connected to the *same* shop -
+  // reusing getShopIdsForUser (already used to scope getArtists/getClients/etc. - see
+  // utils/shop-membership.js) rather than the legacy single Artist.shopId field, so this works
+  // correctly under the fuller multi-shop connection model, not just the common single-shop case.
+  reassignBookingRequest: withAuth(async (_, args, context, info, user) => {
+    const { valid, errors, data } = validate(reassignBookingRequestInputSchema, args);
+    if (!valid) {
+      throw new UserInputError('Errors', { errors });
+    }
+
+    const bookingRequest = await BookingRequest.findById(data.bookingRequestId);
+    if (!bookingRequest) {
+      throw new UserInputError('Errors', {
+        errors: { bookingRequestId: 'Booking request not found' },
+      });
+    }
+    if (
+      user.role > Constants.ROLES.SHOP_ADMIN &&
+      String(user.id) !== String(bookingRequest.artistId)
+    ) {
+      throw new AuthenticationError('Action not allowed');
+    }
+    // Reassigning after conversion doesn't mean anything - the resulting Appointment/Project
+    // already exist under the original artistId, and this mutation only ever touches
+    // BookingRequest.artistId, not those. Only a still-open request can be forwarded.
+    if (bookingRequest.status !== 'pending') {
+      throw new UserInputError('Errors', {
+        errors: { bookingRequestId: 'Only a pending request can be reassigned' },
+      });
+    }
+
+    const newArtist = await User.findById(data.newArtistId);
+    if (!newArtist || newArtist.userType !== Constants.USER_TYPE.ARTIST) {
+      throw new UserInputError('Errors', { errors: { newArtistId: 'Artist not found' } });
+    }
+
+    const [currentArtistShopIds, newArtistShopIds] = await Promise.all([
+      getShopIdsForUser(bookingRequest.artistId),
+      getShopIdsForUser(data.newArtistId),
+    ]);
+    const sharesAShop = newArtistShopIds.some((id) => currentArtistShopIds.includes(id));
+    if (!sharesAShop) {
+      throw new UserInputError('Errors', {
+        errors: { newArtistId: 'That artist is not connected to the same shop' },
+      });
+    }
+
+    bookingRequest.artistId = data.newArtistId;
+    await bookingRequest.save();
     return bookingRequest;
   }),
 };

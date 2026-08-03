@@ -975,6 +975,116 @@ confirm the calendar renders that artist's appointment labels in the chosen colo
 
 ---
 
+## Phase 7 — Session/workflow redesign (August 3, 2026, ongoing)
+
+A larger, deliberately-scoped redesign covering four related gaps identified via a design
+conversation, not a bug report: (1) inconsistent edit-page UI across the app, (2) the appointment-
+creation flow not distinguishing consult vs. session or reusing the booking-request pipeline for
+artist-entered walk-ins, (3) sessions needing a timer/notes/auto-computed total inside Project, and
+(4) the shop-cut ledger UI needing to move off the appointment dialog onto an artist-dashboard
+payout list. Being built in dependency order - schema/settings first, since the other three depend
+on it - then the wizard, then the in-project session view, then the payout dashboard, then a
+whole-app UI consistency sweep last. Full design discussion and the flaws/alternatives considered
+for each piece live in this session's conversation history, not repeated here - this section
+documents what's actually been built.
+
+### Rates & settings foundation - done
+
+New fields: `Artist.flatRate`/`billingType` (hourlyRate already existed) and matching
+`Shop.flatRate` (for symmetry - a shop can express a flat-rate expectation too, not just hourly).
+`ArtistShopConnection.rateSource` (`'shop' | 'own'`, default `'shop'`) decides which side's rate
+actually applies for a given connected artist - lives on the connection record, not on `User` or
+`Shop` directly, since an artist could in principle connect to more than one shop later and use a
+different rate at each.
+
+Two new mutations, both self-service (an artist acting on their own record, not an admin editing
+someone else's):
+- `updateArtistRateSettings(hourlyRate, flatRate, billingType)` - deliberately separate from the
+  existing `updateArtist`, which is `SHOP_ADMIN`-or-better only and so a plain `ARTIST`-role user
+  could never call it on their own record at all, including to set their own rate. Looked up by
+  the caller's own `userId`, not a client-supplied `artistId`, so there's no ownership check to get
+  wrong.
+- `setArtistShopRateSource(artistId, shopId, rateSource)` - same ownership shape as the existing
+  `connectArtistToShop`/`disconnectArtistFromShop` (the artist themselves, or shop-admin-or-better).
+
+New top-level `/settings` page (`client/src/pages/settings/Settings.jsx`), not bolted onto
+`Profile.jsx` - this is going to keep growing (rate config today, likely notification prefs/
+shop-connection management later), and Profile already carries avatar/password/tag-color. Only
+visible in the sidebar nav for `userType === 'artist'` (staff/client/shop-admin have nothing to
+configure here yet). Content: hourly/flat rate + billing-type inputs, and - only when the artist
+has a shop - a "use the shop's rate / use my own" picker wired to `setArtistShopRateSource`.
+
+One real implementation bug caught and fixed before it shipped: the rate inputs initially used
+`IBInput`'s `value` prop for controlled state hydrated from the query result via a `useEffect` -
+`IBInput` is uncontrolled (`defaultValue`, not `value` - it doesn't forward a `value` prop to MUI's
+`TextField` at all), so the effect would have updated React state that was never actually reflected
+in what rendered. Fixed by following `EditArtist.jsx`'s existing (correct) pattern instead: read
+`defaultValue` straight from the query result at render time, and use local state only to capture
+edits, falling back to the query's own value at submit for anything untouched.
+
+Verified via `graphql`'s `buildSchema`/`validate` against the real SDL for every new query/mutation
+document, `node --check`/`@babel/parser` syntax checks on every file, and a standalone script
+confirming the new `tryCheckAuth` helper (see below) behaves correctly against a real signed JWT.
+This sandbox still can't run either test suite (`@rollup/rollup-linux-x64-gnu` resolution failure,
+already documented above) or a live Mongo connection, so no integration test was run against the
+new mutations end-to-end - worth doing once you can run `npm test` yourself.
+
+### Booking-request pipeline - reassignment, session-to-project, and rate-limit fix - done
+
+**Reassignment.** New `reassignBookingRequest(bookingRequestId, newArtistId)` mutation - a 4th
+action ("Forward to...") alongside Book Consult/Book Session/Decline on the artist's booking-
+requests dashboard, for when the artist who originally got a request isn't the right fit but a
+shop-mate is. Only allowed between two artists who share an active `ArtistShopConnection` to the
+same shop (checked via the existing `getShopIdsForUser` helper, so this works under the fuller
+multi-shop model, not just the legacy single-`Artist.shopId` case) - not a general "reassign to
+anyone" escape hatch. Only a still-`pending` request can be reassigned, since a converted one
+already has a real Appointment/Project under the original artist. The dashboard only offers this
+button when the artist actually has shop-mates to forward to.
+
+**Session booking now creates a real Project.** Found while designing the "every session
+appointment must have a project" rule: `convertBookingRequest`'s `session_booked` path only ever
+created an `Appointment`, leaving `projectId` unset - there was no code path that ever created a
+`Project` from a booking request at all. Fixed: booking a session now auto-creates a `Project` from
+the request's own intake fields (`description`/`placement`/`size`/`referenceImages`), and the new
+Project's id becomes the Appointment's `projectId` (overriding anything the caller sent, same
+"derived, not trusted" treatment already applied to `appointmentType`). `Project.title` is required
+and `BookingRequest` never collects one, so `convertBookingRequest` gained a `projectTitle`
+argument - required only when `outcome: session_booked` (a plain runtime check, not expressed as a
+zod cross-field constraint) - surfaced as a text input in the dashboard's existing date/time
+sub-form. `BookingRequest.referenceImages` are plain URL strings (no real `userId` existed when a
+guest uploaded them); each gets wrapped into `Project.referenceImages`'s `[IBImage]` shape with the
+now-real client's `userId` as the attributed uploader.
+
+**Rate-limit fix for artist-submitted walk-ins.** `createBookingRequest`'s existing 5/hour/IP limit
+is sized to stop anonymous scripted abuse of the public intake form - but an artist using that same
+form for real walk-in clients at the studio would hit it on a busy day, since nothing distinguished
+an authenticated caller from an anonymous one. Added `tryCheckAuth` (`utils/check-auth.js`) - a
+non-throwing variant of the existing `checkAuth` that returns `null` instead of raising when
+there's no/an invalid token - and used it to give an authenticated caller a separate, much higher
+bucket (100/hour, keyed independently from the anonymous 5/hour bucket so the two can never bleed
+into each other on the same IP) rather than exempting authenticated calls from rate-limiting
+outright. `createBookingRequest` itself deliberately stays unauthenticated (`withAuth` isn't
+applied) - this only changes which bucket/limit applies when a valid token happens to be present.
+
+Verified the same way as the rates work above: schema validation for the new mutation shape,
+syntax checks, and a standalone script confirming `tryCheckAuth` returns the decoded user for a
+valid signed token and `null` for a missing/garbage one, without throwing either way.
+
+### Still to build (this same Phase 7 effort, not yet started)
+
+- The appointment-creation wizard itself (consult/session/other split, session requiring a
+  project, consult reusing this same booking-request pipeline for an artist entering a walk-in).
+- The in-project session view: session list, click-to-view detail, start/stop/reset timer
+  (server-persisted, not pure client state - see the design conversation on why), auto-computed
+  total from the effective rate (editable), notes, close-session action.
+- The artist-dashboard shop-cut payout list (completed sessions with outstanding cuts, cash/card
+  selection, batch Square invoice for card) and removing the shop-cut panel from
+  Create/UpdateEventDialog.
+- The whole-app UI consistency sweep, deliberately last since it touches every page and the other
+  three pieces above are still changing shape.
+
+---
+
 ## Suggested sequencing
 
 Phase 0 today. Phase 1 this week — it's the part where real damage is currently possible. Phase 2 the following 1-2 weeks, since it's what keeps Phase 1 fixed. Phase 3 (modernization, including the monorepo/TypeScript scaffolding that Phase 5 needs) can run in parallel with Phase 2 once the auth wrapper pattern is settled. Phase 4 (real payments) whenever you're ready to actually take deposits. Phase 5 (mobile) starts once Phase 0-2 are done and the monorepo shape from Phase 3 exists — don't build a mobile UI against an API that's still wide open. Phase 6 items — tests, CI, monitoring — should be stood up incrementally starting in Phase 1, not bolted on at the end; retrofitting tests onto already-migrated code (or two clients instead of one) is much more expensive than writing them alongside the fixes.

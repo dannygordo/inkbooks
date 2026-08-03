@@ -21,6 +21,8 @@ export const ArtistService = (() => {
 					startDate
 					endDate
 					hourlyRate
+					flatRate
+					billingType
 					shopId
 					userId
 					status
@@ -120,11 +122,26 @@ export const ArtistService = (() => {
         return UPDATE_ARTIST_MUTATION;
 	};
 
+	// Self-service rate settings - see server/graphql/mutations/artists.js's comment on why this
+	// is a separate mutation from updateArtist above (which is SHOP_ADMIN-or-better only, so a
+	// plain artist could never call it on their own record). Used by the new Settings page.
+	const _UPDATE_ARTIST_RATE_SETTINGS_MUTATION = gql`
+		mutation ($hourlyRate: Int, $flatRate: Int, $billingType: String!) {
+			updateArtistRateSettings(hourlyRate: $hourlyRate, flatRate: $flatRate, billingType: $billingType) {
+				id
+				hourlyRate
+				flatRate
+				billingType
+			}
+		}
+	`;
+
 	return {
 		fetchArtist: _fetchArtist,
 		fetchArtists: _fetchArtists,
         updateArtist: _updateArtist,
 		FETCH_ARTISTS_BY_SHOP: _FETCH_ARTISTS_BY_SHOP,
-		fetchArtistsByShop: _fetchArtistsByShop
+		fetchArtistsByShop: _fetchArtistsByShop,
+		UPDATE_ARTIST_RATE_SETTINGS_MUTATION: _UPDATE_ARTIST_RATE_SETTINGS_MUTATION,
 	};
 })();

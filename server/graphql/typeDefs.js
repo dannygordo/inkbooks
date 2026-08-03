@@ -66,6 +66,8 @@ module.exports = gql`
     startDate: Date!
     endDate: Date
     hourlyRate: Int
+    flatRate: Int
+    billingType: String
     # Was ID! - broke the moment any independent artist (no shop connection at all, the
     # headline scenario of the artist-centric tenancy redesign - see PRODUCTION_ROADMAP.md) got
     # serialized in a list query: Artist.js's Mongoose schema already allows shopId to be unset,
@@ -97,6 +99,8 @@ module.exports = gql`
     startDate: Date
     endDate: Date
     hourlyRate: Int
+    flatRate: Int
+    billingType: String
     shopId: ID
     userId: ID
     status: Int
@@ -115,6 +119,7 @@ module.exports = gql`
     website: String
     shopMinimum: Int
     hourlyRate: Int
+    flatRate: Int
     logo: String
     billingType: String
     status: Int
@@ -133,6 +138,7 @@ module.exports = gql`
     website: String
     shopMinimum: Int
     hourlyRate: Int
+    flatRate: Int
     logo: String
     billingType: String
     status: Int
@@ -288,6 +294,9 @@ module.exports = gql`
     shopId: ID!
     status: String!
     disconnectedAt: DateTime
+    # Which side's rate (shop's or the artist's own) this artist's sessions bill against at this
+    # shop - see models/ArtistShopConnection.js's comment for the full reasoning.
+    rateSource: String!
     createdAt: DateTime
     updatedAt: DateTime
   }
@@ -537,6 +546,7 @@ module.exports = gql`
     ######### Artist-Shop Connections ###########
     connectArtistToShop(artistId: ID!, shopId: ID!): ArtistShopConnection!
     disconnectArtistFromShop(artistId: ID!, shopId: ID!): ArtistShopConnection!
+    setArtistShopRateSource(artistId: ID!, shopId: ID!, rateSource: String!): ArtistShopConnection!
 
     ######### Users ###########
 
@@ -572,7 +582,10 @@ module.exports = gql`
     ): Artist!
     deleteArtist(artistId: ID!): String!
     updateArtist(artist: ArtistInput): Artist
-    
+    # Self-service - see mutations/artists.js's comment on why this is separate from updateArtist
+    # (which is SHOP_ADMIN-or-better only, so a plain artist could never call it on themselves).
+    updateArtistRateSettings(hourlyRate: Int, flatRate: Int, billingType: String!): Artist!
+
     ######### Shops ###########
 
     createShop(
@@ -708,10 +721,19 @@ module.exports = gql`
     # Artist-only (withAuth) - converts a pending request into a real Appointment (consult or
     # session) or marks it declined. outcome must be one of: consult_booked, session_booked,
     # declined.
+    # projectTitle is only used (and required in practice) when outcome is session_booked - see
+    # mutations/bookingRequests.js's comment on why converting to a session now auto-creates a
+    # real Project from this request's intake fields, and why a title has to come from the
+    # caller rather than being derived, since BookingRequest never collects one.
     convertBookingRequest(
       bookingRequestId: ID!
       outcome: String!
       appointmentInput: AppointmentInput
+      projectTitle: String
     ): BookingRequest!
+    # Artist-only (withAuth) - forwards a still-pending request to another artist at a shop both
+    # the current and new artist are actively connected to. See mutations/bookingRequests.js for
+    # the same-shop check this enforces - this is not a general "reassign to anyone" escape hatch.
+    reassignBookingRequest(bookingRequestId: ID!, newArtistId: ID!): BookingRequest!
   }
 `;

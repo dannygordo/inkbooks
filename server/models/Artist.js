@@ -16,6 +16,13 @@ const ArtistSchema = new mongoose.Schema(
     startDate: { type: Date },
     endDate: { type: Date },
     hourlyRate: { type: Number },
+    // Added alongside Shop.flatRate so an artist can express a flat-rate expectation for
+    // sessions, not just hourly - see billingType below. Which one actually gets used to compute
+    // a session's total, and whether the shop's rate is used instead when this artist is
+    // shop-connected, is decided by ArtistShopConnection.rateSource, not here - this only says
+    // what the artist's *own* rate is, for when 'own' is selected (or there's no shop at all).
+    flatRate: { type: Number },
+    billingType: { type: String, enum: ['hourly', 'flat_rate'], default: 'hourly' },
     avatar: { type: String, default: "" },
     shopId: { type: mongoose.Schema.Types.ObjectId },
     userId: { type: mongoose.Schema.Types.ObjectId },

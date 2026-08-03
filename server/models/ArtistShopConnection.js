@@ -20,6 +20,14 @@ const ArtistShopConnectionSchema = new mongoose.Schema(
     // indistinguishable from "never connected at all".
     status: { type: String, required: true, default: 'active', enum: ['active', 'disconnected'] },
     disconnectedAt: { type: Date },
+    // Which side's rate/billingType this artist's sessions are computed against at this shop -
+    // the shop's own hourlyRate/flatRate/billingType, or the artist's personal ones (User.hourlyRate
+    // etc.). Lives on the connection, not on User or Shop directly, since an artist could in
+    // principle be connected to more than one shop later and might reasonably use a different
+    // rate at each. Defaults to 'shop' - the common case (booth-rent/commission shop sets the
+    // rate everyone bills at), with 'own' as the explicit opt-out for an artist whose personal
+    // rate should be used instead.
+    rateSource: { type: String, required: true, default: 'shop', enum: ['shop', 'own'] },
   },
   { timestamps: true }
 );

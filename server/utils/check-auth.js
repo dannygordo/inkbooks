@@ -7,7 +7,7 @@ const { AuthenticationError } = require('./errors');
 // closes that gap instead of leaving two parallel, inconsistent config mechanisms.
 const SECRET_KEY = process.env.SECRET_KEY;
 
-module.exports = (context) => {
+const checkAuth = (context) => {
   //console.log(context.req.headers.authorization);
   const authHeader = context.req.headers.authorization;
   if (authHeader) {
@@ -32,3 +32,20 @@ module.exports = (context) => {
     'Authentication header must be provided to perform this action',
   );
 };
+
+// Non-throwing variant - returns the decoded user, or null if there's no/an invalid token,
+// instead of raising. Exists for resolvers that are deliberately public (no withAuth) but still
+// want to behave differently for a caller who *happens* to be logged in - e.g.
+// createBookingRequest's per-IP rate limit (see mutations/bookingRequests.js), which is sized to
+// stop anonymous scripted abuse and would otherwise also throttle a shop's own front desk
+// submitting walk-in requests all day from one IP through the same public form/mutation.
+const tryCheckAuth = (context) => {
+  try {
+    return checkAuth(context);
+  } catch (err) {
+    return null;
+  }
+};
+
+module.exports = checkAuth;
+module.exports.tryCheckAuth = tryCheckAuth;

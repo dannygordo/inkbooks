@@ -1,0 +1,27 @@
+.settings {
+	flex: 4;
+	padding: 20px;
+	margin-top: 60px;
+	margin-left: 10px;
+}
+.settingsTitleContainer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+.settingsContainer {
+	margin-top: 10px;
+	display: flex;
+	flex-wrap: wrap;
+}
+.settingsRadioGroup {
+	display: flex;
+	flex-direction: column;
+	margin-top: 10px;
+}
+.settingsActions {
+	padding: 5px;
+	display: flex;
+	justify-content: left;
+	margin-top: 10px;
+}

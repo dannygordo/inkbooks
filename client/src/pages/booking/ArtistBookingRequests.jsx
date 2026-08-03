@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { gql, useMutation, useQuery } from "@apollo/client";
 import { CircularProgress } from "@mui/material";
 import { useAuth } from "../../context/auth";
+import { ArtistService } from "../../services/ArtistService";
 import "./artistBookingRequests.css";
 
 const GET_BOOKING_REQUESTS = gql`
@@ -62,15 +63,29 @@ const CONVERT_BOOKING_REQUEST = gql`
     $bookingRequestId: ID!
     $outcome: String!
     $appointmentInput: AppointmentInput
+    $projectTitle: String
   ) {
     convertBookingRequest(
       bookingRequestId: $bookingRequestId
       outcome: $outcome
       appointmentInput: $appointmentInput
+      projectTitle: $projectTitle
     ) {
       id
       status
       resultingAppointmentId
+    }
+  }
+`;
+
+// See server/graphql/mutations/bookingRequests.js's reassignBookingRequest - only allowed between
+// two artists actively connected to the same shop.
+const REASSIGN_BOOKING_REQUEST = gql`
+  mutation reassignBookingRequest($bookingRequestId: ID!, $newArtistId: ID!) {
+    reassignBookingRequest(bookingRequestId: $bookingRequestId, newArtistId: $newArtistId) {
+      id
+      artistId
+      status
     }
   }
 `;
@@ -89,12 +104,24 @@ const ArtistBookingRequests = () => {
   const [convertError, setConvertError] = useState(null);
   // Which outcome's date/time sub-form is currently open ('consult_booked' | 'session_booked' | null)
   const [pendingOutcome, setPendingOutcome] = useState(null);
+  const [showReassignPicker, setShowReassignPicker] = useState(false);
   const messageInput = useRef();
   const appointmentDateInput = useRef();
+  const projectTitleInput = useRef();
+
+  const shopId = user.userInfo?.shop?.id;
 
   const { data, loading, error, refetch } = useQuery(GET_BOOKING_REQUESTS, {
     variables: { artistId: user.id },
   });
+
+  // Only meaningful when the caller has a shop - an independent artist has no shop-mates to
+  // forward a request to. Reuses the same skip-guarded query the calendar's artist filter
+  // already relies on (see ibCalendar/Sidebar.jsx).
+  const { data: shopArtistsData } = ArtistService.fetchArtistsByShop(shopId);
+  const otherShopArtists = (shopArtistsData?.getArtistsByShop || []).filter(
+    (a) => String(a.user?.id) !== String(user.id)
+  );
 
   const [createMessage, { loading: sending }] = useMutation(CREATE_MESSAGE, {
     onCompleted() {
@@ -117,6 +144,20 @@ const ArtistBookingRequests = () => {
       setConvertError(err.graphQLErrors?.[0]?.message || err.message);
     },
   });
+
+  const [reassignBookingRequest, { loading: reassigning }] = useMutation(
+    REASSIGN_BOOKING_REQUEST,
+    {
+      onCompleted() {
+        setConvertError(null);
+        setShowReassignPicker(false);
+        refetch();
+      },
+      onError(err) {
+        setConvertError(err.graphQLErrors?.[0]?.message || err.message);
+      },
+    }
+  );
 
   if (loading) {
     return (
@@ -173,6 +214,17 @@ const ArtistBookingRequests = () => {
       setConvertError("Pick a date and time first.");
       return;
     }
+    // Booking a session now auto-creates a real Project from this request's own intake fields
+    // (see server/graphql/mutations/bookingRequests.js) - Project.title is required and
+    // BookingRequest never collects one, so it has to come from here.
+    let projectTitle;
+    if (pendingOutcome === "session_booked") {
+      projectTitle = projectTitleInput.current?.value.trim();
+      if (!projectTitle) {
+        setConvertError("Give the project a title first.");
+        return;
+      }
+    }
     convertBookingRequest({
       variables: {
         bookingRequestId: selected.id,
@@ -185,7 +237,23 @@ const ArtistBookingRequests = () => {
           shopCutStatus: "unpaid",
           appointmentStatus: "scheduled",
         },
+        projectTitle,
       },
+    });
+  };
+
+  const handleReassign = (e) => {
+    const newArtistId = e.target.value;
+    if (!newArtistId || !selected) return;
+    if (
+      !window.confirm(
+        "Forward this booking request to that artist? You won't see it here anymore."
+      )
+    ) {
+      return;
+    }
+    reassignBookingRequest({
+      variables: { bookingRequestId: selected.id, newArtistId },
     });
   };
 
@@ -290,6 +358,34 @@ const ArtistBookingRequests = () => {
                 >
                   Decline
                 </button>
+                {/* Only offered when the artist actually has shop-mates to forward to - an
+                    independent artist, or one at a shop with no one else connected, has no one
+                    to hand this off to. */}
+                {otherShopArtists.length > 0 && (
+                  <button
+                    className="bookingRequestActionButton"
+                    onClick={() => setShowReassignPicker((v) => !v)}
+                    disabled={converting || reassigning}
+                  >
+                    Forward to...
+                  </button>
+                )}
+              </div>
+            )}
+
+            {showReassignPicker && (
+              <div className="bookingRequestConvertForm">
+                <label>Forward to</label>
+                <select defaultValue="" onChange={handleReassign} disabled={reassigning}>
+                  <option value="" disabled>
+                    Choose an artist
+                  </option>
+                  {otherShopArtists.map((a) => (
+                    <option key={a.id} value={a.user.id}>
+                      {a.user.firstName} {a.user.lastName}
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
 
@@ -299,6 +395,12 @@ const ArtistBookingRequests = () => {
                   {pendingOutcome === "consult_booked" ? "Consult" : "Session"} date & time
                 </label>
                 <input type="datetime-local" ref={appointmentDateInput} required />
+                {pendingOutcome === "session_booked" && (
+                  <>
+                    <label>Project title</label>
+                    <input type="text" ref={projectTitleInput} placeholder="e.g. Sleeve piece" required />
+                  </>
+                )}
                 <div className="bookingRequestConvertFormButtons">
                   <button type="submit" disabled={converting}>
                     {converting ? <CircularProgress color="inherit" size="16px" /> : "Confirm"}

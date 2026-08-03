@@ -23,7 +23,8 @@ export const ROUTE_CONSTANTS = {
 	SHOP: "/shop/",
 	EDIT_SHOP: "/shop/edit/",
 	CREATE_SHOP: "/shop/create",
-	PROFILE: 'profile'
+	PROFILE: 'profile',
+	SETTINGS: '/settings'
 };
 
 export const APP_SETTINGS_CONSTANTS = {

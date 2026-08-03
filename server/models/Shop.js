@@ -13,6 +13,11 @@ const ShopSchema = new mongoose.Schema({
 	website: {type: String},
 	shopMinimum: {type: Number, default: 0},
 	hourlyRate: {type: Number, default: 0},
+	// Added alongside User.flatRate/hourlyRate/billingType so a shop can express a flat-rate
+	// expectation for booth-renters too, not just hourly. See ArtistShopConnection.rateSource for
+	// which side's rate (shop's or the individual artist's) actually applies to a given
+	// connected artist's sessions.
+	flatRate: {type: Number, default: 0},
 	logo: {type: String, default: ""},
 	billingType: {type: String, default: ""},
 	status: {type: Number},

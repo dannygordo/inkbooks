@@ -226,6 +226,16 @@ const guestMessageInputSchema = z.object({
 
 const convertBookingRequestInputSchema = z.object({
   outcome: z.enum(['consult_booked', 'session_booked', 'declined']),
+  // Only actually required when outcome is session_booked (checked at the resolver level, not
+  // here, since zod's cross-field conditionals get awkward) - see mutations/bookingRequests.js.
+  projectTitle: z.string().trim().min(1).nullish(),
+});
+
+// Forwarding a pending request to a shop-mate - see mutations/bookingRequests.js's
+// reassignBookingRequest for the full authorization/same-shop check this only validates shape for.
+const reassignBookingRequestInputSchema = z.object({
+  bookingRequestId: objectIdSchema,
+  newArtistId: objectIdSchema,
 });
 
 // --- Artist-shop connection schema ---
@@ -234,6 +244,24 @@ const convertBookingRequestInputSchema = z.object({
 const artistShopConnectionInputSchema = z.object({
   artistId: objectIdSchema,
   shopId: objectIdSchema,
+});
+
+// Which side's rate an artist's sessions bill against at a given shop - see
+// models/ArtistShopConnection.js's rateSource field.
+const setRateSourceInputSchema = z.object({
+  artistId: objectIdSchema,
+  shopId: objectIdSchema,
+  rateSource: z.enum(['shop', 'own']),
+});
+
+// Artist's own rate settings (Artist.hourlyRate/flatRate/billingType) - a settings-page update,
+// deliberately narrower than the full ArtistInput used by EditArtist.js, since this is meant to
+// be self-service (the artist editing their own rate, not an admin editing arbitrary artist
+// fields).
+const updateArtistRateSettingsInputSchema = z.object({
+  hourlyRate: z.number().nonnegative().nullish(),
+  flatRate: z.number().nonnegative().nullish(),
+  billingType: z.enum(['hourly', 'flat_rate']),
 });
 
 // --- Shop-cut ledger schemas ---
@@ -275,7 +303,10 @@ module.exports = {
   createBookingRequestInputSchema,
   guestMessageInputSchema,
   convertBookingRequestInputSchema,
+  reassignBookingRequestInputSchema,
   artistShopConnectionInputSchema,
+  setRateSourceInputSchema,
+  updateArtistRateSettingsInputSchema,
   createShopCutInvoiceInputSchema,
   appointmentIdInputSchema,
   processSquarePaymentInputSchema,

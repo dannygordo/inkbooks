@@ -4,7 +4,11 @@ const Shop = require('../../models/Shop');
 const withAuth = require('../../utils/with-auth');
 const { AuthenticationError, UserInputError } = require('../../utils/errors');
 const { Constants } = require('../../utils/constants');
-const { artistShopConnectionInputSchema, validate } = require('../../utils/validation');
+const {
+  artistShopConnectionInputSchema,
+  setRateSourceInputSchema,
+  validate,
+} = require('../../utils/validation');
 
 // Same authorization shape as the Query side (see resolvers/artistShopConnections.js) - the
 // artist themselves, or a shop-admin-or-better role (Shop has no owning-User field to check
@@ -64,6 +68,30 @@ module.exports = {
     }
     connection.status = 'disconnected';
     connection.disconnectedAt = new Date();
+    await connection.save();
+    return connection;
+  }),
+  // Which side's rate (the shop's, or this artist's own) this artist's sessions bill against at
+  // this shop - see models/ArtistShopConnection.js's rateSource field and
+  // PRODUCTION_ROADMAP.md's "Rates & settings" section for the full design. Same authorization
+  // shape as connect/disconnect above - the artist themselves, or shop-admin-or-better.
+  setArtistShopRateSource: withAuth(async (_, args, context, info, user) => {
+    const { valid, errors, data } = validate(setRateSourceInputSchema, args);
+    if (!valid) {
+      throw new UserInputError('Errors', { errors });
+    }
+    assertCanManageConnection(user, data.artistId);
+
+    const connection = await ArtistShopConnection.findOne({
+      artistId: data.artistId,
+      shopId: data.shopId,
+    });
+    if (!connection) {
+      throw new UserInputError('Errors', {
+        errors: { shopId: 'No connection exists between this artist and shop' },
+      });
+    }
+    connection.rateSource = data.rateSource;
     await connection.save();
     return connection;
   }),

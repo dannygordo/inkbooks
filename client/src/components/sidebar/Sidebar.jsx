@@ -18,6 +18,7 @@ import ListItemText from "@mui/material/ListItemText";
 import InboxIcon from "@mui/icons-material/MoveToInbox";
 import MailIcon from "@mui/icons-material/Mail";
 import PriceCheckIcon from "@mui/icons-material/PriceCheck";
+import SettingsIcon from "@mui/icons-material/Settings";
 import { AuthContext } from "../../context/auth";
 import { APP_SETTINGS_CONSTANTS, ROUTE_CONSTANTS, ROLES } from "../../constants";
 import InputBase from "@mui/material/InputBase";
@@ -184,6 +185,10 @@ export default function Sidebar() {
 	const isShopAdminOrBetter = user.role <= ROLES.SHOP_ADMIN;
 	const isStaffOrBetter = user.role <= ROLES.STAFF;
 	const isClient = user.userType === "client";
+	// Settings currently only has real content for an artist (rate config - see pages/settings/
+	// Settings.jsx) - hidden for everyone else rather than linking to a page that just says
+	// "nothing to configure here yet".
+	const isArtistUser = user.userType === "artist";
 	const [anchorEl, setAnchorEl] = useState(null);
 	const openProfile = Boolean(anchorEl);
 
@@ -788,6 +793,34 @@ export default function Sidebar() {
 							</ListItemIcon>
 							<ListItemText
 								primary="Shop Cut Confirmations"
+								sx={{ opacity: open ? 1 : 0 }}
+							/>
+						</ListItemButton>
+					)}
+					{isArtistUser && (
+						<ListItemButton
+							selected={selectedIndex === 11}
+							onClick={(event) =>
+								handleListItemClick(event, 11, "settings")
+							}
+							key="Settings"
+							sx={{
+								minHeight: 48,
+								justifyContent: open ? "initial" : "center",
+								px: 2.5,
+							}}
+						>
+							<ListItemIcon
+								sx={{
+									minWidth: 0,
+									mr: open ? 3 : "auto",
+									justifyContent: "center",
+								}}
+							>
+								<SettingsIcon />
+							</ListItemIcon>
+							<ListItemText
+								primary="Settings"
 								sx={{ opacity: open ? 1 : 0 }}
 							/>
 						</ListItemButton>
