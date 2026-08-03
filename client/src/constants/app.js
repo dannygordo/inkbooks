@@ -19,6 +19,8 @@ export const ROUTE_CONSTANTS = {
 	PROJECT: "/project/",
 	EDIT_PROJECT: "/project/edit/",
 	CREATE_PROJECT: "/project/create",
+	// A consult has no Project of its own to view/edit through - see ConsultDetail.jsx.
+	CONSULT: "/consult/",
 	SHOPS: "shops",
 	SHOP: "/shop/",
 	EDIT_SHOP: "/shop/edit/",

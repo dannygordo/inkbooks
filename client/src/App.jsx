@@ -41,6 +41,7 @@ import GuestConversation from "./pages/booking/GuestConversation";
 import ArtistBookingRequests from "./pages/booking/ArtistBookingRequests";
 import ShopCutConfirmations from "./pages/shopCutConfirmations/ShopCutConfirmations";
 import Settings from "./pages/settings/Settings";
+import ConsultDetail from "./pages/consults/ConsultDetail";
 
 function App() {
 	const { user } = useAuth();
@@ -172,6 +173,16 @@ function App() {
 							element={
 								<AuthRoute>
 									<EditClient />
+								</AuthRoute>
+							}
+						/>
+						{/* A consult has no Project of its own to view/edit through - see
+						pages/consults/ConsultDetail.jsx's own comment. */}
+						<Route
+							path="/consult/:appointmentId"
+							element={
+								<AuthRoute>
+									<ConsultDetail />
 								</AuthRoute>
 							}
 						/>

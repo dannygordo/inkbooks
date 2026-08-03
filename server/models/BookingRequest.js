@@ -52,6 +52,23 @@ const BookingRequestSchema = new mongoose.Schema(
     howHeard: { type: String },
     // Set once the artist converts this request into a real Appointment (consult or session).
     resultingAppointmentId: { type: mongoose.Schema.Types.ObjectId },
+    // Distinguishes a genuine public-intake-form submission from a BookingRequest the
+    // createBookingRequest/convertBookingRequest pipeline generates internally when an artist
+    // schedules a consult or brand-new-project session directly from their own calendar
+    // (AppointmentWizard.jsx) - both go through the exact same mutations for one consistent
+    // find-or-create-client + convert-to-Appointment/Project code path, but only the former
+    // should ever show up in the artist's own "Booking Requests" inbox (see
+    // resolvers/bookingRequests.js's getBookingRequests, which filters on this) - an artist
+    // manually creating their own appointment shouldn't see it echoed back at them as if a
+    // stranger had submitted it. Not a security boundary (an artist could tag their own
+    // submission either way with no consequence beyond which of their own dashboard lists it
+    // shows up in) - just a UI-categorization field, so the client is trusted to set it honestly.
+    source: {
+      type: String,
+      required: true,
+      default: 'public_form',
+      enum: ['public_form', 'artist_created'],
+    },
   },
   {
     timestamps: true,

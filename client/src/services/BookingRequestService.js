@@ -32,6 +32,13 @@ const BookingRequestService = (() => {
 				id
 				status
 				resultingAppointmentId
+				# Only ConsultDetail.jsx's "Convert to Session" action reads this (to navigate
+				# straight to the new Project) - harmless for the other two callers to fetch and
+				# ignore rather than needing a second, near-identical query document just for that.
+				resultingAppointment {
+					id
+					projectId
+				}
 			}
 		}
 	`;

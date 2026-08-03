@@ -30,6 +30,7 @@ const User = require('../../models/User');
 const Appointment = require('../../models/Appointment');
 const Project = require('../../models/Project');
 const Staff = require('../../models/Staff');
+const BookingRequest = require('../../models/BookingRequest');
 const { findOrCreateConversationForMembers } = require('../../utils/conversations');
 
 module.exports = {
@@ -133,6 +134,14 @@ module.exports = {
     },
     project: async(appointment, args, context, info) => {
       return (await Project.findById(appointment.projectId));
+    },
+    // Only set for a consult/session created via convertBookingRequest (see
+    // models/Appointment.js's own comment) - null for "Other" appointments and the
+    // existing-project session path, same as bookingRequestId itself being unset for those.
+    bookingRequest: async(appointment, args, context, info) => {
+      return appointment.bookingRequestId
+        ? (await BookingRequest.findById(appointment.bookingRequestId))
+        : null;
     }
   },
   Artist: {
@@ -167,6 +176,16 @@ module.exports = {
       // client querying `booking { conversation { messages { ... } } }` gets the full thread
       // for free, no separate booking-request-specific message resolver needed.
       return (await Conversation.findById(bookingRequest.conversationId));
+    },
+    // Null until this request has been converted (resultingAppointmentId only gets set at that
+    // point - see convertBookingRequest). Lets a caller go straight from a just-converted
+    // BookingRequest to e.g. the new session's Project (appointment.projectId) in the same round
+    // trip, rather than a separate getAppointment(resultingAppointmentId) query - see
+    // ConsultDetail.jsx's "Convert to Session" action.
+    resultingAppointment: async(bookingRequest, args, context, info) => {
+      return bookingRequest.resultingAppointmentId
+        ? (await Appointment.findById(bookingRequest.resultingAppointmentId))
+        : null;
     }
   },
   Conversation: {

@@ -212,6 +212,11 @@ const AppointmentWizard = ({ selectedDay }) => {
 						size: intakeSize,
 						budget: intakeBudget,
 						isCoverUp,
+						// This wizard is the artist scheduling their own consult/session directly -
+						// not a real inbound submission from the public intake form. Tagged so
+						// getBookingRequests (the artist's "Booking Requests" inbox) can exclude it -
+						// see BookingRequest.js's own comment on why these are kept distinct.
+						source: "artist_created",
 					},
 				},
 			});
@@ -252,12 +257,21 @@ const AppointmentWizard = ({ selectedDay }) => {
 		setError(null);
 		try {
 			const now = UtilsService.formatDateToISO(Date.now());
+			// This Appointment has no BookingRequest to derive a title from (unlike the
+			// consult/new-project-session path - see convertBookingRequest's own comment on why
+			// that one sets a title) - borrowing the already-picked Project's own title here is
+			// the same fix for the same underlying bug: ibCalendar/Day.jsx's template string
+			// shows the literal text "null" for an untitled Appointment.
+			const selectedProject = (projectsData?.getProjectsByArtist || []).find(
+				(p) => p.id === existingProjectId
+			);
 			await createAppointment({
 				variables: {
 					appointmentInput: {
 						projectId: existingProjectId,
 						userId: user.id,
 						shopId,
+						title: selectedProject?.title,
 						shopCutStatus: "unpaid",
 						appointmentStatus: "scheduled",
 						appointmentType: "session",

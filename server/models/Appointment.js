@@ -47,6 +47,13 @@ const AppointmentSchema = new mongoose.Schema({
 	shopCutConfirmedAt: {type: Date},
 	appointmentType: {type: String, required: true},
 	appointmentStatus: {type: String, required: true},
+	// Set by convertBookingRequest (mutations/bookingRequests.js) when this Appointment was created
+	// from a BookingRequest (consult or session) - not set on the "Other" type or the
+	// existing-project session path (both created via plain createAppointment, with nothing to
+	// point back to). Lets a consult Appointment - which has no Project of its own to hold intake
+	// details or a "convert to session" action - link back to its originating BookingRequest for
+	// both (see the Appointment.bookingRequest field resolver in resolvers/index.js).
+	bookingRequestId: {type: mongoose.Schema.Types.ObjectId},
     createdAt: {type: Date, required: true},
     updatedAt: {type: Date, required: true},
 

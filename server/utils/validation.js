@@ -137,6 +137,11 @@ const createAppointmentInputSchema = z.object({
   projectId: objectIdSchema.nullish(),
   userId: objectIdSchema.nullish(),
   shopId: objectIdSchema.nullish(),
+  // Only ever set server-side by convertBookingRequest, never by a client directly - see
+  // models/Appointment.js's own comment. Included here so it actually survives this schema's
+  // validation (zod strips unrecognized keys) rather than silently getting dropped before the
+  // save.
+  bookingRequestId: objectIdSchema.nullish(),
   title: z.string().nullish(),
   description: z.string().nullish(),
   total: z.number().nonnegative().nullish(),
@@ -223,6 +228,10 @@ const createBookingRequestInputSchema = z.object({
   availability: z.string().nullish(),
   isCoverUp: z.boolean().nullish(),
   howHeard: z.string().nullish(),
+  // Defaults to 'public_form' at the resolver level when omitted (see
+  // mutations/bookingRequests.js) - see BookingRequest.js's own comment on what this
+  // distinguishes and why.
+  source: z.enum(['public_form', 'artist_created']).nullish(),
 });
 
 const guestMessageInputSchema = z.object({

@@ -104,6 +104,11 @@ module.exports = {
       availability: data.availability,
       isCoverUp: data.isCoverUp,
       howHeard: data.howHeard,
+      // Defaults to 'public_form' (the Mongoose schema's own default) when the caller doesn't
+      // send one - covers the real public intake form and anything else calling this mutation
+      // without an opinion. AppointmentWizard.jsx is the one caller that explicitly sends
+      // 'artist_created'. See BookingRequest.js's own comment on what this distinguishes.
+      source: data.source || 'public_form',
     }).save();
 
     // Best-effort notifications, sent after the record is safely persisted - a delivery
@@ -304,12 +309,38 @@ module.exports = {
     // requests dashboard) to remember to pass it - one fix here covers both existing callers.
     const artistRecord = await Artist.findOne({ userId: bookingRequest.artistId });
 
+    // A session gets its title from the Project just created above (data.projectTitle) - the
+    // same label already shown everywhere a Project is (dashboard, Project page). A consult has
+    // no Project to borrow a title from at all, so it defaults to the client's own name (e.g.
+    // "Jane Doe") - short, meaningful, and exactly what the calendar already shows next to a
+    // *session* appointment's title (see ibCalendar/Day.jsx's client-name-plus-title format).
+    // Previously neither path set a title at all, so Appointment.title stayed null - harmless in
+    // the data itself, but ibCalendar/Day.jsx's template string interpolates a null title as the
+    // literal text "null" (`${time} - ${evt.title}`), which is what was actually showing up in
+    // the calendar. An explicit caller-supplied title (args.appointmentInput?.title) still wins if
+    // ever sent - today no caller sends one for these two outcomes, but this shouldn't silently
+    // override one if that changes.
+    const derivedTitle =
+      appointmentType === 'consult'
+        ? `${clientForAppointment.firstName} ${clientForAppointment.lastName}`
+        : data.projectTitle;
+
     const appointmentInput = {
       ...(args.appointmentInput || {}),
       appointmentType,
+      title: args.appointmentInput?.title || derivedTitle,
+      // A consult has no Project to hold its own intake description - copying it onto the
+      // Appointment directly is what lets a consult be genuinely self-describing (see the
+      // ConsultDetail view) without one. Harmless to also set for a session, where Project already
+      // carries the same text - just a convenience if the Appointment is ever read on its own.
+      description: args.appointmentInput?.description || bookingRequest.description,
       // Overrides whatever (if anything) the caller sent - same reasoning as appointmentType
       // above, this is derived from the just-created Project, not trusted from the client.
       ...(newProjectId ? { projectId: newProjectId } : {}),
+      // Links this Appointment back to the BookingRequest that produced it - see
+      // models/Appointment.js's own comment on why (lets a consult with no Project still surface
+      // its full intake details and a "convert to session" action).
+      bookingRequestId: bookingRequest.id,
       // .toString() matters here - Mongoose ObjectIds aren't plain strings, and
       // createAppointmentInputSchema's userId/shopId fields are zod string regex checks (see
       // utils/validation.js's objectIdSchema).

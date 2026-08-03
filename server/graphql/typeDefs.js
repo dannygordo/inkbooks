@@ -334,6 +334,13 @@ module.exports = gql`
     isCoverUp: Boolean
     howHeard: String
     resultingAppointmentId: ID
+    # Null until converted - see resolvers/index.js's BookingRequest.resultingAppointment.
+    resultingAppointment: Appointment
+    # 'public_form' (a real guest submission) vs 'artist_created' (the artist scheduled this
+    # directly from their own calendar - see BookingRequest.js's own comment). getBookingRequests
+    # only ever returns 'public_form' ones - this field exists mainly for completeness/debugging,
+    # not because the client needs to branch on it anywhere today.
+    source: String
     createdAt: DateTime
     updatedAt: DateTime
   }
@@ -351,6 +358,9 @@ module.exports = gql`
     availability: String
     isCoverUp: Boolean
     howHeard: String
+    # Defaults to 'public_form' server-side if omitted - see BookingRequest.js's own comment.
+    # AppointmentWizard.jsx is the one caller that sends 'artist_created'.
+    source: String
   }
   type Project {
     id: ID!
@@ -430,6 +440,11 @@ module.exports = gql`
     appointmentDate: DateTime!
     projectId: ID
     project: Project
+    # Set only when this Appointment came from convertBookingRequest (consult or session) - see
+    # models/Appointment.js's own comment. Lets a consult (no Project of its own) surface its
+    # original intake details and be promoted to a session from the client.
+    bookingRequestId: ID
+    bookingRequest: BookingRequest
     # Was ID! - broke serialization for independent artists (no shop, so no shopId at all).
     # models/Appointment.js's Mongoose schema never required this; the GraphQL type just hadn't
     # been fixed to match until now.

@@ -23,11 +23,17 @@ module.exports = {
       return { id: user.id, firstName: user.firstName, lastName: user.lastName, avatar: user.avatar };
     },
     // Artist-only (withAuth) - the artist's own dashboard list, not the guest-facing side.
+    // source: 'public_form' only - a real guest submission via the public intake form. Excludes
+    // 'artist_created' BookingRequests, which the appointment wizard generates internally purely
+    // to reuse this same find-or-create-client + convert pipeline for a consult/session the
+    // artist scheduled directly from their own calendar - those were never a "booking request"
+    // from the artist's own point of view and shouldn't be echoed back at them in this inbox. See
+    // BookingRequest.js's own comment on the source field.
     getBookingRequests: withAuth(async (_, { artistId }, context, info, user) => {
       if (user.role > Constants.ROLES.SHOP_ADMIN && String(user.id) !== String(artistId)) {
         throw new AuthenticationError('Action not allowed');
       }
-      return BookingRequest.find({ artistId }).sort({ createdAt: -1 });
+      return BookingRequest.find({ artistId, source: 'public_form' }).sort({ createdAt: -1 });
     }),
     getBookingRequest: withAuth(async (_, { bookingRequestId }, context, info, user) => {
       const bookingRequest = await BookingRequest.findById(bookingRequestId);

@@ -7,8 +7,10 @@ export const AppointmentService = (() => {
                 id
                 projectId
                 userId
+                bookingRequestId
                 project {
                     id
+                    title
                     client {
                         id
                         user {
@@ -72,6 +74,7 @@ export const AppointmentService = (() => {
                 shopCutAmount
                 shopId
                 projectId
+                bookingRequestId
                 project {
                     id
                     title
@@ -99,8 +102,10 @@ export const AppointmentService = (() => {
                 id
                 projectId
                 userId
+                bookingRequestId
                 project {
                     id
+                    title
                     client {
                         id
                         user {
@@ -312,6 +317,49 @@ export const AppointmentService = (() => {
         });
     };
 
+    // --- Consult detail view ---
+    // A consult has no Project of its own to view/edit through (see ConsultDetail.jsx) - this
+    // single-appointment query is what that page uses instead, pulling the original intake
+    // details back via the bookingRequest field resolver (see resolvers/index.js's
+    // Appointment.bookingRequest) rather than duplicating that data onto Appointment itself.
+    const _FETCH_APPOINTMENT = gql`
+        query GetAppointment($appointmentId: ID!) {
+            getAppointment(appointmentId: $appointmentId) {
+                id
+                title
+                description
+                appointmentType
+                appointmentDate
+                appointmentStatus
+                projectId
+                bookingRequestId
+                bookingRequest {
+                    id
+                    status
+                    description
+                    placement
+                    size
+                    budget
+                    isCoverUp
+                    referenceImages
+                    client {
+                        id
+                        firstName
+                        lastName
+                        email
+                        phone
+                    }
+                }
+            }
+        }
+    `;
+    const _getAppointment = (appointmentId) => {
+        return useQuery(_FETCH_APPOINTMENT, {
+            variables: { appointmentId },
+            skip: !appointmentId,
+        });
+    };
+
     // Shared selection set - all three timer mutations return the same fields the detail view
     // needs to keep ticking/re-render immediately without a separate refetch.
     const _SESSION_TIMER_FIELDS = `
@@ -378,6 +426,7 @@ export const AppointmentService = (() => {
         STOP_SESSION_TIMER: _STOP_SESSION_TIMER,
         RESET_SESSION_TIMER: _RESET_SESSION_TIMER,
         UPDATE_SESSION_DETAILS: _UPDATE_SESSION_DETAILS,
+        getAppointment: _getAppointment,
     }
 
 })();

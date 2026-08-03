@@ -118,24 +118,26 @@ const ArtistPerformancePanel = ({ artistUserId, isSelf = false }) => {
 					<div className="artistPerformanceEmpty">No upcoming appointments.</div>
 				) : (
 					<ul className="artistUpcomingList">
-						{upcoming.map((appt) => (
+						{upcoming.map((appt) => {
+							// A session appointment carries a projectId - convertBookingRequest
+							// (mutations/bookingRequests.js) auto-creates a Project for a session_booked
+							// outcome. A consult never gets a Project of its own (deliberately - see that
+							// resolver's own comment), but does carry a bookingRequestId, which is enough
+							// to open ConsultDetail.jsx (its intake details + a "Convert to Session"
+							// action). An "other" appointment, or a consult created before
+							// bookingRequestId existed, has neither and just isn't clickable.
+							const linkTo = appt.projectId
+								? `${ROUTE_CONSTANTS.PROJECT}${appt.projectId}`
+								: appt.appointmentType === "consult" && appt.bookingRequestId
+								? `${ROUTE_CONSTANTS.CONSULT}${appt.id}`
+								: null;
+							return (
 							<li
 								key={appt.id}
 								className={
-									appt.projectId
-										? "artistUpcomingItem artistUpcomingItemClickable"
-										: "artistUpcomingItem"
+									linkTo ? "artistUpcomingItem artistUpcomingItemClickable" : "artistUpcomingItem"
 								}
-								// Only session appointments carry a projectId today - convertBookingRequest
-								// (mutations/bookingRequests.js) auto-creates a Project for a session_booked
-								// outcome, but deliberately does not for consult_booked (see that resolver's
-								// own comment). A pure consult or "other" appointment has no projectId, so
-								// those rows just aren't clickable.
-								onClick={
-									appt.projectId
-										? () => navigate(`${ROUTE_CONSTANTS.PROJECT}${appt.projectId}`)
-										: undefined
-								}
+								onClick={linkTo ? () => navigate(linkTo) : undefined}
 							>
 								<span className="artistUpcomingDate">
 									{new Date(appt.appointmentDate).toLocaleDateString(undefined, {
@@ -145,16 +147,18 @@ const ArtistPerformancePanel = ({ artistUserId, isSelf = false }) => {
 									})}
 								</span>
 								<span className="artistUpcomingTitle">
-									{/* Was appt.title alone - a session/consult Appointment never
-									    actually has its own title (the wizard never sets one for
-									    those types - see AppointmentWizard.jsx), the title lives on
-									    its Project instead. Falling back to appt.title first still
-									    covers "other" appointments, which do have a real title. */}
-									{appt.title || appt.project?.title || "(untitled appointment)"}
+									{/* convertBookingRequest now sets a real title at creation for both
+									    consult (the client's name) and session (the Project's title) -
+									    see that resolver's own comment. project?.title is still checked
+									    first for a session as a defensive fallback (e.g. a record from
+									    before that fix), and "(untitled appointment)" only for the
+									    genuinely stale case where neither exists. */}
+									{appt.project?.title || appt.title || "(untitled appointment)"}
 								</span>
 								<span className="artistUpcomingType">{appt.appointmentType}</span>
 							</li>
-						))}
+							);
+						})}
 					</ul>
 				)}
 			</IBCardWrapper>

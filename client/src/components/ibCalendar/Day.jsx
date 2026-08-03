@@ -49,6 +49,14 @@ const Day = ({ day, rowIdx }) => {
 			content: <AppointmentWizard selectedDay={day} />,
 		});
 	};
+	// Was `evt.title` alone in both branches below - null for any consult/session Appointment
+	// created before convertBookingRequest started setting a real title (see that resolver's own
+	// comment on why it now does), and a template string interpolates a null value as the literal
+	// text "null", not a blank - that's what was actually showing up in this calendar. Falls back
+	// to the linked Project's own title (for a session), then a friendly placeholder, so a stale
+	// pre-fix record still renders sensibly instead of showing "null".
+	const displayTitle = (evt) => evt.title || evt.project?.title || "Untitled";
+
 	return (
 		<div className="ibCalendarDateCellBody">
 			<div className="ibCalendarDateCell">
@@ -73,11 +81,11 @@ const Day = ({ day, rowIdx }) => {
 											.format("h:mma")} ${
                                                 evt.project.client.user.firstName
                                             } ${evt.project.client.user.lastName} - ${
-											evt.title
+											displayTitle(evt)
 									  }`
 									: `${moment
 											.utc(evt.appointmentDate)
-											.format("h:mma")} - ${evt.title}`
+											.format("h:mma")} - ${displayTitle(evt)}`
 							}
 						>
 							<div
@@ -100,11 +108,11 @@ const Day = ({ day, rowIdx }) => {
 									.format("h:mma")} ${
                                         evt.project.client.user.firstName
                                     } ${evt.project.client.user.lastName} - ${
-									evt.title
+									displayTitle(evt)
 								}`: `${moment
 									.utc(evt.appointmentDate)
 									.format("h:mma")}  - ${
-									evt.title
+									displayTitle(evt)
 								}`}
 							</div>
 						</Tooltip>

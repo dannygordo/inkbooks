@@ -1450,6 +1450,68 @@ on a still-`pending` request. Verified via `node --check` on every changed file 
 tests themselves - same `mongodb-memory-server` 403 network-allowlist block as the prior two
 follow-up passes.
 
+### Phase 7 follow-up fix #4: manual appointments were leaking into the public Booking Requests inbox, and consult/session titles showed literal "null" (August 3, 2026) - done
+
+A real click-through (create a consult directly from the calendar's appointment wizard, not the
+public intake form) turned up two more gaps in the same convertBookingRequest pipeline:
+
+**A manually-created consult/session showed up in the artist's own "Booking Requests" inbox.**
+`AppointmentWizard.jsx`'s Consult and new-project-Session paths both call
+`createBookingRequest`/`convertBookingRequest` purely to reuse that pipeline's find-or-create-
+client + Appointment/Project creation logic - not because the artist actually submitted a request
+to themselves. But `getBookingRequests` (the artist-facing inbox, powering
+`ArtistBookingRequests.jsx`) had no way to tell that kind of BookingRequest apart from a real guest
+submission via the public intake form, so every wizard-created consult/session echoed back at the
+artist as if a stranger had just requested it. Fixed by adding `BookingRequest.source`
+(`public_form` | `artist_created`, default `public_form`) - `AppointmentWizard.jsx` is the one
+caller that now sends `artist_created`; `getBookingRequests` filters to `source: 'public_form'`
+only. Not a security boundary (an artist could tag their own submission either way with no
+consequence beyond which of their own dashboard lists it shows up in) - purely a UI-categorization
+field, so the client is trusted to set it honestly. `ArtistBookingRequests.jsx`'s "Book Consult /
+Book Session from a real public submission" flow (the thing an artist should still be able to do)
+is unaffected - it only ever acts on requests this query still returns.
+
+**Consult/session Appointment titles showed the literal text "null" in the calendar.** Neither
+outcome ever set `Appointment.title` at all - a session had a Project to eventually fall back to on
+the dashboard (see follow-up #1 above), but `ibCalendar/Day.jsx`'s own event-label template string
+(`` `${time} - ${evt.title}` ``) had no such fallback, so a null title rendered as the literal word
+"null", not blank - exactly what was reported. Fixed at the source: `convertBookingRequest` now
+sets a real `title` at creation - the client's name for a consult (which has no Project to borrow
+one from), the just-created Project's own title for a session. `description` is copied from the
+BookingRequest onto the consult Appointment too, for the same "nothing else to hold this" reason.
+`ibCalendar/Day.jsx` also gained a defensive `evt.title || evt.project?.title || "Untitled"`
+fallback and the calendar's own queries now select `project.title`, so a stale pre-fix record (or
+the existing-project session path, which still has no BookingRequest to derive a title from -
+fixed separately in `AppointmentWizard.jsx`'s `handleSubmitExistingProjectSession` by borrowing the
+already-selected Project's own title) renders sensibly instead of "null" either way.
+
+**A consult had no way to be viewed or converted to a session from the dashboard.** The dashboard's
+clickability only ever checked `appt.projectId`, which a pure consult never has by design. Added
+`Appointment.bookingRequestId` (stamped by `convertBookingRequest`, both outcomes) plus a
+`bookingRequest` field resolver (mirrors the existing `project` resolver), so a consult can surface
+its original intake details without needing a Project of its own. Built `ConsultDetail.jsx` (new
+route `/consult/:appointmentId`) - shows the client's contact info and intake fields (pulled from
+the linked BookingRequest) and, while that BookingRequest is still `consult_booked`, a "Convert to
+Session" action that calls the same `convertBookingRequest(outcome: 'session_booked')` used
+elsewhere. `ArtistPerformancePanel.jsx`'s dashboard rows now route a session appointment to its
+Project (unchanged) and a consult appointment (one with a `bookingRequestId`) to `ConsultDetail`
+instead of leaving it non-clickable. Also added `BookingRequest.resultingAppointment` (mirrors
+`Appointment.bookingRequest`) so converting a consult to a session can navigate straight to the new
+Project in one round trip rather than a second query.
+
+Added regression tests: `getBookingRequests` excludes `artist_created` submissions (and a
+submission with no explicit `source` still defaults to `public_form`); `convertBookingRequest`
+derives the client's name as a consult's title (plus copies `description` and stamps
+`bookingRequestId`) and the Project's title as a session's. Verified via `node --check` on every
+changed server file, `@babel/parser` JSX parsing on every changed client file including the new
+`ConsultDetail.jsx`, and `graphql`'s `buildSchema`/`validate` against the real SDL for every new or
+changed query/mutation document (`getBookingRequests`, the extended `convertBookingRequest`
+selection, the new `getAppointment` document `ConsultDetail.jsx` uses). Could not execute the test
+suite itself - same `mongodb-memory-server` 403 network-allowlist block as every prior follow-up
+pass this week; a real click-through (create a consult from the calendar, confirm it's absent from
+Booking Requests, open it from the dashboard, convert it to a session) is still the only way to
+fully confirm this end to end.
+
 ---
 
 ## Suggested sequencing

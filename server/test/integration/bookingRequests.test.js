@@ -36,6 +36,16 @@ const CREATE_BOOKING_REQUEST = `
 	}
 `;
 
+const GET_BOOKING_REQUESTS = `
+	query GetBookingRequests($artistId: ID!) {
+		getBookingRequests(artistId: $artistId) {
+			id
+			status
+			source
+		}
+	}
+`;
+
 const GET_BOOKING_REQUEST_BY_TOKEN = `
 	query GetBookingRequestByToken($token: String!) {
 		getBookingRequestByToken(token: $token) {
@@ -349,10 +359,13 @@ describe('guest token flow: getBookingRequestByToken + sendGuestMessage', () => 
 });
 
 describe('convertBookingRequest', () => {
-	async function submitBookingRequest(artistUserId) {
+	async function submitBookingRequest(artistUserId, overrides = {}) {
 		const server = createTestServer();
 		const response = await server.executeOperation(
-			{ query: CREATE_BOOKING_REQUEST, variables: { bookingRequestInput: bookingInput(artistUserId) } },
+			{
+				query: CREATE_BOOKING_REQUEST,
+				variables: { bookingRequestInput: bookingInput(artistUserId, overrides) },
+			},
 			{ contextValue: { req: { headers: {}, ip: fakeIp() } } },
 		);
 		return BookingRequest.findById(response.body.singleResult.data.createBookingRequest.id);
@@ -431,6 +444,14 @@ describe('convertBookingRequest', () => {
 		// booking request could never show up on the artist's own calendar or dashboard even
 		// though the BookingRequest/Appointment documents both existed.
 		expect(String(appointment.userId)).toBe(String(artistUser.id));
+		// Regression: Appointment.title was never set at all for a session_booked outcome -
+		// ibCalendar/Day.jsx's template string then interpolated the resulting null as the
+		// literal text "null". Now derived from the just-created Project's own title.
+		expect(appointment.title).toBe('Regression test project');
+		// Regression: bookingRequestId was never stamped onto the Appointment at all, so there was
+		// no way back from an Appointment to the BookingRequest that produced it (needed for
+		// ConsultDetail.jsx's "Convert to Session" action on a consult).
+		expect(String(appointment.bookingRequestId)).toBe(String(bookingRequest.id));
 	});
 
 	it('derives Appointment.shopId from the artist\'s own shop when converting a booking request', async () => {
@@ -464,6 +485,39 @@ describe('convertBookingRequest', () => {
 		// Artist.shopId record instead of trusting either client to remember to pass it.
 		const appointment = await Appointment.findById(data.convertBookingRequest.resultingAppointmentId);
 		expect(String(appointment.shopId)).toBe(String(shop._id));
+	});
+
+	it('derives Appointment.title from the client\'s name for a consult_booked outcome', async () => {
+		const { user: artistUser } = await createArtistUser();
+		// bookingInput's default firstName/lastName is 'Arya'/'Stark' (see that helper above).
+		const bookingRequest = await submitBookingRequest(artistUser.id);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{
+				query: CONVERT_BOOKING_REQUEST,
+				variables: {
+					bookingRequestId: bookingRequest.id,
+					outcome: 'consult_booked',
+					appointmentInput: { appointmentDate: new Date().toISOString(), appointmentStatus: 'scheduled' },
+				},
+			},
+			{ contextValue: contextWithToken(signTestToken(artistUser)) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+
+		// Regression: a consult Appointment never had a title at all (unlike a session, which at
+		// least had a Project to borrow one from) - ibCalendar/Day.jsx's template string then
+		// showed the literal text "null". A consult has no Project to derive from, so this falls
+		// back to the client's own name instead. description is also copied from the
+		// BookingRequest directly, for the same "a consult has no Project to hold this otherwise"
+		// reason - see ConsultDetail.jsx, which reads it back via bookingRequestId instead.
+		const appointment = await Appointment.findById(data.convertBookingRequest.resultingAppointmentId);
+		expect(appointment.title).toBe('Arya Stark');
+		expect(appointment.description).toBe(bookingRequest.description);
+		expect(String(appointment.bookingRequestId)).toBe(String(bookingRequest.id));
 	});
 
 	it('lets a consult_booked request progress to session_booked, creating a Project', async () => {
@@ -604,5 +658,55 @@ describe('convertBookingRequest', () => {
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeUndefined();
 		expect(data.convertBookingRequest.status).toBe('declined');
+	});
+});
+
+describe('getBookingRequests', () => {
+	it('defaults a submission to source: public_form when the caller sends none', async () => {
+		const { user: artistUser } = await createArtistUser();
+		const server = createTestServer();
+		const response = await server.executeOperation(
+			{ query: CREATE_BOOKING_REQUEST, variables: { bookingRequestInput: bookingInput(artistUser.id) } },
+			{ contextValue: { req: { headers: {}, ip: fakeIp() } } },
+		);
+		const bookingRequest = await BookingRequest.findById(
+			response.body.singleResult.data.createBookingRequest.id,
+		);
+		expect(bookingRequest.source).toBe('public_form');
+	});
+
+	// Regression: AppointmentWizard.jsx (an artist scheduling a consult/session directly from
+	// their own calendar) reuses this exact createBookingRequest/convertBookingRequest pipeline,
+	// which used to mean it also showed up in this same artist's "Booking Requests" inbox -
+	// confusing, since it was never a real inbound request from anyone. Excluded here via the new
+	// source field (see BookingRequest.js's own comment).
+	it('only returns source: public_form requests, excluding artist_created ones', async () => {
+		const { user: artistUser } = await createArtistUser();
+		const server = createTestServer();
+
+		await server.executeOperation(
+			{
+				query: CREATE_BOOKING_REQUEST,
+				variables: { bookingRequestInput: bookingInput(artistUser.id, { source: 'public_form' }) },
+			},
+			{ contextValue: { req: { headers: {}, ip: fakeIp() } } },
+		);
+		await server.executeOperation(
+			{
+				query: CREATE_BOOKING_REQUEST,
+				variables: { bookingRequestInput: bookingInput(artistUser.id, { source: 'artist_created' }) },
+			},
+			{ contextValue: { req: { headers: {}, ip: fakeIp() } } },
+		);
+
+		const response = await server.executeOperation(
+			{ query: GET_BOOKING_REQUESTS, variables: { artistId: artistUser.id } },
+			{ contextValue: contextWithToken(signTestToken(artistUser)) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.getBookingRequests).toHaveLength(1);
+		expect(data.getBookingRequests[0].source).toBe('public_form');
 	});
 });
