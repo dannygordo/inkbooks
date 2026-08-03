@@ -1579,6 +1579,60 @@ suite wasn't run in this pass either. The calendar CSS fix and the date/time-pic
 particular still need a real browser click-through to confirm visually - nothing in this sandbox
 can render CSS or take a screenshot.
 
+### Phase 7 follow-up fix #6: dashboard appointments missing the time, calendar day-cell min-height, and a real default tagColor (August 3, 2026) - done
+
+Two more small dashboard/calendar issues plus one real bug:
+
+**The artist dashboard's "Upcoming Appointments" list only showed the date.**
+`ArtistPerformancePanel.jsx` (mounted on both Home.jsx's self view and Artist.jsx's shop-admin
+view) used `toLocaleDateString` - switched to `toLocaleString` with both date and time options.
+
+**Calendar event labels still weren't rendering after follow-up #5's CSS fix.** That fix (splitting
+`.ibCalendarDayHeader`'s sizing out of `.ibCalendarDateCell`) was necessary but apparently not
+sufficient - `.ibCalendarDateCellBody`'s height still comes from a `flex: 1` chain that ultimately
+depends on `Month.jsx`'s Grid container (one `height: 800` on the whole 6-row grid, not per row)
+correctly distributing that space through flexbox's default multi-line stretch behavior - not
+something verifiable without a real browser (none available in this sandbox). Gave
+`.ibCalendarDateCellBody` a direct `min-height: 90px` instead of relying on the percentage chain -
+guaranteed room for the header plus a few events regardless of what the ancestor resolves to.
+
+**A user with no tagColor selected defaulted to white - invisible on their own calendar.**
+`Register.jsx` hardcoded every self-registered account's `tagColor` to the literal `'#fff'`, and
+`updateAppointment`'s resolver just echoed back whatever it was sent - so any artist who never
+happened to open Profile and pick a color had appointments that rendered with a white label on a
+white cell (only visible via the tooltip - see follow-up #5's diagnosis of the same visual symptom
+for a different root cause). Built `utils/tag-color.js`: a `TAG_COLORS` palette mirroring the
+client's own list, a fixed `DEFAULT_NO_SHOP_TAG_COLOR` (`'#8E24AA'`, "Royal Purple" in that
+palette) for anyone with no shop affiliation, and `pickDefaultTagColor(shopId, excludeUserId)`
+which picks a color guaranteed not already in use by another Staff/Artist member of that shop (via
+`getMemberUserIdsForShop`, the same shop-membership resolution `getUserTagColors` already uses) -
+falling back to the first palette color if a shop somehow has more members than the 15-color
+palette. `isUnsetTagColor` treats `undefined`/`null`/`''`/`'#fff'`/`'#ffffff'` (any casing) as "not
+a real choice yet" - a tagColor an artist or admin actually picked is never overwritten, even if it
+later collides with a shop-mate.
+
+Wired in three places: `register()` now always assigns `DEFAULT_NO_SHOP_TAG_COLOR` itself,
+ignoring any tagColor the client sends (a self-registered account is always a shopless Client, so
+there's nothing to be unique against) - `Register.jsx`'s hardcoded `'#fff'` was removed entirely,
+along with a stray dead `user` object it never actually sent. `login()` self-heals any account
+whose tagColor is still unset the moment they next log in, using their first shop (if any, via the
+same `getShopIdsForUser` used elsewhere) for shop-scoped uniqueness or the purple default
+otherwise - this fixes every already-broken existing account without needing a one-off DB
+migration script, which this sandbox has no way to run against a live database anyway
+(`mongodb-memory-server`'s binary download is blocked here, same as every other pass this week).
+`connectArtistToShop` also assigns a shop-unique color at the moment a real shop affiliation forms,
+so a newly-connected artist doesn't have to wait for their next login to get a non-colliding color.
+
+Added regression tests: `register()` always returns the purple default regardless of what's sent;
+`login()` heals both a never-set and the old literal-white tagColor, assigns a shop-unique color
+for a shop-affiliated artist (verified against a shop-mate's existing color), and leaves an
+already-set real tagColor untouched; `connectArtistToShop` assigns a real color when unset, avoids
+colliding with an existing shop-mate's color, and never overwrites a deliberate existing choice.
+Verified via `node --check` on every changed/new server file and `graphql`'s `buildSchema`/`parse`/
+`validate` against the real SDL for every changed query/mutation document (the extended
+`register`/`login`/`connectArtistToShop` selections). Could not execute the test suite itself -
+same `mongodb-memory-server` block as every prior pass this week.
+
 ---
 
 ## Suggested sequencing
