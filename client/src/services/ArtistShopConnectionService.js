@@ -37,9 +37,39 @@ const ArtistShopConnectionService = (() => {
 		}
 	`;
 
+	// Settings.jsx's "Shop" card - previously there was no client UI for either of these at all
+	// (see mutations/artistShopConnections.js's own comment: "there's no invite-link/shop-
+	// directory request-approve flow yet" - this is that same direct-connect model, just finally
+	// wired up on the client). connectArtistToShop only returns the raw connection record (no
+	// shop name/website) - Settings.jsx follows up with ShopService.useLazyShop to get those for
+	// display and to update the cached user.
+	const _CONNECT_ARTIST_TO_SHOP_MUTATION = gql`
+		mutation ($artistId: ID!, $shopId: ID!) {
+			connectArtistToShop(artistId: $artistId, shopId: $shopId) {
+				id
+				artistId
+				shopId
+				status
+			}
+		}
+	`;
+
+	const _DISCONNECT_ARTIST_FROM_SHOP_MUTATION = gql`
+		mutation ($artistId: ID!, $shopId: ID!) {
+			disconnectArtistFromShop(artistId: $artistId, shopId: $shopId) {
+				id
+				artistId
+				shopId
+				status
+			}
+		}
+	`;
+
 	return {
 		fetchArtistShopConnections: _fetchArtistShopConnections,
 		SET_ARTIST_SHOP_RATE_SOURCE_MUTATION: _SET_ARTIST_SHOP_RATE_SOURCE_MUTATION,
+		CONNECT_ARTIST_TO_SHOP_MUTATION: _CONNECT_ARTIST_TO_SHOP_MUTATION,
+		DISCONNECT_ARTIST_FROM_SHOP_MUTATION: _DISCONNECT_ARTIST_FROM_SHOP_MUTATION,
 	};
 })();
 

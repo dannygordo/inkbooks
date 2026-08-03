@@ -8,6 +8,7 @@ import IBSelect from "../../components/inputs/IBSelect";
 import IBPageLoader from "../../components/ibPageLoader/IBPageLoader";
 import { ArtistService } from "../../services/ArtistService";
 import ArtistShopConnectionService from "../../services/ArtistShopConnectionService";
+import ShopService from "../../services/ShopService";
 import { ALERT_CONSTANTS, APP_SETTINGS_CONSTANTS } from "../../constants";
 
 // New top-level settings section - see PRODUCTION_ROADMAP.md's "Rates & settings" entry for why
@@ -17,7 +18,7 @@ import { ALERT_CONSTANTS, APP_SETTINGS_CONSTANTS } from "../../constants";
 // flatRate/billingType, plus - when the artist is shop-connected - which side's rate actually
 // applies (ArtistShopConnection.rateSource).
 const Settings = () => {
-	const { user, setAlert } = useAuth();
+	const { user, setAlert, updateCurrentUser } = useAuth();
 	const isArtist = user.userInfo && user.userType === "artist";
 	const artistUserInfoId = isArtist ? user.userInfo.id : null;
 	// Note: getArtistShopConnections expects the artist's *User* id (user.id), not the Artist
@@ -29,6 +30,87 @@ const Settings = () => {
 	const { loading: artistLoading, data: artistData } = ArtistService.fetchArtist(artistUserInfoId);
 	const { loading: connectionsLoading, data: connectionsData } =
 		ArtistShopConnectionService.fetchArtistShopConnections(isArtist ? user.id : null);
+
+	// --- Shop affiliation: which shop (if any) this artist belongs to, plus connect/disconnect -
+	// there was previously no client UI for this at all (see ArtistShopConnectionService.js's own
+	// comment - connectArtistToShop/disconnectArtistFromShop existed server-side with no caller).
+	const [shopIdToConnect, setShopIdToConnect] = useState("");
+	const [shopActionError, setShopActionError] = useState(null);
+	const [connectArtistToShop, { loading: connecting }] = useMutation(
+		ArtistShopConnectionService.CONNECT_ARTIST_TO_SHOP_MUTATION
+	);
+	const [disconnectArtistFromShop, { loading: disconnecting }] = useMutation(
+		ArtistShopConnectionService.DISCONNECT_ARTIST_FROM_SHOP_MUTATION
+	);
+	// Lazy, not eager - connectArtistToShop's own response has no shop name/website to show (just
+	// the raw ArtistShopConnection record), so this is triggered manually right after a successful
+	// connect to fetch those two fields and update the cached user with them.
+	const [fetchShopName] = ShopService.useLazyShop();
+
+	const handleConnectToShop = async (e) => {
+		e.preventDefault();
+		setShopActionError(null);
+		const trimmedShopId = shopIdToConnect.trim();
+		if (!trimmedShopId) {
+			setShopActionError("Enter the Shop ID your shop gave you.");
+			return;
+		}
+		try {
+			await connectArtistToShop({ variables: { artistId: user.id, shopId: trimmedShopId } });
+			const { data } = await fetchShopName({ variables: { shopId: trimmedShopId } });
+			updateCurrentUser({
+				...user,
+				userInfo: {
+					...user.userInfo,
+					shop: data?.getShop
+						? { id: data.getShop.id, name: data.getShop.name, website: data.getShop.website }
+						: { id: trimmedShopId },
+				},
+			});
+			setShopIdToConnect("");
+			setAlert({
+				isAlert: true,
+				severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
+				message: "Connected to shop.",
+				timeout: ALERT_CONSTANTS.TIMEOUT,
+				location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
+			});
+		} catch (err) {
+			setShopActionError(err.graphQLErrors?.[0]?.message || err.message);
+		}
+	};
+
+	const handleDisconnectFromShop = async () => {
+		if (
+			!window.confirm(
+				`Disconnect from ${user.userInfo?.shop?.name || "this shop"}? You can reconnect later.`
+			)
+		) {
+			return;
+		}
+		try {
+			await disconnectArtistFromShop({ variables: { artistId: user.id, shopId } });
+			updateCurrentUser({
+				...user,
+				userInfo: { ...user.userInfo, shop: null },
+			});
+			setAlert({
+				isAlert: true,
+				severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
+				message: "Disconnected from shop.",
+				timeout: ALERT_CONSTANTS.TIMEOUT,
+				location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
+			});
+		} catch (err) {
+			setAlert({
+				isAlert: true,
+				severity: ALERT_CONSTANTS.SEVERITY.ERROR,
+				message: err.graphQLErrors?.[0]?.message || err.message,
+				timeout: ALERT_CONSTANTS.TIMEOUT,
+				location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
+			});
+		}
+	};
 
 	// Deliberately not hydrated into state via a useEffect keyed on the query result - IBInput
 	// is an uncontrolled component (defaultValue, not value - see IBInput.jsx's own prop list),
@@ -156,6 +238,55 @@ const Settings = () => {
 				<h1 className="settingsTitle">Settings</h1>
 			</div>
 			<div className="settingsContainer">
+				<IBCardWrapper>
+					<div>
+						<h1>Shop</h1>
+						<h6 style={{ color: "#bbb", marginBottom: 15 }}>
+							{shopId
+								? "You're connected to this shop - your calendar, rate settings, and shop-cut ledger are all scoped to it."
+								: "You're not currently connected to a shop - you're set up as an independent artist."}
+						</h6>
+					</div>
+					{shopId ? (
+						<div>
+							<p className="settingsShopName">{user.userInfo?.shop?.name || "Connected shop"}</p>
+							{user.userInfo?.shop?.website && (
+								<p className="settingsShopWebsite">{user.userInfo.shop.website}</p>
+							)}
+							<div className="settingsActions">
+								<button
+									type="button"
+									className="ibButton"
+									onClick={handleDisconnectFromShop}
+									disabled={disconnecting}
+								>
+									{disconnecting ? "Disconnecting..." : "Disconnect from Shop"}
+								</button>
+							</div>
+						</div>
+					) : (
+						<form onSubmit={handleConnectToShop}>
+							{/* IBInput is uncontrolled (defaultValue only - see its own prop list), same as
+							    every other form field on this page - onChange still fires normally and
+							    keeps shopIdToConnect in sync for handleConnectToShop to read at submit
+							    time; there's no need to feed a value prop back in since this form
+							    unmounts entirely the moment shopId becomes truthy below. */}
+							<IBInput
+								id="shopIdToConnect"
+								label="Shop ID"
+								onChange={(e) => setShopIdToConnect(e.target.value)}
+								placeholder="Ask your shop for their Shop ID"
+							/>
+							{shopActionError && <div className="settingsError">{shopActionError}</div>}
+							<div className="settingsActions">
+								<button type="submit" className="ibButton" disabled={connecting}>
+									{connecting ? "Connecting..." : "Connect to Shop"}
+								</button>
+							</div>
+						</form>
+					)}
+				</IBCardWrapper>
+
 				<IBCardWrapper>
 					<div>
 						<h1>Rates</h1>

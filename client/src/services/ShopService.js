@@ -34,6 +34,24 @@ const ShopService = (() => {
 		});
 	};
 
+	// Lazy variant of the same query above - used by Settings.jsx right after a successful
+	// connectArtistToShop, since that mutation only returns the raw ArtistShopConnection record
+	// (id/artistId/shopId/status/rateSource - see ArtistShopConnectionService.js), not the shop's
+	// own name/website. Triggered manually (not on mount) so it only ever runs the instant an
+	// artist actually connects to a new shop.
+	const _useLazyShop = () => {
+		const FETCH_SHOP_QUERY = gql`
+			query ($shopId: ID!) {
+				getShop(shopId: $shopId) {
+					id
+					name
+					website
+				}
+			}
+		`;
+		return useLazyQuery(FETCH_SHOP_QUERY);
+	};
+
 	const _fetchShops = () => {
 		const FETCH_SHOPS_QUERY = gql`
 			{
@@ -111,6 +129,7 @@ const ShopService = (() => {
 
 	return {
 		fetchShop: _fetchShop,
+		useLazyShop: _useLazyShop,
 		fetchShops: _fetchShops,
         updateShop: _updateShop,
         useSquareAuthorizationUrl: _useSquareAuthorizationUrl,

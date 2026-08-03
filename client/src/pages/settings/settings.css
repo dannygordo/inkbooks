@@ -1,7 +1,6 @@
 .settings {
 	flex: 4;
 	padding: 20px;
-	margin-top: 60px;
 	margin-left: 10px;
 }
 .settingsTitleContainer {
@@ -24,4 +23,18 @@
 	display: flex;
 	justify-content: left;
 	margin-top: 10px;
+}
+.settingsShopName {
+	font-size: 20px;
+	font-weight: 600;
+	margin: 0;
+}
+.settingsShopWebsite {
+	color: #888;
+	margin: 4px 0 0;
+}
+.settingsError {
+	color: #d32f2f;
+	margin-top: 8px;
+	font-size: 14px;
 }
