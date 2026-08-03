@@ -4,7 +4,21 @@ const ArtistShopConnection = require('../../models/ArtistShopConnection');
 const withAuth = require('../../utils/with-auth');
 const { AuthenticationError, UserInputError } = require('../../utils/errors');
 const { Constants } = require('../../utils/constants');
-const { updateAppointmentInputSchema, createAppointmentInputSchema, validate } = require('../../utils/validation');
+const { updateAppointmentInputSchema, createAppointmentInputSchema, appointmentIdInputSchema, validate } = require('../../utils/validation');
+
+// Same ownership shape as updateAppointment/deleteAppointment below - Admin/SHOP_ADMIN-or-better,
+// or the appointment's own artist. Shared by all three session-timer mutations so that check is
+// written once, not copy-pasted three times.
+async function loadOwnedAppointment(appointmentId, user) {
+  const appointment = await Appointment.findById(appointmentId);
+  if (!appointment) {
+    throw new UserInputError('Errors', { errors: { appointmentId: 'Appointment not found' } });
+  }
+  if (user.role > Constants.ROLES.SHOP_ADMIN && String(user.id) !== String(appointment.userId)) {
+    throw new AuthenticationError('Action not allowed');
+  }
+  return appointment;
+}
 
 // Nothing previously verified that the caller attributing an Appointment to a shopId actually
 // has a real relationship with that shop - anyone could set any shopId on any appointment,
@@ -135,5 +149,53 @@ module.exports = {
           }
           throw new Error(err);
       }
-    })
+    }),
+    startSessionTimer: withAuth(async (_, args, context, info, user) => {
+      const { valid, errors } = validate(appointmentIdInputSchema, args);
+      if (!valid) {
+        throw new UserInputError('Errors', { errors });
+      }
+      const appointment = await loadOwnedAppointment(args.appointmentId, user);
+      // Starting an already-running timer would stomp timerStartedAt and silently lose whatever
+      // time had already elapsed in the current interval - a no-op is the safe behavior here,
+      // not an error, since a double-click of a "Start" button is the realistic trigger.
+      if (appointment.timerStatus !== 'running') {
+        appointment.timerStatus = 'running';
+        appointment.timerStartedAt = new Date();
+        await appointment.save();
+      }
+      return appointment;
+    }),
+    stopSessionTimer: withAuth(async (_, args, context, info, user) => {
+      const { valid, errors } = validate(appointmentIdInputSchema, args);
+      if (!valid) {
+        throw new UserInputError('Errors', { errors });
+      }
+      const appointment = await loadOwnedAppointment(args.appointmentId, user);
+      // Stopping an already-stopped timer is a no-op for the same reason as above - nothing to
+      // bank, and there's no timerStartedAt to safely compute an elapsed interval from.
+      if (appointment.timerStatus === 'running' && appointment.timerStartedAt) {
+        const elapsedSeconds = Math.max(
+          0,
+          Math.floor((Date.now() - appointment.timerStartedAt.getTime()) / 1000),
+        );
+        appointment.accumulatedSeconds = (appointment.accumulatedSeconds || 0) + elapsedSeconds;
+        appointment.timerStatus = 'stopped';
+        appointment.timerStartedAt = null;
+        await appointment.save();
+      }
+      return appointment;
+    }),
+    resetSessionTimer: withAuth(async (_, args, context, info, user) => {
+      const { valid, errors } = validate(appointmentIdInputSchema, args);
+      if (!valid) {
+        throw new UserInputError('Errors', { errors });
+      }
+      const appointment = await loadOwnedAppointment(args.appointmentId, user);
+      appointment.accumulatedSeconds = 0;
+      appointment.timerStatus = 'stopped';
+      appointment.timerStartedAt = null;
+      await appointment.save();
+      return appointment;
+    }),
   };

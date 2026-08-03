@@ -48,7 +48,25 @@ const AppointmentSchema = new mongoose.Schema({
 	appointmentType: {type: String, required: true},
 	appointmentStatus: {type: String, required: true},
     createdAt: {type: Date, required: true},
-    updatedAt: {type: Date, required: true}
+    updatedAt: {type: Date, required: true},
+
+	// Session timer - see mutations/appointments.js's startSessionTimer/stopSessionTimer/
+	// resetSessionTimer. Deliberately not exposed on AppointmentInput (the generic updateAppointment
+	// mutation's input type) - only those three dedicated, ownership-checked mutations are allowed
+	// to change these, so a client can't corrupt timer state through the general-purpose update
+	// path. Server-persisted rather than pure client-side React state so a page refresh, browser
+	// close, or laptop sleep mid-session doesn't lose the actual elapsed time - accumulatedSeconds
+	// holds everything already banked from prior start/stop cycles, timerStartedAt (only set while
+	// timerStatus is 'running') is when the *current* running interval began; the live total while
+	// running is accumulatedSeconds + (now - timerStartedAt), computed on read, not stored.
+	timerStatus: {type: String, enum: ['stopped', 'running'], default: 'stopped'},
+	timerStartedAt: {type: Date},
+	accumulatedSeconds: {type: Number, default: 0},
+	// Session notes - unlike the timer fields above, this one *is* editable through the regular
+	// updateAppointment mutation (see AppointmentInput) - a plain autosaved textarea doesn't need
+	// its own dedicated mutation the way timer state, which has real start/stop/reset semantics
+	// to protect, does.
+	sessionNotes: {type: String}
 
 });
 module.exports = mongoose.model('Appointment', AppointmentSchema);

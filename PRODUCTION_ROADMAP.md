@@ -1121,16 +1121,61 @@ binary limitation) or click through the real UI, so **this needs a manual click-
 relying on it**: try all three types, both new and existing client/project, and confirm the
 calendar actually shows the new appointment afterward.
 
+### In-project session view - done
+
+Server: `Appointment` gained `timerStatus` (`'stopped'|'running'`, default `'stopped'`),
+`timerStartedAt` (`Date`), `accumulatedSeconds` (`Number`, default `0`), and `sessionNotes`
+(`String`) - see `models/Appointment.js`'s own comment for the full reasoning. Timer state is
+server-persisted, not pure client React state, so a refresh/browser-close/laptop-sleep mid-session
+doesn't lose elapsed time - `accumulatedSeconds` banks everything from prior start/stop cycles,
+`timerStartedAt` marks when the *current* running interval began, and the live total while running
+(`accumulatedSeconds + (now - timerStartedAt)`) is always computed on read, never stored. Three new
+dedicated mutations - `startSessionTimer`/`stopSessionTimer`/`resetSessionTimer` (all
+`appointmentId`-only, ownership-checked via a shared `loadOwnedAppointment` helper in
+`mutations/appointments.js` - Admin/shop-admin-or-better or the appointment's own artist) - are the
+only way to touch those three timer fields; they're deliberately absent from the generic
+`AppointmentInput` so `updateAppointment` can't corrupt timer state. `sessionNotes` *is* on
+`AppointmentInput` - a plain autosaved-on-save textarea has no start/stop semantics to protect.
+New `getAppointmentsByProject(projectId)` query (same ownership shape as `getProject` itself:
+shop-admin-or-better, the project's own artist, the project's own client, or shop staff affiliated
+with the artist) powers the session list.
+
+Client: `client/src/utils/sessionRate.js` is a small, dependency-free pure-logic module (no React/
+Apollo, unit-tested standalone) with `getEffectiveRate` (decides shop's rate vs. the artist's own,
+per `ArtistShopConnection.rateSource`, defaulting to `'shop'` when no connection record exists -
+matching the schema field's own default), `computeSessionTotal` (hourly-from-elapsed-time or flat,
+rounded to whole dollars - `total` is stored as `Int`, matching `ArtistPerformancePanel`'s existing
+treatment of it), `getLiveElapsedSeconds`, and `formatElapsed`.
+`client/src/components/projectSessions/ProjectSessionsList.jsx` renders inside a new "Sessions"
+card on `Project.jsx`, listing every session tied to the project (date, open/completed, total);
+clicking one opens `SessionDetail.jsx` in the existing global modal with start/stop/reset timer
+buttons, a live-ticking elapsed readout, an editable "Session Total $" field pre-filled from the
+computed suggestion (with a "Use Suggested" button to reset it back to that if hand-edited), a
+notes textarea, a "Charge via Square" button (reuses the existing sandbox-only
+`IBSquarePaymentForm` - not new payment infrastructure, per the earlier decision that real payments
+stay deprioritized), and "Close Session" (`appointmentStatus: 'completed'` - the exact gate the
+still-to-build payout dashboard below filters on). Once a session is closed, all of its controls
+disable - no editing a session's timer/total/notes after the fact from this view.
+
+Verified via `graphql`'s `buildSchema`/`validate` against the real SDL for every new/changed
+query/mutation document (`getAppointmentsByProject`, all three timer mutations, the trimmed-payload
+`updateAppointment` call this view uses), `@babel/parser` JSX parsing on every new/changed client
+file, `node --check` on every changed server file, and a standalone Node script exercising
+`sessionRate.js`'s four functions against known inputs (independent-artist vs. shop-with-`'shop'`-
+source vs. shop-with-`'own'`-source rate selection, hourly vs. flat total math, live-elapsed math
+against a fixed clock, and `H:MM:SS` formatting) - all passed. This sandbox still can't run the
+client's Vitest suite (documented rollup binary limitation) or click through the real UI, so **this
+needs a manual click-through before relying on it**: start/stop/reset a timer, save a note and a
+manually-edited total, close a session and confirm its controls actually disable, and confirm the
+shop-vs-own rate picker in Settings actually changes which rate `SessionDetail` suggests.
+
 ### Still to build (this same Phase 7 effort, not yet started)
 
-- The in-project session view: session list, click-to-view detail, start/stop/reset timer
-  (server-persisted, not pure client state - see the design conversation on why), auto-computed
-  total from the effective rate (editable), notes, close-session action.
 - The artist-dashboard shop-cut payout list (completed sessions with outstanding cuts, cash/card
   selection, batch Square invoice for card) and removing the shop-cut panel from
   Create/UpdateEventDialog.
 - The whole-app UI consistency sweep, deliberately last since it touches every page and the other
-  two pieces above are still changing shape.
+  piece above is still changing shape.
 - Minor cleanup: delete the now-unreferenced `CreateEventDialog.jsx` + its test file, or repurpose
   it - it's dead code, not a live alternate path, now that both call sites use
   `AppointmentWizard.jsx` instead.

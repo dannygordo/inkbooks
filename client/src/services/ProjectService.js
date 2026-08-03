@@ -16,12 +16,18 @@ const ProjectService = (() => {
 					lastName
 					email
 					id
+					hourlyRate
+					flatRate
+					billingType
 					user {
 						id
 					}
 					shop {
 						id
 						name
+						hourlyRate
+						flatRate
+						billingType
 					}
 				}
 				clientId

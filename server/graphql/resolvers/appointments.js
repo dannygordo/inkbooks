@@ -1,9 +1,12 @@
 const Appointment = require('../../models/Appointment');
 const Staff = require('../../models/Staff');
+const Client = require('../../models/Client');
+const Project = require('../../models/Project');
 const ArtistShopConnection = require('../../models/ArtistShopConnection');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 const { AuthenticationError } = require('../../utils/errors');
+const { getShopIdsForUser, getArtistIdsForShops } = require('../../utils/shop-membership');
 
 // getAppointmentsByShop is called for real by Artist- and Staff-role users viewing their own
 // shop's calendar (see client/src/components/ibCalendar/IBCalendar.jsx), not just Shop Admins -
@@ -86,6 +89,37 @@ module.exports = {
           throw new AuthenticationError('Action not allowed');
         }
         return appointment;
+      } catch (err) {
+        throw new Error(err);
+      }
+    }),
+    // Powers the in-project session list (see client/src/pages/projects/Project.jsx) - every
+    // session appointment tied to a project, so the artist can see and reopen past sessions'
+    // timer/notes/total. Same ownership shape as getProject itself (resolvers/projects.js):
+    // shop-admin-or-better, the project's own artist, the project's own client, or shop staff
+    // affiliated with the project's artist - checked against the Project, not the individual
+    // Appointment, since that's the resource actually being browsed here.
+    getAppointmentsByProject: withAuth(async (_, { projectId }, context, info, user) => {
+      const project = await Project.findById(projectId);
+      if (!project) {
+        throw new Error('Project not found');
+      }
+      if (user.role > Constants.ROLES.SHOP_ADMIN && String(user.id) !== String(project.artistId)) {
+        const myClient = await Client.findOne({ userId: user.id }).select('_id');
+        const isOwnClient = myClient && String(myClient.id) === String(project.clientId);
+        let isShopStaff = false;
+        if (!isOwnClient) {
+          const shopIds = await getShopIdsForUser(user.id);
+          const artistIds = await getArtistIdsForShops(shopIds);
+          isShopStaff = artistIds.map(String).includes(String(project.artistId));
+        }
+        if (!isOwnClient && !isShopStaff) {
+          throw new AuthenticationError('Action not allowed');
+        }
+      }
+      try {
+        const appointments = await Appointment.find({ projectId }).sort({ appointmentDate: 1 });
+        return appointments;
       } catch (err) {
         throw new Error(err);
       }

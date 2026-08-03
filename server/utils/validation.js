@@ -98,6 +98,10 @@ const updateAppointmentInputSchema = z.object({
     .nullish(),
   createdAt: dateLikeSchema.nullish(),
   updatedAt: dateLikeSchema.nullish(),
+  // A plain autosaved textarea, not timer state - see models/Appointment.js's comment on why this
+  // one field is editable through the generic update path while timerStatus/timerStartedAt/
+  // accumulatedSeconds deliberately aren't (and aren't even on this schema at all).
+  sessionNotes: z.string().nullish(),
 });
 
 const updateConversationInputSchema = z.object({
@@ -148,6 +152,7 @@ const createAppointmentInputSchema = z.object({
   appointmentStatus: z.enum(['scheduled', 'completed', 'rescheduled', 'cancelled', 'no_show']),
   createdAt: dateLikeSchema,
   updatedAt: dateLikeSchema,
+  sessionNotes: z.string().nullish(),
 });
 
 const createConversationInputSchema = z.object({

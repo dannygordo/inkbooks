@@ -1,0 +1,82 @@
+.projectSessionsList {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	width: 100%;
+}
+
+.projectSessionRow {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 10px 14px;
+	border: 1px solid #ddd;
+	border-radius: 6px;
+	cursor: pointer;
+}
+
+.projectSessionRow:hover {
+	background-color: #f5f5f5;
+}
+
+.projectSessionRowInfo {
+	display: flex;
+	flex-direction: column;
+}
+
+.projectSessionRowDate {
+	font-weight: 600;
+}
+
+.projectSessionRowMeta {
+	font-size: 0.85em;
+	color: #666;
+}
+
+.projectSessionsEmpty {
+	color: #666;
+	font-style: italic;
+}
+
+.sessionDetail {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	min-width: 320px;
+	padding: 8px;
+}
+
+.sessionDetailStatusRow {
+	display: flex;
+	gap: 8px;
+}
+
+.sessionDetailTimer {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 8px;
+}
+
+.sessionDetailElapsed {
+	font-size: 2.2em;
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+}
+
+.sessionDetailTimerButtons {
+	display: flex;
+	gap: 8px;
+}
+
+.sessionDetailTotal {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.sessionDetailActions {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+}

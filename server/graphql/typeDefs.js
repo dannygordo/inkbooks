@@ -419,6 +419,10 @@ module.exports = gql`
     appointmentStatus: String
     createdAt: DateTime
     updatedAt: DateTime
+    # Deliberately NOT timerStatus/timerStartedAt/accumulatedSeconds - see models/Appointment.js's
+    # comment on why those are only ever changed via the dedicated startSessionTimer/
+    # stopSessionTimer/resetSessionTimer mutations, never through this generic update input.
+    sessionNotes: String
   }
 
   type Appointment {
@@ -450,6 +454,13 @@ module.exports = gql`
     appointmentStatus: String!
     createdAt: DateTime
     updatedAt: DateTime
+    # Session timer + notes - see models/Appointment.js's comment. timerStartedAt is only
+    # meaningful while timerStatus is 'running'; the live elapsed total while running is
+    # accumulatedSeconds + (now - timerStartedAt), computed client-side on read, not stored.
+    timerStatus: String
+    timerStartedAt: DateTime
+    accumulatedSeconds: Int
+    sessionNotes: String
   }
   # Returned by createShopCutInvoice - the invoiceUrl is surfaced directly so the client can show
   # a "pay now" link immediately without waiting on Square's own email/SMS delivery (see
@@ -464,6 +475,7 @@ module.exports = gql`
     getAppointmentsByShop(shopId: ID!): [Appointment]
     getAppointmentsByArtist(userId: ID!): [Appointment]
     getAppointment(appointmentId: ID!): Appointment
+    getAppointmentsByProject(projectId: ID!): [Appointment]
 
     ######### Shop-cut ledger ###########
     # See PRODUCTION_ROADMAP.md's "Shop-cut ledger" section.
@@ -542,6 +554,13 @@ module.exports = gql`
     createAppointment(appointmentInput: AppointmentInput): Appointment
     updateAppointment(appointmentInput: AppointmentInput): Appointment
     deleteAppointment(appointmentId: ID): String
+    # Session timer controls - see models/Appointment.js's comment on why these are separate,
+    # dedicated mutations rather than fields on the generic updateAppointment/AppointmentInput.
+    # All three: Admin/SHOP_ADMIN-or-better, or the appointment's own artist - same ownership
+    # shape as updateAppointment/deleteAppointment above.
+    startSessionTimer(appointmentId: ID!): Appointment!
+    stopSessionTimer(appointmentId: ID!): Appointment!
+    resetSessionTimer(appointmentId: ID!): Appointment!
 
     ######### Artist-Shop Connections ###########
     connectArtistToShop(artistId: ID!, shopId: ID!): ArtistShopConnection!

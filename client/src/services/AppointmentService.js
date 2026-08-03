@@ -259,6 +259,84 @@ export const AppointmentService = (() => {
         });
     };
 
+    // --- In-project session view ---
+    // See PRODUCTION_ROADMAP.md's Phase 7 section and pages/projects/ProjectSessions.jsx. Every
+    // session-type appointment tied to a project, so a Project page can list them and let the
+    // artist click into one for the timer/notes/total detail view.
+    const _FETCH_APPOINTMENTS_BY_PROJECT = gql`
+        query GetAppointmentsByProject($projectId: ID!) {
+            getAppointmentsByProject(projectId: $projectId) {
+                id
+                projectId
+                userId
+                shopId
+                title
+                description
+                appointmentType
+                appointmentDate
+                appointmentStatus
+                total
+                tip
+                timerStatus
+                timerStartedAt
+                accumulatedSeconds
+                sessionNotes
+            }
+        }
+    `;
+    const _getAppointmentsByProject = (projectId) => {
+        return useQuery(_FETCH_APPOINTMENTS_BY_PROJECT, {
+            variables: { projectId },
+            skip: !projectId,
+        });
+    };
+
+    // Shared selection set - all three timer mutations return the same fields the detail view
+    // needs to keep ticking/re-render immediately without a separate refetch.
+    const _SESSION_TIMER_FIELDS = `
+        id
+        timerStatus
+        timerStartedAt
+        accumulatedSeconds
+    `;
+    const _START_SESSION_TIMER = gql`
+        mutation StartSessionTimer($appointmentId: ID!) {
+            startSessionTimer(appointmentId: $appointmentId) {
+                ${_SESSION_TIMER_FIELDS}
+            }
+        }
+    `;
+    const _STOP_SESSION_TIMER = gql`
+        mutation StopSessionTimer($appointmentId: ID!) {
+            stopSessionTimer(appointmentId: $appointmentId) {
+                ${_SESSION_TIMER_FIELDS}
+            }
+        }
+    `;
+    const _RESET_SESSION_TIMER = gql`
+        mutation ResetSessionTimer($appointmentId: ID!) {
+            resetSessionTimer(appointmentId: $appointmentId) {
+                ${_SESSION_TIMER_FIELDS}
+            }
+        }
+    `;
+
+    // Minimal-payload update, matching what updateAppointmentInputSchema actually requires (id +
+    // appointmentDate) plus only the fields the session detail view can change - total,
+    // sessionNotes, appointmentStatus (for "close session"). Deliberately not the same
+    // full-object-replace shape UpdateEventDialog uses, since this view never touches shopCut*/
+    // title/description/etc and re-sending stale copies of those is unnecessary risk.
+    const _UPDATE_SESSION_DETAILS = gql`
+        mutation UpdateSessionDetails($appointmentInput: AppointmentInput) {
+            updateAppointment(appointmentInput: $appointmentInput) {
+                id
+                total
+                sessionNotes
+                appointmentStatus
+            }
+        }
+    `;
+
     return {
         FETCH_APPOINTMENTS_BY_SHOP: _FETCH_APPOINTMENTS_BY_SHOP,
         FETCH_APPOINTMENTS_BY_ARTIST: _FETCH_APPOINTMENTS_BY_ARTIST,
@@ -272,7 +350,12 @@ export const AppointmentService = (() => {
         MARK_SHOP_CUT_PAID_MANUALLY: _MARK_SHOP_CUT_PAID_MANUALLY,
         CONFIRM_SHOP_CUT_PAID: _CONFIRM_SHOP_CUT_PAID,
         getAppointmentsByShop: _getAppointmentsByShop,
-        getPendingShopCutConfirmations: _getPendingShopCutConfirmations
+        getPendingShopCutConfirmations: _getPendingShopCutConfirmations,
+        getAppointmentsByProject: _getAppointmentsByProject,
+        START_SESSION_TIMER: _START_SESSION_TIMER,
+        STOP_SESSION_TIMER: _STOP_SESSION_TIMER,
+        RESET_SESSION_TIMER: _RESET_SESSION_TIMER,
+        UPDATE_SESSION_DETAILS: _UPDATE_SESSION_DETAILS,
     }
 
 })();

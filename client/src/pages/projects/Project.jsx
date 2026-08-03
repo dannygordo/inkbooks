@@ -22,6 +22,7 @@ import { ObjectID } from "bson";
 import MessengerService from "../../services/MessengerService";
 import IBSquarePaymentForm from "../../components/IBSquarePayments/IBSquarePaymentForm";
 import { ALERT_CONSTANTS } from "../../constants";
+import ProjectSessionsList from "../../components/projectSessions/ProjectSessionsList";
 
 const Project = (props) => {
 	const navigate = useNavigate();
@@ -407,6 +408,14 @@ const Project = (props) => {
 								selectValue={data.getProject.palette}
 								defaultValue={data.getProject.palette}
 							/>
+						</div>
+					</IBCardWrapper>
+				</div>
+				<div className="projectContainer">
+					<IBCardWrapper>
+						<div>
+							<h1 className="projectTitle">Sessions</h1>
+							<ProjectSessionsList project={data.getProject} />
 						</div>
 					</IBCardWrapper>
 				</div>
