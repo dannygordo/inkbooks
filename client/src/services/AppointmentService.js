@@ -71,6 +71,11 @@ export const AppointmentService = (() => {
                 shopCutStatus
                 shopCutAmount
                 shopId
+                projectId
+                project {
+                    id
+                    title
+                }
             }
         }
     `;

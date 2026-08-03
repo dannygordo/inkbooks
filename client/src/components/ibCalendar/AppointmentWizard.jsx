@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { DialogActions, DialogContent } from "@mui/material";
 import moment from "moment";
 import { useMutation } from "@apollo/client";
@@ -7,7 +7,6 @@ import { ALERT_CONSTANTS } from "../../constants";
 import IBDateTimePicker from "../inputs/IBDateTimePicker";
 import IBInput from "../inputs/IBInput";
 import IBMultilineInput from "../inputs/IBMultilineInput";
-import IBSelect from "../inputs/IBSelect";
 import IBProjectsByArtistSelect from "../inputs/IBProjectsByArtistSelect";
 import IBPageLoader from "../ibPageLoader/IBPageLoader";
 import { AppointmentService } from "../../services/AppointmentService";
@@ -20,14 +19,37 @@ import UtilsService from "../../services/UtilsService";
 // PRODUCTION_ROADMAP.md's Phase 7 section for the full design discussion this came out of.
 // Step 1 always asks what's being scheduled; each type then gets exactly the steps it actually
 // needs, rather than one form trying to cover all three at once:
-//   - Consult: reuses the *same* booking-request pipeline a public guest goes through
-//     (createBookingRequest -> convertBookingRequest), just entered by the artist on behalf of a
-//     walk-in/phone client instead of the client filling out the public form themselves. Keeps
-//     one intake pipeline instead of a second parallel one that could drift from it.
-//   - Session: requires a real Project - pick an existing one, or create a minimal new one inline
-//     (existing client only for now - see the "not built yet" note below).
+//   - Consult AND a brand-new-project Session now share the *same* pipeline end to end
+//     (email-lookup client step -> intake-details step -> date/time -> createBookingRequest ->
+//     convertBookingRequest) - the only difference is the `outcome` ('consult_booked' vs
+//     'session_booked') and that a session also collects a Project title, since convertBookingRequest
+//     already auto-creates the Project from that same intake data for session_booked (see
+//     mutations/bookingRequests.js). This replaced an earlier version where Session had its own
+//     separate client-dropdown + inline create-project mutation - two parallel intake paths that
+//     could drift from each other, and a picker-based client step real users found confusing (see
+//     the "email lookup" note below for why that was replaced).
+//   - Session can *also* attach to an already-existing Project instead (no client step needed -
+//     the project already has one) - that path is unchanged, simple, and direct
+//     (pick project -> date/time -> createAppointment).
 //   - Other: unchanged, fast, single step - blocked time/non-client entries shouldn't cost three
 //     screens.
+//
+// Email-lookup client step: replaces the old radio-button "existing client (dropdown) / new
+// client" picker for both Consult and new-Session. A real user testing this reported the dropdown
+// itself as confusing (see PRODUCTION_ROADMAP.md), and separately reported a consult silently
+// failing to save - tracing that down, the old flow let you click "Next" out of the client step
+// with nothing actually selected (no validation on that button), so the *only* feedback on a
+// missing client was a small red error line on the final Save step, easy to miss entirely if you
+// didn't look right at it - indistinguishable from "nothing happened." This version replaces the
+// dropdown with a single email field: type an email, and if it matches an already-known client
+// (checked client-side against the already-fetched client list - no new query), that client's
+// name/phone are shown read-only immediately; if it doesn't match, name/phone fields appear to
+// collect a new client. Either way the *same* email/firstName/lastName/phone fields end up in
+// createBookingRequest's input - the server's own findOrCreateGuestClient (already used by the
+// public intake form) does the actual find-or-create by email, so this step is purely a client-
+// side convenience (autofill on match), not new server logic. On top of that, every save now also
+// raises a real global alert (see setAlert calls below) on both success and failure, not just the
+// small in-dialog error line - so a failure is never silently missable again.
 const AppointmentWizard = ({ selectedDay }) => {
 	const { setModal, modal, user, setAlert } = useAuth();
 	const shopId = user.userInfo?.shop?.id;
@@ -42,25 +64,25 @@ const AppointmentWizard = ({ selectedDay }) => {
 	const [otherTitle, setOtherTitle] = useState("");
 	const [otherDescription, setOtherDescription] = useState("");
 
-	// --- Consult ---
-	const [clientMode, setClientMode] = useState("existing"); // 'existing' | 'new'
-	const [existingClientId, setExistingClientId] = useState("");
-	const [newClientFirstName, setNewClientFirstName] = useState("");
-	const [newClientLastName, setNewClientLastName] = useState("");
-	const [newClientEmail, setNewClientEmail] = useState("");
-	const [newClientPhone, setNewClientPhone] = useState("");
-	const [consultDescription, setConsultDescription] = useState("");
-	const [consultPlacement, setConsultPlacement] = useState("");
-	const [consultSize, setConsultSize] = useState("");
-	const [consultBudget, setConsultBudget] = useState("");
-	const [isCoverUp, setIsCoverUp] = useState(false);
+	// --- Shared client-email step (Consult, and a brand-new-project Session) ---
+	const [clientEmail, setClientEmail] = useState("");
+	const [clientFirstName, setClientFirstName] = useState("");
+	const [clientLastName, setClientLastName] = useState("");
+	const [clientPhone, setClientPhone] = useState("");
 
-	// --- Session ---
+	// --- Shared intake-details step (Consult, and a brand-new-project Session) ---
+	const [intakeDescription, setIntakeDescription] = useState("");
+	const [intakePlacement, setIntakePlacement] = useState("");
+	const [intakeSize, setIntakeSize] = useState("");
+	const [intakeBudget, setIntakeBudget] = useState("");
+	const [isCoverUp, setIsCoverUp] = useState(false);
+	// Project.title is required and BookingRequest never collects one - only relevant when
+	// type === 'session' (see convertBookingRequest's own projectTitle requirement).
+	const [projectTitle, setProjectTitle] = useState("");
+
+	// --- Session: existing-project path only ---
 	const [projectMode, setProjectMode] = useState("existing"); // 'existing' | 'new'
 	const [existingProjectId, setExistingProjectId] = useState("");
-	const [newProjectTitle, setNewProjectTitle] = useState("");
-	const [newProjectDescription, setNewProjectDescription] = useState("");
-	const [newProjectClientId, setNewProjectClientId] = useState("");
 
 	const { data: clientsData, loading: clientsLoading } = ClientService.fetchClients();
 	const { data: projectsData, loading: projectsLoading } = ProjectService.fetchProjectsByArtist(
@@ -68,7 +90,6 @@ const AppointmentWizard = ({ selectedDay }) => {
 	);
 
 	const [createAppointment] = useMutation(AppointmentService.CREATE_APPOINTMENT);
-	const [createProject] = useMutation(ProjectService.CREATE_PROJECT_MUTATION);
 	const [createBookingRequest] = useMutation(
 		BookingRequestService.CREATE_BOOKING_REQUEST_MUTATION
 	);
@@ -76,15 +97,50 @@ const AppointmentWizard = ({ selectedDay }) => {
 		BookingRequestService.CONVERT_BOOKING_REQUEST_MUTATION
 	);
 
+	// Client-side only - matches the typed email (case-insensitive) against the artist's already-
+	// fetched client list. No new query: ClientService.fetchClients() is already loaded for this
+	// wizard's own purposes (previously the "existing client" dropdown's data source).
+	const normalizedEmail = clientEmail.trim().toLowerCase();
+	const matchedClient = useMemo(() => {
+		if (!normalizedEmail) {
+			return null;
+		}
+		return (clientsData?.getClients || []).find(
+			(c) => (c.email || "").trim().toLowerCase() === normalizedEmail
+		);
+	}, [normalizedEmail, clientsData]);
+
 	// Whichever appointments query IBCalendar.jsx is actually watching (shop-scoped vs.
-	// artist-scoped, per-artist) - refetching it after any of the three creation paths below is
-	// simpler and less error-prone than replicating cache.modify three separate times for three
-	// different mutations that all ultimately create an Appointment.
+	// artist-scoped, per-artist) - refetching it after any of the creation paths below is
+	// simpler and less error-prone than replicating cache.modify separately for each mutation
+	// that ultimately creates an Appointment.
 	const appointmentsRefetch = shopId
 		? { query: AppointmentService.FETCH_APPOINTMENTS_BY_SHOP, variables: { shopId } }
 		: { query: AppointmentService.FETCH_APPOINTMENTS_BY_ARTIST_FOR_CALENDAR, variables: { userId: user.id } };
 
 	const closeModal = () => setModal({ ...modal, isOpen: false });
+
+	const showSuccessAlert = (message) => {
+		setAlert({
+			isAlert: true,
+			severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
+			message,
+			timeout: ALERT_CONSTANTS.TIMEOUT,
+			location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
+		});
+	};
+	// Raised in addition to the in-dialog `error` line, not instead of it - a global alert is much
+	// harder to miss than a small red line inside a modal that might already be mid-scroll. See
+	// this file's own header comment on why that mattered here.
+	const showErrorAlert = (message) => {
+		setAlert({
+			isAlert: true,
+			severity: ALERT_CONSTANTS.SEVERITY.ERROR,
+			message,
+			timeout: ALERT_CONSTANTS.TIMEOUT,
+			location: ALERT_CONSTANTS.DISPLAY_MODAL,
+		});
+	};
 
 	const handleTypeSelect = (selectedType) => {
 		setType(selectedType);
@@ -92,7 +148,7 @@ const AppointmentWizard = ({ selectedDay }) => {
 		if (selectedType === "other") {
 			setStep("other-form");
 		} else if (selectedType === "consult") {
-			setStep("consult-client");
+			setStep("client-email");
 		} else {
 			setStep("session-project");
 		}
@@ -126,45 +182,20 @@ const AppointmentWizard = ({ selectedDay }) => {
 				refetchQueries: [appointmentsRefetch],
 				awaitRefetchQueries: true,
 			});
+			showSuccessAlert("Appointment saved.");
 			closeModal();
 		} catch (err) {
 			setError(err.message);
+			showErrorAlert(err.message);
 		} finally {
 			setSubmitting(false);
 		}
 	};
 
-	const handleSubmitConsult = async (e) => {
+	// Shared by Consult and a brand-new-project Session - see this file's header comment on why
+	// these two now go through the exact same pipeline.
+	const handleSubmitIntake = async (e) => {
 		e.preventDefault();
-		if (!consultDescription.trim()) {
-			setError("Describe the idea first.");
-			return;
-		}
-		let clientFields;
-		if (clientMode === "existing") {
-			const selected = (clientsData?.getClients || []).find((c) => c.id === existingClientId);
-			if (!selected) {
-				setError("Pick a client first.");
-				return;
-			}
-			clientFields = {
-				firstName: selected.firstName,
-				lastName: selected.lastName,
-				email: selected.email,
-				phone: selected.phone,
-			};
-		} else {
-			if (!newClientFirstName.trim() || !newClientLastName.trim() || !newClientEmail.trim()) {
-				setError("First name, last name, and email are required for a new client.");
-				return;
-			}
-			clientFields = {
-				firstName: newClientFirstName,
-				lastName: newClientLastName,
-				email: newClientEmail,
-				phone: newClientPhone,
-			};
-		}
 		setSubmitting(true);
 		setError(null);
 		try {
@@ -172,11 +203,14 @@ const AppointmentWizard = ({ selectedDay }) => {
 				variables: {
 					bookingRequestInput: {
 						artistId: user.id,
-						...clientFields,
-						description: consultDescription,
-						placement: consultPlacement,
-						size: consultSize,
-						budget: consultBudget,
+						firstName: clientFirstName,
+						lastName: clientLastName,
+						email: clientEmail,
+						phone: clientPhone,
+						description: intakeDescription,
+						placement: intakePlacement,
+						size: intakeSize,
+						budget: intakeBudget,
 						isCoverUp,
 					},
 				},
@@ -185,7 +219,8 @@ const AppointmentWizard = ({ selectedDay }) => {
 			await convertBookingRequest({
 				variables: {
 					bookingRequestId,
-					outcome: "consult_booked",
+					outcome: type === "session" ? "session_booked" : "consult_booked",
+					projectTitle: type === "session" ? projectTitle : undefined,
 					appointmentInput: {
 						appointmentDate: UtilsService.formatDateToISO(startDateTime),
 						shopCutStatus: "unpaid",
@@ -195,46 +230,32 @@ const AppointmentWizard = ({ selectedDay }) => {
 				refetchQueries: [appointmentsRefetch],
 				awaitRefetchQueries: true,
 			});
+			showSuccessAlert(type === "session" ? "Session saved." : "Consult saved.");
 			closeModal();
 		} catch (err) {
 			setError(err.message);
+			showErrorAlert(err.message);
 		} finally {
 			setSubmitting(false);
 		}
 	};
 
-	const handleSubmitSession = async (e) => {
+	// Session, existing-project path only - unchanged direct createAppointment (the project
+	// already has a client, so no client/intake step is needed here at all).
+	const handleSubmitExistingProjectSession = async (e) => {
 		e.preventDefault();
-		let projectId = existingProjectId;
-		if (projectMode === "new") {
-			if (!newProjectTitle.trim() || !newProjectDescription.trim() || !newProjectClientId) {
-				setError("Title, description, and client are all required for a new project.");
-				return;
-			}
-		} else if (!existingProjectId) {
+		if (!existingProjectId) {
 			setError("Pick a project first.");
 			return;
 		}
 		setSubmitting(true);
 		setError(null);
 		try {
-			if (projectMode === "new") {
-				const projectRes = await createProject({
-					variables: {
-						title: newProjectTitle,
-						description: newProjectDescription,
-						artistId: user.id,
-						clientId: newProjectClientId,
-						status: "open",
-					},
-				});
-				projectId = projectRes.data.createProject.id;
-			}
 			const now = UtilsService.formatDateToISO(Date.now());
 			await createAppointment({
 				variables: {
 					appointmentInput: {
-						projectId,
+						projectId: existingProjectId,
 						userId: user.id,
 						shopId,
 						shopCutStatus: "unpaid",
@@ -248,9 +269,11 @@ const AppointmentWizard = ({ selectedDay }) => {
 				refetchQueries: [appointmentsRefetch],
 				awaitRefetchQueries: true,
 			});
+			showSuccessAlert("Session saved.");
 			closeModal();
 		} catch (err) {
 			setError(err.message);
+			showErrorAlert(err.message);
 		} finally {
 			setSubmitting(false);
 		}
@@ -305,59 +328,85 @@ const AppointmentWizard = ({ selectedDay }) => {
 		);
 	}
 
-	if (step === "consult-client") {
+	if (step === "client-email") {
 		if (clientsLoading) {
 			return <IBPageLoader />;
 		}
 		return (
 			<DialogContent dividers>
-				<div style={{ display: "flex", gap: 15, marginBottom: 10 }}>
-					<label>
-						<input
-							type="radio"
-							checked={clientMode === "existing"}
-							onChange={() => setClientMode("existing")}
-						/>{" "}
-						Existing client
-					</label>
-					<label>
-						<input
-							type="radio"
-							checked={clientMode === "new"}
-							onChange={() => setClientMode("new")}
-						/>{" "}
-						New client (walk-in)
-					</label>
-				</div>
-				{clientMode === "existing" ? (
-					<IBSelect
-						data={(clientsData?.getClients || []).map((c) => ({
-							value: c.id,
-							label: `${c.firstName} ${c.lastName}`,
-						}))}
-						label="Client"
-						selectedVal={existingClientId}
-						onChange={(e) => setExistingClientId(e.target.value)}
-					/>
+				<IBInput
+					helperText="Client email"
+					type="email"
+					defaultValue={clientEmail}
+					onChange={(e) => setClientEmail(e.target.value)}
+					placeholder="jon.snow@example.com"
+				/>
+				{matchedClient ? (
+					<div className="clientEmailMatchCard">
+						Found: {matchedClient.firstName} {matchedClient.lastName}
+						{matchedClient.phone ? ` - ${matchedClient.phone}` : ""}
+						<button
+							type="button"
+							className="ibButton"
+							style={{ marginLeft: 10 }}
+							onClick={() => setClientEmail("")}
+						>
+							Not them? Clear
+						</button>
+					</div>
 				) : (
-					<>
-						<IBInput helperText="First Name" onChange={(e) => setNewClientFirstName(e.target.value)} />
-						<IBInput helperText="Last Name" onChange={(e) => setNewClientLastName(e.target.value)} />
-						<IBInput helperText="Email" type="email" onChange={(e) => setNewClientEmail(e.target.value)} />
-						<IBInput helperText="Phone (optional)" onChange={(e) => setNewClientPhone(e.target.value)} />
-					</>
+					normalizedEmail && (
+						<>
+							<div className="clientEmailNoMatchNote">
+								No existing client found for this email - enter their details to create
+								one.
+							</div>
+							<IBInput
+								helperText="First Name"
+								defaultValue={clientFirstName}
+								onChange={(e) => setClientFirstName(e.target.value)}
+							/>
+							<IBInput
+								helperText="Last Name"
+								defaultValue={clientLastName}
+								onChange={(e) => setClientLastName(e.target.value)}
+							/>
+							<IBInput
+								helperText="Phone (optional)"
+								defaultValue={clientPhone}
+								onChange={(e) => setClientPhone(e.target.value)}
+							/>
+						</>
+					)
 				)}
 				{error && <div className="bookingRequestError">{error}</div>}
 				<DialogActions>
-					<button type="button" className="ibButton" onClick={() => setStep("type")}>
+					<button
+						type="button"
+						className="ibButton"
+						onClick={() => setStep(type === "session" ? "session-project" : "type")}
+					>
 						Back
 					</button>
 					<button
 						type="button"
 						className="ibButton"
 						onClick={() => {
+							if (!normalizedEmail || !normalizedEmail.includes("@")) {
+								setError("Enter a valid client email first.");
+								return;
+							}
+							if (!matchedClient && (!clientFirstName.trim() || !clientLastName.trim())) {
+								setError("First and last name are required for a new client.");
+								return;
+							}
+							if (matchedClient) {
+								setClientFirstName(matchedClient.firstName);
+								setClientLastName(matchedClient.lastName);
+								setClientPhone(matchedClient.phone || "");
+							}
 							setError(null);
-							setStep("consult-details");
+							setStep("intake-details");
 						}}
 					>
 						Next
@@ -367,35 +416,59 @@ const AppointmentWizard = ({ selectedDay }) => {
 		);
 	}
 
-	if (step === "consult-details") {
+	if (step === "intake-details") {
 		return (
 			<DialogContent dividers>
+				{type === "session" && (
+					<IBInput
+						helperText="Project Title"
+						defaultValue={projectTitle}
+						onChange={(e) => setProjectTitle(e.target.value)}
+					/>
+				)}
 				<IBMultilineInput
 					helperText="What's the idea? (required)"
-					onChange={(e) => setConsultDescription(e.target.value)}
+					defaultValue={intakeDescription}
+					onChange={(e) => setIntakeDescription(e.target.value)}
 				/>
-				<IBInput helperText="Placement" onChange={(e) => setConsultPlacement(e.target.value)} />
-				<IBInput helperText="Size" onChange={(e) => setConsultSize(e.target.value)} />
-				<IBInput helperText="Budget" onChange={(e) => setConsultBudget(e.target.value)} />
+				<IBInput
+					helperText="Placement"
+					defaultValue={intakePlacement}
+					onChange={(e) => setIntakePlacement(e.target.value)}
+				/>
+				<IBInput
+					helperText="Size"
+					defaultValue={intakeSize}
+					onChange={(e) => setIntakeSize(e.target.value)}
+				/>
+				<IBInput
+					helperText="Budget"
+					defaultValue={intakeBudget}
+					onChange={(e) => setIntakeBudget(e.target.value)}
+				/>
 				<label style={{ display: "block", marginTop: 10 }}>
 					<input type="checkbox" checked={isCoverUp} onChange={(e) => setIsCoverUp(e.target.checked)} />{" "}
 					Cover-up / touch-up
 				</label>
 				{error && <div className="bookingRequestError">{error}</div>}
 				<DialogActions>
-					<button type="button" className="ibButton" onClick={() => setStep("consult-client")}>
+					<button type="button" className="ibButton" onClick={() => setStep("client-email")}>
 						Back
 					</button>
 					<button
 						type="button"
 						className="ibButton"
 						onClick={() => {
-							if (!consultDescription.trim()) {
+							if (!intakeDescription.trim()) {
 								setError("Describe the idea first.");
 								return;
 							}
+							if (type === "session" && !projectTitle.trim()) {
+								setError("A project title is required for a session.");
+								return;
+							}
 							setError(null);
-							setStep("consult-datetime");
+							setStep("datetime");
 						}}
 					>
 						Next
@@ -405,15 +478,15 @@ const AppointmentWizard = ({ selectedDay }) => {
 		);
 	}
 
-	if (step === "consult-datetime") {
+	if (step === "datetime") {
 		return (
-			<form onSubmit={handleSubmitConsult}>
+			<form onSubmit={handleSubmitIntake}>
 				<DialogContent dividers>
 					<IBDateTimePicker label="Select Date" val={startDateTime} setVal={setStartDateTime} />
 					{error && <div className="bookingRequestError">{error}</div>}
 				</DialogContent>
 				<DialogActions>
-					<button type="button" className="ibButton" onClick={() => setStep("consult-details")}>
+					<button type="button" className="ibButton" onClick={() => setStep("intake-details")}>
 						Back
 					</button>
 					<button type="submit" className="ibButton" disabled={submitting}>
@@ -425,7 +498,7 @@ const AppointmentWizard = ({ selectedDay }) => {
 	}
 
 	if (step === "session-project") {
-		if (projectsLoading || clientsLoading) {
+		if (projectsLoading) {
 			return <IBPageLoader />;
 		}
 		return (
@@ -448,34 +521,13 @@ const AppointmentWizard = ({ selectedDay }) => {
 						New project
 					</label>
 				</div>
-				{projectMode === "existing" ? (
+				{projectMode === "existing" && (
 					<IBProjectsByArtistSelect
 						data={projectsData?.getProjectsByArtist || []}
 						label="Project"
 						selectedVal={existingProjectId}
 						onChange={(e) => setExistingProjectId(e.target.value)}
 					/>
-				) : (
-					<>
-						{/* New-project client is limited to an existing Client record for now - a
-						    brand-new client belongs in the Consult path above (which properly runs
-						    through the find-or-create-by-email pipeline) or the Clients page,
-						    rather than duplicating that logic a second time here. */}
-						<IBSelect
-							data={(clientsData?.getClients || []).map((c) => ({
-								value: c.id,
-								label: `${c.firstName} ${c.lastName}`,
-							}))}
-							label="Client"
-							selectedVal={newProjectClientId}
-							onChange={(e) => setNewProjectClientId(e.target.value)}
-						/>
-						<IBInput helperText="Project Title" onChange={(e) => setNewProjectTitle(e.target.value)} />
-						<IBMultilineInput
-							helperText="Description"
-							onChange={(e) => setNewProjectDescription(e.target.value)}
-						/>
-					</>
 				)}
 				{error && <div className="bookingRequestError">{error}</div>}
 				<DialogActions>
@@ -486,19 +538,17 @@ const AppointmentWizard = ({ selectedDay }) => {
 						type="button"
 						className="ibButton"
 						onClick={() => {
-							if (projectMode === "existing" && !existingProjectId) {
-								setError("Pick a project first.");
-								return;
+							if (projectMode === "existing") {
+								if (!existingProjectId) {
+									setError("Pick a project first.");
+									return;
+								}
+								setError(null);
+								setStep("session-existing-datetime");
+							} else {
+								setError(null);
+								setStep("client-email");
 							}
-							if (
-								projectMode === "new" &&
-								(!newProjectTitle.trim() || !newProjectDescription.trim() || !newProjectClientId)
-							) {
-								setError("Title, description, and client are all required.");
-								return;
-							}
-							setError(null);
-							setStep("session-datetime");
 						}}
 					>
 						Next
@@ -508,9 +558,9 @@ const AppointmentWizard = ({ selectedDay }) => {
 		);
 	}
 
-	if (step === "session-datetime") {
+	if (step === "session-existing-datetime") {
 		return (
-			<form onSubmit={handleSubmitSession}>
+			<form onSubmit={handleSubmitExistingProjectSession}>
 				<DialogContent dividers>
 					<IBDateTimePicker label="Select Date" val={startDateTime} setVal={setStartDateTime} />
 					{error && <div className="bookingRequestError">{error}</div>}

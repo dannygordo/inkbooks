@@ -1,9 +1,11 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import IBCardWrapper from "../card/ibCard/IBCardWrapper";
 import IBPageLoader from "../ibPageLoader/IBPageLoader";
 import { AppointmentService } from "../../services/AppointmentService";
 import ProjectService from "../../services/ProjectService";
 import ShopCutPayoutList from "./ShopCutPayoutList";
+import { ROUTE_CONSTANTS } from "../../constants";
 import "./artistPerformancePanel.css";
 
 // Appointment.shopCutStatus values that represent money the artist still owes the shop - see
@@ -32,6 +34,7 @@ const isSameYear = (date, reference) => date.getFullYear() === reference.getFull
  * an artist's appointment history grows large enough that fetching every row becomes expensive.
  */
 const ArtistPerformancePanel = ({ artistUserId, isSelf = false }) => {
+	const navigate = useNavigate();
 	const { data: apptData, loading: apptLoading, refetch: refetchAppointments } =
 		AppointmentService.getAppointmentsByArtist(artistUserId);
 	const { data: projData, loading: projLoading } =
@@ -116,7 +119,23 @@ const ArtistPerformancePanel = ({ artistUserId, isSelf = false }) => {
 				) : (
 					<ul className="artistUpcomingList">
 						{upcoming.map((appt) => (
-							<li key={appt.id} className="artistUpcomingItem">
+							<li
+								key={appt.id}
+								className={
+									appt.projectId
+										? "artistUpcomingItem artistUpcomingItemClickable"
+										: "artistUpcomingItem"
+								}
+								// Session/consult appointments carry a projectId (see
+								// mutations/bookingRequests.js's convertBookingRequest, which now
+								// always creates/attaches a Project) - "other" appointments never
+								// have one, so those rows just aren't clickable.
+								onClick={
+									appt.projectId
+										? () => navigate(`${ROUTE_CONSTANTS.PROJECT}${appt.projectId}`)
+										: undefined
+								}
+							>
 								<span className="artistUpcomingDate">
 									{new Date(appt.appointmentDate).toLocaleDateString(undefined, {
 										month: "short",
@@ -125,7 +144,12 @@ const ArtistPerformancePanel = ({ artistUserId, isSelf = false }) => {
 									})}
 								</span>
 								<span className="artistUpcomingTitle">
-									{appt.title || "(untitled appointment)"}
+									{/* Was appt.title alone - a session/consult Appointment never
+									    actually has its own title (the wizard never sets one for
+									    those types - see AppointmentWizard.jsx), the title lives on
+									    its Project instead. Falling back to appt.title first still
+									    covers "other" appointments, which do have a real title. */}
+									{appt.title || appt.project?.title || "(untitled appointment)"}
 								</span>
 								<span className="artistUpcomingType">{appt.appointmentType}</span>
 							</li>

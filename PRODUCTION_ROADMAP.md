@@ -1274,6 +1274,74 @@ appointment wizard, in-project sessions, shop-cut payout dashboard, and now this
 The CSS-architecture root cause above is a real, separate follow-up worth its own pass, not
 something to fold into "later" without writing it down.
 
+### Phase 7 follow-up fixes from first real usage (August 3, 2026) - done
+
+Four issues reported after actually clicking through the wizard/dashboard built above - three real
+bugs, one design change:
+
+**Consult silently "not saving" + the client dropdown itself, in both Consult and Session.**
+Traced the "nothing happened" report by re-reading the wizard's old client-step flow end to end:
+the "consult-client" step's own "Next" button never validated anything before advancing, so
+picking "Existing client" with zero clients on file (or just not picking one) sailed straight
+through to the details/date-time steps - the *only* place that ever caught the missing client was
+the final Save handler, which set a small red one-line error inside the dialog. Easy to miss
+entirely, and functionally indistinguishable from nothing happening at all. Rather than just adding
+more validation to the same dropdown-based step, replaced it per explicit direction: no more
+client dropdown in either Consult or Session. The new "client-email" step is a single email field -
+typed against the artist's already-fetched client list (no new query) for a live match; a match
+shows a read-only "Found: Name - phone" card, no match shows first/last/phone fields to create one.
+Either way the same firstName/lastName/email/phone end up in `createBookingRequest`'s input exactly
+as before - the server's existing `findOrCreateGuestClient` (already used by the public intake
+form) still does the actual find-or-create by email, so this is a client-side UX change only, no
+new server logic. Every save (success or failure, all four submit handlers) now also raises a real
+global alert via `setAlert`, not just the small in-dialog line - a failure can't go unnoticed the
+same way again regardless of root cause.
+
+**Session's "new project" path now reuses the Consult pipeline, not a separate one.** Per explicit
+direction ("the next step will be the same booking request form fields as for the consult...the
+session needs to be a project as well and contain all of that information"), a brand-new-project
+Session no longer calls `createProject`+`createAppointment` directly - it now goes through the
+exact same `createBookingRequest` -> `convertBookingRequest` pipeline as Consult, just with
+`outcome: 'session_booked'` and an added required Project-title field (Project.title is required
+and BookingRequest never collects one - same requirement `convertBookingRequest` already enforced
+for this outcome, see that resolver). `convertBookingRequest`'s existing session_booked branch
+already auto-creates the Project from the booking request's own description/placement/size - no
+server changes needed here at all, this was a client-only restructuring of `AppointmentWizard.jsx`.
+Session against an *already-existing* Project is unchanged (no client step needed - the project
+already has one; pick project -> date/time -> `createAppointment` directly).
+
+**Dashboard showing "(untitled appointment)" despite a title being entered.** The title the user
+typed was the *Project's* title (there was no field to set the Appointment's own title for a
+session at all - by design, see `AppointmentWizard.jsx`/`convertBookingRequest`, a session/consult
+Appointment never gets its own `title`). `ArtistPerformancePanel.jsx`'s upcoming-appointments list
+only ever read `appt.title`, with no fallback and no `project.title` even fetched by
+`AppointmentService.js`'s `_FETCH_APPOINTMENTS_BY_ARTIST` query. Fixed: that query now selects
+`projectId`/`project { id title }`, and the list falls back to `appt.project?.title` before
+"(untitled appointment)" (checked: `Appointment.project` field resolver already existed and works -
+`Project.findById(appointment.projectId)`, see `resolvers/index.js` - so this was purely a missing
+client-side field selection, not a server gap).
+
+**Dashboard rows weren't clickable.** Same list now navigates to `/project/:projectId` on click
+whenever an appointment has one (session/consult appointments always do post-fix above; "other"
+appointments never have a project and stay non-clickable, no dead click targets).
+
+Not touched, same rationale as "not part of the reported gap" above: the calendar's own day-cell
+rendering (`ibCalendar/Day.jsx`) has this same missing-`project.title`-fallback gap in its own
+tooltip/label text - noticed while tracing the dashboard bug, but not reported broken and not fixed
+here to stay scoped to what was actually asked.
+
+Verified via `@babel/parser` JSX parsing on every changed file and `graphql`'s `buildSchema`/
+`validate` against the real SDL for the (unchanged-shape but re-checked) `createBookingRequest`/
+`convertBookingRequest` documents and the extended `getAppointmentsByArtist` query - all valid.
+Attempted to reproduce the original "nothing happened" report end-to-end against a real in-memory
+Mongo (`mongodb-memory-server`, already a devDependency) rather than guess - this sandbox's network
+allowlist blocks the mongod binary download (403), so that couldn't run; the fix above is grounded
+in reading the actual old step-transition logic, not a confirmed repro. **This needs a real
+click-through before relying on it**: create a Consult via email lookup (both a matching and a
+non-matching email), create a brand-new-project Session the same way and confirm a Project was
+actually created with the entered details, create a Session against an existing project (unchanged
+path), and confirm the dashboard now shows real titles and navigates to the right project on click.
+
 ---
 
 ## Suggested sequencing

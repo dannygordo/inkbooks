@@ -151,6 +151,23 @@
     color: #666;
     font-style: italic;
 }
+/* AppointmentWizard.jsx's email-lookup client step - see that file's own header comment on why
+   the old dropdown-based client picker was replaced with this. */
+.clientEmailMatchCard {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border: 1px solid #b6e6c3;
+    background-color: #e6f6ea;
+    border-radius: 6px;
+    font-size: 14px;
+}
+.clientEmailNoMatchNote {
+    margin-top: 10px;
+    margin-bottom: 5px;
+    font-size: 13px;
+    color: #666;
+    font-style: italic;
+}
 .ibCalendarDateCellBody {
     flex: 1;
     white-space: nowrap;

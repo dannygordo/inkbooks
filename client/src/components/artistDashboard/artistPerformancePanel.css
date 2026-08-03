@@ -57,6 +57,14 @@
 	border-bottom: none;
 }
 
+.artistUpcomingItemClickable {
+	cursor: pointer;
+}
+
+.artistUpcomingItemClickable:hover {
+	background-color: #f7f7f7;
+}
+
 .artistUpcomingDate {
 	color: #999;
 	min-width: 90px;
