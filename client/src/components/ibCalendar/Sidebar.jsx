@@ -14,9 +14,8 @@ const Sidebar = () => {
 	// See IBCalendar.jsx's matching comment - user.userInfo.shop is legitimately absent for an
 	// independent artist. Optional-chained to undefined, which fetchArtistsByShop's own skip
 	// guard now treats as "nothing to fetch" instead of crashing.
-	const { data, loading } = ArtistService.fetchArtistsByShop(
-		user.userInfo?.shop?.id
-	);
+	const shopId = user.userInfo?.shop?.id;
+	const { data, loading } = ArtistService.fetchArtistsByShop(shopId);
 	let events = [];
 
 	const [checked, setChecked] = useState([]);
@@ -78,9 +77,17 @@ const Sidebar = () => {
 		<aside className="ibCalendarAsideContainer">
 			<CreateEventButton />
 			<SmallCalendar />
-			<div style={{ marginTop: 75 }}>
-				<h3>Artists</h3>
-			</div>
+			{/* An independent (shop-less) artist has no shop-mates to filter between - showing an
+			    "Artists" heading over a permanently-empty list (fetchArtistsByShop skips itself
+			    without a shopId) was the other half of the empty-calendar gap noted in
+			    IBCalendar.jsx: their own appointments now actually render (see that file's fix),
+			    but this filter UI has nothing meaningful to do for a solo artist, so it's hidden
+			    entirely rather than shown empty or with a single redundant "just you" entry. */}
+			{shopId && (
+				<div style={{ marginTop: 75 }}>
+					<h3>Artists</h3>
+				</div>
+			)}
       {data &&
         <div>
           <List

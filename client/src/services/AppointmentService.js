@@ -81,6 +81,58 @@ export const AppointmentService = (() => {
         });
     };
 
+    // Same selection set as _FETCH_APPOINTMENTS_BY_SHOP above, just scoped to one artist via the
+    // getAppointmentsByArtist resolver instead of getAppointmentsByShop - used by IBCalendar.jsx so
+    // an independent (shop-less) artist gets a real calendar of their own appointments instead of
+    // an empty one (see PRODUCTION_ROADMAP.md's "known gap" note on this). Deliberately a separate
+    // query from _FETCH_APPOINTMENTS_BY_ARTIST above rather than widening it: that one is scoped
+    // lean for ArtistPerformancePanel's dashboard use case and doesn't select the project/client/
+    // user detail a calendar day cell needs to render an event (see ibCalendar/Day.jsx).
+    const _FETCH_APPOINTMENTS_BY_ARTIST_FOR_CALENDAR = gql`
+        query GetAppointmentsByArtistForCalendar($userId: ID!) {
+            getAppointmentsByArtist(userId: $userId) {
+                id
+                projectId
+                userId
+                project {
+                    id
+                    client {
+                        id
+                        user {
+                            id
+                            firstName
+                            lastName
+                            avatar
+                        }
+                    }
+                    depositAmount
+                }
+                shopId
+                user {
+                    id
+                    tagColor
+                    lastName
+                    firstName
+                    avatar
+                }
+                title
+                description
+                appointmentType
+                appointmentDate
+                shopCutStatus
+                shopCutAmount
+                shopCutPaymentMethod
+                shopCutSquareInvoiceId
+            }
+        }
+    `;
+    const _getAppointmentsByArtistForCalendar = (userId) => {
+        return useQuery(_FETCH_APPOINTMENTS_BY_ARTIST_FOR_CALENDAR, {
+            variables: { userId },
+            skip: !userId,
+        });
+    };
+
     const _CREATE_APPOINTMENT = gql`
         mutation CreateAppointment($appointmentInput: AppointmentInput) {
             createAppointment(appointmentInput: $appointmentInput) {
@@ -210,7 +262,9 @@ export const AppointmentService = (() => {
     return {
         FETCH_APPOINTMENTS_BY_SHOP: _FETCH_APPOINTMENTS_BY_SHOP,
         FETCH_APPOINTMENTS_BY_ARTIST: _FETCH_APPOINTMENTS_BY_ARTIST,
+        FETCH_APPOINTMENTS_BY_ARTIST_FOR_CALENDAR: _FETCH_APPOINTMENTS_BY_ARTIST_FOR_CALENDAR,
         getAppointmentsByArtist: _getAppointmentsByArtist,
+        getAppointmentsByArtistForCalendar: _getAppointmentsByArtistForCalendar,
         CREATE_APPOINTMENT: _CREATE_APPOINTMENT,
         UPDATE_APPOINTMENT: _UPDATE_APPOINTMENT,
         DELETE_APPOINTMENT: _DELETE_APPOINTMENT,

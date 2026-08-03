@@ -13,14 +13,18 @@ const IBCalendar = () => {
     const [currentMonth, setCurrentMonth] = useState(UtilsService.getMonth());
     const { monthIndex, setMonthIndex, savedEvents, setSavedEvents, setFilteredEvents } = useCalendar();
     // user.userInfo.shop is legitimately absent for an independent artist (no shop connection -
-    // see PRODUCTION_ROADMAP.md's artist-centric tenancy section). Optional-chained to undefined,
-    // which getAppointmentsByShop's own skip guard (see AppointmentService.js) now treats as
-    // "nothing to fetch" instead of crashing the whole Calendar page - found via manual testing.
-    // Known gap, not fixed here: this means an independent artist's calendar currently shows no
-    // appointments at all rather than their own (getAppointmentsByArtist would be the right query
-    // for that case) - a real product decision about what an independent artist's calendar should
-    // show, not just a null-check, and out of scope for a crash fix.
-    const { data, loading } = AppointmentService.getAppointmentsByShop(user.userInfo?.shop?.id);
+    // see PRODUCTION_ROADMAP.md's artist-centric tenancy section). Both queries are always called
+    // (required - hooks can't be called conditionally) but each `skip`s itself when its own id is
+    // missing, so only one ever actually fires: getAppointmentsByShop for a shop-connected artist,
+    // getAppointmentsByArtistForCalendar for an independent one. This closes the gap noted
+    // previously here - an independent artist's calendar used to render as permanently empty
+    // instead of showing their own appointments, since getAppointmentsByShop has nothing to query
+    // without a shopId and there was no fallback query at all.
+    const shopId = user.userInfo?.shop?.id;
+    const { data: shopData } = AppointmentService.getAppointmentsByShop(shopId);
+    const { data: artistData } = AppointmentService.getAppointmentsByArtistForCalendar(
+        shopId ? undefined : user.id
+    );
 
     useEffect(() => {
         // Was two debug console.log statements hard-indexing data.getAppointmentsByShop[0] -
@@ -29,11 +33,14 @@ const IBCalendar = () => {
         // shop, or any shop between appointments), not just an independent-artist edge case.
         // Found via manual testing. Removed - they added no functional value; setSavedEvents/
         // setFilteredEvents below already use the full array correctly and don't depend on them.
-        if(data) {
-            setSavedEvents(data.getAppointmentsByShop);
-            setFilteredEvents(data.getAppointmentsByShop);
+        if (shopId && shopData) {
+            setSavedEvents(shopData.getAppointmentsByShop);
+            setFilteredEvents(shopData.getAppointmentsByShop);
+        } else if (!shopId && artistData) {
+            setSavedEvents(artistData.getAppointmentsByArtist);
+            setFilteredEvents(artistData.getAppointmentsByArtist);
         }
-    }, [data,loading])
+    }, [shopId, shopData, artistData])
     useEffect(() => {
         setCurrentMonth(UtilsService.getMonth(monthIndex));
     }, [monthIndex])

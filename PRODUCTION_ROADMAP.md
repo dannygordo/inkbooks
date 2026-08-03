@@ -766,13 +766,14 @@ real one. `CreateEventDialog.jsx`/`UpdateEventDialog.jsx` needed no fallback at 
 `Appointment.shopId` has been nullable in the schema since the shop-cut ledger work specifically to
 support shop-less appointments.
 
-**Known gap, deliberately not fixed here - flagged rather than guessed at:** `IBCalendar.jsx` and
-`ibCalendar/Sidebar.jsx` now degrade gracefully instead of crashing for an independent artist, but
-they still show an empty calendar and an empty artist filter, respectively - not that artist's own
-appointments. Making an independent artist's calendar actually show their own schedule (via
-`getAppointmentsByArtist` instead of `getAppointmentsByShop`) is a real feature decision, not a
-null-check, and lines up with the "no shop-context switcher anywhere" gap already noted above in
-the UI/UX consistency section - worth a dedicated pass together with that, not guessed at here.
+**Independent-artist empty calendar gap - now fixed (August 3, 2026).** Previously flagged and deliberately not fixed at the time: `IBCalendar.jsx`/`ibCalendar/Sidebar.jsx` degraded gracefully instead of crashing for an independent artist, but still showed an empty calendar and an empty artist filter rather than that artist's own appointments.
+
+- `services/AppointmentService.js` gained a new `getAppointmentsByArtistForCalendar(userId)` query - same field selection as the existing `getAppointmentsByShop` query (the shape `Day.jsx`/`UpdateEventDialog.jsx` actually need: `project.client.user`, `user.tagColor`, etc.), just scoped to one artist via the existing `getAppointmentsByArtist` resolver instead of by shop. Deliberately a separate query from the existing `FETCH_APPOINTMENTS_BY_ARTIST` (used by `ArtistPerformancePanel`'s dashboard) rather than widening that one - that query is intentionally lean for its own use case and doesn't select the detail a calendar day cell renders.
+- `IBCalendar.jsx` now calls both `getAppointmentsByShop`/`getAppointmentsByArtistForCalendar` unconditionally (hooks can't be called conditionally) with each one's own `skip` guard based on whether `user.userInfo?.shop?.id` is present, so exactly one ever actually fires, and populates `savedEvents`/`filteredEvents` from whichever one returned data.
+- `ibCalendar/Sidebar.jsx`'s "Artists" filter heading/list is now hidden entirely (not shown empty) when the artist has no shop - there's no one else to filter between for a solo artist, so an empty filter list would just be confusing rather than informative.
+- Verified the new query is schema-valid by parsing and validating it directly against the real SDL (`graphql`'s `buildSchema`/`validate`, not just syntax-checked) - this sandbox still can't run a live server/DB to test the resolver's actual auth/data behavior end to end, but the existing `getAppointmentsByArtist` resolver and its ownership check are unchanged and already covered by `appointments.test.js`.
+- **Not done:** a dedicated component test for the branching logic in `IBCalendar.jsx`/`Sidebar.jsx` - it would need `CalendarProvider` (not just a mocked context, since `CalendarContext` itself isn't exported) plus `MockedProvider` plus the full `Month`/`Sidebar`/`CalendarHeader` render tree, a much heavier setup than the existing focused dialog tests. Worth a manual click-through as an independent-artist test account, and/or a proper test later, rather than skipped silently.
+- **Still open, deliberately not addressed here:** the broader "no shop-context switcher anywhere" gap for artists connected to *multiple* shops (noted in the UI/UX consistency section above) - this fix only addresses the zero-shop case, not letting a multi-shop artist pick which shop's calendar/numbers they're viewing. That's a real design decision, not a bug fix, and stays a separate, larger backlog item.
 
 **Fifth real bug found via manual testing, a different mechanism from the `shop`-optional class
 above.** Clicking into Appointments crashed with `Cannot read properties of undefined (reading
