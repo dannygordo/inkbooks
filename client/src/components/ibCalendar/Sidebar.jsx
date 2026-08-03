@@ -117,8 +117,17 @@ const Sidebar = () => {
                         }}
                         tabIndex={-1}
                         disableRipple
-                        inputProps={{
-                          "aria-labelledby": labelId,
+                        // `inputProps` is dead here too, same as IBPasswordField.jsx's fix -
+                        // Checkbox's underlying SwitchBase also moved to `slots`/`slotProps` in
+                        // MUI v9 and no longer destructures the legacy `inputProps` name at all
+                        // (confirmed by reading the installed SwitchBase.js). Lower-severity than
+                        // the password toggle bug - the checkbox still works, it just silently
+                        // lost its `aria-labelledby` link to this list item's label - but the same
+                        // class of staleness, fixed the same way.
+                        slotProps={{
+                          input: {
+                            "aria-labelledby": labelId,
+                          },
                         }}
                       />
                     </ListItemIcon>

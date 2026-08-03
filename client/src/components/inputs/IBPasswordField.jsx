@@ -40,19 +40,32 @@ const IBPasswordField = ({
 			fullWidth={fullWidth}
 			required={required}
 			inputRef={passwordRef}
-			inputProps={{ minLength: 6 }}
-			InputProps={{
-				endAdornment: (
-					<InputAdornment position="end">
-						<IconButton
-							aria-label="Toggle Password visibility"
-							onClick={handleClick}
-							onMouseDown={handleMouseDown}
-						>
-							{showPassword ? <VisibilityOff /> : <Visibility />}
-						</IconButton>
-					</InputAdornment>
-				),
+			// TextField dropped the legacy top-level `inputProps`/`InputProps` props entirely in
+			// MUI v9 (confirmed by reading the installed TextField.js - neither name is even
+			// destructured from `props` anymore) in favor of `slotProps.htmlInput`/
+			// `slotProps.input`. This was a real, live bug, not just a test problem: the old
+			// `InputProps={{ endAdornment: <IconButton>... }}` silently never rendered the
+			// show/hide toggle button at all post-migration (confirmed via the actual rendered
+			// DOM while debugging IBPasswordField.test.jsx - React even warned by stringifying the
+			// unrecognized prop onto the root div as a raw `inputprops="[object Object]"`
+			// attribute), and `inputProps={{ minLength: 6 }}` silently stopped enforcing the
+			// client-side minimum length too. Same class of staleness as the Avatar `imgProps` and
+			// date-picker `renderInput` fixes elsewhere this session.
+			slotProps={{
+				htmlInput: { minLength: 6 },
+				input: {
+					endAdornment: (
+						<InputAdornment position="end">
+							<IconButton
+								aria-label="Toggle Password visibility"
+								onClick={handleClick}
+								onMouseDown={handleMouseDown}
+							>
+								{showPassword ? <VisibilityOff /> : <Visibility />}
+							</IconButton>
+						</InputAdornment>
+					),
+				},
 			}}
 		/>
 	);
