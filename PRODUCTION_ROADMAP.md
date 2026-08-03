@@ -1322,8 +1322,10 @@ only ever read `appt.title`, with no fallback and no `project.title` even fetche
 client-side field selection, not a server gap).
 
 **Dashboard rows weren't clickable.** Same list now navigates to `/project/:projectId` on click
-whenever an appointment has one (session/consult appointments always do post-fix above; "other"
-appointments never have a project and stay non-clickable, no dead click targets).
+whenever an appointment has one (session appointments do, since `convertBookingRequest` auto-creates
+a Project for a `session_booked` outcome; a pure consult does not by design - see the follow-up
+section below - and "other" appointments never have a project; all three cases stay non-clickable
+with no dead click targets).
 
 Not touched, same rationale as "not part of the reported gap" above: the calendar's own day-cell
 rendering (`ibCalendar/Day.jsx`) has this same missing-`project.title`-fallback gap in its own
@@ -1341,6 +1343,65 @@ click-through before relying on it**: create a Consult via email lookup (both a 
 non-matching email), create a brand-new-project Session the same way and confirm a Project was
 actually created with the entered details, create a Session against an existing project (unchanged
 path), and confirm the dashboard now shows real titles and navigates to the right project on click.
+
+### Phase 7 follow-up fix #2: convertBookingRequest wrote the wrong Appointment.userId, and never set shopId (August 3, 2026) - done
+
+The click-through above turned up a deeper bug the wizard rewrite didn't touch: a converted
+Consult (and, it turns out, a converted Session too) showed up correctly in the booking-request
+list but never appeared on the artist's own calendar or dashboard. Root cause, found by re-reading
+every real consumer of `Appointment.userId` against what `convertBookingRequest`
+(`server/graphql/mutations/bookingRequests.js`) was actually writing:
+
+- **`Appointment.userId` means "the artist" everywhere else in this codebase** -
+  `getAppointmentsByArtist`/`getAppointmentsByShop` filter on it as the artist,
+  `loadOwnedAppointment` (`mutations/appointments.js`) checks it against the caller as the artist,
+  every other creation path (`createAppointment`, the wizard's own existing-project session path)
+  sets it to the logged-in artist's own id. `convertBookingRequest` alone set it to
+  `clientForAppointment.userId` - the *client's* id - so `getAppointmentsByArtist(artistId)` could
+  never match the resulting Appointment against its own artist. This is the exact reason "shows up
+  in booking-request view, not on calendar or dashboard."
+- **`shopId` was never set at all.** `IBCalendar.jsx` exclusively queries `getAppointmentsByShop`
+  once an artist belongs to a shop (falling back to `getAppointmentsByArtistForCalendar` only when
+  shopless) - confirmed neither client caller (`AppointmentWizard.jsx` nor the pre-existing
+  `ArtistBookingRequests.jsx` dashboard) ever sends a `shopId` on conversion. A shop-affiliated
+  artist's converted booking request was therefore invisible on their calendar independent of the
+  `userId` bug above.
+
+Fixed both server-side in the one resolver, so both existing callers are covered without relying on
+either client to remember a `shopId`: `userId` is now always `bookingRequest.artistId.toString()`;
+`shopId` is derived from `Artist.findOne({ userId: bookingRequest.artistId }).shopId` (the same
+single-shop `Artist.shopId` convention every other appointment-creation path already reads via
+`user.userInfo.shop.id`/`Artist.shop`'s resolver - not the newer multi-shop
+`ArtistShopConnection`/`getShopIdsForUser` model, which nothing else in this pipeline uses). Also
+corrected an inaccurate comment left in `ArtistPerformancePanel.jsx` from the first follow-up pass
+that claimed a consult "always" gets a Project/projectId - it doesn't; only `session_booked`
+outcomes create one (see `convertBookingRequest`'s own comment on why), so a pure consult
+Appointment is expected to stay non-clickable on the dashboard even after this fix.
+
+Added two regression tests to `server/test/integration/bookingRequests.test.js`'s
+`convertBookingRequest` describe block: one asserting the resulting Appointment's `userId` equals
+the artist's own id (not the client's), one asserting `shopId` equals the artist's shop id when the
+artist has one. Verified via `node --check` on both the resolver and test file, and via
+`graphql`'s `buildSchema` against the real SDL (no schema/typeDefs changes, resolver logic only).
+Could not run the tests themselves - same `mongodb-memory-server` 403 network-allowlist block as
+the first follow-up pass.
+
+**Not yet resolved - open product question:** should a consult *also* create a Project the same way
+a session does (matching this user's own repeated framing that "a booking request is the beginning
+of a project"), or is "only sessions get a Project" the intended design? A specific existing record
+(a Joseph Smith consult under an `artist.jonas`-named test account) was flagged as "not linked to a
+project, not clickable" - under the current design that's expected behavior for a pure consult, not
+a bug, but it's worth confirming deliberately rather than leaving it implicit. Separately: that
+specific record predates this fix, so it still has the wrong `userId`/no `shopId` baked in and won't
+retroactively correct itself - it'll need to be recreated (or hand-corrected in Mongo) to actually
+verify against a shop-affiliated artist's calendar/dashboard now.
+
+**Also raised, not yet a code change:** confirming the intended public-booking-request flow - a
+guest submits the intake form with no date; the artist reviews it, corresponds with the guest, and
+only then sets a date when converting to a consult or session. That already matches how
+`createBookingRequest`/`convertBookingRequest` are built (`BookingRequest` never collects a date;
+`appointmentInput.appointmentDate` is only supplied at conversion time, by the artist) - no gap
+found, this was a confirm-the-design check, not a bug report.
 
 ---
 

@@ -126,10 +126,11 @@ const ArtistPerformancePanel = ({ artistUserId, isSelf = false }) => {
 										? "artistUpcomingItem artistUpcomingItemClickable"
 										: "artistUpcomingItem"
 								}
-								// Session/consult appointments carry a projectId (see
-								// mutations/bookingRequests.js's convertBookingRequest, which now
-								// always creates/attaches a Project) - "other" appointments never
-								// have one, so those rows just aren't clickable.
+								// Only session appointments carry a projectId today - convertBookingRequest
+								// (mutations/bookingRequests.js) auto-creates a Project for a session_booked
+								// outcome, but deliberately does not for consult_booked (see that resolver's
+								// own comment). A pure consult or "other" appointment has no projectId, so
+								// those rows just aren't clickable.
 								onClick={
 									appt.projectId
 										? () => navigate(`${ROUTE_CONSTANTS.PROJECT}${appt.projectId}`)

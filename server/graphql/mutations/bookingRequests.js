@@ -6,6 +6,7 @@ const Appointment = require('../../models/Appointment');
 const Client = require('../../models/Client');
 const User = require('../../models/User');
 const Project = require('../../models/Project');
+const Artist = require('../../models/Artist');
 const withAuth = require('../../utils/with-auth');
 const { AuthenticationError, UserInputError, RateLimitError } = require('../../utils/errors');
 const { Constants } = require('../../utils/constants');
@@ -260,21 +261,39 @@ module.exports = {
       newProjectId = project.id;
     }
 
+    // Appointment.userId means "the artist this appointment belongs to" everywhere else in this
+    // codebase - getAppointmentsByArtist/getAppointmentsByShop filter on it as the artist,
+    // loadOwnedAppointment (mutations/appointments.js) checks it against the caller as the
+    // artist, every other creation path (createAppointment, the appointment wizard) sets it to
+    // the logged-in artist's own id. This resolver alone set it to the *client's* userId instead -
+    // wrong on every axis above, and the actual reason a converted booking request (consult or
+    // session) never showed up on the artist's calendar or dashboard: getAppointmentsByArtist
+    // was filtering for the artist's id against a field that held the client's id instead, so it
+    // could never match. Found by re-reading every real caller of Appointment.userId against what
+    // this resolver was actually writing - not caught earlier because nothing had exercised this
+    // path against a real dashboard/calendar view until now.
+    //
+    // shopId was never set at all for a shop-affiliated artist - IBCalendar.jsx exclusively uses
+    // getAppointmentsByShop once an artist has a shop (see that file's own comment), which filters
+    // on Appointment.shopId, so a converted booking request was invisible on a shop-affiliated
+    // artist's calendar for the same "never actually appears anywhere" reason, independent of the
+    // userId bug above. Derived from the artist's own Shop record here (same single-shop
+    // convention every other appointment-creation path already uses via user.userInfo.shop.id -
+    // see Artist.shop's resolver) rather than requiring every caller (the wizard, the booking-
+    // requests dashboard) to remember to pass it - one fix here covers both existing callers.
+    const artistRecord = await Artist.findOne({ userId: bookingRequest.artistId });
+
     const appointmentInput = {
       ...(args.appointmentInput || {}),
       appointmentType,
       // Overrides whatever (if anything) the caller sent - same reasoning as appointmentType
       // above, this is derived from the just-created Project, not trusted from the client.
       ...(newProjectId ? { projectId: newProjectId } : {}),
-      // .toString() matters here - clientForAppointment.userId is a real Mongoose ObjectId
-      // instance, not a string, and createAppointmentInputSchema's userId field is a zod string
-      // regex check (see utils/validation.js's objectIdSchema). Without this, validate() always
-      // rejected with "expected string, received ObjectId" - meaning converting a booking request
-      // into a real consult/session Appointment was completely broken in production; this bug was
-      // only found by exercising this path end-to-end in a real integration test (see
-      // test/integration/bookingRequests.test.js), since nothing else in this codebase ever
-      // called convertBookingRequest with a real Client record before.
-      userId: clientForAppointment.userId.toString(),
+      // .toString() matters here - Mongoose ObjectIds aren't plain strings, and
+      // createAppointmentInputSchema's userId/shopId fields are zod string regex checks (see
+      // utils/validation.js's objectIdSchema).
+      userId: bookingRequest.artistId.toString(),
+      shopId: artistRecord?.shopId ? artistRecord.shopId.toString() : args.appointmentInput?.shopId,
       createdAt: args.appointmentInput?.createdAt || now,
       updatedAt: args.appointmentInput?.updatedAt || now,
     };

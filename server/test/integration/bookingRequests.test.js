@@ -406,6 +406,46 @@ describe('convertBookingRequest', () => {
 
 		const appointment = await Appointment.findById(data.convertBookingRequest.resultingAppointmentId);
 		expect(appointment.appointmentType).toBe('session');
+		// Regression: convertBookingRequest used to set Appointment.userId to the *client's*
+		// userId instead of the artist's - see that resolver's own comment on why. Every other
+		// consumer of Appointment.userId (getAppointmentsByArtist, getAppointmentsByShop,
+		// loadOwnedAppointment) treats it as the artist, so a wrong value here meant a converted
+		// booking request could never show up on the artist's own calendar or dashboard even
+		// though the BookingRequest/Appointment documents both existed.
+		expect(String(appointment.userId)).toBe(String(artistUser.id));
+	});
+
+	it('derives Appointment.shopId from the artist\'s own shop when converting a booking request', async () => {
+		const { shop } = await createShopAdminUser();
+		const { user: artistUser } = await createArtistUser({ artist: { shopId: shop._id } });
+		const bookingRequest = await submitBookingRequest(artistUser.id);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{
+				query: CONVERT_BOOKING_REQUEST,
+				variables: {
+					bookingRequestId: bookingRequest.id,
+					outcome: 'session_booked',
+					appointmentInput: { appointmentDate: new Date().toISOString(), appointmentStatus: 'scheduled' },
+					projectTitle: 'Regression test project',
+				},
+			},
+			{ contextValue: contextWithToken(signTestToken(artistUser)) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+
+		// Regression: shopId was never set at all on the resulting Appointment, for either this
+		// mutation's caller (the appointment wizard) or the pre-existing ArtistBookingRequests
+		// dashboard - neither ever sends one. IBCalendar.jsx exclusively queries
+		// getAppointmentsByShop (filtered on Appointment.shopId) once an artist belongs to a shop,
+		// so a converted booking request was invisible on a shop-affiliated artist's calendar
+		// regardless of the userId fix above. Derived server-side here from the artist's own
+		// Artist.shopId record instead of trusting either client to remember to pass it.
+		const appointment = await Appointment.findById(data.convertBookingRequest.resultingAppointmentId);
+		expect(String(appointment.shopId)).toBe(String(shop._id));
 	});
 
 	it('a SHOP_ADMIN-or-better user can convert a request that isn\'t theirs', async () => {
