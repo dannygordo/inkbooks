@@ -8,7 +8,7 @@ import {AdapterMoment} from '@mui/x-date-pickers/AdapterMoment';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import {MobileDateTimePicker} from '@mui/x-date-pickers/MobileDateTimePicker';
 
-const IBDateTimePicker = ({label, val, setVal}) => {
+const IBDateTimePicker = ({label, val, setVal, disabled}) => {
     const onChange = (newVal) => {
         console.log(newVal.format('LLL'));
         setVal(newVal);
@@ -23,6 +23,7 @@ const IBDateTimePicker = ({label, val, setVal}) => {
         label={label}
         value={val}
         onChange={onChange}
+        disabled={disabled}
       />
     </LocalizationProvider>
   )

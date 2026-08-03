@@ -1,8 +1,13 @@
 import { useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { gql, useMutation, useQuery } from "@apollo/client";
 import { CircularProgress } from "@mui/material";
+import moment from "moment";
 import { useAuth } from "../../context/auth";
 import { ArtistService } from "../../services/ArtistService";
+import IBDateTimePicker from "../../components/inputs/IBDateTimePicker";
+import BookSessionDatesForm from "../../components/booking/BookSessionDatesForm";
+import { ROUTE_CONSTANTS } from "../../constants";
 import "./artistBookingRequests.css";
 
 const GET_BOOKING_REQUESTS = gql`
@@ -103,15 +108,18 @@ const STATUS_LABELS = {
 
 const ArtistBookingRequests = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [selectedId, setSelectedId] = useState(null);
   const [replyError, setReplyError] = useState(null);
   const [convertError, setConvertError] = useState(null);
   // Which outcome's date/time sub-form is currently open ('consult_booked' | 'session_booked' | null)
   const [pendingOutcome, setPendingOutcome] = useState(null);
+  // Only used for the consult_booked form - a consult is always a single meeting, unlike Book
+  // Session (see BookSessionDatesForm, which manages its own date list and looks/behaves like a
+  // real date/time picker instead of a plain native input).
+  const [consultDate, setConsultDate] = useState(moment());
   const [showReassignPicker, setShowReassignPicker] = useState(false);
   const messageInput = useRef();
-  const appointmentDateInput = useRef();
-  const projectTitleInput = useRef();
 
   const shopId = user.userInfo?.shop?.id;
 
@@ -227,40 +235,35 @@ const ArtistBookingRequests = () => {
     });
   };
 
-  const handleConfirmConversion = (e) => {
+  const handleConfirmConsult = (e) => {
     e.preventDefault();
-    if (!selected || !pendingOutcome) return;
-    const rawDate = appointmentDateInput.current.value;
-    if (!rawDate) {
-      setConvertError("Pick a date and time first.");
-      return;
-    }
-    // Booking a session now auto-creates a real Project from this request's own intake fields
-    // (see server/graphql/mutations/bookingRequests.js) - Project.title is required and
-    // BookingRequest never collects one, so it has to come from here.
-    let projectTitle;
-    if (pendingOutcome === "session_booked") {
-      projectTitle = projectTitleInput.current?.value.trim();
-      if (!projectTitle) {
-        setConvertError("Give the project a title first.");
-        return;
-      }
-    }
+    if (!selected) return;
     convertBookingRequest({
       variables: {
         bookingRequestId: selected.id,
-        outcome: pendingOutcome,
-        // shopCutStatus/appointmentStatus are sensible defaults for a freshly-booked
-        // consult/session, not something worth a form field for yet - both are editable
-        // afterward from the regular Appointments views like any other appointment.
+        outcome: "consult_booked",
+        // shopCutStatus/appointmentStatus are sensible defaults for a freshly-booked consult, not
+        // something worth a form field for yet - both are editable afterward from the regular
+        // Appointments views like any other appointment.
         appointmentInput: {
-          appointmentDate: new Date(rawDate).toISOString(),
+          appointmentDate: moment(consultDate).toISOString(),
           shopCutStatus: "unpaid",
           appointmentStatus: "scheduled",
         },
-        projectTitle,
       },
     });
+  };
+
+  // BookSessionDatesForm (see that component's own comment) handles the session_booked outcome
+  // itself - it calls convertBookingRequest for the first date and createAppointment for any
+  // additional ones, so this just closes the form, refreshes the list, and follows the artist to
+  // the new Project, the same way ConsultDetail.jsx's own "Convert to Session" does.
+  const handleSessionBooked = (projectId) => {
+    setPendingOutcome(null);
+    refetch();
+    if (projectId) {
+      navigate(`${ROUTE_CONSTANTS.PROJECT}${projectId}`);
+    }
   };
 
   const handleReassign = (e) => {
@@ -356,6 +359,7 @@ const ArtistBookingRequests = () => {
                   className="bookingRequestActionButton"
                   onClick={() => {
                     setPendingOutcome("consult_booked");
+                    setConsultDate(moment());
                     setConvertError(null);
                   }}
                   disabled={converting}
@@ -436,18 +440,9 @@ const ArtistBookingRequests = () => {
               </div>
             )}
 
-            {pendingOutcome && (
-              <form className="bookingRequestConvertForm" onSubmit={handleConfirmConversion}>
-                <label>
-                  {pendingOutcome === "consult_booked" ? "Consult" : "Session"} date & time
-                </label>
-                <input type="datetime-local" ref={appointmentDateInput} required />
-                {pendingOutcome === "session_booked" && (
-                  <>
-                    <label>Project title</label>
-                    <input type="text" ref={projectTitleInput} placeholder="e.g. Sleeve piece" required />
-                  </>
-                )}
+            {pendingOutcome === "consult_booked" && (
+              <form className="bookingRequestConvertForm" onSubmit={handleConfirmConsult}>
+                <IBDateTimePicker label="Consult date & time" val={consultDate} setVal={setConsultDate} />
                 <div className="bookingRequestConvertFormButtons">
                   <button type="submit" disabled={converting}>
                     {converting ? <CircularProgress color="inherit" size="16px" /> : "Confirm"}
@@ -457,6 +452,13 @@ const ArtistBookingRequests = () => {
                   </button>
                 </div>
               </form>
+            )}
+            {pendingOutcome === "session_booked" && (
+              <BookSessionDatesForm
+                bookingRequestId={selected.id}
+                onSuccess={handleSessionBooked}
+                onCancel={() => setPendingOutcome(null)}
+              />
             )}
             {convertError && <div className="bookingRequestError">{convertError}</div>}
 

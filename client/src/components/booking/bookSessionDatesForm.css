@@ -1,0 +1,26 @@
+.bookSessionDatesForm {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	background-color: #f8f9fb;
+	padding: 14px 16px;
+	border-radius: 8px;
+}
+
+.bookSessionDatesList {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.bookSessionDateRow {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.bookSessionDatesFormButtons {
+	display: flex;
+	gap: 8px;
+	margin-top: 4px;
+}

@@ -1,10 +1,9 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useMutation } from "@apollo/client";
 import { CircularProgress } from "@mui/material";
+import moment from "moment";
 import { AppointmentService } from "../../services/AppointmentService";
-import BookingRequestService from "../../services/BookingRequestService";
-import IBPageLoader from "../../components/ibPageLoader/IBPageLoader";
+import BookSessionDatesForm from "../../components/booking/BookSessionDatesForm";
 import { useAuth } from "../../context/auth";
 import { ALERT_CONSTANTS, ROUTE_CONSTANTS } from "../../constants";
 // Reuses ArtistBookingRequests.jsx's own stylesheet rather than duplicating near-identical
@@ -26,9 +25,9 @@ const STATUS_LABELS = {
  * shows the consult's date and its original intake details (pulled from the BookingRequest it was
  * created from - see Appointment.bookingRequestId / the bookingRequest field resolver in
  * resolvers/index.js), and, while the underlying BookingRequest is still at consult_booked, offers
- * "Convert to Session" - the same convertBookingRequest(outcome: 'session_booked') call
- * ArtistBookingRequests.jsx's own "Book Session" action uses, which auto-creates the real Project
- * from this same intake data (see mutations/bookingRequests.js).
+ * "Convert to Session" via the shared BookSessionDatesForm (see that component's own comment) -
+ * lets the artist book one or several session dates in one go, with a real date/time picker
+ * instead of a plain native input.
  *
  * Reached from ArtistPerformancePanel.jsx's dashboard (a consult-type upcoming appointment row) -
  * previously those rows weren't clickable at all, since the dashboard's clickability only ever
@@ -39,34 +38,8 @@ const ConsultDetail = () => {
 	const navigate = useNavigate();
 	const { setAlert } = useAuth();
 	const [showConvertForm, setShowConvertForm] = useState(false);
-	const [convertError, setConvertError] = useState(null);
-	const appointmentDateInput = useRef();
-	const projectTitleInput = useRef();
 
 	const { data, loading, error } = AppointmentService.getAppointment(appointmentId);
-
-	const [convertBookingRequest, { loading: converting }] = useMutation(
-		BookingRequestService.CONVERT_BOOKING_REQUEST_MUTATION,
-		{
-			onCompleted(res) {
-				setConvertError(null);
-				const projectId = res.convertBookingRequest?.resultingAppointment?.projectId;
-				setAlert({
-					isAlert: true,
-					severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
-					message: "Session booked.",
-					timeout: ALERT_CONSTANTS.TIMEOUT,
-					location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
-				});
-				if (projectId) {
-					navigate(`${ROUTE_CONSTANTS.PROJECT}${projectId}`);
-				}
-			},
-			onError(err) {
-				setConvertError(err.graphQLErrors?.[0]?.message || err.message);
-			},
-		}
-	);
 
 	if (loading) {
 		return (
@@ -103,30 +76,18 @@ const ConsultDetail = () => {
 		);
 	}
 
-	const handleConfirmConvert = (e) => {
-		e.preventDefault();
-		const rawDate = appointmentDateInput.current.value;
-		if (!rawDate) {
-			setConvertError("Pick a date and time first.");
-			return;
-		}
-		const projectTitle = projectTitleInput.current.value.trim();
-		if (!projectTitle) {
-			setConvertError("Give the project a title first.");
-			return;
-		}
-		convertBookingRequest({
-			variables: {
-				bookingRequestId: bookingRequest.id,
-				outcome: "session_booked",
-				appointmentInput: {
-					appointmentDate: new Date(rawDate).toISOString(),
-					shopCutStatus: "unpaid",
-					appointmentStatus: "scheduled",
-				},
-				projectTitle,
-			},
+	const handleConverted = (projectId) => {
+		setShowConvertForm(false);
+		setAlert({
+			isAlert: true,
+			severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
+			message: "Session booked.",
+			timeout: ALERT_CONSTANTS.TIMEOUT,
+			location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
 		});
+		if (projectId) {
+			navigate(`${ROUTE_CONSTANTS.PROJECT}${projectId}`);
+		}
 	};
 
 	return (
@@ -171,39 +132,20 @@ const ConsultDetail = () => {
 
 				{bookingRequest.status === "consult_booked" && !showConvertForm && (
 					<div className="bookingRequestDetailActions">
-						<button
-							className="bookingRequestActionButton"
-							onClick={() => {
-								setShowConvertForm(true);
-								setConvertError(null);
-							}}
-						>
+						<button className="bookingRequestActionButton" onClick={() => setShowConvertForm(true)}>
 							Convert to Session
 						</button>
 					</div>
 				)}
 
 				{showConvertForm && (
-					<form className="bookingRequestConvertForm" onSubmit={handleConfirmConvert}>
-						<label>
-							Session date & time
-							<input type="datetime-local" ref={appointmentDateInput} required />
-						</label>
-						<label>
-							Project title
-							<input type="text" ref={projectTitleInput} placeholder="e.g. Sleeve piece" required />
-						</label>
-						<div className="bookingRequestConvertFormButtons">
-							<button type="submit" disabled={converting}>
-								{converting ? <CircularProgress color="inherit" size="16px" /> : "Confirm"}
-							</button>
-							<button type="button" onClick={() => setShowConvertForm(false)}>
-								Cancel
-							</button>
-						</div>
-					</form>
+					<BookSessionDatesForm
+						bookingRequestId={bookingRequest.id}
+						initialDate={moment(appointment.appointmentDate)}
+						onSuccess={handleConverted}
+						onCancel={() => setShowConvertForm(false)}
+					/>
 				)}
-				{convertError && <div className="bookingRequestError">{convertError}</div>}
 
 				{bookingRequest.status === "session_booked" && (
 					<div className="bookingRequestDetailContact">
