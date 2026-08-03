@@ -61,13 +61,14 @@ const Day = ({ day, rowIdx }) => {
 		<div className="ibCalendarDateCellBody">
 			<div className="ibCalendarDateCell">
 				<header
+					className="ibCalendarDayHeader"
 					onClick={handleCreateEvent}
 					style={{ cursor: "pointer" }}
 				>
 					{rowIdx === 0 && <p>{day.format("ddd").toUpperCase()}</p>}
 					<p className={getCurrentDayClass()}>{day.format("DD")}</p>
 				</header>
-				<div>
+				<div className="ibCalendarDayEvents">
 					{dayEvents.map((evt, index) => (
                         
 						<Tooltip

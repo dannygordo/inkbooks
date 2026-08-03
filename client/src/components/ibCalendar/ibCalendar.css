@@ -22,11 +22,29 @@
 .ibCalendarDayContainer {
 	border: solid 1px #000;
 }
+/* This used to carry the day-number header's own sizing (height: 24px; line-height: 24px) - since
+   it wraps BOTH the header and the events list below it, that squashed the whole cell (including
+   every event's colored label) into a 24px sliver. The label divs were still technically in the
+   DOM (so hovering one still triggered its MUI Tooltip, which renders in a portal outside this
+   clipped box - that's why "only a tooltip" showed up at all), just not visibly rendered. Moved
+   the fixed sizing to .ibCalendarDayHeader (the actual day-number row) below, and let this
+   container stretch to fill the day cell instead. */
 .ibCalendarDateCell {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+}
+.ibCalendarDayHeader {
 	font-size: 14px;
 	font-weight: 600;
 	height: 24px;
 	line-height: 24px;
+	flex-shrink: 0;
+}
+.ibCalendarDayEvents {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
 }
 .ibCalendarToday {
 	margin-top: 0px;
