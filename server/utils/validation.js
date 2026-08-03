@@ -230,9 +230,12 @@ const guestMessageInputSchema = z.object({
 });
 
 const convertBookingRequestInputSchema = z.object({
-  outcome: z.enum(['consult_booked', 'session_booked', 'declined']),
+  outcome: z.enum(['consult_booked', 'session_booked', 'declined', 'not_booked']),
   // Only actually required when outcome is session_booked (checked at the resolver level, not
   // here, since zod's cross-field conditionals get awkward) - see mutations/bookingRequests.js.
+  // Which *current* statuses each outcome is even reachable from (e.g. not_booked only makes
+  // sense following consult_booked) is also enforced at the resolver level, not here - zod
+  // validates the shape of this one call's input, not the BookingRequest's existing state.
   projectTitle: z.string().trim().min(1).nullish(),
 });
 

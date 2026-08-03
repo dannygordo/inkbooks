@@ -95,6 +95,10 @@ const STATUS_LABELS = {
   consult_booked: "Consult booked",
   session_booked: "Session booked",
   declined: "Declined",
+  // Distinct from "Declined" - the consult happened, the client just chose not to move forward
+  // afterward. See BookingRequest.status's own comment (server/models/BookingRequest.js) for why
+  // these are kept as two separate terminal values instead of one shared "closed" status.
+  not_booked: "Not booked",
 };
 
 const ArtistBookingRequests = () => {
@@ -203,6 +207,23 @@ const ArtistBookingRequests = () => {
     }
     convertBookingRequest({
       variables: { bookingRequestId: selected.id, outcome: "declined" },
+    });
+  };
+
+  // Only reachable from a consult_booked request (see the resolver's own transition guard) - the
+  // consult happened, the client isn't moving forward. Distinct from Decline, which is for a
+  // request that never got that far.
+  const handleMarkNotBooked = () => {
+    if (!selected) return;
+    if (
+      !window.confirm(
+        "Mark this as not booked? This can't be undone, but you can still message the client."
+      )
+    ) {
+      return;
+    }
+    convertBookingRequest({
+      variables: { bookingRequestId: selected.id, outcome: "not_booked" },
     });
   };
 
@@ -370,6 +391,32 @@ const ArtistBookingRequests = () => {
                     Forward to...
                   </button>
                 )}
+              </div>
+            )}
+
+            {/* The consult already happened - the only two places this can go next are booking
+                the actual session (spawns a Project, same "Book Session" sub-form as above) or
+                marking it not booked (the client decided not to move forward). Forwarding to a
+                shop-mate doesn't apply here - that's for a request nobody's engaged with yet. */}
+            {selected.status === "consult_booked" && (
+              <div className="bookingRequestDetailActions">
+                <button
+                  className="bookingRequestActionButton"
+                  onClick={() => {
+                    setPendingOutcome("session_booked");
+                    setConvertError(null);
+                  }}
+                  disabled={converting}
+                >
+                  Book Session
+                </button>
+                <button
+                  className="bookingRequestActionButtonDecline"
+                  onClick={handleMarkNotBooked}
+                  disabled={converting}
+                >
+                  Mark Not Booked
+                </button>
               </div>
             )}
 

@@ -1386,22 +1386,69 @@ artist has one. Verified via `node --check` on both the resolver and test file, 
 Could not run the tests themselves - same `mongodb-memory-server` 403 network-allowlist block as
 the first follow-up pass.
 
-**Not yet resolved - open product question:** should a consult *also* create a Project the same way
-a session does (matching this user's own repeated framing that "a booking request is the beginning
-of a project"), or is "only sessions get a Project" the intended design? A specific existing record
-(a Joseph Smith consult under an `artist.jonas`-named test account) was flagged as "not linked to a
-project, not clickable" - under the current design that's expected behavior for a pure consult, not
-a bug, but it's worth confirming deliberately rather than leaving it implicit. Separately: that
-specific record predates this fix, so it still has the wrong `userId`/no `shopId` baked in and won't
-retroactively correct itself - it'll need to be recreated (or hand-corrected in Mongo) to actually
-verify against a shop-affiliated artist's calendar/dashboard now.
+**Resolved - the consult/Project question:** confirmed the intended funnel is `pending` ->
+`consult_booked` -> (`session_booked` | `not_booked`), with `session_booked` reachable directly from
+`pending` too (some sessions get booked with no separate consult). A consult does *not* spawn a
+Project on its own - only the eventual `session_booked` conversion does, whether that happens
+straight from `pending` or as the next step after an existing `consult_booked` request. See the
+next section for what that required.
 
-**Also raised, not yet a code change:** confirming the intended public-booking-request flow - a
-guest submits the intake form with no date; the artist reviews it, corresponds with the guest, and
-only then sets a date when converting to a consult or session. That already matches how
-`createBookingRequest`/`convertBookingRequest` are built (`BookingRequest` never collects a date;
-`appointmentInput.appointmentDate` is only supplied at conversion time, by the artist) - no gap
-found, this was a confirm-the-design check, not a bug report.
+A specific existing record (a Joseph Smith consult under an `artist.jonas`-named test account) was
+flagged as "not linked to a project, not clickable" - that's expected for a pure consult under this
+design, not a bug. That specific record also predates the userId/shopId fix above, so it still has
+the wrong `userId`/no `shopId` baked in and won't retroactively correct itself - it'll need to be
+recreated (or hand-corrected in Mongo) to actually verify against a shop-affiliated artist's
+calendar/dashboard now.
+
+**Also raised, confirmed as already correct, not a code change:** the intended public-booking-
+request flow - a guest submits the intake form with no date; the artist reviews it, corresponds with
+the guest, and only then sets a date when converting to a consult or session. That already matches
+how `createBookingRequest`/`convertBookingRequest` are built (`BookingRequest` never collects a
+date; `appointmentInput.appointmentDate` is only supplied at conversion time, by the artist) - no
+gap found, this was a confirm-the-design check, not a bug report.
+
+### Phase 7 follow-up fix #3: consult -> session progression + a distinct "not booked" outcome (August 3, 2026) - done
+
+Before this, `convertBookingRequest` treated `consult_booked` as a dead end: once a request became
+a consult, there was no way to later book the actual session from it (the "Book Consult / Book
+Session / Decline" actions on `ArtistBookingRequests.jsx` only rendered for `status === "pending"`),
+and the only terminal non-success state was `declined` - conflating "never even had a consult" with
+"had the consult, client went cold," which loses information an artist would actually want when
+reviewing their own booking-request history.
+
+Changes, all server-driven so the existing dashboard and the wizard both get this for free:
+
+- `BookingRequest.status` enum gained a fifth value, `not_booked`, kept deliberately distinct from
+  `declined` (see that model's own comment on why - different points in the real-world funnel, same
+  practical "nothing more happens here" outcome).
+- `convertBookingRequest` now enforces which outcome is reachable from which *current* status
+  (`VALID_OUTCOMES_BY_STATUS`, resolver-local): `pending` -> `consult_booked | session_booked |
+  declined`; `consult_booked` -> `session_booked | not_booked`; anything already terminal
+  (`session_booked`/`declined`/`not_booked`) rejects any further conversion. Previously there was no
+  such guard at all - a second call against an already-`session_booked` request would have silently
+  created a *second* Appointment/Project and overwritten `resultingAppointmentId`, orphaning the
+  link to the first one.
+- `not_booked` behaves like `declined` (status change only, no Appointment/Project) but is only
+  reachable from `consult_booked`.
+- `ArtistBookingRequests.jsx` gained a second action block, rendered for `status === "consult_booked"`:
+  "Book Session" (reuses the same date/time + project-title sub-form as the pending path) and "Mark
+  Not Booked". Forwarding to a shop-mate isn't offered here - that action is for a request nobody's
+  engaged with yet.
+- `convertBookingRequestInputSchema` (zod) extended to accept the new outcome value.
+
+Also fixed, found while extending the test file: `CONVERT_BOOKING_REQUEST`'s test query never
+declared a `$projectTitle` variable at all, so the existing "converts to session_booked" test's
+`projectTitle` would never have reached the resolver had it actually run against a database - the
+resolver would have thrown for a missing required project title. Added the missing variable
+declaration and a real value to that test.
+
+Added five regression tests to `bookingRequests.test.js`: consult -> session progression (asserts
+the resulting Appointment has a `projectId`), consult -> not_booked (asserts no Appointment is
+created), rejecting a second conversion of an already-`declined` request, and rejecting `not_booked`
+on a still-`pending` request. Verified via `node --check` on every changed file and `graphql`'s
+`validate`/`buildSchema` against the real SDL for the updated test query. Could not execute the
+tests themselves - same `mongodb-memory-server` 403 network-allowlist block as the prior two
+follow-up passes.
 
 ---
 

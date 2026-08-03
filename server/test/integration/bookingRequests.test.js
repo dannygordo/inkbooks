@@ -55,8 +55,18 @@ const SEND_GUEST_MESSAGE = `
 `;
 
 const CONVERT_BOOKING_REQUEST = `
-	mutation ConvertBookingRequest($bookingRequestId: ID!, $outcome: String!, $appointmentInput: AppointmentInput) {
-		convertBookingRequest(bookingRequestId: $bookingRequestId, outcome: $outcome, appointmentInput: $appointmentInput) {
+	mutation ConvertBookingRequest(
+		$bookingRequestId: ID!
+		$outcome: String!
+		$appointmentInput: AppointmentInput
+		$projectTitle: String
+	) {
+		convertBookingRequest(
+			bookingRequestId: $bookingRequestId
+			outcome: $outcome
+			appointmentInput: $appointmentInput
+			projectTitle: $projectTitle
+		) {
 			id
 			status
 			resultingAppointmentId
@@ -394,6 +404,14 @@ describe('convertBookingRequest', () => {
 					bookingRequestId: bookingRequest.id,
 					outcome: 'session_booked',
 					appointmentInput: { appointmentDate: new Date().toISOString(), appointmentStatus: 'scheduled' },
+					// Required for session_booked (see the resolver's own projectTitle check) - this
+					// test previously omitted it, and CONVERT_BOOKING_REQUEST didn't even declare a
+					// $projectTitle variable, so this was passing "by accident": the resolver would
+					// have thrown a UserInputError for a missing project title had this actually run
+					// against a real database. Found while fixing the query to add $projectTitle for
+					// the new shopId regression test below - fixed here too rather than leave a test
+					// that doesn't actually exercise what it claims to.
+					projectTitle: 'Regression test project',
 				},
 			},
 			{ contextValue: contextWithToken(signTestToken(artistUser)) },
@@ -446,6 +464,130 @@ describe('convertBookingRequest', () => {
 		// Artist.shopId record instead of trusting either client to remember to pass it.
 		const appointment = await Appointment.findById(data.convertBookingRequest.resultingAppointmentId);
 		expect(String(appointment.shopId)).toBe(String(shop._id));
+	});
+
+	it('lets a consult_booked request progress to session_booked, creating a Project', async () => {
+		const { user: artistUser } = await createArtistUser();
+		const bookingRequest = await submitBookingRequest(artistUser.id);
+		const server = createTestServer();
+		const token = signTestToken(artistUser);
+
+		const consultResponse = await server.executeOperation(
+			{
+				query: CONVERT_BOOKING_REQUEST,
+				variables: {
+					bookingRequestId: bookingRequest.id,
+					outcome: 'consult_booked',
+					appointmentInput: { appointmentDate: new Date().toISOString(), appointmentStatus: 'scheduled' },
+				},
+			},
+			{ contextValue: contextWithToken(token) },
+		);
+		expect(consultResponse.body.singleResult.errors).toBeUndefined();
+		expect(consultResponse.body.singleResult.data.convertBookingRequest.status).toBe('consult_booked');
+
+		// The consult happened, the client wants to move forward - this is the "Book Session"
+		// action on an already consult_booked request (ArtistBookingRequests.jsx), not a fresh
+		// booking request. Should be allowed to progress rather than rejected as already-handled.
+		const sessionResponse = await server.executeOperation(
+			{
+				query: CONVERT_BOOKING_REQUEST,
+				variables: {
+					bookingRequestId: bookingRequest.id,
+					outcome: 'session_booked',
+					appointmentInput: { appointmentDate: new Date().toISOString(), appointmentStatus: 'scheduled' },
+					projectTitle: 'Sleeve piece',
+				},
+			},
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = sessionResponse.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.convertBookingRequest.status).toBe('session_booked');
+		const appointment = await Appointment.findById(data.convertBookingRequest.resultingAppointmentId);
+		expect(appointment.appointmentType).toBe('session');
+		expect(appointment.projectId).toBeTruthy();
+	});
+
+	it('lets a consult_booked request be marked not_booked without creating an Appointment', async () => {
+		const { user: artistUser } = await createArtistUser();
+		const bookingRequest = await submitBookingRequest(artistUser.id);
+		const server = createTestServer();
+		const token = signTestToken(artistUser);
+
+		await server.executeOperation(
+			{
+				query: CONVERT_BOOKING_REQUEST,
+				variables: {
+					bookingRequestId: bookingRequest.id,
+					outcome: 'consult_booked',
+					appointmentInput: { appointmentDate: new Date().toISOString(), appointmentStatus: 'scheduled' },
+				},
+			},
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const response = await server.executeOperation(
+			{
+				query: CONVERT_BOOKING_REQUEST,
+				variables: { bookingRequestId: bookingRequest.id, outcome: 'not_booked' },
+			},
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.convertBookingRequest.status).toBe('not_booked');
+		expect(data.convertBookingRequest.resultingAppointmentId).toBeNull();
+	});
+
+	it('rejects converting an already-terminal booking request (e.g. re-converting a declined one)', async () => {
+		const { user: artistUser } = await createArtistUser();
+		const bookingRequest = await submitBookingRequest(artistUser.id);
+		const server = createTestServer();
+		const token = signTestToken(artistUser);
+
+		await server.executeOperation(
+			{ query: CONVERT_BOOKING_REQUEST, variables: { bookingRequestId: bookingRequest.id, outcome: 'declined' } },
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const response = await server.executeOperation(
+			{
+				query: CONVERT_BOOKING_REQUEST,
+				variables: {
+					bookingRequestId: bookingRequest.id,
+					outcome: 'session_booked',
+					appointmentInput: { appointmentDate: new Date().toISOString(), appointmentStatus: 'scheduled' },
+					projectTitle: 'Should not be created',
+				},
+			},
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors } = response.body.singleResult;
+		expect(errors).toBeDefined();
+		expect(errors[0].message).toMatch(/Errors/);
+	});
+
+	it('rejects not_booked on a request that never had a consult', async () => {
+		const { user: artistUser } = await createArtistUser();
+		const bookingRequest = await submitBookingRequest(artistUser.id);
+		const server = createTestServer();
+
+		// not_booked only makes sense following an actual consult - a still-pending request should
+		// use 'declined' instead. See the resolver's VALID_OUTCOMES_BY_STATUS guard.
+		const response = await server.executeOperation(
+			{
+				query: CONVERT_BOOKING_REQUEST,
+				variables: { bookingRequestId: bookingRequest.id, outcome: 'not_booked' },
+			},
+			{ contextValue: contextWithToken(signTestToken(artistUser)) },
+		);
+
+		const { errors } = response.body.singleResult;
+		expect(errors).toBeDefined();
 	});
 
 	it('a SHOP_ADMIN-or-better user can convert a request that isn\'t theirs', async () => {

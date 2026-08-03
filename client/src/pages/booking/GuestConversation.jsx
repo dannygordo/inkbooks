@@ -58,6 +58,7 @@ const STATUS_LABELS = {
   consult_booked: "Consult booked",
   session_booked: "Session booked",
   declined: "Declined",
+  not_booked: "Not booked",
 };
 
 const GuestConversation = () => {

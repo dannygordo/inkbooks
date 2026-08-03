@@ -19,14 +19,25 @@ const BookingRequestSchema = new mongoose.Schema(
     clientId: { type: mongoose.Schema.Types.ObjectId, required: true },
     conversationId: { type: mongoose.Schema.Types.ObjectId, required: true },
     guestToken: { type: String, required: true, unique: true },
-    // pending -> consult_booked | session_booked | declined. Deliberately not reusing Project's
-    // status enum (open/in_progress/waitlist/cancelled/completed) - a booking request that's
-    // still being discussed isn't a project yet, and forcing it into that enum has no good fit.
+    // pending -> consult_booked -> session_booked | not_booked, or pending -> session_booked
+    // directly (some sessions get booked with no separate consult), or pending -> declined.
+    // Deliberately not reusing Project's status enum (open/in_progress/waitlist/cancelled/
+    // completed) - a booking request that's still being discussed isn't a project yet, and
+    // forcing it into that enum has no good fit.
+    //
+    // declined vs not_booked are deliberately separate terminal states, not one shared "closed"
+    // value: declined means the artist never even had the consult (turned the request away
+    // outright); not_booked means the consult happened and the client chose not to move forward
+    // afterward. Same practical effect (nothing further happens with this request), but different
+    // enough in the real-world funnel - "declined before a consult" vs. "had a consult, went
+    // cold" - that collapsing them would lose information an artist would want when reviewing
+    // their own booking-request history. See mutations/bookingRequests.js's convertBookingRequest
+    // for the actual transition guard that enforces which of these are reachable from which.
     status: {
       type: String,
       required: true,
       default: 'pending',
-      enum: ['pending', 'consult_booked', 'session_booked', 'declined'],
+      enum: ['pending', 'consult_booked', 'session_booked', 'declined', 'not_booked'],
     },
     description: { type: String, required: true },
     // Plain URL strings, not [IBImageSchema] - see the matching comment in graphql/typeDefs.js

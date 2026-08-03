@@ -206,8 +206,29 @@ module.exports = {
       throw new AuthenticationError('Action not allowed');
     }
 
-    if (data.outcome === 'declined') {
-      bookingRequest.status = 'declined';
+    // Which outcome is reachable depends on the request's *current* status, not just its shape -
+    // the real-world funnel is pending -> (consult_booked -> (session_booked | not_booked)) |
+    // session_booked | declined. A request that's already session_booked/declined/not_booked is
+    // terminal - re-converting it would either silently orphan the Appointment/Project already
+    // created (the old resultingAppointmentId gets overwritten with nothing pointing at the
+    // original) or double-book a client who already has a real Appointment on the books. See
+    // BookingRequest.status's own comment for why declined and not_booked are kept as two distinct
+    // terminal values instead of one shared "closed" state.
+    const VALID_OUTCOMES_BY_STATUS = {
+      pending: ['consult_booked', 'session_booked', 'declined'],
+      consult_booked: ['session_booked', 'not_booked'],
+    };
+    const allowedOutcomes = VALID_OUTCOMES_BY_STATUS[bookingRequest.status] || [];
+    if (!allowedOutcomes.includes(data.outcome)) {
+      throw new UserInputError('Errors', {
+        errors: {
+          outcome: `Cannot convert a "${bookingRequest.status}" booking request to "${data.outcome}"`,
+        },
+      });
+    }
+
+    if (data.outcome === 'declined' || data.outcome === 'not_booked') {
+      bookingRequest.status = data.outcome;
       await bookingRequest.save();
       return bookingRequest;
     }
