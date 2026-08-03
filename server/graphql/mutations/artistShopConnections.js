@@ -9,6 +9,7 @@ const {
   setRateSourceInputSchema,
   validate,
 } = require('../../utils/validation');
+const { isUnsetTagColor, pickDefaultTagColor } = require('../../utils/tag-color');
 
 // Same authorization shape as the Query side (see resolvers/artistShopConnections.js) - the
 // artist themselves, or a shop-admin-or-better role (Shop has no owning-User field to check
@@ -45,6 +46,18 @@ module.exports = {
       { artistId: data.artistId, shopId: data.shopId, status: 'active', disconnectedAt: null },
       { new: true, upsert: true, setDefaultsOnInsert: true },
     );
+
+    // First time this artist is actually affiliated with a shop, their tagColor may still be the
+    // purple "no shop" default from registration (or, for an account that predates this fix, the
+    // old white default) - assign one guaranteed not already in use by another artist/staff member
+    // at this shop. Never overwrites a tagColor the artist (or an admin) already deliberately
+    // chose, even if it happens to collide with a shop-mate right now - see
+    // utils/tag-color.js's isUnsetTagColor for exactly what counts as "not a real choice yet".
+    if (isUnsetTagColor(artist.tagColor)) {
+      artist.tagColor = await pickDefaultTagColor(data.shopId, artist.id);
+      await artist.save();
+    }
+
     return connection;
   }),
   // Either party can disconnect at any time, per the design - doesn't touch any Appointment

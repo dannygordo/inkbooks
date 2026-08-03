@@ -35,7 +35,6 @@ const Register = () => {
       $confirmPassword: String!
       $role: Int!
       $userType: String!
-      $tagColor: String
     ) {
       register(
         registerInput: {
@@ -48,7 +47,6 @@ const Register = () => {
           confirmPassword: $confirmPassword
           role: $role
           userType: $userType
-          tagColor: $tagColor
         }
       ){
         id
@@ -90,17 +88,12 @@ const handleClick =  (e) => {
     // server/graphql/resolvers/users.js register()) - this was a real vulnerability (client-
     // supplied role let anyone register as Admin) and is fixed server-side, not by this
     // client-side value. Don't rely on this being the security boundary.
-    const user = {
-      username: username.current.value,
-      email: email.current.value,
-      firstName: firstName.current.value,
-      lastName: lastName.current.value,
-      avatar: avatar.current.value,
-      password: password.current.value,
-      role: 30,
-      userType: 'client',
-      tagColor: '#fff'
-    };
+    //
+    // tagColor is no longer sent at all - it used to be hardcoded to the literal '#fff' here,
+    // which is exactly why every self-registered account's calendar label rendered invisibly
+    // (white on white). register() now always assigns a real default itself (purple, since a
+    // self-registered account has no shop - see utils/tag-color.js) regardless of what's sent, so
+    // there's nothing useful for the client to contribute here either.
     registerUser({variables: {
       username: username.current.value,
       email: email.current.value,
@@ -111,7 +104,6 @@ const handleClick =  (e) => {
       confirmPassword: confirmPassword.current.value,
       role: 30,
       userType: 'client',
-      tagColor: '#fff'
     }
   });
   }

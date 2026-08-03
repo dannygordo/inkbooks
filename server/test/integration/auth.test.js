@@ -5,10 +5,12 @@
 // describe/it/expect come from Vitest's `globals: true` config - see the comment in
 // test/integration/appointments.test.js for why there's no `require('vitest')` here.
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const { createTestServer, contextWithToken } = require('../helpers/testServer');
 const { signTestToken } = require('../helpers/auth');
 const { createUser, createArtistUser, createShopAdminUser } = require('../helpers/factories');
 const { Constants } = require('../../utils/constants');
+const { DEFAULT_NO_SHOP_TAG_COLOR } = require('../../utils/tag-color');
 const User = require('../../models/User');
 
 const REGISTER_MUTATION = `
@@ -20,6 +22,7 @@ const REGISTER_MUTATION = `
 			role
 			userType
 			accessToken
+			tagColor
 		}
 	}
 `;
@@ -32,6 +35,7 @@ const LOGIN_MUTATION = `
 			username
 			role
 			accessToken
+			tagColor
 		}
 	}
 `;
@@ -109,6 +113,29 @@ describe('register mutation', () => {
 		const stored = await User.findOne({ username: registerInput.username });
 		expect(stored.role).toBe(Constants.ROLES.CLIENT);
 		expect(stored.userType).toBe(Constants.USER_TYPE.CLIENT);
+	});
+
+	// Regression test: Register.jsx used to hardcode tagColor: '#fff' on the client, and the
+	// resolver just echoed back whatever it was sent - so every self-registered account's calendar
+	// label rendered invisibly (white on white). register() now always assigns a real default
+	// itself (see utils/tag-color.js), ignoring any tagColor the caller sends - a self-registered
+	// account is always a Client with no shop, so there's nothing to be "unique among shop-mates"
+	// against, always the fixed purple default.
+	it('assigns the fixed purple "no shop" default tagColor, ignoring anything the caller sends', async () => {
+		const server = createTestServer();
+		const registerInput = baseRegisterInput({ tagColor: '#123456' });
+		const response = await server.executeOperation(
+			{ query: REGISTER_MUTATION, variables: { registerInput } },
+			{ contextValue: contextWithToken() },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.register.tagColor).toBe(DEFAULT_NO_SHOP_TAG_COLOR);
+
+		// Also confirm it stuck in the actual DB record, not just the mutation's return value.
+		const stored = await User.findOne({ username: registerInput.username });
+		expect(stored.tagColor).toBe(DEFAULT_NO_SHOP_TAG_COLOR);
 	});
 
 	it('rejects a password under 8 characters', async () => {
@@ -250,6 +277,78 @@ describe('login mutation', () => {
 		expect(errors).toBeDefined();
 		expect(errors[0].message).toMatch(/Invalid username\/password/);
 		expect(data).toBeNull();
+	});
+});
+
+// Regression tests for login()'s tagColor self-heal (see resolvers/users.js) - fixes every
+// account already stuck at a missing/placeholder tagColor the moment they next log in, rather
+// than needing a one-off DB migration script this sandbox has no way to run against a live DB
+// anyway. Uses factories.createUser/createArtistUser directly (not the register mutation, which
+// only ever creates Clients) with a real bcrypt hash so login()'s bcrypt.compare check actually
+// passes - factories' own placeholder password field isn't a valid hash.
+describe('login mutation: tagColor self-heal', () => {
+	const REAL_PASSWORD = 'reallongpassword123';
+
+	async function login(username) {
+		const server = createTestServer();
+		const response = await server.executeOperation(
+			{ query: LOGIN_MUTATION, variables: { username, password: REAL_PASSWORD } },
+			{ contextValue: contextWithToken() },
+		);
+		return response.body.singleResult;
+	}
+
+	it('heals a never-set tagColor to the purple default for a user with no shop affiliation', async () => {
+		const user = await createUser({
+			password: await bcrypt.hash(REAL_PASSWORD, 12),
+			tagColor: undefined,
+		});
+
+		const { errors, data } = await login(user.username);
+		expect(errors).toBeUndefined();
+		expect(data.login.tagColor).toBe(DEFAULT_NO_SHOP_TAG_COLOR);
+
+		// Also confirm it's actually persisted, not just returned once.
+		const stored = await User.findById(user.id);
+		expect(stored.tagColor).toBe(DEFAULT_NO_SHOP_TAG_COLOR);
+	});
+
+	it('heals the old literal white default the same way', async () => {
+		const user = await createUser({
+			password: await bcrypt.hash(REAL_PASSWORD, 12),
+			tagColor: '#fff',
+		});
+
+		const { data } = await login(user.username);
+		expect(data.login.tagColor).toBe(DEFAULT_NO_SHOP_TAG_COLOR);
+	});
+
+	it('assigns a shop-unique color for a shop-affiliated artist, never colliding with a shop-mate', async () => {
+		const { shop } = await createShopAdminUser();
+		// A shop-mate already sitting on a real color - the healing artist below must not land on
+		// this one.
+		await createArtistUser({ tagColor: '#c69818', artist: { shopId: shop.id } });
+
+		const { user: healingArtist } = await createArtistUser({
+			password: await bcrypt.hash(REAL_PASSWORD, 12),
+			tagColor: undefined,
+			artist: { shopId: shop.id },
+		});
+
+		const { errors, data } = await login(healingArtist.username);
+		expect(errors).toBeUndefined();
+		expect(data.login.tagColor).toBeTruthy();
+		expect(data.login.tagColor).not.toBe('#c69818');
+	});
+
+	it('leaves an already-set real tagColor untouched', async () => {
+		const user = await createUser({
+			password: await bcrypt.hash(REAL_PASSWORD, 12),
+			tagColor: '#2ea2dc',
+		});
+
+		const { data } = await login(user.username);
+		expect(data.login.tagColor).toBe('#2ea2dc');
 	});
 });
 

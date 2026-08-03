@@ -30,7 +30,6 @@ const REGISTER_USER = gql`
 		$confirmPassword: String!
 		$role: Int!
 		$userType: String!
-		$tagColor: String
 	) {
 		register(
 			registerInput: {
@@ -43,7 +42,6 @@ const REGISTER_USER = gql`
 				confirmPassword: $confirmPassword
 				role: $role
 				userType: $userType
-				tagColor: $tagColor
 			}
 		) {
 			id
@@ -145,7 +143,11 @@ describe("Register", () => {
 			accessToken: "real-jwt",
 			firebaseToken: null,
 			userType: "client",
-			tagColor: "#fff",
+			// Was "#fff" - register() now always assigns a real default itself (purple, since a
+			// self-registered account has no shop) rather than echoing back whatever the client
+			// sent (see resolvers/users.js's register() and utils/tag-color.js). The client no
+			// longer sends a tagColor at all - see the mutation variables below.
+			tagColor: "#8E24AA",
 		};
 		const mocks = [
 			{
@@ -161,7 +163,6 @@ describe("Register", () => {
 						confirmPassword: "longenoughpassword",
 						role: 30,
 						userType: "client",
-						tagColor: "#fff",
 					},
 				},
 				result: { data: { register: returnedUser } },
@@ -193,7 +194,6 @@ describe("Register", () => {
 						confirmPassword: "short1",
 						role: 30,
 						userType: "client",
-						tagColor: "#fff",
 					},
 				},
 				result: { errors: [graphQLError] },

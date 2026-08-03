@@ -19,6 +19,7 @@ const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 const { mintFirebaseToken } = require('../../utils/firebase-admin');
 const { getShopIdsForUser } = require('../../utils/shop-membership');
+const { DEFAULT_NO_SHOP_TAG_COLOR, isUnsetTagColor, pickDefaultTagColor } = require('../../utils/tag-color');
 
 function generateToken(user) {
   return jwt.sign(
@@ -61,6 +62,22 @@ module.exports = {
             password: 'Invalid username/password',
           }
         });
+      }
+      // Self-heals a missing/placeholder tagColor on the next real login, rather than needing a
+      // one-off DB migration script (this sandbox has no way to run one against a live DB anyway -
+      // mongodb-memory-server's binary download is blocked here). Fixes every account already
+      // stuck at the old hardcoded '#fff' default (see register() below, and the previous
+      // Register.jsx literal) the moment they next log in, without waiting for them to
+      // stumble into Profile and notice their calendar events render invisibly (white on white).
+      // Uses this user's first shop (Artist/Staff, legacy shopId or an active
+      // ArtistShopConnection - same resolution getShopIdsForUser uses everywhere else) so the
+      // assigned color is guaranteed unique among shop-mates; falls back to the fixed purple
+      // default for anyone with no shop at all (an independent artist, staff with no shop - rare -
+      // or a Client). See utils/tag-color.js.
+      if (isUnsetTagColor(user.tagColor)) {
+        const shopIds = await getShopIdsForUser(user.id);
+        user.tagColor = await pickDefaultTagColor(shopIds[0], user.id);
+        await user.save();
       }
       // user has been authenticated, generate token and return user object
       const token = generateToken(user);
@@ -112,10 +129,12 @@ module.exports = {
       _,
       {
         registerInput: {
-          username, password, email, firstName, lastName, avatar, confirmPassword, tagColor
+          username, password, email, firstName, lastName, avatar, confirmPassword
           // NOTE: role and userType are intentionally NOT destructured from client input here.
           // Public self-registration must never let the caller choose their own role - see
           // PRODUCTION_ROADMAP.md Phase 1, item 3. Every self-registered account is a Client.
+          // tagColor is intentionally not destructured either any more - see the comment on
+          // newUser below for why the client's value is never used.
         },
       },
     ) {
@@ -123,7 +142,7 @@ module.exports = {
       const userType = Constants.USER_TYPE.CLIENT;
 
       const { valid, errors } = validate(registerInputSchema, {
-        username, email, firstName, lastName, avatar, password, confirmPassword, tagColor,
+        username, email, firstName, lastName, avatar, password, confirmPassword,
       });
       if (!valid) {
         throw new UserInputError('Errors', { errors });
@@ -158,7 +177,13 @@ module.exports = {
         password: hashedPassword,
         role,
         userType,
-        tagColor
+        // Was the client-supplied value - Register.jsx always hardcoded the literal string '#fff'
+        // (see that file), so every self-registered account's calendar label rendered invisibly
+        // (white on white) until the artist happened to open Profile and pick a real color
+        // themselves. Every self-registered account is a Client with no shop (see the note above),
+        // so there's no "unique among shop-mates" computation needed here - always the fixed
+        // purple default. See utils/tag-color.js.
+        tagColor: DEFAULT_NO_SHOP_TAG_COLOR,
       });
 
       // save new user to database and return user object
