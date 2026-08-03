@@ -47,8 +47,17 @@ export const APP_SETTINGS_CONSTANTS = {
 	LOADING_TEXT: "Loading...",
 	ROUTE_NOT_FOUND_TEXT:
 		"The page you're looking for does not exist.  Click anywhere on this card to go back.",
+	// Was missing 'none'/'invoice_sent'/'pending_confirmation' - only had the 3 oldest values,
+	// out of sync with the real enum on Appointment.shopCutStatus (see models/Appointment.js's
+	// own comment on the full lifecycle) ever since the Square-invoice/manual-confirm flow was
+	// added. Wasn't actually wired to any dropdown anywhere (grepped the whole client - dead
+	// until now), but worth having correct for whatever reads it next rather than leaving a
+	// stale enum sitting in constants as a trap.
 	SHOP_CUT_STATUS: [
+		{ value: 'none', label: 'No shop cut owed' },
 		{ value: 'unpaid', label: 'Unpaid' },
+		{ value: 'invoice_sent', label: 'Invoice sent - awaiting payment' },
+		{ value: 'pending_confirmation', label: 'Marked paid - awaiting shop confirmation' },
 		{ value: 'paid', label: 'Paid' },
 		{ value: 'received', label: 'Received' }
 	],

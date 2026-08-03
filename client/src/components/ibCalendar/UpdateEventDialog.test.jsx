@@ -1,7 +1,9 @@
-// UpdateEventDialog.jsx tests. Same AuthContext.Provider + MockedProvider approach as
-// CreateEventDialog.test.jsx. Focuses on the two things this component adds over
-// CreateEventDialog: editing/deleting an existing appointment, and the shop-cut ledger panel
-// (Send Square Invoice / Mark as Paid) that only renders when the appointment has a shopId.
+// UpdateEventDialog.jsx tests. CreateEventDialog.jsx (and its own test file) were deleted as
+// dead code once AppointmentWizard.jsx replaced it at both real entry points - see
+// PRODUCTION_ROADMAP.md's Phase 7 section. Focuses on editing/deleting an existing appointment,
+// and the shop-cut status readout (now read-only - the actual pay/invoice actions moved to the
+// artist dashboard's "Shop Cut Payouts" list, see ShopCutPayoutList.jsx) that only renders when
+// the appointment has a shopId.
 import React from "react";
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
@@ -104,14 +106,17 @@ describe("UpdateEventDialog", () => {
 		expect(screen.getByText(/delete/i)).toBeInTheDocument();
 	});
 
-	it("shows the shop-cut ledger panel and its status label when the appointment has a shopId", async () => {
+	it("shows the shop-cut status readout (read-only) when the appointment has a shopId", async () => {
 		const event = baseEvent({ shopId: "shop-1", shopCutStatus: "unpaid", shopCutAmount: 80 });
 		renderDialog({ event, mocks: [projectsByArtistMock(USER.id)] });
 
 		await screen.findByDisplayValue("Sleeve session 2");
 		expect(screen.getByText(/shop cut:\s*unpaid/i)).toBeInTheDocument();
-		expect(screen.getByText("Send Square Invoice")).toBeInTheDocument();
-		expect(screen.getByText("Mark as Paid (cash)")).toBeInTheDocument();
+		// Send Square Invoice / Mark as Paid (cash) moved to the artist dashboard's "Shop Cut
+		// Payouts" list (see ShopCutPayoutList.jsx) - this dialog is read-only for shop cut now.
+		expect(screen.queryByText("Send Square Invoice")).not.toBeInTheDocument();
+		expect(screen.queryByText("Mark as Paid (cash)")).not.toBeInTheDocument();
+		expect(screen.getByText(/manage payment for this shop cut from your dashboard/i)).toBeInTheDocument();
 	});
 
 	it("does not render a Delete button when the logged-in user isn't the appointment's own artist", async () => {
@@ -120,42 +125,6 @@ describe("UpdateEventDialog", () => {
 
 		await screen.findByDisplayValue("Sleeve session 2");
 		expect(screen.queryByText(/delete/i)).not.toBeInTheDocument();
-	});
-
-	it("clicking Mark as Paid (cash) calls markShopCutPaidManually and updates the visible status", async () => {
-		const user = userEvent.setup();
-		const event = baseEvent({ shopId: "shop-1", shopCutStatus: "unpaid", shopCutAmount: 80 });
-		const mocks = [
-			projectsByArtistMock(USER.id),
-			{
-				request: {
-					query: AppointmentService.MARK_SHOP_CUT_PAID_MANUALLY,
-					variables: { appointmentId: event.id },
-				},
-				result: {
-					data: {
-						markShopCutPaidManually: {
-							__typename: "Appointment",
-							id: event.id,
-							shopCutStatus: "pending_confirmation",
-							shopCutPaymentMethod: "manual",
-							shopCutMarkedPaidAt: "2026-08-02T00:00:00.000Z",
-						},
-					},
-				},
-			},
-		];
-		const contextValue = renderDialog({ event, mocks });
-
-		await screen.findByDisplayValue("Sleeve session 2");
-		await user.click(screen.getByText("Mark as Paid (cash)"));
-
-		await waitFor(() =>
-			expect(screen.getByText(/shop cut:\s*marked paid/i)).toBeInTheDocument(),
-		);
-		expect(contextValue.setAlert).toHaveBeenCalled();
-		const alertArg = contextValue.setAlert.mock.calls[0][0];
-		expect(alertArg.severity).toBe("success");
 	});
 
 	it("clicking DELETE calls deleteAppointment and closes the modal", async () => {

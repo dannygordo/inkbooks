@@ -281,6 +281,16 @@ const appointmentIdInputSchema = z.object({
   appointmentId: objectIdSchema,
 });
 
+// Batch version of createShopCutInvoiceInputSchema above - see mutations/shopCutPayments.js's
+// createBatchShopCutInvoice, used by the artist-dashboard payout list (client/src/components/
+// artistDashboard/ShopCutPayoutList.jsx) to combine several completed sessions' shop cuts into
+// one Square invoice instead of sending one per session. min(1) since an empty selection isn't a
+// real batch; the resolver itself enforces same-shop/same-artist/unpaid-only on top of this.
+const createBatchShopCutInvoiceInputSchema = z.object({
+  appointmentIds: z.array(objectIdSchema).min(1),
+  paymentMethod: z.enum(['ach', 'card']).nullish(),
+});
+
 // --- Direct card payment (deposit checkout) schema ---
 // See PRODUCTION_ROADMAP.md's Phase 4 section and routes/squarePayments.js. sourceId is the
 // nonce/token the client's Web Payments SDK produces (tokenizeCard()'s token field) - a plain
@@ -313,6 +323,7 @@ module.exports = {
   setRateSourceInputSchema,
   updateArtistRateSettingsInputSchema,
   createShopCutInvoiceInputSchema,
+  createBatchShopCutInvoiceInputSchema,
   appointmentIdInputSchema,
   processSquarePaymentInputSchema,
   validate,

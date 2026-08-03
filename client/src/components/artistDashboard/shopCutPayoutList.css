@@ -1,0 +1,49 @@
+.shopCutPayoutList {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	width: 100%;
+}
+
+.shopCutPayoutRow {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 8px 10px;
+	border: 1px solid #ddd;
+	border-radius: 6px;
+}
+
+.shopCutPayoutRowInfo {
+	display: flex;
+	flex-direction: column;
+	flex-grow: 1;
+}
+
+.shopCutPayoutRowDate {
+	font-weight: 600;
+}
+
+.shopCutPayoutRowAmount {
+	font-size: 0.85em;
+	color: #666;
+}
+
+.shopCutPayoutRowActions {
+	display: flex;
+	gap: 6px;
+}
+
+.shopCutPayoutBatchBar {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-top: 10px;
+	padding-top: 10px;
+	border-top: 1px solid #ddd;
+}
+
+.shopCutPayoutEmpty {
+	color: #666;
+	font-style: italic;
+}

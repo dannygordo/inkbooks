@@ -11,6 +11,7 @@ const {
 } = require('../../utils/email');
 const {
   createShopCutInvoiceInputSchema,
+  createBatchShopCutInvoiceInputSchema,
   appointmentIdInputSchema,
   validate,
 } = require('../../utils/validation');
@@ -83,6 +84,87 @@ module.exports = {
     await appointment.save();
 
     return { appointment, invoiceUrl: invoiceResult.publicUrl };
+  }),
+
+  // Combines several completed sessions' shop cuts into one Square invoice instead of the artist
+  // sending one per session - see the artist-dashboard payout list (client/src/components/
+  // artistDashboard/ShopCutPayoutList.jsx). All the same per-appointment guards as
+  // createShopCutInvoice above apply to every appointment in the batch, plus two batch-specific
+  // ones: everything must belong to the same shop (one invoice can't span shops) and the caller
+  // must own every appointment in the list (not just some of them).
+  createBatchShopCutInvoice: withAuth(async (_, args, context, info, user) => {
+    const { valid, errors, data } = validate(createBatchShopCutInvoiceInputSchema, args);
+    if (!valid) {
+      throw new UserInputError('Errors', { errors });
+    }
+
+    const appointments = await Appointment.find({ _id: { $in: data.appointmentIds } });
+    if (appointments.length !== data.appointmentIds.length) {
+      throw new UserInputError('Errors', {
+        errors: { appointmentIds: 'One or more appointments were not found.' },
+      });
+    }
+    for (const appointment of appointments) {
+      if (String(user.id) !== String(appointment.userId)) {
+        throw new AuthenticationError('Only the artist on these appointments can send this invoice.');
+      }
+      if (!appointment.shopId) {
+        throw new UserInputError('Errors', {
+          errors: { appointmentIds: 'One or more appointments have no shop attached.' },
+        });
+      }
+      if (!appointment.shopCutAmount || appointment.shopCutAmount <= 0) {
+        throw new UserInputError('Errors', {
+          errors: { appointmentIds: 'One or more appointments have no shop cut amount set.' },
+        });
+      }
+      if (appointment.shopCutStatus !== 'unpaid') {
+        throw new UserInputError('Errors', {
+          errors: { appointmentIds: 'One or more appointments are not in an unpaid state.' },
+        });
+      }
+    }
+    const shopId = String(appointments[0].shopId);
+    if (!appointments.every((a) => String(a.shopId) === shopId)) {
+      throw new UserInputError('Errors', {
+        errors: { appointmentIds: 'All appointments in a batch must belong to the same shop.' },
+      });
+    }
+
+    const shop = await Shop.findById(shopId);
+    if (!shop || !shop.squareConnected) {
+      throw new UserInputError('Errors', {
+        errors: { appointmentIds: 'This shop has not connected a Square account yet.' },
+      });
+    }
+
+    const artist = await User.findById(user.id);
+    if (!artist) {
+      throw new UserInputError('Errors', { errors: { appointmentIds: 'Artist account not found.' } });
+    }
+
+    const paymentMethod = data.paymentMethod || 'ach';
+    const totalAmount = appointments.reduce((sum, a) => sum + a.shopCutAmount, 0);
+    const targetAmountCents = Math.round(totalAmount * 100);
+
+    const invoiceResult = await square.createAndPublishShopCutInvoice({
+      shop,
+      artistEmail: artist.email,
+      artistFirstName: artist.firstName,
+      artistLastName: artist.lastName,
+      targetAmountCents,
+      description: `Shop cut for ${appointments.length} session(s)`,
+      paymentMethod,
+    });
+
+    for (const appointment of appointments) {
+      appointment.shopCutSquareInvoiceId = invoiceResult.invoiceId;
+      appointment.shopCutStatus = 'invoice_sent';
+      appointment.shopCutPaymentMethod = 'square_invoice';
+      await appointment.save();
+    }
+
+    return { appointments, invoiceUrl: invoiceResult.publicUrl };
   }),
 
   // The artist's own claim that they paid the shop (e.g. cash) - deliberately does NOT flip

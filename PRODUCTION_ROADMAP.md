@@ -1169,16 +1169,66 @@ needs a manual click-through before relying on it**: start/stop/reset a timer, s
 manually-edited total, close a session and confirm its controls actually disable, and confirm the
 shop-vs-own rate picker in Settings actually changes which rate `SessionDetail` suggests.
 
+### Artist-dashboard shop-cut payout list - done
+
+Moves shop-cut *payment actions* (send invoice, mark paid cash) off the per-appointment
+Create/UpdateEventDialog and onto the artist's own dashboard, where every outstanding cut across
+every completed session is visible and actionable at once - see `ShopCutPayoutList.jsx`
+(`components/artistDashboard/`), rendered inside `ArtistPerformancePanel.jsx` only when
+`isSelf` (the mutations it calls are all self-service, server-checked against
+`String(user.id) === String(appointment.userId)`, so a shop admin viewing someone else's numbers
+couldn't act on these buttons even if they were shown). Filtered to `appointmentStatus ===
+'completed' && shopCutStatus === 'unpaid' && shopId` - the exact gate `SessionDetail`'s
+close-session action sets, per the earlier design decision to only surface a shop cut as payable
+once the session itself is actually done.
+
+Each row gets a "Paid (Cash)" button (existing `markShopCutPaidManually` - unchanged, still sets
+`pending_confirmation` and emails the shop rather than trusting the artist's own claim) and a
+"Charge (Card)" button (existing `createShopCutInvoice`, one appointment at a time). New: checking
+multiple rows enables "Send Combined Invoice", which calls a new `createBatchShopCutInvoice`
+mutation - sums the selected sessions' `shopCutAmount`, creates one Square invoice for that total
+(reusing `square.createAndPublishShopCutInvoice` unchanged - it already only needed a target amount
+and description, nothing single-appointment-specific), and sets `shopCutStatus: 'invoice_sent'` +
+the same `shopCutSquareInvoiceId` on every appointment in the batch. Server-side, this required
+three real changes, not just a new resolver: `createBatchShopCutInvoiceInputSchema` (validation.js),
+the `createBatchShopCutInvoice` resolver itself (checks ownership/shop/unpaid-status/same-shop on
+*every* appointment in the batch before creating anything), and - easy to miss - the Square webhook
+handler (`routes/squareWebhooks.js`), which previously did `Appointment.findOne({
+shopCutSquareInvoiceId })` on `invoice.payment_made`; a batch invoice's payment event needs to mark
+every appointment sharing that invoice id paid, not just whichever one `findOne` returned first, so
+this is now `Appointment.find(...)` with a loop.
+
+`UpdateEventDialog.jsx`'s shop-cut section is now read-only (status label + a note pointing at the
+dashboard) - the `shopCutAmount` dollar input itself stays (still the only place that number gets
+set), but the payment-method radio buttons and Send Invoice/Mark Paid buttons were removed along
+with their handlers/mutations/state. Its existing test file had two tests asserting those removed
+buttons rendered and worked - updated in place rather than left broken (one now asserts the buttons
+are *absent* and the read-only note is present; the other, which tested clicking "Mark as Paid",
+was removed outright since that action doesn't live in this component anymore).
+
+Also fixed in passing: `client/src/constants/app.js`'s `SHOP_CUT_STATUS` array only had 3 of the 6
+real `Appointment.shopCutStatus` enum values (missing `none`/`invoice_sent`/`pending_confirmation`)
+- stale since the Square-invoice/manual-confirm flow was added. Wasn't actually wired to any
+dropdown anywhere (grepped the whole client), but fixed for whoever reads it next.
+
+**Cleanup done alongside this, not deferred further:** `CreateEventDialog.jsx` and its test file -
+fully dead since `AppointmentWizard.jsx` replaced it at both real entry points a few commits ago -
+are deleted, not just left unreferenced.
+
+Verified via `graphql`'s `buildSchema`/`validate` against the real SDL for the new
+`createBatchShopCutInvoice` mutation document, `node --check` on every changed server file,
+`@babel/parser` JSX parsing on every changed client file, and re-confirming the full resolver map
+still wires cleanly (`require('./graphql/resolvers/index')` after the schema change). This sandbox
+still can't run either test suite (documented rollup/Mongo limitations), so **this needs a manual
+click-through before relying on it**: complete a session with a shop cut owed, confirm it shows up
+in the dashboard's payout list, try both the cash and single-card-invoice buttons, then try
+selecting 2+ rows and sending a combined invoice, and confirm the amounts/status transitions match
+what's expected.
+
 ### Still to build (this same Phase 7 effort, not yet started)
 
-- The artist-dashboard shop-cut payout list (completed sessions with outstanding cuts, cash/card
-  selection, batch Square invoice for card) and removing the shop-cut panel from
-  Create/UpdateEventDialog.
-- The whole-app UI consistency sweep, deliberately last since it touches every page and the other
-  piece above is still changing shape.
-- Minor cleanup: delete the now-unreferenced `CreateEventDialog.jsx` + its test file, or repurpose
-  it - it's dead code, not a live alternate path, now that both call sites use
-  `AppointmentWizard.jsx` instead.
+- The whole-app UI consistency sweep, deliberately last since it touches every page and needed the
+  other pieces above to actually exist first.
 
 ---
 

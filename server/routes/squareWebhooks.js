@@ -48,10 +48,15 @@ router.post(
       try {
         const invoice = event.data && event.data.object && event.data.object.invoice;
         if (invoice && invoice.status === 'PAID') {
-          const appointment = await Appointment.findOne({
+          // Was findOne - broke once createBatchShopCutInvoice (see mutations/shopCutPayments.js)
+          // started letting several appointments share a single invoice id. A batch invoice's
+          // payment_made event needs to mark every appointment in that batch paid, not just
+          // whichever one findOne happened to return first.
+          const appointments = await Appointment.find({
             shopCutSquareInvoiceId: invoice.id,
+            shopCutStatus: { $ne: 'paid' },
           });
-          if (appointment && appointment.shopCutStatus !== 'paid') {
+          for (const appointment of appointments) {
             appointment.shopCutStatus = 'paid';
             await appointment.save();
           }

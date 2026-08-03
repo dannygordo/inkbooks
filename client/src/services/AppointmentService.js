@@ -215,6 +215,22 @@ export const AppointmentService = (() => {
         }
     `;
 
+    // Batch version of createShopCutInvoice - combines several completed sessions' shop cuts
+    // into one Square invoice (see the artist-dashboard payout list, ShopCutPayoutList.jsx).
+    const _CREATE_BATCH_SHOP_CUT_INVOICE = gql`
+        mutation CreateBatchShopCutInvoice($appointmentIds: [ID!]!, $paymentMethod: String) {
+            createBatchShopCutInvoice(appointmentIds: $appointmentIds, paymentMethod: $paymentMethod) {
+                invoiceUrl
+                appointments {
+                    id
+                    shopCutStatus
+                    shopCutPaymentMethod
+                    shopCutSquareInvoiceId
+                }
+            }
+        }
+    `;
+
     const _MARK_SHOP_CUT_PAID_MANUALLY = gql`
         mutation MarkShopCutPaidManually($appointmentId: ID!) {
             markShopCutPaidManually(appointmentId: $appointmentId) {
@@ -347,6 +363,7 @@ export const AppointmentService = (() => {
         UPDATE_APPOINTMENT: _UPDATE_APPOINTMENT,
         DELETE_APPOINTMENT: _DELETE_APPOINTMENT,
         CREATE_SHOP_CUT_INVOICE: _CREATE_SHOP_CUT_INVOICE,
+        CREATE_BATCH_SHOP_CUT_INVOICE: _CREATE_BATCH_SHOP_CUT_INVOICE,
         MARK_SHOP_CUT_PAID_MANUALLY: _MARK_SHOP_CUT_PAID_MANUALLY,
         CONFIRM_SHOP_CUT_PAID: _CONFIRM_SHOP_CUT_PAID,
         getAppointmentsByShop: _getAppointmentsByShop,

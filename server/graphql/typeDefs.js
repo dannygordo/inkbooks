@@ -469,6 +469,13 @@ module.exports = gql`
     appointment: Appointment!
     invoiceUrl: String!
   }
+  # Batch version of ShopCutInvoiceResult above - one invoice covering several completed
+  # sessions' combined shop cut (see mutations/shopCutPayments.js's createBatchShopCutInvoice
+  # and the artist-dashboard payout list that calls it).
+  type BatchShopCutInvoiceResult {
+    appointments: [Appointment!]!
+    invoiceUrl: String!
+  }
   type Query {
     ######### Appointments ############
 
@@ -633,6 +640,7 @@ module.exports = gql`
     # for the automated path (InkBooks never touches the money), a manual mark-paid/confirm
     # dual-control path for cash or other off-platform payment.
     createShopCutInvoice(appointmentId: ID!, paymentMethod: String): ShopCutInvoiceResult!
+    createBatchShopCutInvoice(appointmentIds: [ID!]!, paymentMethod: String): BatchShopCutInvoiceResult!
     markShopCutPaidManually(appointmentId: ID!): Appointment!
     confirmShopCutPaid(appointmentId: ID!): Appointment!
 

@@ -145,6 +145,12 @@
     font-size: 13px;
     word-break: break-all;
 }
+.shopCutLedgerNote {
+    margin-top: 8px;
+    font-size: 13px;
+    color: #666;
+    font-style: italic;
+}
 .ibCalendarDateCellBody {
     flex: 1;
     white-space: nowrap;

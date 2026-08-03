@@ -3,6 +3,7 @@ import IBCardWrapper from "../card/ibCard/IBCardWrapper";
 import IBPageLoader from "../ibPageLoader/IBPageLoader";
 import { AppointmentService } from "../../services/AppointmentService";
 import ProjectService from "../../services/ProjectService";
+import ShopCutPayoutList from "./ShopCutPayoutList";
 import "./artistPerformancePanel.css";
 
 // Appointment.shopCutStatus values that represent money the artist still owes the shop - see
@@ -31,7 +32,7 @@ const isSameYear = (date, reference) => date.getFullYear() === reference.getFull
  * an artist's appointment history grows large enough that fetching every row becomes expensive.
  */
 const ArtistPerformancePanel = ({ artistUserId, isSelf = false }) => {
-	const { data: apptData, loading: apptLoading } =
+	const { data: apptData, loading: apptLoading, refetch: refetchAppointments } =
 		AppointmentService.getAppointmentsByArtist(artistUserId);
 	const { data: projData, loading: projLoading } =
 		ProjectService.fetchProjectsByArtist(artistUserId);
@@ -70,6 +71,17 @@ const ArtistPerformancePanel = ({ artistUserId, isSelf = false }) => {
 				SHOP_CUT_OWED_STATUSES.includes(a.shopCutStatus),
 		)
 		.reduce((sum, a) => sum + (a.shopCutAmount || 0), 0);
+
+	// Only 'completed' sessions - see PRODUCTION_ROADMAP.md's Phase 7 section: a shop cut isn't
+	// actually payable until the session itself is done, matching SessionDetail's own close-session
+	// gate (appointmentStatus: 'completed'). 'unpaid' only (not invoice_sent/pending_confirmation -
+	// those already have an action in flight, nothing new to do here until they resolve).
+	const payoutCandidates = appointments.filter(
+		(a) =>
+			a.appointmentStatus === "completed" &&
+			a.shopCutStatus === "unpaid" &&
+			a.shopId,
+	);
 
 	return (
 		<div className="artistPerformancePanel">
@@ -121,6 +133,15 @@ const ArtistPerformancePanel = ({ artistUserId, isSelf = false }) => {
 					</ul>
 				)}
 			</IBCardWrapper>
+			{isSelf && (
+				<IBCardWrapper>
+					<h2 className="artistPerformanceSectionTitle">Shop Cut Payouts</h2>
+					<ShopCutPayoutList
+						appointments={payoutCandidates}
+						onChanged={() => refetchAppointments()}
+					/>
+				</IBCardWrapper>
+			)}
 		</div>
 	);
 };
