@@ -1633,6 +1633,96 @@ Verified via `node --check` on every changed/new server file and `graphql`'s `bu
 `register`/`login`/`connectArtistToShop` selections). Could not execute the test suite itself -
 same `mongodb-memory-server` block as every prior pass this week.
 
+### Phase 7 follow-up fix #7: page content hidden under the fixed header, Settings had no shop-affiliation UI, calendar edit/view separation, shop cut removed from the appointment modal, and a dashboard caching gap (August 3, 2026) - done
+
+Five more issues from continued real usage:
+
+**Page content rendered underneath the app's own header on every page, not just ConsultDetail.**
+`components/sidebar/Sidebar.jsx` renders its own MUI `AppBar` with `position="fixed"` (the real
+header - the separate, unrelated `Topbar.jsx` component is commented out in `App.jsx` and was never
+the culprit). A fixed element is removed from normal document flow entirely, so nothing below it
+gets pushed down automatically - the Drawer compensates for this internally (its own `DrawerHeader`
+spacer), but the actual routed page content in `App.jsx` never did. ~19 individual pages had each
+separately hand-patched this with their own hardcoded `margin-top: 60px` (one used `55px`) on their
+own top-level wrapper class - an inconsistent, per-page workaround rather than a fix at the source,
+and `ConsultDetail.jsx`/`ArtistBookingRequests.jsx` (reusing `artistBookingRequests.css`) had no
+workaround at all, which is what made the overlap visible there first. Fixed at the one real source:
+`App.jsx` now wraps `<Routes>` in a `<Box component="main">` with an empty MUI `<Toolbar />` spacer
+as its first child (only rendered when `user` is truthy, matching the `AppBar` itself) - MUI's own
+documented pattern for this exact "permanent mini-drawer + fixed AppBar" layout, since it tracks the
+AppBar's real rendered height (which changes across breakpoints) instead of a hardcoded number.
+Removed all ~19 pages' redundant `margin-top` hacks, which would otherwise have doubled up with the
+new global spacer and pushed every page's content down twice as far.
+
+**Settings had no way to see or manage shop affiliation at all.** An artist could see their rate
+settings and (if already connected) which rate source applied, but nothing showed which shop they
+belonged to, and there was no way to connect to a shop or disconnect from one -
+`connectArtistToShop`/`disconnectArtistFromShop` existed server-side with no client caller at all.
+Added a "Shop" card at the top of Settings.jsx: shows the connected shop's name/website (already
+available on the cached user from login/register - see `Login.jsx`'s own `userInfo.shop` selection,
+no new query needed for that part) with a "Disconnect from Shop" action, or, for an independent
+artist, a small form to connect via a Shop ID (the only mechanism `connectArtistToShop` actually
+supports today - see that mutation's own comment: "there's no invite-link/shop-directory
+request-approve flow yet", not something this fix invents a workaround for). Added the two missing
+mutations to `ArtistShopConnectionService.js` and a lazy `ShopService.useLazyShop` (fetches
+id/name/website by shopId) used right after a successful connect, since `connectArtistToShop`'s own
+response is just the raw `ArtistShopConnection` record with no shop name to display - the result
+updates the cached user (`updateCurrentUser`) so the rest of the app (calendar, rate-source card)
+reflects the new affiliation immediately, no re-login required.
+
+**A shop-connected artist's calendar showed every artist's appointments (already correct -
+`getAppointmentsByShop` was already shop-wide, not scoped to the caller), but clicking a shop-mate's
+appointment silently did nothing at all.** `Day.jsx`'s `handleUpdateEvent` already correctly gated
+`UpdateEventDialog` (the editable dialog) to `evt.userId === user.id` - that's the right "can't edit
+someone else's appointment" behavior, but a dead click reads as broken, not as "this is read-only".
+Built `ViewEventDialog.jsx` - a deliberately minimal, non-editable summary (artist name/tag color,
+date/time, title, client if it's a session, description) with only a Close button, opened instead
+whenever the clicked appointment belongs to a different artist. Reusing `UpdateEventDialog` itself
+in some "disabled" mode wasn't safe: it fetches `ProjectService.fetchProjectsByArtist(user.id)` -
+the *viewer's own* projects, not the appointment owner's - so its project dropdown would silently
+show the wrong artist's projects entirely if just unlocked read-only.
+
+**Shop cut had an editable amount field and a status readout inside the appointment edit
+dialog.** Paying/invoicing a shop cut already lives entirely on the artist dashboard's "Shop Cut
+Payouts" list (`ArtistPerformancePanel.jsx`/`ShopCutPayoutList.jsx`, across every completed session
+at once) - the amount field and status panel in `UpdateEventDialog.jsx` added a second, duplicate,
+partially-editable surface for the same data with no real workflow attached to it there. Removed
+both entirely; `handleSubmit`'s save payload now echoes back `event.shopCutAmount`/`shopCutStatus`
+unchanged instead of reading a ref that no longer has a DOM node behind it (the same "don't touch
+what this view doesn't actually edit" pattern `SessionDetail.jsx`'s own minimal-payload save already
+uses). Updated `UpdateEventDialog.test.jsx`'s matching test into a regression test confirming the
+panel never reappears, even when the appointment has a shopId.
+
+**Converting a consult to a session, editing the new project, then visiting the dashboard didn't
+show the new session until a hard reload.** `ArtistPerformancePanel.jsx`'s two dashboard queries
+(`AppointmentService.getAppointmentsByArtist`, `ProjectService.fetchProjectsByArtist`) both used
+Apollo's default `cache-first` fetch policy. Converting a consult creates the new Appointment/
+Project via mutations (`convertBookingRequest`, `createAppointment`) that have no reason to know
+these specific cached list queries exist, let alone update them - Apollo normalizes individual
+entities into its cache automatically, but never inserts a newly-created entity into an
+*already-cached* list query's result array on its own. If the dashboard had been visited once
+already earlier in the session, revisiting it after creating something elsewhere just re-served the
+stale cached array, and only a full page reload (which resets the in-memory cache entirely) showed
+the new data. Changed both to `fetchPolicy: 'cache-and-network'` - still shows the cached list
+instantly (no loading flash on a normal visit) but always fires a real network request behind it
+too, so a dashboard visit is guaranteed to reflect anything created elsewhere in the same session.
+Note: the calendar's own list queries (`getAppointmentsByShop`/`getAppointmentsByArtistForCalendar`)
+likely have the same underlying staleness risk (same cache-first default, same "a mutation
+elsewhere doesn't know to update this list" gap) - not changed here since it wasn't the reported
+symptom, but worth the same fix if a similar "created it elsewhere, calendar didn't pick it up
+without a reload" report comes in.
+
+Verified via `@babel/parser` on every changed/new client file (`App.jsx`, `Settings.jsx`,
+`ShopService.js`, `ArtistShopConnectionService.js`, `Day.jsx`, `ViewEventDialog.jsx`,
+`UpdateEventDialog.jsx`, `UpdateEventDialog.test.jsx`, `AppointmentService.js`, `ProjectService.js`)
+and `graphql`'s `buildSchema`/`parse`/`validate` against the real SDL for the new
+`connectArtistToShop`/`disconnectArtistFromShop`/`getShop` documents. Could not execute the client
+test suite - this sandbox's `npm install` is also network-blocked (403 from the npm registry,
+same class of restriction as `mongodb-memory-server`'s block on the server side), and a pre-existing
+`@rollup/rollup-linux-x64-gnu` optional-dependency gap means `vitest` can't even start here as-is.
+None of this round's changes could be visually confirmed in a real browser either - the header-
+spacing fix and the Settings page layout in particular are worth a real click-through.
+
 ---
 
 ## Suggested sequencing
