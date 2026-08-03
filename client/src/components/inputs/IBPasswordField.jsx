@@ -1,6 +1,9 @@
+// Explicit React import - same recurring Vitest-vs-Vite JSX-transform issue as Login.jsx/
+// Register.jsx/IBDatePicker.jsx/IBDateTimePicker.jsx/IBEmailField.jsx - this is the first time
+// this component is actually mounted under a test (IBPasswordField.test.jsx).
+import React, { useState } from "react";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 import { IconButton, InputAdornment, TextField } from "@mui/material";
-import { useState } from "react";
 
 /**
  * Password input with some defaults set
