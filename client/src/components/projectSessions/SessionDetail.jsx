@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useMutation } from "@apollo/client";
+import moment from "moment";
 import { Button, Chip } from "@mui/material";
-import { PlayArrow, Stop, RestartAlt, Save } from "@mui/icons-material";
+import { PlayArrow, Stop, RestartAlt, Save, DeleteOutline } from "@mui/icons-material";
 import { AppointmentService } from "../../services/AppointmentService";
 import IBInput from "../inputs/IBInput";
 import IBMultilineInput from "../inputs/IBMultilineInput";
+import IBDateTimePicker from "../inputs/IBDateTimePicker";
 import IBSquarePaymentForm from "../IBSquarePayments/IBSquarePaymentForm";
 import { useAuth } from "../../context/auth";
 import { ALERT_CONSTANTS } from "../../constants";
@@ -33,11 +35,19 @@ import "./projectSessions.css";
  *   an independent artist
  * - onClosed(): called after a successful "Close Session" save, so the parent can refresh its list
  *   and close the modal
+ * - onDeleted(): called after a successful "Delete Session", so the parent can refresh its list
+ *   and close the modal - separate from onClosed since "closed" (completed) and "deleted" (gone
+ *   entirely) are very different outcomes for the parent to react to
  */
-const SessionDetail = ({ appointment: initialAppointment, project, connections, onClosed }) => {
+const SessionDetail = ({ appointment: initialAppointment, project, connections, onClosed, onDeleted }) => {
 	const { setModal, modal, setAlert } = useAuth();
 	const [appointment, setAppointment] = useState(initialAppointment);
 	const [notes, setNotes] = useState(initialAppointment.sessionNotes || "");
+	// The date/time was previously not editable anywhere in this view - buildSavePayload just
+	// echoed back the original value on every save. The time matters just as much as the date for
+	// a booked session, so both are now editable via the same IBDateTimePicker used elsewhere.
+	const [sessionDate, setSessionDate] = useState(moment(initialAppointment.appointmentDate));
+	const [deleting, setDeleting] = useState(false);
 	const totalRef = useRef();
 	// Forces a re-render every second while the timer is running so the live elapsed readout
 	// actually ticks - the underlying value is always computed fresh from
@@ -58,6 +68,7 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 	const [updateSessionDetails, { loading: saving }] = useMutation(
 		AppointmentService.UPDATE_SESSION_DETAILS
 	);
+	const [deleteAppointment] = useMutation(AppointmentService.DELETE_APPOINTMENT);
 
 	const effectiveRate = getEffectiveRate(project?.artist, project?.artist?.shop, connections);
 	const elapsedSeconds = getLiveElapsedSeconds(appointment);
@@ -85,7 +96,7 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 
 	const buildSavePayload = () => ({
 		id: appointment.id,
-		appointmentDate: appointment.appointmentDate,
+		appointmentDate: moment(sessionDate).toISOString(),
 		total: totalRef.current?.value ? parseInt(totalRef.current.value, 10) : appointment.total,
 		sessionNotes: notes,
 	});
@@ -96,6 +107,7 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 			variables: { appointmentInput: buildSavePayload() },
 		});
 		setAppointment((prev) => ({ ...prev, ...data.updateAppointment }));
+		setSessionDate(moment(data.updateAppointment.appointmentDate));
 		setAlert({
 			isAlert: true,
 			severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
@@ -103,6 +115,39 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 			timeout: ALERT_CONSTANTS.TIMEOUT,
 			location: ALERT_CONSTANTS.DISPLAY_MODAL,
 		});
+	};
+
+	const handleDeleteSession = async () => {
+		// Matches this app's existing confirm-before-destructive-action pattern (see
+		// ArtistBookingRequests.jsx's handleDecline) rather than introducing a new dialog
+		// component just for this one action.
+		if (!window.confirm("Delete this session? This cannot be undone.")) {
+			return;
+		}
+		setDeleting(true);
+		try {
+			await deleteAppointment({ variables: { appointmentId: appointment.id } });
+			setAlert({
+				isAlert: true,
+				severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
+				message: "Session deleted.",
+				timeout: ALERT_CONSTANTS.TIMEOUT,
+				location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
+			});
+			if (onDeleted) {
+				onDeleted();
+			}
+		} catch (err) {
+			setAlert({
+				isAlert: true,
+				severity: ALERT_CONSTANTS.SEVERITY.ERROR,
+				message: err.graphQLErrors?.[0]?.message || err.message,
+				timeout: ALERT_CONSTANTS.TIMEOUT,
+				location: ALERT_CONSTANTS.DISPLAY_MODAL,
+			});
+		} finally {
+			setDeleting(false);
+		}
 	};
 
 	const handleCloseSession = async (e) => {
@@ -177,6 +222,13 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 					}`}
 				/>
 			</div>
+
+			<IBDateTimePicker
+				label="Session date & time"
+				val={sessionDate}
+				setVal={setSessionDate}
+				disabled={isClosed}
+			/>
 
 			<div className="sessionDetailTimer">
 				<div className="sessionDetailElapsed">{formatElapsed(elapsedSeconds)}</div>
@@ -255,6 +307,16 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 					onClick={handleCloseSession}
 				>
 					Close Session
+				</Button>
+				<Button
+					variant="text"
+					color="error"
+					startIcon={<DeleteOutline />}
+					disabled={deleting}
+					onClick={handleDeleteSession}
+					sx={{ marginLeft: "auto" }}
+				>
+					Delete Session
 				</Button>
 			</div>
 		</div>

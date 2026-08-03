@@ -395,10 +395,14 @@ export const AppointmentService = (() => {
     // sessionNotes, appointmentStatus (for "close session"). Deliberately not the same
     // full-object-replace shape UpdateEventDialog uses, since this view never touches shopCut*/
     // title/description/etc and re-sending stale copies of those is unnecessary risk.
+    // appointmentDate added to the return selection (was id/total/sessionNotes/appointmentStatus
+    // only) - SessionDetail.jsx now lets the date/time itself be edited from this view, and needs
+    // the saved value back to update its local state without a separate refetch.
     const _UPDATE_SESSION_DETAILS = gql`
         mutation UpdateSessionDetails($appointmentInput: AppointmentInput) {
             updateAppointment(appointmentInput: $appointmentInput) {
                 id
+                appointmentDate
                 total
                 sessionNotes
                 appointmentStatus
