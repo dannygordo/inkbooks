@@ -2,7 +2,7 @@ import "./ibCalendar.css";
 import moment from "moment";
 import { useCalendar } from "../../context/calendar";
 import { useAuth } from "../../context/auth";
-import CreateEventDialog from "./CreateEventDialog";
+import AppointmentWizard from "./AppointmentWizard";
 import { useEffect, useState } from "react";
 import UpdateEventDialog from "./UpdateEventDialog";
 import { Tooltip } from "@mui/material";
@@ -46,7 +46,7 @@ const Day = ({ day, rowIdx }) => {
 		setModal({
 			isOpen: true,
 			title: `Appointment for ${day.format("LL")}`,
-			content: <CreateEventDialog selectedDay={day} />,
+			content: <AppointmentWizard selectedDay={day} />,
 		});
 	};
 	return (

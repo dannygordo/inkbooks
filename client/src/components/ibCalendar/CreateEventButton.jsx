@@ -3,7 +3,7 @@ import { Fab } from '@mui/material'
 import React from 'react'
 import { useAuth } from "../../context/auth";
 import { useCalendar } from '../../context/calendar';
-import CreateEventDialog from './CreateEventDialog';
+import AppointmentWizard from './AppointmentWizard';
 
 const CreateEventButton = () => {
     
@@ -12,7 +12,7 @@ const CreateEventButton = () => {
     
     const handleCreateEvent = (e) => {
         e.preventDefault();
-        setModal({isOpen: true, title:`Appointment for ${daySelected.format('LL')}`, content: <CreateEventDialog selectedDay={daySelected} />});
+        setModal({isOpen: true, title:`Appointment for ${daySelected.format('LL')}`, content: <AppointmentWizard selectedDay={daySelected} />});
     } 
   return (
     <>

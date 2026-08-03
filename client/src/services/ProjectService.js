@@ -287,6 +287,37 @@ const ProjectService = (() => {
 		return UPDATE_PROJECT_NOTES_MUTATION;
 	};
 
+	// Flat arguments, not a wrapped ProjectInput - matches the server's createProject signature
+	// exactly (typeDefs.js), unlike updateProject above. No client-side createProject existed
+	// before this - the only way a Project ever got made was via the server's seed script - added
+	// for the appointment wizard's "Session" path (see ibCalendar/AppointmentWizard.jsx), which
+	// needs to be able to create a brand-new Project inline when there isn't an existing one to
+	// attach the session to yet.
+	const _CREATE_PROJECT_MUTATION = gql`
+		mutation (
+			$title: String!
+			$description: String!
+			$placement: String
+			$size: String
+			$artistId: ID!
+			$clientId: ID!
+			$status: String!
+		) {
+			createProject(
+				title: $title
+				description: $description
+				placement: $placement
+				size: $size
+				artistId: $artistId
+				clientId: $clientId
+				status: $status
+			) {
+				id
+				title
+			}
+		}
+	`;
+
 	const _updateProjectTags = () => {
 		const UPDATE_PROJECT_TAGS_MUTATION = gql`
 			mutation ($projectId: ID!, $tags: [String]) {
@@ -375,7 +406,8 @@ const ProjectService = (() => {
 		updateProjectNotes: _updateProjectNotes,
 		updateProjectTags: _updateProjectTags,
 		fetchProjectGQL: GQL_FETCH_PROJECT_QUERY,
-		fetchProjectsByArtist: _fetchProjectsByArtist
+		fetchProjectsByArtist: _fetchProjectsByArtist,
+		CREATE_PROJECT_MUTATION: _CREATE_PROJECT_MUTATION
 	};
 })();
 

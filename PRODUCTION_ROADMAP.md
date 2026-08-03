@@ -1070,10 +1070,59 @@ Verified the same way as the rates work above: schema validation for the new mut
 syntax checks, and a standalone script confirming `tryCheckAuth` returns the decoded user for a
 valid signed token and `null` for a missing/garbage one, without throwing either way.
 
+### Appointment-creation wizard - done
+
+New `client/src/components/ibCalendar/AppointmentWizard.jsx` replaces `CreateEventDialog.jsx` at
+both entry points (`ibCalendar/Day.jsx`'s day-cell click, `ibCalendar/CreateEventButton.jsx`'s
+header button) - `CreateEventDialog.jsx` itself and its existing test file were left in place,
+now genuinely unreferenced from the app's real render tree, rather than deleted alongside a larger
+change; cleaning it up is a small, safe follow-up (noted below, not done here).
+
+Step one always asks what's being scheduled - consult, session, or other:
+
+- **Consult** reuses the exact `createBookingRequest` -> `convertBookingRequest` pipeline a public
+  guest already goes through, just entered by the logged-in artist on behalf of a walk-in/phone
+  client (pick an existing `Client` from a dropdown, or enter new first/last/email/phone) instead
+  of building a second, parallel "create a consult" path that could drift from the first one.
+  Client -> intake details (description/placement/size/budget/cover-up) -> date/time, each its own
+  step.
+- **Session** requires a real `Project` - pick an existing one (`IBProjectsByArtistSelect`,
+  already used elsewhere) or create a minimal new one inline (title/description + an *existing*
+  `Client` only - see the scope note below) - then date/time. The appointment's `projectId` is
+  always the chosen/just-created project's id; `createProject` didn't exist as a client-side
+  mutation anywhere in this app before this (the only prior way a `Project` ever got made was the
+  server's seed script) - added to `ProjectService.js` matching the server's flat-argument
+  `createProject` signature (unlike `updateProject`'s wrapped `ProjectInput`).
+- **Other** stays a single fast step (title/description/date-time, no project, no shop cut) -
+  deliberately not folded into the multi-step flow, since blocking off time or logging a non-client
+  entry shouldn't cost three screens.
+
+All three paths end by refetching whichever appointments query `IBCalendar.jsx` is actually
+watching (shop-scoped `getAppointmentsByShop` vs. artist-scoped `getAppointmentsByArtist`, chosen
+by whether `shopId` is present) rather than hand-rolling three separate `cache.modify` calls for
+three different mutations that all ultimately create an `Appointment` - simpler and less
+error-prone than replicating that pattern three times.
+
+**Deliberate scope cut, not an oversight:** a brand-new project's client is limited to an existing
+`Client` record. Creating a genuinely new client inline here would mean re-implementing the same
+find-or-create-by-email logic the Consult path already runs through properly - rather than
+duplicate that a second time, a brand-new client either goes through the Consult path first (which
+does this correctly) or the Clients page. Also not carried over from the original design
+conversation: reference-image upload on the Consult path (the public form's upload route exists,
+but wiring an authenticated equivalent into this wizard is a reasonable follow-up, not core to
+unblocking the type-split itself).
+
+Verified via `graphql`'s `buildSchema`/`validate` against the real SDL for the new
+`createProject` document, `node --check`/`@babel/parser` on every new/changed file, and manual
+tracing of every field name against the real query/mutation shapes already confirmed elsewhere
+in this codebase (`FETCH_APPOINTMENTS_BY_SHOP`'s `$shopId`, `FETCH_APPOINTMENTS_BY_ARTIST_FOR_CALENDAR`'s
+`$userId`, etc.) - this sandbox still can't run the client's Vitest suite (documented rollup
+binary limitation) or click through the real UI, so **this needs a manual click-through before
+relying on it**: try all three types, both new and existing client/project, and confirm the
+calendar actually shows the new appointment afterward.
+
 ### Still to build (this same Phase 7 effort, not yet started)
 
-- The appointment-creation wizard itself (consult/session/other split, session requiring a
-  project, consult reusing this same booking-request pipeline for an artist entering a walk-in).
 - The in-project session view: session list, click-to-view detail, start/stop/reset timer
   (server-persisted, not pure client state - see the design conversation on why), auto-computed
   total from the effective rate (editable), notes, close-session action.
@@ -1081,7 +1130,10 @@ valid signed token and `null` for a missing/garbage one, without throwing either
   selection, batch Square invoice for card) and removing the shop-cut panel from
   Create/UpdateEventDialog.
 - The whole-app UI consistency sweep, deliberately last since it touches every page and the other
-  three pieces above are still changing shape.
+  two pieces above are still changing shape.
+- Minor cleanup: delete the now-unreferenced `CreateEventDialog.jsx` + its test file, or repurpose
+  it - it's dead code, not a live alternate path, now that both call sites use
+  `AppointmentWizard.jsx` instead.
 
 ---
 
