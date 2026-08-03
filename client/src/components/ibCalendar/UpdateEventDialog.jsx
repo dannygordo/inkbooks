@@ -17,27 +17,12 @@ import { useMutation } from "@apollo/client";
 import { AppointmentService } from "../../services/AppointmentService";
 import UtilsService from "../../services/UtilsService";
 
-// Human-readable labels for Appointment.shopCutStatus - see models/Appointment.js's own comment
-// on the full enum/lifecycle. Same labels as APP_SETTINGS_CONSTANTS.SHOP_CUT_STATUS
-// (client/src/constants/app.js) - kept as a local lookup here rather than importing that array
-// and re-deriving a label map from it, since this is just a read-only status display now (see
-// below - the actual pay/invoice actions moved to the artist dashboard).
-const SHOP_CUT_STATUS_LABELS = {
-	none: "No shop cut owed",
-	unpaid: "Unpaid",
-	invoice_sent: "Invoice sent - awaiting payment",
-	pending_confirmation: "Marked paid - awaiting shop confirmation",
-	paid: "Paid",
-	received: "Received",
-};
-
 const UpdateEventDialog = ({ selectedDay, event }) => {
 	const { setModal, modal, user, setAlert } = useAuth();
 	const titleRef = useRef(event.title);
 	const appointmentTypeRef = useRef();
 	const projectRef = useRef(event.projectId);
 	const descriptionRef = useRef(event.description);
-	const shopCutAmountRef = useRef(event.shopCutAmount);
 	const [startDateTime, setStartDateTime] = useState(moment.utc(event.appointmentDate));
     const [appointmentType, setAppointmentType] = useState(event.appointmentType);
     const [selectedEvent, setSelectedEvent] = useState(event);
@@ -64,12 +49,12 @@ const UpdateEventDialog = ({ selectedDay, event }) => {
             shopId: user.userInfo?.shop?.id,
             title: titleRef.current.value,
             description: descriptionRef.current.value,
+            // Shop cut is no longer editable from this dialog at all (see the removed JSX block
+            // below) - echoed back unchanged rather than read from a field that no longer exists,
+            // same "don't touch what this view doesn't actually edit" reasoning as
+            // SessionDetail.jsx's own minimal-payload save.
             shopCutStatus: event.shopCutStatus,
-            // Whole dollars only - matches total/tip/shopMinimum/hourlyRate, which are also Int
-            // rather than Float in this schema (see typeDefs.js).
-            shopCutAmount: shopCutAmountRef.current.value
-                ? parseInt(shopCutAmountRef.current.value, 10)
-                : null,
+            shopCutAmount: event.shopCutAmount,
             appointmentStatus: event.appointmentStatus,
             appointmentType: appointmentTypeRef.current.value.toLowerCase(),
             createdAt: event.createdAt,
@@ -219,38 +204,13 @@ const UpdateEventDialog = ({ selectedDay, event }) => {
 							inputRef={descriptionRef}
                             defaultValue={selectedEvent.description}
 						/>
-						{event.shopId && (
-							<>
-								<IBInput
-									inputRef={shopCutAmountRef}
-									helperText="Shop Cut Amount ($)"
-									placeholder="e.g. 200"
-									type="number"
-									defaultValue={selectedEvent.shopCutAmount}
-								/>
-								{/* Paying/invoicing the shop cut moved to the artist dashboard's
-								    "Shop Cut Payouts" list (see ArtistPerformancePanel.jsx /
-								    ShopCutPayoutList.jsx) - across every completed session at once
-								    rather than one appointment dialog at a time. This is now just a
-								    read-only status readout plus the amount input above. */}
-								<div className="shopCutLedgerPanel">
-									<div className="shopCutLedgerStatus">
-										Shop cut:{" "}
-										{SHOP_CUT_STATUS_LABELS[selectedEvent.shopCutStatus] ||
-											selectedEvent.shopCutStatus ||
-											"Unpaid"}
-									</div>
-									{(!selectedEvent.shopCutStatus ||
-										selectedEvent.shopCutStatus === "unpaid") && (
-										<div className="shopCutLedgerNote">
-											Manage payment for this shop cut from your Dashboard's
-											"Shop Cut Payouts" list once this session is marked
-											completed.
-										</div>
-									)}
-								</div>
-							</>
-						)}
+						{/* Shop cut amount/status used to be shown and editable right here - removed
+						    entirely. Paying/invoicing it already lives on the artist dashboard's
+						    "Shop Cut Payouts" list (see ArtistPerformancePanel.jsx / ShopCutPayoutList.jsx),
+						    across every completed session at once - this dialog duplicating a
+						    read-only status readout (plus an amount field with no real workflow
+						    attached to it here) added nothing but clutter to what should just be a
+						    quick edit of the appointment itself. */}
 					</DialogContent>
 					<DialogActions>
                         {
