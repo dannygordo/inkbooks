@@ -1225,10 +1225,54 @@ in the dashboard's payout list, try both the cash and single-card-invoice button
 selecting 2+ rows and sending a combined invoice, and confirm the amounts/status transitions match
 what's expected.
 
-### Still to build (this same Phase 7 effort, not yet started)
+### UI consistency sweep - first pass done, real scope larger than one pass
 
-- The whole-app UI consistency sweep, deliberately last since it touches every page and needed the
-  other pieces above to actually exist first.
+Scoped down to the concrete thing the user actually asked for: "all edit pages should have
+consistent UI matching EditArtist's look/feel" (functionality unchanged - explicitly UI-only, per
+the user's own clarification). Read all four canonical edit forms
+(`components/{artist,client,staff,shop}/edit/Edit*.jsx`) side by side rather than assuming, and
+found the real, concrete gap: `EditArtist.jsx`/`EditClient.jsx` already use the styled `IBInput`
+(MUI `TextField`) component for every field, but `EditStaff.jsx` and `EditShop.jsx` were still
+using bare unstyled native `<input>` elements - the actual visible inconsistency, not a vague one.
+Fixed by swapping every `<input ref={...}>` to `<IBInput inputRef={...}>` in both files, prop-for-
+prop identical (`type`/`defaultValue`/`placeholder` untouched) so this is purely visual - no
+`handleSave` logic, ref usage, or submitted data changed at all.
+
+Two smaller bugs fixed alongside, both squarely UI/markup, not behavior: (1) `EditStaff.jsx`'s
+Title field had a copy-paste `className="artistItem"` instead of `"staffItem"` - cosmetically
+harmless today only because `.artistItem` happens to be defined globally with the same layout
+rules, but a landmine waiting for either class to diverge; (2) `.artistActions`'s
+`justify-content` was declared *twice* across this app with conflicting values -
+`editArtist.css` said `left`, `pages/artists/artist.css` said `right` - meaning which one actually
+won depended on CSS load order, not deliberate design. Every other edit page's own `*Actions` rule
+(client/staff/shop) already says `right`, so `editArtist.css` was the outlier - fixed to `right` to
+match everywhere else and to stop the two same-named rules from disagreeing with each other.
+
+**What this pass deliberately did not do, and why it's flagged rather than silently skipped:**
+this app has no CSS Modules/scoping - every component's CSS file declares plain global class names
+(`.shopItem`, `.artistActions`, etc.), and multiple unrelated files (an edit form's own CSS file
+*and* that entity's list/detail page CSS file) independently redeclare the same class names,
+sometimes with different values, as this pass's own `.artistActions` finding shows. That's the
+actual root cause of "look and feel isn't consistent" - not that nobody tried, but that styling
+correctness currently depends on avoiding accidental collisions across files that don't know about
+each other. A real fix is a CSS Modules (or styled-components/Tailwind) migration - a much larger,
+separate effort than one pass, and not started here. Also out of scope for this pass, deliberately:
+`Profile.jsx`/`Settings.jsx` (newer pages, already both use `IBInput` consistently - not part of
+the reported gap) and any deeper visual redesign beyond matching what `EditArtist.jsx` already
+does.
+
+Verified via `@babel/parser` JSX parsing on both changed files, and confirming (via `Grep`) no
+lingering bare `ref={...}` was left unconverted to `inputRef={...}` in either file - a raw `ref`
+passed to a non-forwardRef component like `IBInput` would silently fail to populate `.current`,
+which `handleSave` in both files depends on. This sandbox still can't run the client's Vitest suite
+or render the real UI, so **this needs a manual click-through before relying on it**: open Edit
+Staff and Edit Shop, confirm every field now renders as a styled MUI input matching Edit
+Artist/Edit Client, and confirm Save still submits the same values as before.
+
+This closes out Phase 7's originally-scoped four pieces (rates/settings, booking-request pipeline,
+appointment wizard, in-project sessions, shop-cut payout dashboard, and now this first UI pass).
+The CSS-architecture root cause above is a real, separate follow-up worth its own pass, not
+something to fold into "later" without writing it down.
 
 ---
 

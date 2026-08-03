@@ -31,7 +31,12 @@
     box-shadow: 2px 2px 15px -12px #000000; */
     padding: 5px;
     display: flex;
-    justify-content: left;
+    /* Was 'left' here, while pages/artists/artist.css's own .artistActions rule (and every
+       other edit page's *Actions rule - client/staff/shop) all say 'right' - two conflicting
+       global-class definitions for the exact same className, real inconsistency whichever one
+       happened to win the cascade. Standardized on 'right' to match everywhere else instead of
+       the other way, so Save/Cancel/Delete lands in the same spot on every edit page. */
+    justify-content: right;
 }
 .artistActionItem {
     display: flex;

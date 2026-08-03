@@ -4,6 +4,7 @@ import "./editShop.css";
 import ShopService from "../../../services/ShopService";
 import IBPageLoader from "../../../components/ibPageLoader/IBPageLoader";
 import { useMutation } from "@apollo/client";
+import IBInput from "../../inputs/IBInput";
 
 const EditShop = (props) => {
 	const navigate = useNavigate();
@@ -97,17 +98,17 @@ const EditShop = (props) => {
 					</div> */}
 					<div className="shopItem">
 						<label>Name</label>
-						<input
+						<IBInput
 							type="text"
-							ref={name}
+							inputRef={name}
 							defaultValue={data.getShop.name}
 							placeholder="Jon"
 						/>
 					</div>
 					<div className="shopItem">
 						<label>email</label>
-						<input
-							ref={email}
+						<IBInput
+							inputRef={email}
 							defaultValue={data.getShop.email}
 							type="email"
 							placeholder="Jon@thecopperwolf.com"
@@ -115,17 +116,17 @@ const EditShop = (props) => {
 					</div>
 					<div className="shopItem">
 						<label>Phone</label>
-						<input
+						<IBInput
 							type="tel"
-							ref={phone}
+							inputRef={phone}
 							defaultValue={data.getShop.phone}
 							placeholder="555-555-5555"
 						/>
 					</div>
 					<div className="shopItem">
 						<label>Address</label>
-						<input
-							ref={address}
+						<IBInput
+							inputRef={address}
 							defaultValue={data.getShop.address}
 							type="text"
 							placeholder="123 Stark Dr"
@@ -133,8 +134,8 @@ const EditShop = (props) => {
 					</div>
 					<div className="shopItem">
 						<label>City</label>
-						<input
-							ref={city}
+						<IBInput
+							inputRef={city}
 							defaultValue={data.getShop.city}
 							type="text"
 							placeholder="Winterfell"
@@ -142,8 +143,8 @@ const EditShop = (props) => {
 					</div>
 					<div className="shopItem">
 						<label>State</label>
-						<input
-							ref={state}
+						<IBInput
+							inputRef={state}
 							defaultValue={data.getShop.state}
 							type="text"
 							placeholder="WA"
@@ -151,8 +152,8 @@ const EditShop = (props) => {
 					</div>
 					<div className="shopItem">
 						<label>Zip</label>
-						<input
-							ref={zip}
+						<IBInput
+							inputRef={zip}
 							defaultValue={data.getShop.zip}
 							type="text"
 							placeholder="98512"
@@ -160,8 +161,8 @@ const EditShop = (props) => {
 					</div>
 					<div className="shopItem">
 						<label>Instagram</label>
-						<input
-							ref={instagram}
+						<IBInput
+							inputRef={instagram}
 							defaultValue={data.getShop.instagram}
 							type="text"
 							placeholder="theDireWolf"
@@ -169,8 +170,8 @@ const EditShop = (props) => {
 					</div>
 					<div className="shopItem">
 						<label>Facebook</label>
-						<input
-							ref={facebook}
+						<IBInput
+							inputRef={facebook}
 							defaultValue={data.getShop.facebook}
 							type="text"
 							placeholder="kingOfTheNorth"
@@ -178,8 +179,8 @@ const EditShop = (props) => {
 					</div>
                     <div className="shopItem">
 						<label>Website</label>
-						<input
-							ref={website}
+						<IBInput
+							inputRef={website}
 							defaultValue={data.getShop.website}
 							type="text.com"
 							placeholder="kingOfTheNorth.com"
@@ -187,8 +188,8 @@ const EditShop = (props) => {
 					</div>
                     <div className="shopItem">
 						<label>Shop Minimum</label>
-						<input
-							ref={shopMinimum}
+						<IBInput
+							inputRef={shopMinimum}
 							defaultValue={data.getShop.shopMinimum}
 							type="number"
 							placeholder="100"
@@ -196,8 +197,8 @@ const EditShop = (props) => {
 					</div>
                     <div className="shopItem">
 						<label>Hourly Rate</label>
-						<input
-							ref={hourlyRate}
+						<IBInput
+							inputRef={hourlyRate}
 							defaultValue={data.getShop.hourlyRate}
 							type="number"
 							placeholder="200"
@@ -205,8 +206,8 @@ const EditShop = (props) => {
 					</div>
                     <div className="shopItem">
 						<label>Billing Type</label>
-						<input
-							ref={billingType}
+						<IBInput
+							inputRef={billingType}
 							defaultValue={data.getShop.billingType}
 							type="number"
 							placeholder="0"

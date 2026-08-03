@@ -4,6 +4,7 @@ import "./editStaff.css";
 import StaffService from "../../../services/StaffService";
 import IBPageLoader from "../../../components/ibPageLoader/IBPageLoader";
 import { useMutation } from "@apollo/client";
+import IBInput from "../../inputs/IBInput";
 
 const EditStaff = (props) => {
 	const navigate = useNavigate();
@@ -93,35 +94,35 @@ const EditStaff = (props) => {
 					</div> */}
 					<div className="staffItem">
 						<label>First Name</label>
-						<input
+						<IBInput
 							type="text"
-							ref={firstName}
+							inputRef={firstName}
 							defaultValue={data.getOneStaff.firstName}
 							placeholder="Jon"
 						/>
 					</div>
 					<div className="staffItem">
 						<label>Last Name</label>
-						<input
+						<IBInput
 							type="text"
-							ref={lastName}
+							inputRef={lastName}
 							defaultValue={data.getOneStaff.lastName}
 							placeholder="Snow"
 						/>
 					</div>
 					<div className="staffItem">
 						<label>email</label>
-						<input
-							ref={email}
+						<IBInput
+							inputRef={email}
 							defaultValue={data.getOneStaff.email}
 							type="email"
 							placeholder="Jon@thecopperwolf.com"
 						/>
 					</div>
-					<div className="artistItem">
+					<div className="staffItem">
 						<label>Title</label>
-						<input
-							ref={title}
+						<IBInput
+							inputRef={title}
 							defaultValue={data.getOneStaff.title}
 							type="text"
 							placeholder="Bastard"
@@ -129,17 +130,17 @@ const EditStaff = (props) => {
 					</div>
 					<div className="staffItem">
 						<label>Phone</label>
-						<input
+						<IBInput
 							type="tel"
-							ref={phone}
+							inputRef={phone}
 							defaultValue={data.getOneStaff.phone}
 							placeholder="555-555-5555"
 						/>
 					</div>
 					<div className="staffItem">
 						<label>Address</label>
-						<input
-							ref={address}
+						<IBInput
+							inputRef={address}
 							defaultValue={data.getOneStaff.address}
 							type="text"
 							placeholder="123 Stark Dr"
@@ -147,8 +148,8 @@ const EditStaff = (props) => {
 					</div>
 					<div className="staffItem">
 						<label>City</label>
-						<input
-							ref={city}
+						<IBInput
+							inputRef={city}
 							defaultValue={data.getOneStaff.city}
 							type="text"
 							placeholder="Winterfell"
@@ -156,8 +157,8 @@ const EditStaff = (props) => {
 					</div>
 					<div className="staffItem">
 						<label>State</label>
-						<input
-							ref={state}
+						<IBInput
+							inputRef={state}
 							defaultValue={data.getOneStaff.state}
 							type="text"
 							placeholder="WA"
@@ -165,8 +166,8 @@ const EditStaff = (props) => {
 					</div>
 					<div className="staffItem">
 						<label>Zip</label>
-						<input
-							ref={zip}
+						<IBInput
+							inputRef={zip}
 							defaultValue={data.getOneStaff.zip}
 							type="text"
 							placeholder="98512"
@@ -174,8 +175,8 @@ const EditStaff = (props) => {
 					</div>
 					<div className="staffItem">
 						<label>Instagram</label>
-						<input
-							ref={instagram}
+						<IBInput
+							inputRef={instagram}
 							defaultValue={data.getOneStaff.instagram}
 							type="text"
 							placeholder="theDireWolf"
@@ -183,8 +184,8 @@ const EditStaff = (props) => {
 					</div>
 					<div className="staffItem">
 						<label>Facebook</label>
-						<input
-							ref={facebook}
+						<IBInput
+							inputRef={facebook}
 							defaultValue={data.getOneStaff.facebook}
 							type="text"
 							placeholder="kingOfTheNorth"
