@@ -186,8 +186,21 @@
     color: #666;
     font-style: italic;
 }
+/* min-height added - the previous fix (splitting .ibCalendarDayHeader out of
+   .ibCalendarDateCell) was necessary but not sufficient: this element's own height still comes
+   from `flex: 1` against its parent (Item, the MUI Paper in Month.jsx, styled with
+   height: '100%'), which in turn depends on its Grid item ancestor actually having a definite
+   height. Month.jsx's Grid container sets a single `height: 800` on the whole 6-row container,
+   not per-row - whether that space actually gets distributed down to each row (and therefore each
+   day cell) via flexbox's default multi-line `align-content: normal` (~= stretch) is exactly the
+   kind of thing that's unverifiable without a real browser (not available in this sandbox), so
+   rather than keep stacking percentage-height assumptions, this gives the cell a real minimum
+   height directly - guaranteed room for the day-number header plus a few event rows regardless of
+   what the ancestor chain computes. If the ancestor DOES end up giving more room, flex:1 still
+   lets this stretch further; it just no longer depends on that to render anything at all. */
 .ibCalendarDateCellBody {
     flex: 1;
+    min-height: 90px;
     white-space: nowrap;
     overflow-x: hidden;
     text-overflow: ellipsis;
