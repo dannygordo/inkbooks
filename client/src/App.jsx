@@ -1,5 +1,7 @@
 import React, { useContext } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import Box from "@mui/material/Box";
+import Toolbar from "@mui/material/Toolbar";
 import "./App.css";
 import Sidebar from "./components/sidebar/Sidebar";
 import Topbar from "./components/topbar/Topbar";
@@ -53,7 +55,21 @@ function App() {
 				{/* <Topbar /> */}
 				<div className="container">
 					{user && <Sidebar />}
-					<Routes>
+					{/* Sidebar.jsx renders its own MUI AppBar with position="fixed" (see that file) - a
+					fixed element is taken out of normal document flow entirely, so nothing below it
+					gets pushed down automatically. Sidebar's Drawer compensates for this internally
+					(its own DrawerHeader spacer), but the actual routed page content never did - every
+					page's content rendered starting underneath the fixed header, just by varying
+					amounts depending on whether that page happened to have enough incidental top
+					padding of its own to clear it (ConsultDetail's bookingRequestDetailHeader had none,
+					which is what made it visibly obvious first, but this affected every page). An empty
+					Toolbar, sized via the same theme.mixins.toolbar the AppBar itself uses, is MUI's own
+					documented fix for exactly this "permanent mini-drawer + fixed AppBar" layout - it
+					tracks the AppBar's real rendered height (which changes across breakpoints) instead
+					of a hardcoded magic-number offset that could silently drift out of sync. */}
+					<Box component="main" sx={{ flexGrow: 1, minWidth: 0 }}>
+						{user && <Toolbar />}
+						<Routes>
 						<Route
 							path="/"
 							element={
@@ -302,8 +318,9 @@ function App() {
 							}
 						/>
 					</Routes>
-				</div>
+				</Box>
 			</div>
+		</div>
 		</SocketProvider>
 	);
 }
