@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useMutation } from "@apollo/client";
 import moment from "moment";
 import { Button, Chip } from "@mui/material";
-import { PlayArrow, Stop, RestartAlt, Save, DeleteOutline } from "@mui/icons-material";
+import { PlayArrow, Stop, RestartAlt, Save, Delete } from "@mui/icons-material";
 import { AppointmentService } from "../../services/AppointmentService";
 import IBInput from "../inputs/IBInput";
 import IBMultilineInput from "../inputs/IBMultilineInput";
@@ -311,7 +311,7 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 				<Button
 					variant="text"
 					color="error"
-					startIcon={<DeleteOutline />}
+					startIcon={<Delete />}
 					disabled={deleting}
 					onClick={handleDeleteSession}
 					sx={{ marginLeft: "auto" }}
