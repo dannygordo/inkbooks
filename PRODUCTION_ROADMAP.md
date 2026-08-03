@@ -1512,6 +1512,73 @@ pass this week; a real click-through (create a consult from the calendar, confir
 Booking Requests, open it from the dashboard, convert it to a session) is still the only way to
 fully confirm this end to end.
 
+### Phase 7 follow-up fix #5: shopId-immutability crash, calendar labels only rendering in tooltips, single-date-only session booking, and no session CRUD from the Project page (August 3, 2026) - done
+
+A second real click-through (booking a session against a brand-new project) turned up four more
+gaps, all downstream of the fixes above:
+
+**Saving a session threw `shopId cannot be changed once an appointment has been attributed to a
+shop.`** `updateAppointment`'s immutability check compared the raw incoming
+`appointment.shopId` against the existing one, but `SessionDetail.jsx`'s minimal-payload save (see
+`AppointmentService.UPDATE_SESSION_DETAILS` - only ever sends `id/appointmentDate/total/
+sessionNotes/appointmentStatus`, deliberately never `shopId`) means `appointment.shopId` is simply
+absent, not falsy-with-a-value - `String(undefined || '') !== String(realShopId)` always threw.
+This bug existed all along but had no way to surface until follow-up fix #2 (above) made
+`convertBookingRequest` actually set `shopId` on session/consult Appointments - before that,
+`existingAppointment.shopId` was always empty, so this branch never ran. Fixed by gating the check
+on `'shopId' in appointment` (a plain JS `in` check - verified via a live `graphql()` run in this
+session that an omitted GraphQL input field is truly absent as a JS key, not present-with-value-
+`undefined`) rather than just truthiness, so a partial update that never mentions `shopId` leaves
+it untouched instead of being treated as an attempt to null it out. Added a regression test
+matching `SessionDetail.jsx`'s exact minimal-payload shape.
+
+**Calendar events only showed their color-coded label in a hover tooltip, not in the day cell
+itself.** `ibCalendar.css`'s `.ibCalendarDateCell` carried a hardcoded `height: 24px; line-height:
+24px` meant only for the day-number header text, but it wrapped both the header *and* the events
+list below it - squashing the whole cell, including every event's colored label div, into a 24px
+sliver. The label divs were still genuinely in the DOM (MUI `Tooltip`s render via a portal, outside
+this clipped box, which is exactly why hovering still worked), just visually invisible. Fixed by
+splitting the header's fixed sizing onto its own `.ibCalendarDayHeader` class and letting
+`.ibCalendarDateCell` stretch (`flex; height: 100%`) with a new `.ibCalendarDayEvents` child taking
+the remaining space - `Day.jsx` updated to use both new classes.
+
+**Booking a session only ever allowed one date, and used a plain
+`<input type="datetime-local">`.** A real tattoo project is very often several sittings agreed on
+up front (a sleeve, a large back piece). Built a shared `BookSessionDatesForm.jsx` (used by both
+`ArtistBookingRequests.jsx` and `ConsultDetail.jsx`, rather than two copies that could drift, per
+this app's own established anti-pattern lesson elsewhere) - lets an artist add as many session dates
+as needed, each via the app's existing `IBDateTimePicker` (the same date/time picker
+`AppointmentWizard.jsx` already uses) instead of a native input. Mechanically: the first date still
+goes through `convertBookingRequest(outcome: 'session_booked')` (the only call that creates the
+real Project from the BookingRequest's intake fields); every additional date reuses the plain
+`createAppointment` mutation pointed at the just-created project, mirroring
+`AppointmentWizard.jsx`'s existing "session against an existing project" path. No new server-side
+mutation was needed.
+
+**The Project page had no way to add another session, and an open session's date/time wasn't
+editable or deletable.** `ProjectSessionsList.jsx` gained an "Add Session" button/inline form
+(same `IBDateTimePicker` + `createAppointment`, using the *project's* own artist/shop - not
+necessarily the viewer's - since a shop admin can view and add a session to another artist's
+project) and each row now shows the full date+time (`LLL`, not date-only `LL`). `SessionDetail.jsx`
+gained an editable `IBDateTimePicker` for `appointmentDate` (previously not editable anywhere -
+`buildSavePayload()` just echoed back the original value unchanged) wired into the existing save
+path, and a "Delete Session" action using the already-defined `AppointmentService.DELETE_APPOINTMENT`
+mutation with a `window.confirm` guard (matching this app's existing confirm-before-destructive-
+action pattern) and a new `onDeleted` callback so the parent list refreshes and the modal closes.
+`AppointmentService.UPDATE_SESSION_DETAILS`'s return selection gained `appointmentDate` so the
+saved value round-trips back into local state without a refetch. `IBDateTimePicker` itself gained a
+`disabled` prop (previously unsupported) so the date can be locked once a session is closed, same
+as the total/notes fields already were.
+
+Verified via `node --check`/live `graphql()` experiments on the server-side change, `@babel/parser`
+JSX parsing on every changed/new client file (`ProjectSessionsList.jsx`, `SessionDetail.jsx`,
+`IBDateTimePicker.jsx`, `BookSessionDatesForm.jsx`, `ConsultDetail.jsx`,
+`ArtistBookingRequests.jsx`). Could not execute the client or server test suites - same
+`mongodb-memory-server` 403 network-allowlist block as every prior pass this week, and the client
+suite wasn't run in this pass either. The calendar CSS fix and the date/time-picker UX in
+particular still need a real browser click-through to confirm visually - nothing in this sandbox
+can render CSS or take a screenshot.
+
 ---
 
 ## Suggested sequencing
