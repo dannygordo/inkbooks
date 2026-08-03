@@ -5,6 +5,7 @@ import { useAuth } from "../../context/auth";
 import AppointmentWizard from "./AppointmentWizard";
 import { useEffect, useState } from "react";
 import UpdateEventDialog from "./UpdateEventDialog";
+import ViewEventDialog from "./ViewEventDialog";
 import { Tooltip } from "@mui/material";
 
 const Day = ({ day, rowIdx }) => {
@@ -30,12 +31,23 @@ const Day = ({ day, rowIdx }) => {
 	const handleUpdateEvent = (e, evt) => {
 		e.preventDefault();
 		setDaySelected(day);
-		console.log(evt);
 		if (evt.userId === user.id) {
 			setModal({
 				isOpen: true,
 				title: `Update Appointment for ${day.format("LL")}`,
 				content: <UpdateEventDialog selectedDay={day} event={evt} />,
+			});
+		} else {
+			// A shop-connected artist's calendar shows every artist's appointments at the shop (see
+			// getAppointmentsByShop - already shop-wide, not scoped to the caller), not just their
+			// own - but they should only ever be able to edit their own. This used to silently do
+			// nothing at all when the appointment belonged to someone else, which reads as broken
+			// rather than "read-only". ViewEventDialog shows the same details with no edit/delete
+			// actions instead.
+			setModal({
+				isOpen: true,
+				title: `Appointment for ${day.format("LL")}`,
+				content: <ViewEventDialog event={evt} />,
 			});
 		}
 	};

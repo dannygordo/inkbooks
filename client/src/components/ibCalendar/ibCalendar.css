@@ -142,6 +142,40 @@
     box-shadow: 0px 24px 38px 3px rgb(0 0 0 / 14%), 0px 9px 46px 8px rgb(0 0 0 / 12%), 0px 11px 15px -7px rgb(0 0 0 / 20%);
     border-radius: 8px;
 }
+/* ViewEventDialog.jsx - read-only view of a shop-mate's appointment. */
+.viewEventArtistRow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+.viewEventType {
+    color: #888;
+    text-transform: capitalize;
+    font-size: 14px;
+}
+.viewEventDate {
+    font-weight: 600;
+    margin: 0 0 4px;
+}
+.viewEventTitle {
+    font-size: 18px;
+    margin: 0 0 4px;
+}
+.viewEventClient {
+    color: #555;
+    margin: 0 0 4px;
+}
+.viewEventDescription {
+    color: #555;
+    margin: 0 0 10px;
+}
+.viewEventReadOnlyNote {
+    color: #999;
+    font-style: italic;
+    font-size: 13px;
+    margin: 10px 0 0;
+}
 .shopCutLedgerPanel {
     margin-top: 15px;
     padding: 10px 15px;
