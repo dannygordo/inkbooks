@@ -20,6 +20,78 @@ const isSameMonth = (date, reference) =>
 
 const isSameYear = (date, reference) => date.getFullYear() === reference.getFullYear();
 
+// How many rows each appointment list shows. Shared by the upcoming and completed lists so
+// "the same rules" is enforced by there being one rule, not two that happen to match today.
+const APPOINTMENT_LIST_LIMIT = 5;
+
+/**
+ * Where an appointment row navigates to when clicked, or null if it isn't clickable.
+ *
+ * A session carries a projectId - convertBookingRequest (mutations/bookingRequests.js)
+ * auto-creates a Project for a session_booked outcome. A consult never gets a Project of its own
+ * (deliberately - see that resolver's comment), but does carry a bookingRequestId, which is enough
+ * to open ConsultDetail.jsx. An "other" appointment, or a consult created before bookingRequestId
+ * existed, has neither and isn't clickable.
+ */
+const appointmentLinkTo = (appt) => {
+	if (appt.projectId) {
+		return `${ROUTE_CONSTANTS.PROJECT}${appt.projectId}`;
+	}
+	if (appt.appointmentType === "consult" && appt.bookingRequestId) {
+		return `${ROUTE_CONSTANTS.CONSULT}${appt.id}`;
+	}
+	return null;
+};
+
+/**
+ * One appointment row. Extracted so the upcoming and completed lists share it outright rather than
+ * being two near-identical blocks that drift the first time one of them is touched - the linking
+ * rules, the date format and the title fallback chain are all decisions that should only exist in
+ * one place.
+ *
+ * @param {boolean} showEarnings - completed sessions show what they brought in; an upcoming one
+ *   has no money attached yet, so displaying a total there would be a prediction dressed up as a
+ *   fact.
+ */
+const AppointmentRow = ({ appt, onNavigate, showEarnings = false }) => {
+	const linkTo = appointmentLinkTo(appt);
+	return (
+		<li
+			className={
+				linkTo ? "artistUpcomingItem artistUpcomingItemClickable" : "artistUpcomingItem"
+			}
+			onClick={linkTo ? () => onNavigate(linkTo) : undefined}
+		>
+			<span className="artistUpcomingDate">
+				{/* Was toLocaleDateString (date only) - the time matters just as much as the date
+				    for an appointment, and wasn't shown here at all. */}
+				{new Date(appt.appointmentDate).toLocaleString(undefined, {
+					month: "short",
+					day: "numeric",
+					year: "numeric",
+					hour: "numeric",
+					minute: "2-digit",
+				})}
+			</span>
+			<span className="artistUpcomingTitle">
+				{/* convertBookingRequest now sets a real title at creation for both consult (the
+				    client's name) and session (the Project's title) - see that resolver's own
+				    comment. project?.title is still checked first for a session as a defensive
+				    fallback (e.g. a record from before that fix), and "(untitled appointment)"
+				    only for the genuinely stale case where neither exists. */}
+				{appt.project?.title || appt.title || "(untitled appointment)"}
+			</span>
+			{showEarnings && (
+				<span className="artistUpcomingEarnings">
+					{formatCents(appt.totalCents)}
+					{appt.tipCents ? ` (${formatCents(appt.tipCents)} tip)` : ""}
+				</span>
+			)}
+			<span className="artistUpcomingType">{appt.appointmentType}</span>
+		</li>
+	);
+};
+
 /**
  * Reusable artist performance summary - upcoming appointments, MTD/YTD revenue, MTD/YTD shop-cut
  * owed, and active project count. Mounted with different framing in two places (see
@@ -50,7 +122,22 @@ const ArtistPerformancePanel = ({ artistUserId, isSelf = false }) => {
 	const upcoming = appointments
 		.filter((a) => new Date(a.appointmentDate) >= now)
 		.sort((a, b) => new Date(a.appointmentDate) - new Date(b.appointmentDate))
-		.slice(0, 5);
+		.slice(0, APPOINTMENT_LIST_LIMIT);
+
+	// The mirror of `upcoming`, and deliberately built the same way: same row component, same
+	// clickability rules, same limit - just sorted newest-first, because the useful end of a
+	// finished list is the recent end while the useful end of a pending one is the near end.
+	//
+	// Filtered on appointmentStatus rather than appointmentType === 'session'. The only thing in
+	// the app that marks anything 'completed' is SessionDetail's "Close Session" (and the same
+	// field on updateAppointment), which only exists for sessions - so in practice this IS the
+	// completed-sessions list. Keying on status rather than type means a completed appointment
+	// that isn't strictly typed as a session still shows up instead of silently vanishing, which
+	// is the safer failure direction for a list an artist checks against their own memory.
+	const completed = appointments
+		.filter((a) => a.appointmentStatus === "completed")
+		.sort((a, b) => new Date(b.appointmentDate) - new Date(a.appointmentDate))
+		.slice(0, APPOINTMENT_LIST_LIMIT);
 
 	const inMonth = appointments.filter((a) => isSameMonth(new Date(a.appointmentDate), now));
 	const inYear = appointments.filter((a) => isSameYear(new Date(a.appointmentDate), now));
@@ -155,51 +242,28 @@ const ArtistPerformancePanel = ({ artistUserId, isSelf = false }) => {
 					<div className="artistPerformanceEmpty">No upcoming appointments.</div>
 				) : (
 					<ul className="artistUpcomingList">
-						{upcoming.map((appt) => {
-							// A session appointment carries a projectId - convertBookingRequest
-							// (mutations/bookingRequests.js) auto-creates a Project for a session_booked
-							// outcome. A consult never gets a Project of its own (deliberately - see that
-							// resolver's own comment), but does carry a bookingRequestId, which is enough
-							// to open ConsultDetail.jsx (its intake details + a "Convert to Session"
-							// action). An "other" appointment, or a consult created before
-							// bookingRequestId existed, has neither and just isn't clickable.
-							const linkTo = appt.projectId
-								? `${ROUTE_CONSTANTS.PROJECT}${appt.projectId}`
-								: appt.appointmentType === "consult" && appt.bookingRequestId
-								? `${ROUTE_CONSTANTS.CONSULT}${appt.id}`
-								: null;
-							return (
-							<li
+						{upcoming.map((appt) => (
+							<AppointmentRow key={appt.id} appt={appt} onNavigate={navigate} />
+						))}
+					</ul>
+				)}
+			</IBCardWrapper>
+			<IBCardWrapper>
+				<h2 className="artistPerformanceSectionTitle">
+					{isSelf ? "Your Completed Sessions" : "Completed Sessions"}
+				</h2>
+				{completed.length === 0 ? (
+					<div className="artistPerformanceEmpty">No completed sessions yet.</div>
+				) : (
+					<ul className="artistUpcomingList">
+						{completed.map((appt) => (
+							<AppointmentRow
 								key={appt.id}
-								className={
-									linkTo ? "artistUpcomingItem artistUpcomingItemClickable" : "artistUpcomingItem"
-								}
-								onClick={linkTo ? () => navigate(linkTo) : undefined}
-							>
-								<span className="artistUpcomingDate">
-									{/* Was toLocaleDateString (date only) - the time matters just as much as
-									    the date for an upcoming appointment, and wasn't shown here at all. */}
-									{new Date(appt.appointmentDate).toLocaleString(undefined, {
-										month: "short",
-										day: "numeric",
-										year: "numeric",
-										hour: "numeric",
-										minute: "2-digit",
-									})}
-								</span>
-								<span className="artistUpcomingTitle">
-									{/* convertBookingRequest now sets a real title at creation for both
-									    consult (the client's name) and session (the Project's title) -
-									    see that resolver's own comment. project?.title is still checked
-									    first for a session as a defensive fallback (e.g. a record from
-									    before that fix), and "(untitled appointment)" only for the
-									    genuinely stale case where neither exists. */}
-									{appt.project?.title || appt.title || "(untitled appointment)"}
-								</span>
-								<span className="artistUpcomingType">{appt.appointmentType}</span>
-							</li>
-							);
-						})}
+								appt={appt}
+								onNavigate={navigate}
+								showEarnings
+							/>
+						))}
 					</ul>
 				)}
 			</IBCardWrapper>

@@ -83,6 +83,15 @@
 	font-weight: 500;
 }
 
+/* Only rendered in the completed-sessions list - an upcoming appointment has no money attached
+   yet. Sits between the title and the type so the column order stays stable across both lists.
+   Tabular figures so a column of amounts lines up on the decimal instead of wandering. */
+.artistUpcomingEarnings {
+	font-variant-numeric: tabular-nums;
+	color: #444;
+	white-space: nowrap;
+}
+
 .artistUpcomingType {
 	text-transform: capitalize;
 	color: #666;

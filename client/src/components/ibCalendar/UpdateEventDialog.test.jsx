@@ -25,6 +25,53 @@ const USER = {
 // the dialog no longer fetches the artist's project list, because the project dropdown it fed is
 // now a label sourced from event.project (see UpdateEventDialog.jsx's header comment).
 
+// The dialog fetches the full appointment (for its BookingRequest) only when the appointment is a
+// consult - a session skips the query entirely, which is why the session cases below need no
+// mock at all. Built from AppointmentService's own exported document rather than a hand-copied
+// one, so the mock can't drift away from the query the component actually runs.
+function consultMock(appointmentId, status) {
+	return {
+		request: {
+			query: AppointmentService.FETCH_APPOINTMENT,
+			variables: { appointmentId },
+		},
+		result: {
+			data: {
+				getAppointment: {
+					__typename: "Appointment",
+					id: appointmentId,
+					title: "Consult - Arya Stark",
+					description: null,
+					appointmentType: "consult",
+					appointmentDate: "2026-08-01T12:00:00.000Z",
+					appointmentStatus: "scheduled",
+					projectId: null,
+					bookingRequestId: "br-1",
+					bookingRequest: {
+						__typename: "BookingRequest",
+						id: "br-1",
+						status,
+						description: "Wolf on the forearm",
+						placement: "Forearm",
+						size: "Medium",
+						budget: "500",
+						isCoverUp: false,
+						referenceImages: [],
+						client: {
+							__typename: "Client",
+							id: "client-1",
+							firstName: "Arya",
+							lastName: "Stark",
+							email: "arya@example.com",
+							phone: "555-0100",
+						},
+					},
+				},
+			},
+		},
+	};
+}
+
 function baseEvent(overrides = {}) {
 	return {
 		id: "appt-1",
@@ -112,6 +159,60 @@ describe("UpdateEventDialog", () => {
 		await screen.findByDisplayValue("Sleeve session 2");
 		expect(screen.getByText("Consult")).toBeInTheDocument();
 		expect(screen.getByText("No project linked")).toBeInTheDocument();
+	});
+
+	// A session's whole point is that it belongs to a Project - the timer, notes and totals all
+	// live there - so the dialog has to offer a way through to it. It previously dead-ended.
+	it("offers View Project on a session bound to a project", async () => {
+		const event = baseEvent({
+			appointmentType: "session",
+			projectId: "project-1",
+			project: { id: "project-1", title: "Half sleeve - koi" },
+		});
+		renderDialog({ event });
+
+		await screen.findByDisplayValue("Sleeve session 2");
+		expect(screen.getByText(/view project/i)).toBeInTheDocument();
+		expect(screen.queryByText(/convert to session/i)).not.toBeInTheDocument();
+	});
+
+	// Defensive: a session created before convertBookingRequest reliably set projectId has no
+	// project to open, and a button that navigates to /project/undefined is worse than no button.
+	it("does not offer View Project on a session with no project", async () => {
+		const event = baseEvent({ appointmentType: "session", projectId: null, project: null });
+		renderDialog({ event });
+
+		await screen.findByDisplayValue("Sleeve session 2");
+		expect(screen.queryByText(/view project/i)).not.toBeInTheDocument();
+	});
+
+	it("offers Convert to Session on a consult whose booking request is still consult_booked", async () => {
+		const event = baseEvent({
+			appointmentType: "consult",
+			projectId: null,
+			bookingRequestId: "br-1",
+		});
+		renderDialog({ event, mocks: [consultMock(event.id, "consult_booked")] });
+
+		expect(await screen.findByText(/convert to session/i)).toBeInTheDocument();
+		expect(screen.queryByText(/view project/i)).not.toBeInTheDocument();
+	});
+
+	// Same gate ConsultDetail.jsx applies - a consult that already produced a session has nothing
+	// left to convert, and offering the action anyway would let an artist create a duplicate
+	// project from the same intake.
+	it("does not offer Convert to Session once the consult has already been converted", async () => {
+		const event = baseEvent({
+			appointmentType: "consult",
+			projectId: null,
+			bookingRequestId: "br-1",
+		});
+		renderDialog({ event, mocks: [consultMock(event.id, "session_booked")] });
+
+		expect(
+			await screen.findByText(/this consult already led to a booked session/i)
+		).toBeInTheDocument();
+		expect(screen.queryByText(/convert to session/i)).not.toBeInTheDocument();
 	});
 
 	it("does not render a Delete button when the logged-in user isn't the appointment's own artist", async () => {

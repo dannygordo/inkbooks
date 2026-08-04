@@ -1,11 +1,13 @@
-import { Delete, Update } from "@mui/icons-material";
+import { Delete, Update, OpenInNew, EventAvailable } from "@mui/icons-material";
 import { DialogActions, DialogContent } from "@mui/material";
 import moment from "moment";
 import React, { useRef, useState } from "react";
-import { ALERT_CONSTANTS, APP_SETTINGS_CONSTANTS } from "../../constants";
+import { useNavigate } from "react-router-dom";
+import { ALERT_CONSTANTS, APP_SETTINGS_CONSTANTS, ROUTE_CONSTANTS } from "../../constants";
 import IBDateTimePicker from "../inputs/IBDateTimePicker";
 import IBInput from "../inputs/IBInput";
 import IBMultilineInput from "../inputs/IBMultilineInput";
+import BookSessionDatesForm from "../booking/BookSessionDatesForm";
 import { useAuth } from "../../context/auth";
 import { useMutation } from "@apollo/client";
 import { AppointmentService } from "../../services/AppointmentService";
@@ -33,11 +35,30 @@ import UtilsService from "../../services/UtilsService";
  */
 const UpdateEventDialog = ({ selectedDay, event }) => {
 	const { setModal, modal, user, setAlert } = useAuth();
+	const navigate = useNavigate();
 	const titleRef = useRef(event.title);
 	const descriptionRef = useRef(event.description);
 	const [startDateTime, setStartDateTime] = useState(moment.utc(event.appointmentDate));
+	const [showConvertForm, setShowConvertForm] = useState(false);
     const [updateAppointment] = useMutation(AppointmentService.UPDATE_APPOINTMENT);
     const [deleteAppointment] = useMutation(AppointmentService.DELETE_APPOINTMENT);
+
+    const isConsult = event.appointmentType === "consult";
+
+    // Only a consult needs this. The calendar's own query (_FETCH_APPOINTMENTS_BY_SHOP) carries
+    // bookingRequestId but not the BookingRequest itself, and adding it there would mean one extra
+    // findById per appointment on every month render - a real cost paid by every session and
+    // "other" appointment on the calendar for data only a consult's Convert action reads.
+    // Fetched here instead, skipped entirely for anything that isn't a consult.
+    const { data: consultData } = AppointmentService.getAppointment(event.id, {
+        skip: !isConsult,
+    });
+    const bookingRequest = consultData?.getAppointment?.bookingRequest;
+    // Same gate ConsultDetail.jsx uses: a request that has already moved to session_booked has
+    // nothing left to convert, and one at any other status was never a booked consult to begin
+    // with. Also false while the query is still in flight, so the button appears once it can
+    // actually do something rather than flickering in and immediately erroring.
+    const canConvert = isConsult && bookingRequest?.status === "consult_booked";
 
     // Maps the stored value ('session') to the palette's display label ('Session') using the same
     // APPOINTMENT_TYPE list the wizard populates its buttons from, so the two views can't drift
@@ -109,6 +130,39 @@ const UpdateEventDialog = ({ selectedDay, event }) => {
 			});
 	};
 
+    // Closes the modal before navigating. IBModal renders through a portal at the app root, so it
+    // survives a route change and would otherwise stay open on top of the page it just sent the
+    // user to.
+    const closeAndNavigate = (to) => {
+        setModal({ ...modal, isOpen: false });
+        navigate(to);
+    };
+
+    const handleViewProject = (e) => {
+        e.preventDefault();
+        closeAndNavigate(`${ROUTE_CONSTANTS.PROJECT}${event.projectId}`);
+    };
+
+    // Mirrors ConsultDetail.jsx's handleConverted - same alert, same navigate-to-the-new-project.
+    // The conversion itself is BookSessionDatesForm's job, unchanged: the point of reusing that
+    // component rather than reimplementing the flow here is that convertBookingRequest's
+    // create-the-Project semantics and the multi-sitting loop only exist in one place.
+    const handleConverted = (projectId) => {
+        setShowConvertForm(false);
+        setAlert({
+            isAlert: true,
+            severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
+            message: "Session booked.",
+            timeout: ALERT_CONSTANTS.TIMEOUT,
+            location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
+        });
+        if (projectId) {
+            closeAndNavigate(`${ROUTE_CONSTANTS.PROJECT}${projectId}`);
+        } else {
+            setModal({ ...modal, isOpen: false });
+        }
+    };
+
     const handleDelete = (e) => {
         e.preventDefault();
         try{
@@ -152,6 +206,29 @@ const UpdateEventDialog = ({ selectedDay, event }) => {
         }
 
     }
+
+	// Converting takes over the dialog entirely rather than appearing below the edit fields the way
+	// it does on ConsultDetail.jsx. That page has room to show both; a modal doesn't, and leaving
+	// a Save button live next to a booking form invites someone to hit the wrong one.
+	if (showConvertForm) {
+		return (
+			<div className="ibCalendarAddEventContainer">
+				<DialogContent dividers className="updateEventConvertContent">
+					<h3 className="updateEventConvertTitle">Convert to Session</h3>
+					<p className="updateEventConvertSubtitle">
+						Creates the project from this consult's intake details and books the
+						session date(s) against it.
+					</p>
+					<BookSessionDatesForm
+						bookingRequestId={bookingRequest.id}
+						initialDate={moment(event.appointmentDate)}
+						onSuccess={handleConverted}
+						onCancel={() => setShowConvertForm(false)}
+					/>
+				</DialogContent>
+			</div>
+		);
+	}
 
 	return (
 			<div className="ibCalendarAddEventContainer">
@@ -209,6 +286,15 @@ const UpdateEventDialog = ({ selectedDay, event }) => {
 						    read-only status readout (plus an amount field with no real workflow
 						    attached to it here) added nothing but clutter to what should just be a
 						    quick edit of the appointment itself. */}
+
+						{/* A consult that has already been converted. Same message ConsultDetail.jsx
+						    shows, so the two views agree about what state this consult is in
+						    instead of one of them silently showing nothing. */}
+						{isConsult && bookingRequest?.status === "session_booked" && (
+							<p className="updateEventConvertedNote">
+								This consult already led to a booked session.
+							</p>
+						)}
 					</DialogContent>
 					<DialogActions>
                         {
@@ -217,6 +303,30 @@ const UpdateEventDialog = ({ selectedDay, event }) => {
                                 DELETE <Delete />
                             </button>
                         }
+                        {/* A session always belongs to a Project - that's what makes it a session
+                            rather than a consult - so this is the way from the calendar into the
+                            work itself: timer, notes, totals, the other sittings. projectId is
+                            still checked rather than assumed, since a session created before
+                            convertBookingRequest reliably set it may not have one. */}
+                        {event.appointmentType === "session" && event.projectId && (
+                            <button onClick={handleViewProject} className="ibButton">
+                                View Project <OpenInNew />
+                            </button>
+                        )}
+                        {/* Consults are where this dialog used to dead-end: no project to open and
+                            no way forward. This is the same conversion ConsultDetail.jsx offers,
+                            reachable from the calendar where the artist is already standing. */}
+                        {canConvert && (
+                            <button
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    setShowConvertForm(true);
+                                }}
+                                className="ibButton"
+                            >
+                                Convert to Session <EventAvailable />
+                            </button>
+                        )}
                         <button onClick={handleSubmit} className="ibButton">
                             Update <Update />
                         </button>

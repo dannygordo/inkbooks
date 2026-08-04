@@ -377,10 +377,16 @@ export const AppointmentService = (() => {
             }
         }
     `;
-    const _getAppointment = (appointmentId) => {
+    // `options` exists for UpdateEventDialog, which needs to skip this on top of the id check:
+    // it opens for every appointment type, but only a consult has a bookingRequest worth fetching.
+    // A hook can't be called conditionally, so "don't run this for sessions" has to be expressed
+    // as a skip rather than an if - otherwise every session click on the calendar would pay for a
+    // round trip whose entire result it ignores.
+    const _getAppointment = (appointmentId, options = {}) => {
         return useQuery(_FETCH_APPOINTMENT, {
             variables: { appointmentId },
-            skip: !appointmentId,
+            ...options,
+            skip: !appointmentId || options.skip,
         });
     };
 
@@ -462,6 +468,10 @@ export const AppointmentService = (() => {
         RESET_SESSION_TIMER: _RESET_SESSION_TIMER,
         UPDATE_SESSION_DETAILS: _UPDATE_SESSION_DETAILS,
         getAppointment: _getAppointment,
+        // Exported so tests can build a MockedProvider mock against the same document the
+        // component actually runs - mirroring it by hand in a test file is how a query and its
+        // mock silently drift apart.
+        FETCH_APPOINTMENT: _FETCH_APPOINTMENT,
     }
 
 })();

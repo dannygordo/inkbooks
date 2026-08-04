@@ -300,6 +300,32 @@ body .ibCalendar * {
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+/* UpdateEventDialog.jsx's "Convert to Session" state - the form replaces the edit fields rather
+   than sitting below them (see that file's comment on why a modal can't show both). Width matches
+   .appointmentWizardDialogContent so the dialog doesn't jump size when the form opens. */
+.updateEventConvertContent {
+    width: 560px;
+    box-sizing: border-box;
+    padding: 24px 28px !important;
+}
+.updateEventConvertTitle {
+    margin: 0 0 4px;
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--ibcal-text);
+}
+.updateEventConvertSubtitle {
+    margin: 0 0 18px;
+    font-size: 13px;
+    color: var(--ibcal-text-muted);
+}
+/* Shown on a consult whose conversion already happened - reads as a status, not an action. */
+.updateEventConvertedNote {
+    margin: 16px 0 0;
+    font-size: 13px;
+    color: var(--ibcal-text-muted);
+    font-style: italic;
+}
 /* ViewEventDialog.jsx - read-only view of a shop-mate's appointment. */
 .viewEventArtistRow {
     display: flex;
