@@ -30,6 +30,8 @@ const Project = require('../models/Project');
 const Appointment = require('../models/Appointment');
 const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
+const BookingRequest = require('../models/BookingRequest');
+const PasswordToken = require('../models/PasswordToken');
 const { Constants } = require('../utils/constants');
 const { pickDefaultTagColor } = require('../utils/tag-color');
 
@@ -90,6 +92,13 @@ async function seed() {
     Appointment.deleteMany({}),
     Conversation.deleteMany({}),
     Message.deleteMany({}),
+    // These two were missed, so a re-seed left them behind pointing at users and clients that no
+    // longer existed. BookingRequest is the worse of the pair: orphaned requests keep showing up
+    // in an artist's inbox referencing a deleted client, which looks like a bug in the inbox
+    // rather than leftover data. PasswordToken orphans are only litter - a token whose user is
+    // gone can't be redeemed - but there's no reason to keep them either.
+    BookingRequest.deleteMany({}),
+    PasswordToken.deleteMany({}),
   ]);
 
   const hashedPassword = await bcrypt.hash(DEV_PASSWORD, 12);
@@ -309,7 +318,6 @@ async function seed() {
     notes: [{ author: 'Maya Chen', note: 'Client wants to extend to the elbow in a future session.' }],
     tags: ['fine-line', 'botanical', 'black-and-grey'],
     status: 'in_progress',
-    depositAmount: 100,
   }).save();
 
   const project2 = await new Project({
@@ -324,7 +332,6 @@ async function seed() {
     notes: [{ author: 'Jonas Petrov', note: 'Stencil approved, first session scheduled.' }],
     tags: ['traditional', 'color'],
     status: 'in_progress',
-    depositAmount: 150,
   }).save();
 
   const project3 = await new Project({
@@ -338,7 +345,49 @@ async function seed() {
     notes: [],
     tags: ['script', 'small'],
     status: 'completed',
-    depositAmount: 40,
+  }).save();
+
+  // --- A consult that took a deposit, and the project it spawned ----------
+  // Deposits only exist on the appointment that collected them (see models/Appointment.js), and a
+  // Project reaches its deposit through the BookingRequest both share. Seeded end to end so the
+  // deposit UI has something real to show - without this, every seeded project reads "no deposit
+  // taken" and the whole flow is invisible in a fresh database.
+  const consultConvo = await findOrCreateConversation([artist1User._id, clients[0].user._id]);
+  const depositRequest = await new BookingRequest({
+    artistId: artist1User._id,
+    clientId: clients[0].client._id,
+    conversationId: consultConvo._id,
+    guestToken: 'seed-guest-token-botanical-sleeve',
+    status: 'session_booked',
+    description: 'Fine-line botanical piece wrapping the left forearm.',
+    placement: 'Left forearm',
+    size: 'Large',
+    source: 'public_form',
+  }).save();
+  // The link that makes the deposit findable from the project.
+  await Project.findByIdAndUpdate(project1._id, { bookingRequestId: depositRequest._id });
+
+  await new Appointment({
+    appointmentDate: daysAgo(21),
+    shopId: shop._id,
+    userId: artist1User._id,
+    bookingRequestId: depositRequest._id,
+    title: 'Consult - Priya Raman',
+    appointmentType: 'consult',
+    appointmentStatus: 'completed',
+    // The deposit IS this appointment's transaction: $100 taken, so subtotal and total are $100
+    // and the shop's 20% cut is charged here ($20). That second half is what keeps the shop whole
+    // once the deposit is deducted from the final session - see utils/shop-cut.js.
+    depositCents: 10000,
+    depositStatus: 'available',
+    depositCollectedAt: daysAgo(21),
+    subtotalCents: 10000,
+    totalCents: 10000,
+    shopCutCents: 2000,
+    shopCutPercentApplied: 20,
+    shopCutStatus: 'unpaid',
+    createdAt: daysAgo(21),
+    updatedAt: daysAgo(21),
   }).save();
 
   // --- Appointments - covers the full shopCutStatus lifecycle -------------
@@ -426,7 +475,6 @@ async function seed() {
     clientId: clients[project4ClientIndex].client._id,
     tags: ['illustrative', 'color'],
     status: 'in_progress',
-    depositAmount: 100,
   }).save();
   await new Appointment({
     appointmentDate: daysFromNow(14),
