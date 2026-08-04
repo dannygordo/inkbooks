@@ -141,6 +141,61 @@ async function sendShopCutMarkedPaidNotificationToShop({ to, shopName, artistNam
 // Courtesy confirmation back to the artist once the shop has independently confirmed - not part
 // of the security-relevant half of the flow (that's confirmShopCutPaid's own role check), just
 // closes the loop for the artist.
+// Same environment-aware base URL the guest links use - see buildGuestConversationLink above.
+function buildSetPasswordLink(rawToken) {
+  return `${Constants.URLS.INKBOOKS_WEBAPP}/set-password/${rawToken}`;
+}
+
+// Sent when a shop admin creates an artist or staff account. The account exists with an unusable
+// random password until this link is used (see utils/password-tokens.js), so this email is the
+// ONLY way in - which is why the wizard also shows the link on screen for the admin to hand over
+// directly. sendEmail() no-ops when the provider isn't configured, and an invite that silently
+// went nowhere would leave a new hire with an account they can't reach and no way to find out.
+async function sendAccountInviteEmail({ to, firstName, shopName, rawToken, expiresAt }) {
+  const link = buildSetPasswordLink(rawToken);
+  const expiry = expiresAt ? new Date(expiresAt).toDateString() : 'in one week';
+  return sendEmail({
+    to,
+    subject: `Set up your InkBooks account`,
+    htmlBody:
+      `<p>Hi ${firstName || 'there'},</p>` +
+      `<p>${shopName || 'Your shop'} has created an InkBooks account for you. ` +
+      `Choose a password to get started:</p>` +
+      `<p><a href="${link}">Set your password</a></p>` +
+      `<p>This link works until ${expiry}, and can only be used once. ` +
+      `If it expires, ask your shop admin to send a new one.</p>`,
+    textBody:
+      `Hi ${firstName || 'there'},\n\n` +
+      `${shopName || 'Your shop'} has created an InkBooks account for you. ` +
+      `Choose a password to get started:\n\n${link}\n\n` +
+      `This link works until ${expiry}, and can only be used once.`,
+  });
+}
+
+// Self-service reset. Deliberately says nothing about whether the address is registered - the
+// mutation behind it returns the same response either way (see mutations/passwords.js), and an
+// email that says "no account here" would undo that by telling anyone who asks.
+async function sendPasswordResetEmail({ to, firstName, rawToken }) {
+  const link = buildSetPasswordLink(rawToken);
+  return sendEmail({
+    to,
+    subject: 'Reset your InkBooks password',
+    htmlBody:
+      `<p>Hi ${firstName || 'there'},</p>` +
+      `<p>Someone asked to reset the password for this account. ` +
+      `If that was you, choose a new one here:</p>` +
+      `<p><a href="${link}">Reset your password</a></p>` +
+      `<p>This link expires in one hour and can only be used once. ` +
+      `If you didn't ask for it, you can ignore this email - nothing has changed.</p>`,
+    textBody:
+      `Hi ${firstName || 'there'},\n\n` +
+      `Someone asked to reset the password for this account. If that was you, ` +
+      `choose a new one here:\n\n${link}\n\n` +
+      `This link expires in one hour and can only be used once. If you didn't ask for it, ` +
+      `you can ignore this email - nothing has changed.`,
+  });
+}
+
 async function sendShopCutConfirmedNotificationToArtist({ to, artistFirstName, shopName }) {
   return sendEmail({
     to,
@@ -151,6 +206,9 @@ async function sendShopCutConfirmedNotificationToArtist({ to, artistFirstName, s
 }
 
 module.exports = {
+  sendAccountInviteEmail,
+  sendPasswordResetEmail,
+  buildSetPasswordLink,
   sendBookingRequestReceivedEmail,
   sendNewMessageNotificationToGuest,
   sendNewBookingRequestNotificationToArtist,

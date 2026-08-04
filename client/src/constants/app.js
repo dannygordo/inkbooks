@@ -1,5 +1,8 @@
 export const ROUTE_CONSTANTS = {
 	LOGIN: "/login",
+	// Public. The logged-out reset request form, and where an emailed invite/reset link lands.
+	RESET_PASSWORD: "/resetPassword",
+	SET_PASSWORD: "/set-password/",
 	REGISTER: "/register",
 	USER: "users",
 	HOME: "/",

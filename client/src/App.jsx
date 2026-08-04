@@ -37,6 +37,7 @@ import Messenger from "./pages/messenger/Messenger";
 import { SocketProvider } from "./context/SocketProvider";
 import Profile from "./pages/profile/Profile";
 import ResetPassword from "./pages/resetPassword/ResetPassword";
+import SetPassword from "./pages/setPassword/SetPassword";
 import { CalendarProvider } from "./context/calendar";
 import IBModal from "./components/ibModal/IBModal";
 import BookingRequest from "./pages/booking/BookingRequest";
@@ -316,6 +317,12 @@ function App() {
 							}
 						/>
 						<Route path="/resetPassword" element={<ResetPassword />} />
+						{/* Public, and necessarily so - this is where an invite or reset link
+						    lands, and the person following it has no session by definition. The
+						    token in the URL is the only credential, which is why it's 256 random
+						    bits, single-use, expiring, and stored only as a hash (see
+						    server/utils/password-tokens.js). */}
+						<Route path="/set-password/:token" element={<SetPassword />} />
 						<Route path="/login" element={user?.id ? <Home /> : <Login />} />
 						<Route path="/register" element={user?.id ? <Home /> : <Register />} />
 						{/* Public, unauthenticated by design - no AuthRoute wrapper, same as

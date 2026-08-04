@@ -618,6 +618,15 @@ module.exports = gql`
     # Empty on the single-artist query, where it would only restate the totals as a one-row table.
     artists: [ArtistAnalyticsRow!]!
   }
+  # What the set-password page can learn about a link before anyone types into the form.
+  # Deliberately carries no email and no user id - a guessed token must not become a way to read
+  # an account. See resolvers/passwords.js.
+  type PasswordTokenStatus {
+    valid: Boolean!
+    purpose: String
+    firstName: String
+  }
+
   type Query {
     ######### Appointments ############
 
@@ -704,6 +713,9 @@ module.exports = gql`
     # resolvers/deposits.js on why it's scoped by client rather than by project.
     getAvailableDeposits(appointmentId: ID!): [Appointment]
 
+    # Public - the caller is someone who can't log in. See resolvers/passwords.js.
+    inspectPasswordToken(token: String!): PasswordTokenStatus!
+
     getShopAnalytics(shopId: ID!, start: DateTime!, end: DateTime!): Analytics
     getArtistAnalytics(userId: ID!, start: DateTime!, end: DateTime!): Analytics
   }
@@ -734,6 +746,17 @@ module.exports = gql`
     # current password. A true logged-out "forgot password" flow needs an email-based reset
     # token and isn't implemented yet (see PRODUCTION_ROADMAP.md Phase 1, item 1).
     changePassword(currentPassword: String!, newPassword: String!): User!
+    # Both public, both for someone who cannot log in - that's the point of them.
+    #
+    # requestPasswordReset ALWAYS returns true, whether or not the address belongs to an account.
+    # Anything else makes it an oracle for "does this person have an account here", which for a
+    # shop's client list is a real question about real people. See mutations/passwords.js.
+    requestPasswordReset(email: String!): Boolean!
+    # Redeems an invite or reset token. Returns a boolean rather than a session: setting a
+    # password isn't proof of intent to log in, and auto-authenticating whoever redeems a link
+    # would make an intercepted email grant a session outright rather than a password the real
+    # owner can immediately reset.
+    setPasswordWithToken(token: String!, newPassword: String!): Boolean!
 
     ######### Artists ###########
 
