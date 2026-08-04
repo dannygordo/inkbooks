@@ -19,8 +19,8 @@ import { Button, Chip, ListItem, Paper } from "@mui/material";
 import IBChatBox from "../../components/ibChatBox/IBChatBox";
 import { ObjectID } from "bson";
 import MessengerService from "../../services/MessengerService";
-import IBSquarePaymentForm from "../../components/IBSquarePayments/IBSquarePaymentForm";
 import { ALERT_CONSTANTS } from "../../constants";
+import { formatCents } from "../../utils/money";
 import ProjectSessionsList from "../../components/projectSessions/ProjectSessionsList";
 
 const Project = (props) => {
@@ -38,7 +38,6 @@ const Project = (props) => {
 	let addNoteRef = useRef();
 	let addTagRef = useRef();
 	let selectPaletteRef = useRef();
-	let depositAmountRef = useRef();
 	const [activeMessages, setActiveMessages] = useState([]);
 	// Autosave bookkeeping for the Details panel. lastSavedDetailsRef holds a serialized copy of
 	// the last payload actually sent, which is what the dirty check compares against - see
@@ -203,9 +202,9 @@ const Project = (props) => {
 		clientId: data.getProject.clientId,
 		artistId: data.getProject.artistId,
 		status: data.getProject.status,
-		depositAmount: depositAmountRef.current?.value
-			? parseInt(depositAmountRef.current.value)
-			: 0,
+		// depositAmount is deliberately NOT sent. It's the deprecated whole-dollar field from
+		// before deposits moved onto appointments, and nothing writes it any more - echoing it
+		// back would keep a stale number alive beside the real one.
 	});
 
 	const handleDetailFieldBlur = async () => {
@@ -237,45 +236,11 @@ const Project = (props) => {
 		}
 	};
 
-	/**
-	 * Opens the global IBModal with a Square payment form pre-filled to this project's current
-	 * depositAmount (whatever was last saved via handleUpdateDetails - not the unsaved ref value,
-	 * so this always charges the amount actually on record). Sandbox-only right now, see
-	 * IBSquarePaymentForm.jsx and server/routes/squarePayments.js for why.
-	 */
-	const handlePayDepositClick = (e) => {
-		e.preventDefault();
-		const amountCents = Math.round(data.getProject.depositAmount * 100);
-		setModal({
-			isOpen: true,
-			title: "Pay Deposit",
-			content: (
-				<IBSquarePaymentForm
-					amountCents={amountCents}
-					note={`Deposit for project ${data.getProject.title}`}
-					onSuccess={() => {
-						setModal({ ...modal, isOpen: false });
-						setAlert({
-							isAlert: true,
-							severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
-							message: "Deposit paid successfully.",
-							timeout: ALERT_CONSTANTS.TIMEOUT,
-							location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
-						});
-					}}
-					onError={(message) => {
-						setAlert({
-							isAlert: true,
-							severity: ALERT_CONSTANTS.SEVERITY.ERROR,
-							message: `Payment failed: ${message}`,
-							timeout: ALERT_CONSTANTS.TIMEOUT,
-							location: ALERT_CONSTANTS.DISPLAY_MODAL,
-						});
-					}}
-				/>
-			),
-		});
-	};
+	// The "Pay Deposit" button and its Square form that used to live here are gone. A deposit is
+	// taken at the consult, by the artist, at the moment the consult becomes a session - not later
+	// from a project page by whoever happens to be looking at it. Collecting one from here would
+	// be a second, competing way for the same money to enter the system, with no consult
+	// transaction to attach it to.
 
 	// The corner "Edit Project" button is gone, along with its handler. Worth recording what that
 	// handler actually did: its navigate() call was commented out and the body was a
@@ -417,27 +382,30 @@ const Project = (props) => {
 							onBlur={handleDetailFieldBlur}
 							defaultValue={data.getProject.size}
 						/>
-						<IBInput
-							id="depositAmount"
-							label="Deposit Amount $"
-							helperText=" "
-							sx={{ m: 1, width: "25ch" }}
-							type="number"
-							inputRef={depositAmountRef}
-							onBlur={handleDetailFieldBlur}
-							defaultValue={data.getProject.depositAmount}
-						/>
-						<Button
-							variant="outlined"
-							sx={{ m: 1 }}
-							onClick={handlePayDepositClick}
-							disabled={
-								!data.getProject.depositAmount ||
-								data.getProject.depositAmount <= 0
-							}
-						>
-							Pay Deposit
-						</Button>
+						{/* Read-only. A deposit isn't a project property someone types in - it's a
+						    payment that either happened at the consult or didn't, and the record of
+						    it lives on the appointment that took it (see models/Appointment.js). An
+						    editable box here would let someone write a number no money corresponds
+						    to. Plenty of projects won't have one. */}
+						<div className="projectDepositReadout">
+							<span className="projectDepositLabel">Deposit</span>
+							{data.getProject.depositCollectedCents > 0 ? (
+								<span className="projectDepositValue">
+									{formatCents(data.getProject.depositCollectedCents)} taken at consult
+									<span className="projectDepositNote">
+										{data.getProject.depositAvailableCents > 0
+											? ` - ${formatCents(
+													data.getProject.depositAvailableCents
+											  )} still to apply to a session`
+											: " - already applied to a session"}
+									</span>
+								</span>
+							) : (
+								<span className="projectDepositValue projectDepositValueNone">
+									None taken
+								</span>
+							)}
+						</div>
 						<div>
 							{/* A select has no meaningful "done editing" moment - picking an option IS the
 							    edit, and waiting for blur would leave a changed value unsaved until the

@@ -283,7 +283,10 @@ module.exports = {
       if (!projValid) {
         throw new UserInputError('Errors', { errors: projErrors });
       }
-      const project = await new Project(projData).save();
+      // bookingRequestId is stamped on here so a Project can find its way back to the consult
+      // that collected its deposit - see models/Project.js. The consult carries bookingRequestId
+      // too, so the request is the join between them.
+      const project = await new Project({ ...projData, bookingRequestId: bookingRequest._id }).save();
       newProjectId = project.id;
     }
 

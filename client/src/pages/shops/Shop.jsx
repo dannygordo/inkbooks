@@ -1,9 +1,11 @@
 import { useParams, useSearchParams } from "react-router-dom";
 import { useMutation } from "@apollo/client";
+import React, { useRef, useState } from "react";
 import "./shop.css";
 import ShopService  from "../../services/ShopService";
 import IBPageLoader from "../../components/ibPageLoader/IBPageLoader";
 import IBCardShowError from "../../components/card/ibCardShowError/IBCardShowError";
+import IBInput from "../../components/inputs/IBInput";
 
 // Messages shown after landing back here from the Square OAuth redirect (see
 // routes/squareOAuth.js's callback - it redirects to /shop/:shopId?square=<status>). See
@@ -25,6 +27,62 @@ const Shop = (props) => {
 	const [getSquareAuthorizationUrl, { loading: squareUrlLoading }] =
 		ShopService.useSquareAuthorizationUrl();
 	const [disconnectShopSquare] = useMutation(ShopService.DISCONNECT_SHOP_SQUARE);
+	const [updateShop] = useMutation(ShopService.updateShop());
+	const shopCutRef = useRef();
+	const [cutSaveState, setCutSaveState] = useState("idle");
+
+	/**
+	 * The shop's percentage cut, saved on blur - same autosave pattern as the project Details
+	 * panel, and for the same reason: a lone Save button next to one field is more chrome than
+	 * the edit is worth.
+	 *
+	 * This is the only place the percentage can be set. It defaults to 0 (see models/Shop.js -
+	 * deliberately, so nothing starts billing artists a cut nobody configured), which means until
+	 * someone fills this in, every shop cut computes to zero and the payout list stays empty. That
+	 * was a real gap: the ledger was built with no way to configure the number it runs on.
+	 */
+	const handleShopCutBlur = async () => {
+		const raw = shopCutRef.current?.value;
+		const percent = raw === "" || raw === undefined ? 0 : Number(raw);
+		if (Number.isNaN(percent) || percent < 0 || percent > 100) {
+			setCutSaveState("error");
+			return;
+		}
+		if (percent === (data?.getShop?.shopCutPercent ?? 0)) {
+			return;
+		}
+		setCutSaveState("saving");
+		try {
+			await updateShop({
+				variables: {
+					shop: {
+						id: params.shopId,
+						// updateShop replaces the document, so the rest of the shop has to be
+						// echoed back or this one edit would blank every other field.
+						name: data.getShop.name,
+						email: data.getShop.email,
+						phone: data.getShop.phone,
+						address: data.getShop.address,
+						city: data.getShop.city,
+						state: data.getShop.state,
+						zip: data.getShop.zip,
+						instagram: data.getShop.instagram,
+						facebook: data.getShop.facebook,
+						website: data.getShop.website,
+						shopMinimum: data.getShop.shopMinimum,
+						hourlyRate: data.getShop.hourlyRate,
+						logo: data.getShop.logo,
+						billingType: data.getShop.billingType,
+						status: data.getShop.status,
+						shopCutPercent: percent,
+					},
+				},
+			});
+			setCutSaveState("saved");
+		} catch (err) {
+			setCutSaveState("error");
+		}
+	};
 
 	// The corner "Edit" button is gone from every detail page. It was a fixed action in the top
 	// right of a record that didn't say what it edited or where it went, and it was the only way
@@ -79,6 +137,32 @@ const Shop = (props) => {
 				<h1 className="shopTitle">
 					{data.getShop.name}
 				</h1>
+				<div className="squareSection">
+					<div className="squareSectionTitle">Shop cut</div>
+					<p className="shopSectionHint">
+						The shop's percentage of each artist's session work. Applied to the tattoo
+						work only - never to tips, tax or processing fees. Leave at 0 if the shop
+						doesn't take a cut.
+					</p>
+					<div className="shopCutRow">
+						<IBInput
+							id="shopCutPercent"
+							label="Shop cut %"
+							type="number"
+							sx={{ m: 0, width: "16ch" }}
+							fullWidth={false}
+							helperText=" "
+							inputRef={shopCutRef}
+							defaultValue={data.getShop.shopCutPercent ?? 0}
+							onBlur={handleShopCutBlur}
+						/>
+						<span className={`shopCutSaveState shopCutSaveState--${cutSaveState}`}>
+							{cutSaveState === "saving" && "Saving..."}
+							{cutSaveState === "saved" && "Saved"}
+							{cutSaveState === "error" && "Enter a whole number between 0 and 100"}
+						</span>
+					</div>
+				</div>
 				<div className="squareSection">
 					<div className="squareSectionTitle">Square</div>
 					{data.getShop.squareConnected ? (

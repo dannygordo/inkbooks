@@ -18,6 +18,7 @@ const ShopService = (() => {
                     website
                     shopMinimum
                     hourlyRate
+                    shopCutPercent
                     logo
                     billingType
                     status
@@ -95,6 +96,7 @@ const ShopService = (() => {
                     website
                     shopMinimum
                     hourlyRate
+                    shopCutPercent
                     logo
                     billingType
                     status

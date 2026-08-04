@@ -144,6 +144,8 @@ const ConsultDetail = () => {
 						initialDate={moment(appointment.appointmentDate)}
 						onSuccess={handleConverted}
 						onCancel={() => setShowConvertForm(false)}
+						// This IS the consult, so a deposit taken today is recorded against it.
+						consultAppointmentId={appointment.id}
 					/>
 				)}
 

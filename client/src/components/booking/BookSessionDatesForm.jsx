@@ -7,7 +7,9 @@ import IBDateTimePicker from "../inputs/IBDateTimePicker";
 import IBInput from "../inputs/IBInput";
 import BookingRequestService from "../../services/BookingRequestService";
 import { AppointmentService } from "../../services/AppointmentService";
+import DepositService from "../../services/DepositService";
 import { useAuth } from "../../context/auth";
+import { dollarsToCents } from "../../utils/money";
 import "./bookSessionDatesForm.css";
 
 /**
@@ -32,16 +34,31 @@ import "./bookSessionDatesForm.css";
  * pointed at the Project convertBookingRequest just created, so a second call here doesn't need
  * to reinvent that. No new server-side capability was needed for any of this.
  */
-const BookSessionDatesForm = ({ bookingRequestId, initialDate, onSuccess, onCancel }) => {
+const BookSessionDatesForm = ({
+	bookingRequestId,
+	initialDate,
+	onSuccess,
+	onCancel,
+	// The consult appointment this conversion is happening from, when there is one. A deposit is
+	// recorded against it - see the deposit field below.
+	consultAppointmentId,
+}) => {
 	const { user } = useAuth();
 	const shopId = user.userInfo?.shop?.id;
 	const [sessionDates, setSessionDates] = useState([initialDate || moment()]);
 	const [projectTitle, setProjectTitle] = useState("");
+	// A deposit is taken when the consult actually happens and the work is agreed - which is this
+	// moment, not when the consult was booked. A consult sitting in the calendar for next Tuesday
+	// has no deposit against it because nobody has met yet.
+	//
+	// Optional: plenty of jobs don't take one.
+	const [depositDollars, setDepositDollars] = useState("");
 	const [error, setError] = useState(null);
 	const [submitting, setSubmitting] = useState(false);
 
 	const [convertBookingRequest] = useMutation(BookingRequestService.CONVERT_BOOKING_REQUEST_MUTATION);
 	const [createAppointment] = useMutation(AppointmentService.CREATE_APPOINTMENT);
+	const [recordDeposit] = useMutation(DepositService.RECORD_DEPOSIT);
 
 	const updateDate = (index, val) => {
 		setSessionDates((prev) => prev.map((d, i) => (i === index ? val : d)));
@@ -106,6 +123,31 @@ const BookSessionDatesForm = ({ bookingRequestId, initialDate, onSuccess, onCanc
 					},
 				});
 			}
+			// Recorded AFTER the conversion succeeds, and against the consult rather than the new
+			// session: the money was taken at the consult, so that's the transaction it belongs
+			// to, and recording it there is what makes it show up as revenue on the day it was
+			// actually collected (see server/graphql/mutations/deposits.js).
+			//
+			// A failure here doesn't roll back the booking. The sessions are real and on the
+			// calendar; losing them because a deposit amount was mistyped would be a far worse
+			// outcome than an unrecorded deposit, which can be added afterwards.
+			const depositCents = depositDollars ? dollarsToCents(depositDollars) : 0;
+			if (depositCents > 0 && consultAppointmentId) {
+				try {
+					await recordDeposit({
+						variables: { appointmentId: consultAppointmentId, depositCents },
+					});
+				} catch (depositErr) {
+					setError(
+						`Sessions booked, but the deposit couldn't be recorded: ${
+							depositErr.graphQLErrors?.[0]?.message || depositErr.message
+						}`
+					);
+					setSubmitting(false);
+					return;
+				}
+			}
+
 			if (onSuccess) {
 				onSuccess(projectId);
 			}
@@ -147,6 +189,18 @@ const BookSessionDatesForm = ({ bookingRequestId, initialDate, onSuccess, onCanc
 			<Button startIcon={<Add />} onClick={addDate} size="small" sx={{ alignSelf: "flex-start" }}>
 				Add another session
 			</Button>
+			{/* Only offered when there's a consult to attach it to. Without one there's no
+			    transaction the money belongs to, and a deposit floating free of the appointment
+			    that took it is exactly what the ledger design avoids. */}
+			{consultAppointmentId && (
+				<IBInput
+					label="Deposit taken today $"
+					type="number"
+					placeholder="0"
+					helperText="Optional - credited against the client's final session"
+					onChange={(e) => setDepositDollars(e.target.value)}
+				/>
+			)}
 			{error && <div className="bookingRequestError">{error}</div>}
 			<div className="bookSessionDatesFormButtons">
 				<Button type="submit" variant="contained" disabled={submitting}>

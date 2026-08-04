@@ -107,6 +107,47 @@ module.exports = {
         return null;
       }
       return findOrCreateConversationForMembers([project.artistId, client.userId]);
+    },
+    // --- Deposits ------------------------------------------------------------------------------
+    // A deposit is collected at the consult and lives on that appointment (see
+    // models/Appointment.js on why it's recorded against the transaction that took it). The
+    // consult has no projectId - it predates the Project - so the path here runs
+    // Project -> bookingRequestId -> the consult created from that same request.
+    //
+    // Returned as a resolver rather than a stored field so it can't drift: the deposit's real
+    // state lives in one place, and this reads it.
+    deposits: async(project) => {
+      if (!project.bookingRequestId) {
+        return [];
+      }
+      return Appointment.find({
+        bookingRequestId: project.bookingRequestId,
+        depositCents: { $gt: 0 },
+      }).sort({ depositCollectedAt: 1 });
+    },
+    depositCollectedCents: async(project) => {
+      if (!project.bookingRequestId) {
+        return 0;
+      }
+      const rows = await Appointment.find({
+        bookingRequestId: project.bookingRequestId,
+        depositCents: { $gt: 0 },
+      }).select('depositCents');
+      return rows.reduce((sum, row) => sum + (row.depositCents || 0), 0);
+    },
+    // What's still spendable against a session. Distinct from the total collected, because a
+    // deposit that's already been credited is gone - showing only the total would imply money
+    // still available that isn't.
+    depositAvailableCents: async(project) => {
+      if (!project.bookingRequestId) {
+        return 0;
+      }
+      const rows = await Appointment.find({
+        bookingRequestId: project.bookingRequestId,
+        depositStatus: 'available',
+        depositCents: { $gt: 0 },
+      }).select('depositCents');
+      return rows.reduce((sum, row) => sum + (row.depositCents || 0), 0);
     }
   },
   IBImage: {

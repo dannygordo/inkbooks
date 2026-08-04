@@ -183,7 +183,7 @@ export default function Sidebar() {
 	// Hiding the nav entry is a real UX improvement but not a security fix - flagging this
 	// distinction rather than letting "no visible link" read as "actually restricted".
 	const isShopAdminOrBetter = user.role <= ROLES.SHOP_ADMIN;
-	const isStaffOrBetter = user.role <= ROLES.STAFF;
+	const isStaffOrBetter = user.role <= ROLES.SHOP_STAFF;
 	const isClient = user.userType === "client";
 	// Settings currently only has real content for an artist (rate config - see pages/settings/
 	// Settings.jsx) - hidden for everyone else rather than linking to a page that just says

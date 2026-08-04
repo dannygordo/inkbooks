@@ -458,6 +458,10 @@ const ArtistBookingRequests = () => {
                 bookingRequestId={selected.id}
                 onSuccess={handleSessionBooked}
                 onCancel={() => setPendingOutcome(null)}
+                // Deliberately no consultAppointmentId here. This is the inbox for a request that
+                // is being booked straight to a session without a consult ever happening - there
+                // is no consult transaction for a deposit to belong to, so the form doesn't offer
+                // the field. A deposit taken at a later consult gets recorded there instead.
               />
             )}
             {convertError && <div className="bookingRequestError">{convertError}</div>}

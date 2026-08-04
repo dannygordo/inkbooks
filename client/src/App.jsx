@@ -117,7 +117,7 @@ function App() {
 						<Route
 							path="/artists"
 							element={
-								<RoleRoute minRole={ROLES.STAFF}>
+								<RoleRoute minRole={ROLES.SHOP_STAFF}>
 									<Artists />
 								</RoleRoute>
 							}
@@ -125,7 +125,7 @@ function App() {
 						<Route
 							path="/artist/:artistId"
 							element={
-								<RoleRoute minRole={ROLES.STAFF} allowIf={isOwnArtistPage}>
+								<RoleRoute minRole={ROLES.SHOP_STAFF} allowIf={isOwnArtistPage}>
 									<Artist />
 								</RoleRoute>
 							}
@@ -133,7 +133,7 @@ function App() {
 						<Route
 							path="/artist/edit/:artistId"
 							element={
-								<RoleRoute minRole={ROLES.STAFF} allowIf={isOwnArtistPage}>
+								<RoleRoute minRole={ROLES.SHOP_STAFF} allowIf={isOwnArtistPage}>
 									<EditArtist />
 								</RoleRoute>
 							}
@@ -202,14 +202,12 @@ function App() {
 								</AuthRoute>
 							}
 						/>
-						<Route
-							path="/project/edit/:projectId"
-							element={
-								<AuthRoute>
-									<EditClient />
-								</AuthRoute>
-							}
-						/>
+						{/* /project/edit/:projectId is gone. Nothing in the app ever navigated to it -
+						    ROUTE_CONSTANTS.EDIT_PROJECT was defined and never used - so it was
+						    reachable only by typing the URL, and when reached it rendered
+						    EditClient: the CLIENT edit form, under a project's id. Every project
+						    field is editable in place on the project page itself (and autosaves),
+						    so there's nothing this route was for. */}
 						{/* A consult has no Project of its own to view/edit through - see
 						pages/consults/ConsultDetail.jsx's own comment. */}
 						<Route

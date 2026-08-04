@@ -40,7 +40,7 @@ const IBPageActionBar = ({ pageType, onCreated }) => {
     // Staff and above. Both mirror the server's own gate (see mutations/accounts.js); this only
     // decides whether to offer the button, and hiding it is not the boundary.
     const canManageAccounts = user?.role <= ROLES.SHOP_ADMIN;
-    const canAddClients = user?.role <= ROLES.STAFF;
+    const canAddClients = user?.role <= ROLES.SHOP_STAFF;
 
     switch(pageType) {
         case 'artists':

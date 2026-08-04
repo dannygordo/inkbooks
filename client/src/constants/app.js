@@ -20,7 +20,8 @@ export const ROUTE_CONSTANTS = {
 	CREATE_STAFF: "/staff/create",
 	PROJECTS: "projects",
 	PROJECT: "/project/",
-	EDIT_PROJECT: "/project/edit/",
+	// EDIT_PROJECT removed alongside its route - nothing ever navigated to it, and the route it
+	// named rendered the client edit form. See App.jsx.
 	CREATE_PROJECT: "/project/create",
 	// A consult has no Project of its own to view/edit through - see ConsultDetail.jsx.
 	CONSULT: "/consult/",

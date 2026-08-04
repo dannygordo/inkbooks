@@ -106,3 +106,31 @@
     color: #861d15;
     font-weight: 500;
 }
+
+
+/* Deposit readout in the Details panel - read-only by design (see Project.jsx). Styled as a
+   reported fact rather than a field, so nobody tries to type in it. */
+.projectDepositReadout {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 12px 8px 4px;
+}
+.projectDepositLabel {
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    color: #777;
+}
+.projectDepositValue {
+    font-size: 15px;
+    color: #333;
+}
+.projectDepositValueNone {
+    color: #777;
+    font-style: italic;
+}
+.projectDepositNote {
+    color: #555;
+}

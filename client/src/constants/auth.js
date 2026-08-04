@@ -1,7 +1,13 @@
+// Names match server/utils/constants.js exactly. They didn't: this file called 15 STAFF while
+// the server called it SHOP_STAFF, so the same number had two names depending on which half of
+// the codebase you were reading - and a role check written from memory in the wrong file is a
+// silent authorization bug, not a compile error.
+//
+// Lower is more privileged throughout, so "at least this privileged" is `role <= X`.
 export const ROLES = {
 	ADMIN: 1,
 	SHOP_ADMIN: 10,
-	STAFF: 15,
+	SHOP_STAFF: 15,
 	ARTIST: 20,
 	CLIENT: 30,
 };

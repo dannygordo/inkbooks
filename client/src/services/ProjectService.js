@@ -215,7 +215,10 @@ const ProjectService = (() => {
 					}
 					tags
 					status
-					depositAmount
+					# depositAmount is deprecated (whole dollars, unwritten) - the real figures are
+					# below, resolved from the appointment that collected the deposit.
+					depositCollectedCents
+					depositAvailableCents
 				}
 			}
 		`;
@@ -277,7 +280,10 @@ const ProjectService = (() => {
 					}
 					tags
 					status
-					depositAmount
+					# depositAmount is deprecated (whole dollars, unwritten) - the real figures are
+					# below, resolved from the appointment that collected the deposit.
+					depositCollectedCents
+					depositAvailableCents
 				}
 			}
 		`;

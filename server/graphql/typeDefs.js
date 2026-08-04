@@ -400,7 +400,18 @@ module.exports = gql`
     notes: [IBNote]
     tags: [String]
     status: String!
+    # DEPRECATED - whole dollars, from before the move to integer cents, no longer written by
+    # anything. Use depositCollectedCents/depositAvailableCents below, which read the real
+    # deposit off the appointment that collected it. See models/Project.js.
     depositAmount: Int
+    bookingRequestId: ID
+    # Deposits taken at this project's consult. Resolved rather than stored, so they can't drift
+    # from the appointment records that actually hold them - see resolvers/index.js.
+    deposits: [Appointment]
+    depositCollectedCents: Int
+    # Still spendable against a session. Distinct from the total collected: a deposit already
+    # credited is gone, and showing only the total would imply money still available that isn't.
+    depositAvailableCents: Int
     # The model has always had Mongoose timestamps enabled (see models/Project.js) - these were
     # simply never exposed. The client dashboard shows when a project was started.
     createdAt: DateTime

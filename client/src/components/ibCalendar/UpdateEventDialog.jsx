@@ -224,6 +224,9 @@ const UpdateEventDialog = ({ selectedDay, event }) => {
 						initialDate={moment(event.appointmentDate)}
 						onSuccess={handleConverted}
 						onCancel={() => setShowConvertForm(false)}
+						// The appointment this dialog is open on IS the consult, so a deposit taken
+						// today is recorded against it.
+						consultAppointmentId={event.id}
 					/>
 				</DialogContent>
 			</div>
