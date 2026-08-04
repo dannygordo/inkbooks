@@ -1,45 +1,63 @@
-import { Delete, Save, Update } from "@mui/icons-material";
-import { DialogActions, DialogContent, DialogContentText } from "@mui/material";
+import { Delete, Update } from "@mui/icons-material";
+import { DialogActions, DialogContent } from "@mui/material";
 import moment from "moment";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import { ALERT_CONSTANTS, APP_SETTINGS_CONSTANTS } from "../../constants";
-import { useCalendar } from "../../context/calendar";
 import IBDateTimePicker from "../inputs/IBDateTimePicker";
 import IBInput from "../inputs/IBInput";
 import IBMultilineInput from "../inputs/IBMultilineInput";
-import IBSelect from "../inputs/IBSelect";
-import IBSubmitButton from "../inputs/IBSubmitButton";
 import { useAuth } from "../../context/auth";
-import IBProjectsByArtistSelect from "../inputs/IBProjectsByArtistSelect";
-import ProjectService from "../../services/ProjectService";
-import IBPageLoader from "../ibPageLoader/IBPageLoader";
 import { useMutation } from "@apollo/client";
 import { AppointmentService } from "../../services/AppointmentService";
 import UtilsService from "../../services/UtilsService";
 
+/**
+ * Appointment type and project are LABELS here, not inputs.
+ *
+ * Both used to be editable dropdowns, from back when this dialog was the only way an appointment
+ * got its type and project at all. AppointmentWizard.jsx now owns that decision at creation time,
+ * and it isn't a free-form choice: the wizard branches on type (a consult collects intake details
+ * and has no Project; a session is bound to a specific Project, either new or existing) and
+ * convertBookingRequest wires the resulting Appointment to its BookingRequest accordingly. Letting
+ * someone flip 'session' to 'consult', or repoint an appointment at an unrelated project, from a
+ * quick-edit dialog would silently break those invariants - the appointment would keep its
+ * bookingRequestId, its Project's sessions list, and its shop-cut ledger entry while claiming to be
+ * something else entirely. Changing either is a different, deliberate operation than "fix the time
+ * or fix a typo in the title", which is all this dialog is for.
+ *
+ * Removing the project dropdown also removed this component's only reason to run
+ * ProjectService.fetchProjectsByArtist(user.id) - the project's title comes straight off
+ * event.project, which the calendar's own query already fetches (see AppointmentService's
+ * _FETCH_APPOINTMENTS_BY_SHOP). That drops a whole network round-trip and the loading gate that
+ * came with it, so the dialog now renders immediately instead of flashing a spinner.
+ */
 const UpdateEventDialog = ({ selectedDay, event }) => {
 	const { setModal, modal, user, setAlert } = useAuth();
 	const titleRef = useRef(event.title);
-	const appointmentTypeRef = useRef();
-	const projectRef = useRef(event.projectId);
 	const descriptionRef = useRef(event.description);
 	const [startDateTime, setStartDateTime] = useState(moment.utc(event.appointmentDate));
-    const [appointmentType, setAppointmentType] = useState(event.appointmentType);
-    const [selectedEvent, setSelectedEvent] = useState(event);
-	const { loading, data } = ProjectService.fetchProjectsByArtist(user.id);
     const [updateAppointment] = useMutation(AppointmentService.UPDATE_APPOINTMENT);
     const [deleteAppointment] = useMutation(AppointmentService.DELETE_APPOINTMENT);
-    console.log(event);
 
-   
+    // Maps the stored value ('session') to the palette's display label ('Session') using the same
+    // APPOINTMENT_TYPE list the wizard populates its buttons from, so the two views can't drift
+    // apart. Falls back to the raw value rather than rendering blank if an appointment somehow
+    // carries a type not in the list.
+    const appointmentTypeLabel =
+        APP_SETTINGS_CONSTANTS.APPOINTMENT_TYPE.find(
+            (t) => t.value === event.appointmentType,
+        )?.label || event.appointmentType || "-";
+    // Consults and "Other" appointments legitimately have no Project at all - see
+    // models/Appointment.js on projectId being optional.
+    const projectLabel = event.project?.title || "No project linked";
 
 	const handleSubmit = (e) => {
 		e.preventDefault();
-		//console.log(startDateTime.format("LLL"));
-        console.log(user);
         const newAppointment = {
             id: event.id,
-            projectId: projectRef.current.value,
+            // Echoed back unchanged - no longer read from a dropdown, same reasoning as
+            // shopCutStatus/shopCutAmount below. See this file's header comment.
+            projectId: event.projectId,
             userId: user.id,
             // user.userInfo.shop is legitimately absent for an independent artist (no shop
             // connection - see PRODUCTION_ROADMAP.md's artist-centric tenancy section).
@@ -56,7 +74,7 @@ const UpdateEventDialog = ({ selectedDay, event }) => {
             shopCutStatus: event.shopCutStatus,
             shopCutAmount: event.shopCutAmount,
             appointmentStatus: event.appointmentStatus,
-            appointmentType: appointmentTypeRef.current.value.toLowerCase(),
+            appointmentType: event.appointmentType,
             createdAt: event.createdAt,
             updatedAt: UtilsService.formatDateToISO(Date.now()),
             appointmentDate: UtilsService.formatDateToISO(startDateTime)
@@ -90,22 +108,9 @@ const UpdateEventDialog = ({ selectedDay, event }) => {
 			});
 	};
 
-    const handleProjectChange = (e) =>  {
-        let proj = data.getProjectsByArtist.filter((proj) => proj.id === e.target.value);
-        console.log(e.target.value);
-        console.log(proj);
-        titleRef.current.value = proj[0].title;
-        descriptionRef.current.value = proj[0].description;
-        titleRef.current.focus();
-        projectRef.current.value = proj[0].id;
-        console.log(projectRef.current.value);
-        console.log(proj);
-    }
-
     const handleDelete = (e) => {
         e.preventDefault();
         try{
-            console.log(event);
             deleteAppointment({
                 variables: {
                     appointmentId: event.id,
@@ -147,8 +152,7 @@ const UpdateEventDialog = ({ selectedDay, event }) => {
 
     }
 
-	if (data) {
-		return (
+	return (
 			<div className="ibCalendarAddEventContainer">
 					<DialogContent dividers>
 						<div
@@ -165,44 +169,37 @@ const UpdateEventDialog = ({ selectedDay, event }) => {
 									setVal={setStartDateTime}
 								/>
 							</div>
-							{/* <div>
-                                <IBDateTimePicker label="End Date" val={endDateTime} setVal={setEndDateTime}  />
-                            </div> */}
 						</div>
 
-						<div>
-							<IBSelect
-								data={APP_SETTINGS_CONSTANTS.APPOINTMENT_TYPE}
-								label="Appointment Type"
-								inputRef={appointmentTypeRef}
-								selectedVal={appointmentType}
-								defaultValue={
-									APP_SETTINGS_CONSTANTS.APPOINTMENT_TYPE[0]
-										.value
-								}
-							/>
-						</div>
-						<div>
-							<IBProjectsByArtistSelect
-								data={data.getProjectsByArtist}
-								inputRef={projectRef}
-								label="Projects"
-                                selectedVal={selectedEvent.projectId}
-								defaultValue=""
-                                onChange={handleProjectChange}
-							/>
+						{/* Read-only. See this file's header comment on why type and project are no
+						    longer editable from here. */}
+						<div className="updateEventReadOnlyFields">
+							<div className="updateEventReadOnlyField">
+								<span className="updateEventReadOnlyLabel">
+									Appointment Type
+								</span>
+								<span className="updateEventReadOnlyValue">
+									{appointmentTypeLabel}
+								</span>
+							</div>
+							<div className="updateEventReadOnlyField">
+								<span className="updateEventReadOnlyLabel">Project</span>
+								<span className="updateEventReadOnlyValue">
+									{projectLabel}
+								</span>
+							</div>
 						</div>
 						<IBInput
 							inputRef={titleRef}
 							helperText="Add Title"
 							placeholder="Add title"
-                            defaultValue={selectedEvent.title}
+                            defaultValue={event.title}
 						/>
 						<IBMultilineInput
 							id="description"
 							helperText="Description"
 							inputRef={descriptionRef}
-                            defaultValue={selectedEvent.description}
+                            defaultValue={event.description}
 						/>
 						{/* Shop cut amount/status used to be shown and editable right here - removed
 						    entirely. Paying/invoicing it already lives on the artist dashboard's
@@ -225,8 +222,6 @@ const UpdateEventDialog = ({ selectedDay, event }) => {
 					</DialogActions>
 			</div>
 		);
-	}
-	return <IBPageLoader />;
 };
 
 export default UpdateEventDialog;

@@ -10,7 +10,6 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MockedProvider } from "@apollo/client/testing";
-import { gql } from "@apollo/client";
 import UpdateEventDialog from "./UpdateEventDialog";
 import { AuthContext } from "../../context/auth";
 import { AppointmentService } from "../../services/AppointmentService";
@@ -22,40 +21,9 @@ const USER = {
 	userInfo: { shop: { id: "shop-1" } },
 };
 
-// See the matching note in CreateEventDialog.test.jsx - ProjectService doesn't export this
-// document directly, so it's mirrored here for MockedProvider's request matching.
-const GET_PROJECTS_BY_ARTIST = gql`
-	query GetProjectsByArtist($artistId: ID!) {
-		getProjectsByArtist(artistId: $artistId) {
-			id
-			title
-			description
-			client {
-				user {
-					id
-					firstName
-					lastName
-					avatar
-				}
-			}
-			artist {
-				user {
-					id
-					firstName
-					lastName
-					avatar
-				}
-			}
-		}
-	}
-`;
-
-function projectsByArtistMock(artistId, projects = []) {
-	return {
-		request: { query: GET_PROJECTS_BY_ARTIST, variables: { artistId } },
-		result: { data: { getProjectsByArtist: projects } },
-	};
-}
+// The GET_PROJECTS_BY_ARTIST mock that used to live here is gone along with the query itself -
+// the dialog no longer fetches the artist's project list, because the project dropdown it fed is
+// now a label sourced from event.project (see UpdateEventDialog.jsx's header comment).
 
 function baseEvent(overrides = {}) {
 	return {
@@ -96,7 +64,7 @@ function renderDialog({ event, mocks, contextOverrides = {} } = {}) {
 describe("UpdateEventDialog", () => {
 	it("renders the existing appointment's values", async () => {
 		const event = baseEvent();
-		renderDialog({ event, mocks: [projectsByArtistMock(USER.id)] });
+		renderDialog({ event });
 
 		expect(await screen.findByDisplayValue("Sleeve session 2")).toBeInTheDocument();
 		expect(screen.getByDisplayValue("Continuing the sleeve piece")).toBeInTheDocument();
@@ -109,7 +77,7 @@ describe("UpdateEventDialog", () => {
 	// comment) - it used to render whenever event.shopId was set; confirms it doesn't come back.
 	it("never shows a shop-cut panel, even when the appointment has a shopId", async () => {
 		const event = baseEvent({ shopId: "shop-1", shopCutStatus: "unpaid", shopCutAmount: 80 });
-		renderDialog({ event, mocks: [projectsByArtistMock(USER.id)] });
+		renderDialog({ event });
 
 		await screen.findByDisplayValue("Sleeve session 2");
 		expect(screen.queryByText(/shop cut:/i)).not.toBeInTheDocument();
@@ -118,9 +86,37 @@ describe("UpdateEventDialog", () => {
 		expect(screen.queryByText("Mark as Paid (cash)")).not.toBeInTheDocument();
 	});
 
+	// Regression test locking in that appointment type and project are labels, not inputs - the
+	// wizard owns both choices at creation time and changing either from here would break the
+	// consult/session invariants those choices carry (see UpdateEventDialog.jsx's header comment).
+	it("shows appointment type and project as read-only labels, not dropdowns", async () => {
+		const event = baseEvent({
+			projectId: "project-1",
+			project: { id: "project-1", title: "Half sleeve - koi" },
+		});
+		renderDialog({ event });
+
+		await screen.findByDisplayValue("Sleeve session 2");
+		// Display label from APPOINTMENT_TYPE, not the raw stored 'session'.
+		expect(screen.getByText("Session")).toBeInTheDocument();
+		expect(screen.getByText("Half sleeve - koi")).toBeInTheDocument();
+		// MUI's Select renders with role="combobox" - neither field should be one any more.
+		expect(screen.queryAllByRole("combobox")).toHaveLength(0);
+	});
+
+	it("falls back to a placeholder when the appointment has no project", async () => {
+		// Consults and "Other" appointments have no Project at all - see models/Appointment.js.
+		const event = baseEvent({ appointmentType: "consult", projectId: null, project: null });
+		renderDialog({ event });
+
+		await screen.findByDisplayValue("Sleeve session 2");
+		expect(screen.getByText("Consult")).toBeInTheDocument();
+		expect(screen.getByText("No project linked")).toBeInTheDocument();
+	});
+
 	it("does not render a Delete button when the logged-in user isn't the appointment's own artist", async () => {
 		const event = baseEvent({ userId: "someone-else" });
-		renderDialog({ event, mocks: [projectsByArtistMock(USER.id)] });
+		renderDialog({ event });
 
 		await screen.findByDisplayValue("Sleeve session 2");
 		expect(screen.queryByText(/delete/i)).not.toBeInTheDocument();
@@ -130,7 +126,6 @@ describe("UpdateEventDialog", () => {
 		const user = userEvent.setup();
 		const event = baseEvent();
 		const mocks = [
-			projectsByArtistMock(USER.id),
 			{
 				request: {
 					query: AppointmentService.DELETE_APPOINTMENT,
