@@ -31,6 +31,7 @@ const Appointment = require('../models/Appointment');
 const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 const { Constants } = require('../utils/constants');
+const { pickDefaultTagColor } = require('../utils/tag-color');
 
 // Every seeded account uses this same password - it's local dev data, not real credentials.
 const DEV_PASSWORD = 'devpass123';
@@ -129,6 +130,8 @@ async function seed() {
     firstName: 'Alex',
     lastName: 'Admin',
     hasSetPassword: true,
+    // No shop to be unique within - same fallback pickDefaultTagColor uses for anyone unaffiliated.
+    tagColor: await pickDefaultTagColor(null),
   }).save();
 
   // --- Shop Admin (User + Staff) -------------------------------------------
@@ -141,6 +144,8 @@ async function seed() {
     firstName: 'Dana',
     lastName: 'Wolfe',
     hasSetPassword: true,
+    // Shop-unique among Copper Wolf's members - same picker the real login/calendar self-heal use.
+    tagColor: await pickDefaultTagColor(shop._id),
   }).save();
   await new Staff({
     firstName: 'Dana',
@@ -163,6 +168,7 @@ async function seed() {
     firstName: 'Sam',
     lastName: 'Rivera',
     hasSetPassword: true,
+    tagColor: await pickDefaultTagColor(shop._id),
   }).save();
   await new Staff({
     firstName: 'Sam',
@@ -185,6 +191,7 @@ async function seed() {
     firstName: 'Maya',
     lastName: 'Chen',
     hasSetPassword: true,
+    tagColor: await pickDefaultTagColor(shop._id),
   }).save();
   await new Artist({
     firstName: 'Maya',
@@ -209,6 +216,7 @@ async function seed() {
     firstName: 'Jonas',
     lastName: 'Petrov',
     hasSetPassword: true,
+    tagColor: await pickDefaultTagColor(shop._id),
   }).save();
   await new Artist({
     firstName: 'Jonas',
@@ -234,6 +242,8 @@ async function seed() {
     firstName: 'Robin',
     lastName: 'Ashby',
     hasSetPassword: true,
+    // No shop - independent artists get the same no-shop fallback as everyone else unaffiliated.
+    tagColor: await pickDefaultTagColor(null),
   }).save();
   await new Artist({
     firstName: 'Robin',
@@ -270,6 +280,8 @@ async function seed() {
       firstName: def.firstName,
       lastName: def.lastName,
       hasSetPassword: true,
+      // Clients have no shop concept at all - same no-shop fallback as an independent artist.
+      tagColor: await pickDefaultTagColor(null),
     }).save();
     const clientDoc = await new Client({
       firstName: def.firstName,
