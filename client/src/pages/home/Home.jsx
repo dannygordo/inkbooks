@@ -3,18 +3,23 @@ import "./home.css";
 import { useAuth } from "../../context/auth";
 import ArtistPerformancePanel from "../../components/artistDashboard/ArtistPerformancePanel";
 import ClientDashboard from "../../components/clientDashboard/ClientDashboard";
+import ShopAnalyticsPanel from "../../components/analytics/ShopAnalyticsPanel";
+import { ROLES } from "../../constants/auth";
 
-// Was a bare "Dashboard" placeholder with no real content - first real content here is the
-// artist's own performance view (upcoming appointments, MTD/YTD revenue and shop-cut owed, active
-// projects), reusing the same panel Artist.jsx mounts for a shop's view into one specific artist.
-// See PRODUCTION_ROADMAP.md for the reasoning on why the same data lives in both places, scoped
-// differently (self view here vs. a shop's view of someone else on Artist.jsx).
-//
-// Still open: a shop-wide dashboard for Shop Admin/Staff/Client logins (aggregate across all
-// connected artists, shop-wide revenue, pending confirmations count, etc.) - deliberately not
-// built in this pass. Those roles currently see only the greeting below.
+// One route, three dashboards, picked by who's looking:
+//   artist  - their own performance panel (ArtistPerformancePanel, isSelf).
+//   client  - their own projects, spend, tips and appointments (ClientDashboard, isSelf).
+//   staff   - shop-wide analytics (ShopAnalyticsPanel). This was the last placeholder standing;
+//             Staff and Shop Admin logins saw nothing but the greeting until now.
 const Home = () => {
 	const { user } = useAuth();
+
+	// Shop Admin and above see money; Staff see activity only. Passed down as a prop purely so the
+	// panel knows whether to render the money cards and columns at all - the server independently
+	// returns null for every currency field below this role (see resolvers/analytics.js), so this
+	// is presentation, not the boundary. Getting this prop wrong would show a Staff member a row
+	// of em dashes, not somebody's earnings.
+	const canSeeMoney = user.role <= ROLES.SHOP_ADMIN;
 
 	return (
 		<div className="home">
@@ -30,10 +35,10 @@ const Home = () => {
 				<ClientDashboard clientId={user.userInfo?.id} isSelf={true} />
 			)}
 			{user.userType === "staff" && (
-				<div className="homeWidgets">
-					Shop-wide dashboard analytics aren't built yet - see
-					PRODUCTION_ROADMAP.md.
-				</div>
+				<ShopAnalyticsPanel
+					shopId={user.userInfo?.shop?.id}
+					canSeeMoney={canSeeMoney}
+				/>
 			)}
 		</div>
 	);

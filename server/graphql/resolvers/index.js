@@ -18,6 +18,7 @@ const appointmentMutations = require('../mutations/appointments');
 const bookingRequestResolvers = require('./bookingRequests');
 const bookingRequestMutations = require('../mutations/bookingRequests');
 const artistShopConnectionResolvers = require('./artistShopConnections');
+const analyticsResolvers = require('./analytics');
 const artistShopConnectionMutations = require('../mutations/artistShopConnections');
 const shopCutPaymentMutations = require('../mutations/shopCutPayments');
 const Artist = require('../../models/Artist');
@@ -48,7 +49,8 @@ module.exports = {
     ...projectResolvers.Query,
     ...appointmentResolvers.Query,
     ...bookingRequestResolvers.Query,
-    ...artistShopConnectionResolvers.Query
+    ...artistShopConnectionResolvers.Query,
+    ...analyticsResolvers.Query
   },
   Mutation: {
     ...usersResolvers.Mutation,

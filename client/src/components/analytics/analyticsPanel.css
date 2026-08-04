@@ -1,0 +1,119 @@
+.analyticsPanel {
+	display: flex;
+	flex-direction: column;
+	gap: 18px;
+}
+
+.analyticsSectionTitle {
+	font-size: 18px;
+	font-weight: 600;
+	margin: 6px 0 0;
+}
+
+.analyticsStatGrid {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 16px;
+}
+
+/* Deliberately the same card as the artist dashboard's (artistPerformancePanel.css) rather than a
+   second visual language for the same idea - the two dashboards are read against each other. */
+.analyticsStatCard {
+	flex: 1 1 170px;
+	min-width: 170px;
+	padding: 16px 18px;
+	border: 1px solid #eee;
+	border-radius: 8px;
+	background-color: #fff;
+}
+
+.analyticsStatLabel {
+	font-size: 13px;
+	color: #555;
+	margin-bottom: 6px;
+}
+
+.analyticsStatValue {
+	font-size: 22px;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+}
+
+/* The em dash a Staff-role user sees where a money figure would be. Muted so it reads as
+   "nothing here" rather than as a value in its own right - but still legible, because a figure
+   they can't see shouldn't look like a rendering bug either. */
+.analyticsStatValueEmpty {
+	color: #aaa;
+	font-weight: 400;
+}
+
+.analyticsStatSubLabel {
+	font-size: 11px;
+	color: #777;
+	margin-top: 4px;
+}
+
+.analyticsEmpty {
+	color: #666;
+	font-style: italic;
+}
+
+.analyticsArtistTable {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.analyticsArtistHeader {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	/* Matches .analyticsArtistRow's padding plus its 4px left border, so the column headings line
+	   up with the values under them instead of sitting 20px to their left. */
+	padding: 0 16px 6px 20px;
+	font-size: 12px;
+	font-weight: 500;
+	letter-spacing: 0.3px;
+	text-transform: uppercase;
+	color: #777;
+}
+
+.analyticsArtistRow {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 12px 16px;
+	border-left: 4px solid transparent;
+	border-radius: 6px;
+	font-size: 14px;
+	transition: box-shadow 140ms ease;
+}
+
+.analyticsArtistRowClickable {
+	cursor: pointer;
+}
+
+/* The row's background is the artist's tag colour at low alpha, set inline (see
+   utils/tagColor.js). Only the non-colour part of hovering lives here. */
+.analyticsArtistRowClickable:hover {
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.analyticsArtistName {
+	flex: 1;
+	font-weight: 500;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Fixed width and tabular figures so the columns actually line up as columns - a money table
+   where the amounts wander horizontally is unreadable at a glance, which is the only way anyone
+   reads a leaderboard. */
+.analyticsArtistNum {
+	width: 100px;
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+	color: #333;
+}

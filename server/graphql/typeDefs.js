@@ -528,6 +528,74 @@ module.exports = gql`
     appointments: [Appointment!]!
     invoiceUrl: String!
   }
+  # --- Dashboard analytics -------------------------------------------------------------------
+  # Computed server-side (see utils/analytics.js) rather than by summing rows in the browser.
+  # ArtistPerformancePanel used to do the latter, with a standing note that it should move here as
+  # data grew; a shop-wide version is that volume times every artist at the shop, so client-side
+  # would have meant shipping every artist's full financial history to whoever opened the page.
+  #
+  # MONEY FIELDS ARE NULLABLE ON PURPOSE. They resolve to null for a caller below SHOP_ADMIN -
+  # Staff get the activity figures and nothing else. That distinction is enforced in the resolver,
+  # not in the UI, so hiding a card client-side is presentation rather than the boundary. A
+  # non-null type here would have forced the opposite design: either Staff get the money or they
+  # get an error, with no room for "some of this, not that".
+  type ArtistAnalyticsRow {
+    userId: ID!
+    # The Artist DOCUMENT's id, not the User's - /artist/:artistId routes on the former. Resolved
+    # server-side so the client can't link with the wrong one. Null for an artist with no Artist
+    # record, which shouldn't happen but shouldn't produce a broken link if it does.
+    artistId: ID
+    user: User
+    revenueCents: Int
+    tipsCents: Int
+    shopCutEarnedCents: Int
+    shopCutOutstandingCents: Int
+    completedSessionCount: Int!
+    consultCount: Int!
+    appointmentCount: Int!
+  }
+  type Analytics {
+    # Echoed back so a client can tell which window a given payload describes - with a range
+    # picker, a slow response for one range can land after the user has already picked another.
+    start: DateTime!
+    end: DateTime!
+
+    # Money - null for anyone below SHOP_ADMIN on the shop-wide query.
+    # revenueCents is totalCents on COMPLETED appointments only: a scheduled session has a price
+    # but nothing has changed hands yet.
+    revenueCents: Int
+    subtotalCents: Int
+    taxCents: Int
+    feeCents: Int
+    tipsCents: Int
+    # Averaged over appointments that actually received a tip, not all of them - see
+    # utils/analytics.js.
+    averageTipCents: Int
+    tippedCount: Int
+    # Three buckets rather than one total, because they need three different responses: money the
+    # shop has, money it is owed, and money an artist claims to have paid that nobody has
+    # confirmed. See models/Appointment.js's shopCutStatus lifecycle.
+    shopCutEarnedCents: Int
+    shopCutOutstandingCents: Int
+    shopCutAwaitingConfirmationCents: Int
+
+    # Activity - always returned, whatever the caller's role.
+    completedSessionCount: Int!
+    consultCount: Int!
+    appointmentCount: Int!
+    # upcomingCount and activeProjectCount are NOT range-scoped: both mean "as of right now".
+    # Range-scoping them would make either read as zero for a historical window, which looks like
+    # missing data rather than a definition.
+    upcomingCount: Int!
+    activeProjectCount: Int!
+    newProjectCount: Int!
+    totalClientCount: Int!
+    newClientCount: Int!
+    artistCount: Int!
+
+    # Empty on the single-artist query, where it would only restate the totals as a one-row table.
+    artists: [ArtistAnalyticsRow!]!
+  }
   type Query {
     ######### Appointments ############
 
@@ -607,6 +675,11 @@ module.exports = gql`
     # invite-link/shop-directory lifecycle from PRODUCTION_ROADMAP.md.
     getArtistShopConnections(artistId: ID!): [ArtistShopConnection]
     getShopArtistConnections(shopId: ID!): [ArtistShopConnection]
+
+    # Dashboard analytics. start is inclusive and end is exclusive, so consecutive ranges neither
+    # overlap nor drop an appointment sitting exactly on a boundary.
+    getShopAnalytics(shopId: ID!, start: DateTime!, end: DateTime!): Analytics
+    getArtistAnalytics(userId: ID!, start: DateTime!, end: DateTime!): Analytics
   }
   type Mutation {
     ######### Appointments ############

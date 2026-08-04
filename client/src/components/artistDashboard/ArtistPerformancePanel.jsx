@@ -2,24 +2,21 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import IBCardWrapper from "../card/ibCard/IBCardWrapper";
 import IBPageLoader from "../ibPageLoader/IBPageLoader";
+import DateRangePicker from "../analytics/DateRangePicker";
+import StatCard from "../analytics/StatCard";
+import AnalyticsService from "../../services/AnalyticsService";
+import { getDefaultRange } from "../../utils/dateRanges";
 import { AppointmentService } from "../../services/AppointmentService";
-import ProjectService from "../../services/ProjectService";
 import ShopCutPayoutList from "./ShopCutPayoutList";
 import { ROUTE_CONSTANTS } from "../../constants";
 import { formatCents } from "../../utils/money";
 import { tagColorRowStyle } from "../../utils/tagColor";
 import "./artistPerformancePanel.css";
 
-// Appointment.shopCutStatus values that represent money the artist still owes the shop - see
-// models/Appointment.js's own comment on the full lifecycle. 'none'/'paid'/'received' are
-// deliberately excluded (nothing currently owed).
-const SHOP_CUT_OWED_STATUSES = ["unpaid", "invoice_sent", "pending_confirmation"];
-
-
-const isSameMonth = (date, reference) =>
-	date.getMonth() === reference.getMonth() && date.getFullYear() === reference.getFullYear();
-
-const isSameYear = (date, reference) => date.getFullYear() === reference.getFullYear();
+// SHOP_CUT_OWED_STATUSES, isSameMonth and isSameYear all lived here and are gone: the figures
+// they fed are now computed server-side over a selectable range (see server/utils/analytics.js),
+// which is also what removed the last reason this component fetched the artist's project list -
+// activeProjectCount comes back with the rest of the aggregate now.
 
 // How many rows each appointment list shows. Shared by the upcoming and completed lists so
 // "the same rules" is enforced by there being one rule, not two that happen to match today.
@@ -115,18 +112,32 @@ const AppointmentRow = ({ appt, onNavigate, showEarnings = false }) => {
  */
 const ArtistPerformancePanel = ({ artistUserId, isSelf = false }) => {
 	const navigate = useNavigate();
+	const [range, setRange] = useState(getDefaultRange);
+
+	// Two queries doing two different jobs, deliberately not merged.
+	//
+	// The FIGURES now come from the same server-side aggregation the shop dashboard uses
+	// (server/utils/analytics.js), so an artist's own numbers and the shop's view of that artist
+	// agree by construction rather than by two client-side implementations happening to match.
+	// They also respond to the range picker, which client-side MTD/YTD constants could not.
+	//
+	// The LISTS still come from the appointment query, because "the next five appointments" needs
+	// actual rows, not aggregates - and those two lists are not range-scoped: upcoming means
+	// what's ahead of now, and recently-completed means the most recent regardless of which
+	// window is selected. Range-scoping them would empty both for any historical range, which
+	// reads as data loss rather than as a definition.
+	const { data: analyticsData, loading: analyticsLoading } =
+		AnalyticsService.getArtistAnalytics(artistUserId, range);
 	const { data: apptData, loading: apptLoading, refetch: refetchAppointments } =
 		AppointmentService.getAppointmentsByArtist(artistUserId);
-	const { data: projData, loading: projLoading } =
-		ProjectService.fetchProjectsByArtist(artistUserId);
 
-	if (apptLoading || projLoading) {
+	if (apptLoading && !apptData) {
 		return <IBPageLoader />;
 	}
 
 	const now = new Date();
 	const appointments = (apptData && apptData.getAppointmentsByArtist) || [];
-	const activeProjectsCount = ((projData && projData.getProjectsByArtist) || []).length;
+	const analytics = analyticsData?.getArtistAnalytics;
 
 	const upcoming = appointments
 		.filter((a) => new Date(a.appointmentDate) >= now)
@@ -148,49 +159,11 @@ const ArtistPerformancePanel = ({ artistUserId, isSelf = false }) => {
 		.sort((a, b) => new Date(b.appointmentDate) - new Date(a.appointmentDate))
 		.slice(0, APPOINTMENT_LIST_LIMIT);
 
-	const inMonth = appointments.filter((a) => isSameMonth(new Date(a.appointmentDate), now));
-	const inYear = appointments.filter((a) => isSameYear(new Date(a.appointmentDate), now));
-
-	// Was `total + tip`, which only worked because the old `total` happened to exclude the tip.
-	// totalCents is now what the client actually paid - subtotal + tax + fee + tip - so adding
-	// tipCents on top would double-count every tip.
-	const revenueMTD = inMonth.reduce((sum, a) => sum + (a.totalCents || 0), 0);
-	const revenueYTD = inYear.reduce((sum, a) => sum + (a.totalCents || 0), 0);
-
-	// Tips, tracked on their own. They're the artist's alone - never part of the shop cut - and
-	// they're the figure most artists actually want to watch, which is exactly why folding them
-	// into a single revenue number made them impossible to see.
-	//
-	// The average is over appointments that ACTUALLY RECEIVED a tip, not over all of them.
-	// Dividing by every appointment would drag the average toward zero with consults, cancelled
-	// sessions and anything else that was never going to be tipped, and answer a question nobody
-	// asked. This answers "when I get tipped, how much?".
-	const tipsMTD = inMonth.reduce((sum, a) => sum + (a.tipCents || 0), 0);
-	const tipsYTD = inYear.reduce((sum, a) => sum + (a.tipCents || 0), 0);
-	const tippedYTD = inYear.filter((a) => (a.tipCents || 0) > 0);
-	const averageTipYTD = tippedYTD.length
-		? Math.round(tipsYTD / tippedYTD.length)
-		: 0;
-
-	const shopCutOwedMTD = appointments
-		.filter(
-			(a) =>
-				isSameMonth(new Date(a.appointmentDate), now) &&
-				SHOP_CUT_OWED_STATUSES.includes(a.shopCutStatus),
-		)
-		.reduce((sum, a) => sum + (a.shopCutCents || 0), 0);
-	const shopCutOwedYTD = appointments
-		.filter(
-			(a) =>
-				isSameYear(new Date(a.appointmentDate), now) &&
-				SHOP_CUT_OWED_STATUSES.includes(a.shopCutStatus),
-		)
-		.reduce((sum, a) => sum + (a.shopCutCents || 0), 0);
-
 	// Only 'completed' sessions - see PRODUCTION_ROADMAP.md's Phase 7 section: a shop cut isn't
 	// actually payable until the session itself is done, matching SessionDetail's own close-session
 	// gate (appointmentStatus: 'completed'). 'unpaid' only (not invoice_sent/pending_confirmation -
 	// those already have an action in flight, nothing new to do here until they resolve).
+	// Not range-scoped either: what an artist owes is what they owe, not what they owed in March.
 	const payoutCandidates = appointments.filter(
 		(a) =>
 			a.appointmentStatus === "completed" &&
@@ -200,49 +173,64 @@ const ArtistPerformancePanel = ({ artistUserId, isSelf = false }) => {
 
 	return (
 		<div className="artistPerformancePanel">
-			<div className="artistPerformanceStats">
-				<div className="artistStatCard">
-					<div className="artistStatLabel">Revenue (MTD)</div>
-					<div className="artistStatValue">{formatCents(revenueMTD)}</div>
-				</div>
-				<div className="artistStatCard">
-					<div className="artistStatLabel">Revenue (YTD)</div>
-					<div className="artistStatValue">{formatCents(revenueYTD)}</div>
-				</div>
-				{/* Tips get their own cards rather than being folded into revenue: they're the
-				    artist's alone (never part of the shop cut), and they're the number most
-				    artists actually track. */}
-				<div className="artistStatCard">
-					<div className="artistStatLabel">Tips (MTD)</div>
-					<div className="artistStatValue">{formatCents(tipsMTD)}</div>
-				</div>
-				<div className="artistStatCard">
-					<div className="artistStatLabel">Tips (YTD)</div>
-					<div className="artistStatValue">{formatCents(tipsYTD)}</div>
-				</div>
-				<div className="artistStatCard">
-					<div className="artistStatLabel">Avg Tip (YTD)</div>
-					<div className="artistStatValue">{formatCents(averageTipYTD)}</div>
-					{/* Stated explicitly - an average that silently included un-tipped
-					    appointments would read much lower and mean something else entirely. */}
-					<div className="artistStatSubLabel">
-						across {tippedYTD.length} tipped appointment
-						{tippedYTD.length === 1 ? "" : "s"}
+			<DateRangePicker value={range} onChange={setRange} />
+
+			{/* The figures are aggregates over the selected range and come from the server; the
+			    lists below are not range-scoped (see the note where they're built). Rendered from
+			    `analytics` rather than from summed rows, so an artist's numbers and the shop's
+			    view of the same artist are the same computation, not two that agree by luck.
+
+			    Each card is one figure over one window instead of the old MTD/YTD pair - with a
+			    picker, "Revenue (MTD)" next to a range control set to "last quarter" would be a
+			    contradiction printed on the page. */}
+			{analyticsLoading && !analytics ? (
+				<IBPageLoader />
+			) : (
+				analytics && (
+					<div className="artistPerformanceStats">
+						<StatCard
+							label="Revenue"
+							value={formatCents(analytics.revenueCents)}
+							// Worth stating: this changed. It used to count every appointment in
+							// the window regardless of status, so an artist's "revenue" included
+							// sessions that were merely booked. It's now completed work only.
+							subLabel="completed appointments only"
+						/>
+						{/* Tips get their own card rather than being folded into revenue: they're
+						    the artist's alone (never part of the shop cut), and they're the number
+						    most artists actually track. */}
+						<StatCard label="Tips" value={formatCents(analytics.tipsCents)} />
+						<StatCard
+							label="Average tip"
+							value={formatCents(analytics.averageTipCents)}
+							// Stated explicitly - an average that silently included un-tipped
+							// appointments would read much lower and mean something else entirely.
+							subLabel={`across ${analytics.tippedCount} tipped appointment${
+								analytics.tippedCount === 1 ? "" : "s"
+							}`}
+						/>
+						<StatCard
+							label="Shop cut owed"
+							value={formatCents(analytics.shopCutOutstandingCents)}
+						/>
+						<StatCard
+							label="Shop cut awaiting confirmation"
+							value={formatCents(analytics.shopCutAwaitingConfirmationCents)}
+						/>
+						<StatCard
+							label="Sessions completed"
+							value={analytics.completedSessionCount}
+						/>
+						{/* Not range-scoped - it means "right now". Labelled so it isn't
+						    mysterious when it doesn't move as the range changes. */}
+						<StatCard
+							label="Active projects"
+							value={analytics.activeProjectCount}
+							subLabel="as of today, any range"
+						/>
 					</div>
-				</div>
-				<div className="artistStatCard">
-					<div className="artistStatLabel">Shop Cut Owed (MTD)</div>
-					<div className="artistStatValue">{formatCents(shopCutOwedMTD)}</div>
-				</div>
-				<div className="artistStatCard">
-					<div className="artistStatLabel">Shop Cut Owed (YTD)</div>
-					<div className="artistStatValue">{formatCents(shopCutOwedYTD)}</div>
-				</div>
-				<div className="artistStatCard">
-					<div className="artistStatLabel">Active Projects</div>
-					<div className="artistStatValue">{activeProjectsCount}</div>
-				</div>
-			</div>
+				)
+			)}
 			<IBCardWrapper>
 				<h2 className="artistPerformanceSectionTitle">
 					{isSelf ? "Your Upcoming Appointments" : "Upcoming Appointments"}

@@ -1,0 +1,34 @@
+.dateRangePicker {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	margin-bottom: 20px;
+}
+
+.dateRangePickerPresets {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.dateRangePickerCustom {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	flex-wrap: wrap;
+	padding: 12px 14px;
+	background-color: #fafafa;
+	border-radius: 6px;
+}
+
+.dateRangePickerError {
+	font-size: 13px;
+	color: #861d15;
+}
+
+/* The line that makes a number quotable. A figure with no stated period is a figure someone will
+   later misremember the period for. */
+.dateRangePickerSummary {
+	font-size: 13px;
+	color: #555;
+}
