@@ -1,9 +1,32 @@
+/* This bar had no bottom spacing at all, so the Add button sat directly on top of the first list
+   row - heading, button and data ran together as one block with nothing separating "what this
+   page is" from "what's on it".
+
+   The gap below is deliberately larger than the 6px between list rows. Space inside a group has
+   to be smaller than space between groups or the grouping stops reading as grouping: at equal
+   spacing the button looks like the first item in the list rather than an action above it. The
+   hairline rule reinforces that boundary without spending another 20px of empty page on it. */
 .ibPageActionBarTitleContainer {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 16px;
+    padding-bottom: 16px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #eee;
 }
 
+/* h1 carries a browser default bottom margin that fought the container's own spacing - with both
+   in play the gap was inconsistent between pages depending on whether the bar had a button. */
 .ibPageActionBarTitle{
     font-weight: 600;
+    margin: 0;
+}
+
+/* App.css's global `button` rule sets margin-right: 20px on every button in the app. Here that
+   pushed the Add button 20px in from the right edge while the list below ran full width, so the
+   two didn't share a right margin and the page read as lopsided. Zeroed for this bar only -
+   plenty of other screens depend on that global spacing. */
+.ibPageActionBarTitleContainer button {
+    margin-right: 0;
 }
