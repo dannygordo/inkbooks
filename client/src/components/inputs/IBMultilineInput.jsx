@@ -18,7 +18,8 @@ const IBMultilineInput = ({
 	autoFocus = false,
 	variant = 'standard',
     onChange=()=>{},
-	onKeyDown=()=>{}
+	onKeyDown=()=>{},
+	onBlur = () => {},
 }) => {
 	return (
 		<TextField
@@ -35,6 +36,7 @@ const IBMultilineInput = ({
 			helperText={helperText}
             onChange={onChange}
 			onKeyDown={onKeyDown}
+			onBlur={onBlur}
 			fullWidth
 		/>
 	);

@@ -24,13 +24,17 @@ const IBPageActionBar = (props) => {
                     </Link>
                 </div>
                 );
+        // No "Add Project" button, deliberately. A project isn't created directly - it's spawned
+        // by the booking workflow (a booking request becomes a consult, a consult converts to a
+        // session, and convertBookingRequest creates the Project from the request's own intake
+        // fields - see server/graphql/mutations/bookingRequests.js). A project with no client and
+        // no booked work has nothing to be about, which is why there's no independent create path
+        // to offer. The button that used to be here linked to /projects/createProject, a route
+        // that has never existed in App.jsx.
         case 'projects':
             return (
                 <div className="ibPageActionBarTitleContainer">
                     <h1 className="ibPageActionBarTitle">Projects</h1>
-                    <Link to={"/projects/createProject"}>
-                        <button>Add Project</button>
-                    </Link>
                 </div>
                 );
         case 'shops':

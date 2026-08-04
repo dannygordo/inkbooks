@@ -15,8 +15,7 @@ import { useAuth } from "../../context/auth";
 import moment from "moment";
 import IBProjectPalettesSelect from "../../components/inputs/IBProjectPalettesSelect";
 import IBTagsWidget from "../../components/ibTagsWidget/IBTagsWidget";
-import { Button, Chip, Fab, ListItem, Paper } from "@mui/material";
-import { Save } from "@mui/icons-material";
+import { Button, Chip, ListItem, Paper } from "@mui/material";
 import IBChatBox from "../../components/ibChatBox/IBChatBox";
 import { ObjectID } from "bson";
 import MessengerService from "../../services/MessengerService";
@@ -41,6 +40,11 @@ const Project = (props) => {
 	let selectPaletteRef = useRef();
 	let depositAmountRef = useRef();
 	const [activeMessages, setActiveMessages] = useState([]);
+	// Autosave bookkeeping for the Details panel. lastSavedDetailsRef holds a serialized copy of
+	// the last payload actually sent, which is what the dirty check compares against - see
+	// handleDetailFieldBlur.
+	const lastSavedDetailsRef = useRef(null);
+	const [detailsSaveState, setDetailsSaveState] = useState("idle");
 	const [projectTags, setProjectTags] = useState([]);
 
 	/**
@@ -172,27 +176,65 @@ const Project = (props) => {
 		});
 	};
 
-	const handleUpdateDetails = (e) => {
-		e.preventDefault();
-		console.log(descriptionRef.current.value);
-		updateProject({
-			variables: {
-				project: {
-					id: data.getProject.id,
-					title: titleRef.current.value,
-					description: descriptionRef.current.value,
-					placement: placementRef.current.value,
-					size: sizeRef.current.value,
-					palette: selectPaletteRef.current.value,
-					clientId: data.getProject.clientId,
-					artistId: data.getProject.artistId,
-					status: data.getProject.status,
-					depositAmount: depositAmountRef.current.value
-						? parseInt(depositAmountRef.current.value)
-						: 0,
-				},
-			},
-		});
+	/**
+	 * Autosave for the Details panel, called when a field loses focus.
+	 *
+	 * Replaces a Save button that sat in the corner of the panel. Two reasons it's better gone:
+	 * a form that looks editable but silently discards what you typed unless you find the right
+	 * button is a trap, and that button was three fields away from the last one you edited.
+	 *
+	 * ON BLUR, NOT ON CHANGE. Saving per keystroke would fire a mutation per character and write
+	 * a half-typed title to the database on the way to a finished one. Blur is the moment a field
+	 * is actually done being edited.
+	 *
+	 * The dirty check is what makes this safe to attach to every field: tabbing through the panel
+	 * without typing anything, or clicking in and straight back out, changes nothing and must not
+	 * write. Without it every focus/blur cycle would be a mutation, and the whole form would be
+	 * re-sent each time - so a stale value in one field could overwrite a fresh one saved from
+	 * another.
+	 */
+	const buildDetailsPayload = () => ({
+		id: data.getProject.id,
+		title: titleRef.current?.value ?? data.getProject.title,
+		description: descriptionRef.current?.value ?? data.getProject.description,
+		placement: placementRef.current?.value ?? data.getProject.placement,
+		size: sizeRef.current?.value ?? data.getProject.size,
+		palette: selectPaletteRef.current?.value ?? data.getProject.palette,
+		clientId: data.getProject.clientId,
+		artistId: data.getProject.artistId,
+		status: data.getProject.status,
+		depositAmount: depositAmountRef.current?.value
+			? parseInt(depositAmountRef.current.value)
+			: 0,
+	});
+
+	const handleDetailFieldBlur = async () => {
+		const payload = buildDetailsPayload();
+		// Compared against the last payload actually sent rather than against the server's copy,
+		// so two saves in a row from different fields both go through while a no-op blur doesn't.
+		const serialized = JSON.stringify(payload);
+		if (serialized === lastSavedDetailsRef.current) {
+			return;
+		}
+		lastSavedDetailsRef.current = serialized;
+		setDetailsSaveState("saving");
+		try {
+			await updateProject({ variables: { project: payload } });
+			setDetailsSaveState("saved");
+		} catch (err) {
+			// The save state is reset so the next blur retries rather than believing the field is
+			// already persisted - an autosave that fails silently is worse than a Save button,
+			// because there's nothing left for the user to press.
+			lastSavedDetailsRef.current = null;
+			setDetailsSaveState("error");
+			setAlert({
+				isAlert: true,
+				severity: ALERT_CONSTANTS.SEVERITY.ERROR,
+				message: `Couldn't save: ${err.graphQLErrors?.[0]?.message || err.message}`,
+				timeout: ALERT_CONSTANTS.TIMEOUT,
+				location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
+			});
+		}
 	};
 
 	/**
@@ -330,19 +372,23 @@ const Project = (props) => {
 						<div>
 							<h1>Details</h1>
 						</div>
+						{/* The Save button that used to sit here is gone - fields save themselves when
+						    they lose focus. Replaced with a status line rather than nothing at all:
+						    autosave with no feedback leaves people unsure whether an edit took, and the
+						    answer to "did that save" should be on screen rather than inferred. */}
 						<div className="projectDetailsActions">
-							<Fab
-								className="imagesUploadButton"
-								sx={{ backgroundColor: "#333", color: "#ddd" }}
-								aria-label="Save Project"
-								onClick={handleUpdateDetails}
+							<span
+								className={`projectDetailsSaveState projectDetailsSaveState--${detailsSaveState}`}
 							>
-								<Save fontSize="medium" />
-							</Fab>
+								{detailsSaveState === "saving" && "Saving..."}
+								{detailsSaveState === "saved" && "All changes saved"}
+								{detailsSaveState === "error" && "Couldn't save - try again"}
+							</span>
 						</div>
 						<IBInput
 							id="title"
 							inputRef={titleRef}
+							onBlur={handleDetailFieldBlur}
 							label="Title"
 							helperText=" "
 							defaultValue={data.getProject.title}
@@ -352,6 +398,7 @@ const Project = (props) => {
 							label="Description"
 							helperText=" "
 							inputRef={descriptionRef}
+							onBlur={handleDetailFieldBlur}
 							defaultValue={data.getProject.description}
 						/>
 						<IBInput
@@ -359,6 +406,7 @@ const Project = (props) => {
 							label="Placement"
 							helperText=" "
 							inputRef={placementRef}
+							onBlur={handleDetailFieldBlur}
 							defaultValue={data.getProject.placement}
 						/>
 						<IBInput
@@ -366,6 +414,7 @@ const Project = (props) => {
 							label="Approx. Size in Inches"
 							helperText=" "
 							inputRef={sizeRef}
+							onBlur={handleDetailFieldBlur}
 							defaultValue={data.getProject.size}
 						/>
 						<IBInput
@@ -375,6 +424,7 @@ const Project = (props) => {
 							sx={{ m: 1, width: "25ch" }}
 							type="number"
 							inputRef={depositAmountRef}
+							onBlur={handleDetailFieldBlur}
 							defaultValue={data.getProject.depositAmount}
 						/>
 						<Button
@@ -389,10 +439,14 @@ const Project = (props) => {
 							Pay Deposit
 						</Button>
 						<div>
+							{/* A select has no meaningful "done editing" moment - picking an option IS the
+							    edit, and waiting for blur would leave a changed value unsaved until the
+							    user happened to click elsewhere. Saved on change instead. */}
 							<IBProjectPalettesSelect
 								inputRef={selectPaletteRef}
 								selectValue={data.getProject.palette}
 								defaultValue={data.getProject.palette}
+								onChange={handleDetailFieldBlur}
 							/>
 						</div>
 					</IBCardWrapper>

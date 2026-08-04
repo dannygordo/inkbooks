@@ -89,3 +89,20 @@
 	padding-right: 10px;
 	padding-bottom: 5px;
 }
+
+
+/* Autosave status for the Details panel, in place of the Save button that used to sit here.
+   Deliberately quiet - a persistent "All changes saved" that shouts is worse than the button it
+   replaced. The error state is the one that needs to be noticed, so it's the only one with
+   colour. */
+.projectDetailsSaveState {
+    font-size: 12px;
+    color: #777;
+    min-height: 16px;
+    display: inline-block;
+    transition: color 140ms ease;
+}
+.projectDetailsSaveState--error {
+    color: #861d15;
+    font-weight: 500;
+}

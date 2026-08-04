@@ -22,7 +22,8 @@ const IBInput = ({
 	variant = 'standard',
 	helperText,
 	onChange = () => {},
-	onKeyDown = () =>{}
+	onKeyDown = () =>{},
+	onBlur = () => {},
 }) => {
 	return (
 		<TextField
@@ -43,6 +44,7 @@ const IBInput = ({
 			helperText={helperText}
             onChange={onChange}
 			onKeyDown={onKeyDown}
+			onBlur={onBlur}
 		/>
 	);
 };
