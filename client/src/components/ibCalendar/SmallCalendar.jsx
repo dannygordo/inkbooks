@@ -106,7 +106,10 @@ const SmallCalendar = () => {
 						    size prop - every non-container Grid is implicitly an "item" now. */}
 						{currentMonth[0].map((day, index) => (
 							<Grid size={1} key={index}>
-								<Item elevation={0}>
+								{/* ibSmallCalendarDays already existed in ibCalendar.css but was
+								    never applied to anything - these weekday letters are what it
+								    was written for. */}
+								<Item elevation={0} className="ibSmallCalendarDays">
 									{day.format("dd").charAt(0)}
 								</Item>
 							</Grid>
@@ -125,7 +128,18 @@ const SmallCalendar = () => {
                                                 setDaySelected(day);
 											}}
 										>
-											<span className={getDayClass(day)}>
+											{/* getDayClass returns undefined for an ordinary day -
+											    interpolating that directly would put the literal
+											    string "undefined" in the class list, hence the
+											    filter/join. */}
+											<span
+												className={[
+													"ibSmallCalendarDayNumber",
+													getDayClass(day),
+												]
+													.filter(Boolean)
+													.join(" ")}
+											>
 												{day.format("D")}
 											</span>
 										</Item>

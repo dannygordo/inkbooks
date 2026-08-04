@@ -1,3 +1,44 @@
+/* ---------------------------------------------------------------------------------------------
+   Google Calendar month-view typography.
+
+   Google Calendar sets "Google Sans" and falls back to Roboto. Google Sans is proprietary and
+   can't be loaded from a public CDN, so it's listed first only for the (rare) machines that
+   already have it installed locally - everyone else lands on Roboto, which is what Google
+   Calendar itself falls back to and is loaded from Google Fonts in index.html.
+
+   The `*` rule in index.html applies 'Source Sans Pro' to EVERY element at zero specificity.
+   Because it targets each element directly, it beats inherited values - so setting the font on
+   .ibCalendar alone would not reach any descendant. The `.ibCalendar *` selector below (0,1,0)
+   outranks `*` (0,0,0) on those same elements, which is why the descendant selector is needed
+   rather than a single rule on the container. Scope is deliberately limited to the calendar; the
+   rest of the app stays on Source Sans Pro.
+
+   Note: MUI dialogs (the appointment wizard, update/view event) render through a portal attached
+   to <body>, OUTSIDE .ibCalendar, so they are intentionally not covered here and keep the app's
+   default typeface.
+
+   Values below mirror Google Calendar's month grid:
+     weekday label   11px / 500 / .8px letter-spacing / uppercase / #70757a
+     day number      12px / 500 / #3c4043, 24px circle when it's today (#1a73e8, white)
+     event chip      12px / 500 / 16px line-height / 4px radius
+     month title     22px / 400 / #3c4043
+   --------------------------------------------------------------------------------------------- */
+:root {
+	--ibcal-font: "Google Sans", "Roboto", "Helvetica Neue", Arial, sans-serif;
+	--ibcal-text: #3c4043;
+	--ibcal-text-muted: #70757a;
+	--ibcal-blue: #1a73e8;
+}
+
+/* `body` prefix is not decoration: MUI's styled() injects its emotion classes into <head> at
+   runtime, and a single-class emotion selector (0,1,0) would tie with a bare `.ibCalendar *`,
+   leaving the winner up to stylesheet insertion order. `body .ibCalendar *` is (0,1,1) and
+   settles it. */
+body .ibCalendar,
+body .ibCalendar * {
+	font-family: var(--ibcal-font);
+}
+
 .ibCalendar {
 	height: calc(100vh - 70px);
 	flex: 4;
@@ -34,42 +75,106 @@
 	flex-direction: column;
 	height: 100%;
 }
+/* Was a fixed height: 24px with line-height: 24px. In the top row this header holds TWO stacked
+   <p> elements (the weekday label and the day number), which needs ~40px - the fixed 24px meant
+   the day number spilled out of the header box and overlapped the events beneath it in row 0
+   only. Now a centered flex column with a min-height instead of a hard height, so the top row is
+   taller than the rest exactly like Google Calendar's own grid, where the weekday label row sits
+   above the numbers. */
 .ibCalendarDayHeader {
-	font-size: 14px;
-	font-weight: 600;
-	height: 24px;
-	line-height: 24px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	min-height: 24px;
 	flex-shrink: 0;
+}
+/* The weekday label ("MON") - only rendered in row 0, so it is the first of two children there
+   and simply absent elsewhere. `:not(:last-child)` distinguishes it from the day number, which is
+   always the last child regardless of how many children the header has. */
+.ibCalendarDayHeader p:first-child:not(:last-child) {
+	font-size: 11px;
+	font-weight: 500;
+	line-height: 16px;
+	letter-spacing: 0.8px;
+	text-transform: uppercase;
+	color: var(--ibcal-text-muted);
+}
+/* The day number. */
+.ibCalendarDayHeader p:last-child {
+	font-size: 12px;
+	font-weight: 500;
+	line-height: 24px;
+	color: var(--ibcal-text);
 }
 .ibCalendarDayEvents {
 	flex: 1;
 	min-height: 0;
 	overflow-y: auto;
 }
-.ibCalendarToday {
-	margin-top: 0px;
-	height: 24px;
-	line-height: 24px;
+/* Was a pile of inline styles in Day.jsx (fontSize 12, paddingLeft 2, borderRadius 3,
+   marginBottom 2, textAlign left). Only backgroundColor stays inline there, since it comes from
+   the artist's tagColor at runtime. Google Calendar's month chips are 12px/500 on a 16px line
+   with a 4px radius and real horizontal padding - the old 2px left padding with none on the right
+   let text run flush into the chip's edge. nowrap + ellipsis replaces relying on the ancestor's
+   overflow to clip, so a long title truncates cleanly inside its own chip. */
+.ibCalendarEventChip {
+	font-size: 12px;
+	font-weight: 500;
+	line-height: 16px;
+	padding: 2px 6px;
+	margin-bottom: 2px;
+	border-radius: 4px;
 	color: #fff;
-	background-color: #1a73e8;
+	text-align: left;
+	cursor: pointer;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+/* margin-left: 45% was doing the centering by hand - a percentage of the cell width, so the
+   circle drifted off-centre at any cell size other than the one it was eyeballed at. The parent
+   is now a centered flex column (see .ibCalendarDayHeader), so the circle centers itself.
+   Google Calendar's today marker is the same 24px #1a73e8 circle with white 12px/500 text. */
+/* Selector is deliberately over-qualified: this class lands on the same <p> that
+   `.ibCalendarDayHeader p:last-child` (0,2,1) already targets, and a bare `.ibCalendarToday`
+   (0,1,0) would lose that fight - the day number would keep #3c4043 and render dark-on-blue
+   inside the today circle. This is (0,3,1) and wins outright rather than relying on source order. */
+.ibCalendarDayHeader p:last-child.ibCalendarToday {
+	height: 24px;
+	width: 24px;
+	line-height: 24px;
+	font-size: 12px;
+	font-weight: 500;
+	color: #fff;
+	background-color: var(--ibcal-blue);
 	-webkit-border-radius: 50%;
 	border-radius: 50%;
-	width: 24px;
-	margin-left: 45%;
 }
-/* .ibCalendarTodayButton {
+/* Previously commented out entirely, so this button fell through to App.css's global `button`
+   rule (16px / weight 600). Google Calendar's "Today" button is 14px at weight 500 - restored
+   with those values rather than the old height-only block. */
+.ibCalendarTodayButton {
 	margin-left: 10px;
 	margin-right: 20px;
-	height: 38px;
-} */
+	height: 36px;
+	font-size: 14px;
+	font-weight: 500;
+	color: var(--ibcal-text);
+}
 
 .ibCalendarChevronButton {
 	margin: 0 5px;
 }
+/* Google Calendar's "August 2026" title is 22px at weight 400 - noticeably lighter and larger
+   than the 600-weight this used to carry (it's an <h2>, so it was also inheriting the browser's
+   bold default before that). Google leans on size, not weight, for this heading. */
 .ibCalendarCurrentMonthYear {
     margin-left: 20px;
-    font-weight: 600;
-    color: #333;
+    font-size: 22px;
+    font-weight: 400;
+    line-height: 28px;
+    letter-spacing: 0;
+    color: var(--ibcal-text);
 }
 .ibCalendarAsideContainer {
     border-right: 1px solid #ddd;
@@ -93,39 +198,59 @@
 .ibSmallCalendarContainer {
     margin-top: 10px;
 }
+/* Google Calendar's mini-calendar month title is 14px/500, not the ambient bold. */
 .ibSmallCalendarHeader {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     margin-top: 20px;
     padding-left: 10px;
-    font-weight: 600;
 }
-.ibSmallCalendarDays {
+.ibSmallCalendarContainer .ibSmallCalendarHeader p {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ibcal-text);
+}
+/* This class existed but was never applied to anything - SmallCalendar.jsx rendered the weekday
+   letters into a bare <Item> with no className, so these rules were dead. Now attached to that
+   Item. Container-qualified (0,2,0) so it outranks the emotion class MUI's styled(Paper) puts on
+   the same element, which carries theme.typography.body2's own 14px. */
+.ibSmallCalendarContainer .ibSmallCalendarDays {
     padding-top: 1px;
     align-items: center;
     font-size: 10px;
     font-weight: 500;
+    letter-spacing: 0.3px;
+    color: var(--ibcal-text-muted);
     width: 24px;
     height: 24px;
 }
-
-.ibSmallCalendarToday {
+/* Mini-calendar day numbers. Kept ahead of the today/selected rules below, which are the same
+   specificity and therefore win on color/background by source order. */
+.ibSmallCalendarContainer .ibSmallCalendarDayNumber {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ibcal-text);
+}
+.ibSmallCalendarContainer .ibSmallCalendarToday {
     padding-top: 1px;
 	font-weight: 500;
+    font-size: 11px;
     -webkit-border-radius: 50%;
     border-radius: 50%;
-    background-color: #1a73e8;
+    background-color: var(--ibcal-blue);
     color: #fff;
     width: 24px;
     height: 24px;
     margin-left: -7px !important;
     padding-right: 2px;
 }
-.ibSmallCalendarSelectedDay {
+.ibSmallCalendarContainer .ibSmallCalendarSelectedDay {
     padding-top: 1px;
     color: #185abc;
     background-color: #d2e3fc;
     font-weight: 500;
+    font-size: 11px;
     -webkit-border-radius: 50%;
     border-radius: 50%;
     width: 24px;

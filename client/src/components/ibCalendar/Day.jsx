@@ -101,20 +101,15 @@ const Day = ({ day, rowIdx }) => {
 											.format("h:mma")} - ${displayTitle(evt)}`
 							}
 						>
+							{/* Everything except backgroundColor moved to .ibCalendarEventChip in
+							    ibCalendar.css - backgroundColor has to stay inline because it's the
+							    artist's own tagColor, resolved per event at runtime. */}
 							<div
+								className="ibCalendarEventChip"
 								onClick={(e) => {
 									handleUpdateEvent(e, evt);
 								}}
-								style={{
-									backgroundColor: evt.user.tagColor,
-									color: "#fff",
-									marginBottom: 2,
-									fontSize: "12px",
-									paddingLeft: 2,
-									borderRadius: 3,
-									cursor: "pointer",
-                                    textAlign: 'left'
-								}}
+								style={{ backgroundColor: evt.user.tagColor }}
 							>
 								{evt.projectId ? `${moment
 									.utc(evt.appointmentDate)
