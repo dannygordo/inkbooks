@@ -12,13 +12,21 @@
     gap: 12px;
     max-width: 700px;
 }
+/* Same treatment as the dashboard's lists: the grey outline gives way to the artist's tag-colour
+   tint plus a 4px left bar, set inline (see utils/tagColor.js). This is the list where that
+   actually earns its keep - it's the only genuinely multi-artist list in the app, so the colour
+   distinguishes rows rather than restating whose page you're on.
+
+   Padding raised to match, and border-left declared transparent so an uncoloured row still
+   reserves the same 4px and doesn't sit out of line with the rest. */
 .shopCutConfirmationRow {
     display: flex;
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 15px;
-    border: 1px solid #ddd;
+    gap: 16px;
+    padding: 14px 18px;
+    border-left: 4px solid transparent;
     border-radius: 6px;
 }
 .shopCutConfirmationArtist {
@@ -32,7 +40,9 @@
     font-size: 14px;
     margin-top: 4px;
 }
+/* #555 - see the contrast note in artistPerformancePanel.css. #888 drops to roughly 2.4:1
+   against the darkest palette entry once the row carries a tint. */
 .shopCutConfirmationMarkedAt {
     font-size: 12px;
-    color: #888;
+    color: #555;
 }

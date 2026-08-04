@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import IBCardWrapper from "../card/ibCard/IBCardWrapper";
 import IBPageLoader from "../ibPageLoader/IBPageLoader";
@@ -7,6 +7,7 @@ import ProjectService from "../../services/ProjectService";
 import ShopCutPayoutList from "./ShopCutPayoutList";
 import { ROUTE_CONSTANTS } from "../../constants";
 import { formatCents } from "../../utils/money";
+import { tagColorRowStyle } from "../../utils/tagColor";
 import "./artistPerformancePanel.css";
 
 // Appointment.shopCutStatus values that represent money the artist still owes the shop - see
@@ -55,11 +56,19 @@ const appointmentLinkTo = (appt) => {
  */
 const AppointmentRow = ({ appt, onNavigate, showEarnings = false }) => {
 	const linkTo = appointmentLinkTo(appt);
+	// Hover is tracked in state rather than left to a :hover rule because the tint is an inline
+	// style built from per-artist data - CSS can't express "24% of whatever hex this row's artist
+	// happens to have". The static parts of hovering (cursor, shadow, transition) stay in the
+	// stylesheet; only the colour is driven from here.
+	const [hovered, setHovered] = useState(false);
 	return (
 		<li
 			className={
 				linkTo ? "artistUpcomingItem artistUpcomingItemClickable" : "artistUpcomingItem"
 			}
+			style={tagColorRowStyle(appt.user?.tagColor, hovered && Boolean(linkTo))}
+			onMouseEnter={() => setHovered(true)}
+			onMouseLeave={() => setHovered(false)}
 			onClick={linkTo ? () => onNavigate(linkTo) : undefined}
 		>
 			<span className="artistUpcomingDate">

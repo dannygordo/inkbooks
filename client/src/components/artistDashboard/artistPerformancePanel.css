@@ -50,31 +50,54 @@
 	list-style: none;
 	margin: 0;
 	padding: 0;
+	/* Rows are now separated blocks rather than lines divided by borders, so the gap does the
+	   separating. */
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
 }
 
+/* Rows previously had `padding: 10px 0` - zero horizontal padding. That was survivable while the
+   background was white, but the hover highlight is a filled block: with no horizontal padding it
+   ran flush to the first and last characters, so text sat directly against the edge of the fill.
+   Now that every row is tinted by default, that would be permanent rather than only on hover.
+   Real padding on all four sides, a radius so the fill reads as a card rather than a bar, and the
+   4px left border comes from tagColorRowStyle (see utils/tagColor.js).
+
+   border-left is declared here as transparent so a row WITHOUT a resolvable tag colour still
+   reserves the same 4px: otherwise an uncoloured row's text would sit 4px left of every coloured
+   row's, and the column would visibly stagger. */
 .artistUpcomingItem {
 	display: flex;
 	align-items: center;
 	gap: 15px;
-	padding: 10px 0;
-	border-bottom: 1px solid #eee;
+	padding: 12px 16px;
+	border-left: 4px solid transparent;
+	border-radius: 6px;
 	font-size: 14px;
-}
-
-.artistUpcomingItem:last-child {
-	border-bottom: none;
+	/* Only the colour transitions. Animating `all` would also animate the border-left width on
+	   first paint, which reads as the bar sliding in. */
+	transition: background-color 140ms ease;
 }
 
 .artistUpcomingItemClickable {
 	cursor: pointer;
 }
 
+/* The hover BACKGROUND is set inline per row (it's a function of that artist's colour - see
+   AppointmentRow's hovered state). What stays here is everything about hovering that isn't
+   colour: a slight lift, so a clickable row still reads as clickable even for an artist whose
+   colour is pale enough that deepening the tint is subtle. */
 .artistUpcomingItemClickable:hover {
-	background-color: #f7f7f7;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
+/* #555, not the #999 this used to be. Verified rather than eyeballed: against the darkest
+   palette entry (#122152) at the hover tint, #999 lands at 2.3:1 and #666 at 3.5:1 - both below
+   WCAG AA's 4.5:1 for normal text. #555 is the lightest grey that clears AA on all fifteen
+   colours at both tint strengths. The same applies to .artistUpcomingType below. */
 .artistUpcomingDate {
-	color: #999;
+	color: #555;
 	min-width: 90px;
 }
 
@@ -88,11 +111,11 @@
    Tabular figures so a column of amounts lines up on the decimal instead of wandering. */
 .artistUpcomingEarnings {
 	font-variant-numeric: tabular-nums;
-	color: #444;
+	color: #333;
 	white-space: nowrap;
 }
 
 .artistUpcomingType {
 	text-transform: capitalize;
-	color: #666;
+	color: #555;
 }

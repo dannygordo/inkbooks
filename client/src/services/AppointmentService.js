@@ -78,6 +78,15 @@ export const AppointmentService = (() => {
                 shopId
                 projectId
                 bookingRequestId
+                # Added for the dashboard's row tinting - every list showing artist data colours
+                # its rows by the artist's tagColor (see utils/tagColor.js). Selected here rather
+                # than derived client-side from the logged-in user, because this panel is also
+                # mounted on Artist.jsx showing someone ELSE's appointments - the colour has to
+                # belong to the appointment's own artist, not the viewer.
+                user {
+                    id
+                    tagColor
+                }
                 project {
                     id
                     title
@@ -291,6 +300,10 @@ export const AppointmentService = (() => {
                     firstName
                     lastName
                     avatar
+                    # This is the one list in the app that is genuinely multi-artist - a shop's
+                    # inbox of every artist's manual mark-paid claims - so the row colour actually
+                    # distinguishes rows here rather than just restating whose page you're on.
+                    tagColor
                 }
             }
         }

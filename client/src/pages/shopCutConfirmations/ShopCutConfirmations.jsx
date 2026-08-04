@@ -5,6 +5,7 @@ import { AppointmentService } from "../../services/AppointmentService";
 import IBPageLoader from "../../components/ibPageLoader/IBPageLoader";
 import { ALERT_CONSTANTS } from "../../constants";
 import { formatCents } from "../../utils/money";
+import { tagColorRowStyle } from "../../utils/tagColor";
 import "./shopCutConfirmations.css";
 
 // Shop-side inbox for the manual mark-paid/confirm dual-control flow - see
@@ -63,7 +64,14 @@ const ShopCutConfirmations = () => {
 			) : (
 				<div className="shopCutConfirmationsList">
 					{items.map((item) => (
-						<div className="shopCutConfirmationRow" key={item.id}>
+						// The one genuinely multi-artist list in the app - a shop's inbox of every
+						// artist's mark-paid claims - so the tag colour actually distinguishes rows
+						// here rather than just restating whose page you're already on.
+						<div
+							className="shopCutConfirmationRow"
+							key={item.id}
+							style={tagColorRowStyle(item.user?.tagColor)}
+						>
 							<div className="shopCutConfirmationInfo">
 								<div className="shopCutConfirmationArtist">
 									{item.user ? `${item.user.firstName} ${item.user.lastName}` : "Artist"}

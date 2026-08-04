@@ -5,6 +5,7 @@ import { AppointmentService } from "../../services/AppointmentService";
 import { useAuth } from "../../context/auth";
 import { ALERT_CONSTANTS } from "../../constants";
 import { formatCents } from "../../utils/money";
+import { tagColorRowStyle } from "../../utils/tagColor";
 import "./shopCutPayoutList.css";
 
 /**
@@ -114,7 +115,13 @@ const ShopCutPayoutList = ({ appointments, onChanged }) => {
 	return (
 		<div className="shopCutPayoutList">
 			{appointments.map((appointment) => (
-				<div key={appointment.id} className="shopCutPayoutRow">
+				// No hover tint here: these rows aren't clickable - the actions are individual
+				// buttons - so a hover response would advertise an affordance that doesn't exist.
+				<div
+					key={appointment.id}
+					className="shopCutPayoutRow"
+					style={tagColorRowStyle(appointment.user?.tagColor)}
+				>
 					<Checkbox
 						checked={selectedIds.includes(appointment.id)}
 						onChange={() => toggleSelected(appointment.id)}

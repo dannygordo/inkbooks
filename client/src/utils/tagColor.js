@@ -33,3 +33,67 @@ export function resolveTagColor(tagColor) {
 	}
 	return tagColor;
 }
+
+// Parses #rgb or #rrggbb into {r,g,b}. Returns null for anything it doesn't recognise, so callers
+// can fall back rather than rendering "rgba(NaN, NaN, NaN, 0.14)" - which browsers drop silently,
+// leaving a row with no tint and no clue why.
+function hexToRgb(hex) {
+	if (typeof hex !== "string") {
+		return null;
+	}
+	const value = hex.trim().replace(/^#/, "");
+	const full =
+		value.length === 3
+			? value
+					.split("")
+					.map((c) => c + c)
+					.join("")
+			: value;
+	if (!/^[0-9a-fA-F]{6}$/.test(full)) {
+		return null;
+	}
+	return {
+		r: parseInt(full.slice(0, 2), 16),
+		g: parseInt(full.slice(2, 4), 16),
+		b: parseInt(full.slice(4, 6), 16),
+	};
+}
+
+// How strongly a row is tinted at rest and on hover. Low on purpose.
+//
+// The palette runs from #122152 (near-black navy) to #e2d355 (pale banana), a luminance spread
+// wide enough that no single text colour is readable on all fifteen at full saturation. Painting
+// rows solid would force the text colour to flip per row based on luminance - legible, but a list
+// then reads as a stack of paint chips with the type colour changing line to line.
+//
+// A low-alpha tint over white sidesteps that entirely: the resulting background stays light for
+// every palette entry, so the text colour never has to change, and the artist is still identified
+// at a glance. The full-strength colour goes on a solid left bar instead, where saturation reads
+// as a marker rather than competing with the text sitting on top of it.
+const TINT_ALPHA = 0.14;
+const TINT_ALPHA_HOVER = 0.24;
+
+/**
+ * Inline style for a list row belonging to a given artist: a tinted background plus a solid
+ * left-edge bar in the full colour.
+ *
+ * Returned as an inline style rather than a CSS class because the value is per-artist data, not
+ * one of a fixed set of states - there's no stylesheet rule that can know an arbitrary hex ahead
+ * of time. Everything that ISN'T colour (padding, radius, layout, transition) stays in the
+ * stylesheet where it belongs.
+ *
+ * @param {string|null|undefined} tagColor - raw User.tagColor
+ * @param {boolean} hovered
+ * @returns {object} a React style object; empty when the colour can't be parsed
+ */
+export function tagColorRowStyle(tagColor, hovered = false) {
+	const rgb = hexToRgb(resolveTagColor(tagColor));
+	if (!rgb) {
+		return {};
+	}
+	const alpha = hovered ? TINT_ALPHA_HOVER : TINT_ALPHA;
+	return {
+		backgroundColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`,
+		borderLeft: `4px solid rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`,
+	};
+}

@@ -5,12 +5,19 @@
 	width: 100%;
 }
 
+/* Padding raised from 8px/10px, and the grey 1px box replaced by the tag-colour tint plus a 4px
+   left bar (set inline - see utils/tagColor.js). A tinted fill needs more breathing room than an
+   outline did: with 10px of horizontal padding the checkbox and the action buttons sat almost
+   against the edge of the fill.
+
+   border-left is transparent rather than absent so a row with no resolvable tag colour still
+   reserves the same 4px and lines up with the coloured ones. */
 .shopCutPayoutRow {
 	display: flex;
 	align-items: center;
-	gap: 10px;
-	padding: 8px 10px;
-	border: 1px solid #ddd;
+	gap: 12px;
+	padding: 12px 16px;
+	border-left: 4px solid transparent;
 	border-radius: 6px;
 }
 
@@ -24,9 +31,11 @@
 	font-weight: 600;
 }
 
+/* #555 - see the contrast note in artistPerformancePanel.css. #666 fails AA against the darkest
+   palette entry once the row is tinted. */
 .shopCutPayoutRowAmount {
 	font-size: 0.85em;
-	color: #666;
+	color: #555;
 }
 
 .shopCutPayoutRowActions {
