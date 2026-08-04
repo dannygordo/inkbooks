@@ -25,8 +25,7 @@ import Payments from "./pages/payments/Payments";
 import Artist from "./pages/artists/Artist";
 import EditArtist from "./components/artist/edit/EditArtist";
 import Client from "./pages/clients/Client";
-import IBCard from "./components/card/ibCard/IBCard";
-import { APP_SETTINGS_CONSTANTS } from "./constants";
+import IBRouteNotFound from "./components/ibRouteNotFound/IBRouteNotFound";
 import EditClient from "./components/client/edit/EditClient";
 import StaffProfile from "./pages/staff/StaffProfile";
 import EditStaff from "./components/staff/edit/EditStaff";
@@ -327,14 +326,13 @@ function App() {
 						Intentionally public/no AuthRoute: the whole point is a guest with no
 						account can reach this. */}
 						<Route path="/booking/:token" element={<GuestConversation />} />
-						<Route
-							path="*"
-							element={
-								<IBCard
-								cardData={{}} 
-								cardType={APP_SETTINGS_CONSTANTS.CARD_TYPES.ROUTE_NOT_FOUND} />
-							}
-						/>
+						{/* Was routed through IBCard with cardType ROUTE_NOT_FOUND - a switch in
+						    that component whose only job for this case was to render
+						    IBRouteNotFound and pass along an empty cardData it never read. Points
+						    at the component directly now, which is what removed IBCard's last
+						    caller and let it and its five per-entity detail components be
+						    deleted along with the card grids they existed for. */}
+						<Route path="*" element={<IBRouteNotFound />} />
 					</Routes>
 				</Box>
 			</div>

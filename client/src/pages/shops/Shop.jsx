@@ -1,8 +1,7 @@
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { useMutation } from "@apollo/client";
 import "./shop.css";
 import ShopService  from "../../services/ShopService";
-import { ROUTE_CONSTANTS } from "../../constants";
 import IBPageLoader from "../../components/ibPageLoader/IBPageLoader";
 import IBCardShowError from "../../components/card/ibCardShowError/IBCardShowError";
 
@@ -16,7 +15,6 @@ const SQUARE_REDIRECT_MESSAGES = {
 };
 
 const Shop = (props) => {
-	const navigate = useNavigate();
 	let params = useParams();
 	const [searchParams, setSearchParams] = useSearchParams();
     const errors = {};
@@ -28,13 +26,12 @@ const Shop = (props) => {
 		ShopService.useSquareAuthorizationUrl();
 	const [disconnectShopSquare] = useMutation(ShopService.DISCONNECT_SHOP_SQUARE);
 
-	/**
-	 * Handles the edit click event
-	 */
-	const handleEdit = (e) => {
-		e.preventDefault();
-		navigate(`${ROUTE_CONSTANTS.EDIT_SHOP}${params.shopId}`);
-	};
+	// The corner "Edit" button is gone from every detail page. It was a fixed action in the top
+	// right of a record that didn't say what it edited or where it went, and it was the only way
+	// in - so viewing and editing were two separate destinations for the same record, with a
+	// round trip between them. Rows now lead straight to the record, and editing belongs beside
+	// the thing being edited rather than in a corner. The edit ROUTES are untouched and still
+	// reachable directly; only the corner button is removed.
 
 	// Redirects the browser straight to Square's own hosted authorization page - InkBooks never
 	// shows its own consent UI for this, Square owns that entire screen (see
@@ -82,19 +79,6 @@ const Shop = (props) => {
 				<h1 className="shopTitle">
 					{data.getShop.name}
 				</h1>
-				<div>
-					<div className="shopActions">
-						<div className="shopActionItem">
-							<button
-								onClick={handleEdit}
-								className="shopButton"
-								disabled={params.shopId && false}
-							>
-								Edit Shop
-							</button>
-						</div>
-					</div>
-				</div>
 				<div className="squareSection">
 					<div className="squareSectionTitle">Square</div>
 					{data.getShop.squareConnected ? (

@@ -1,12 +1,10 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import "./staffProfile.css";
 import StaffService  from "../../services/StaffService";
-import { ROUTE_CONSTANTS } from "../../constants";
 import IBPageLoader from "../../components/ibPageLoader/IBPageLoader";
 import IBCardShowError from "../../components/card/ibCardShowError/IBCardShowError";
 
 const StaffProfile = (props) => {
-	const navigate = useNavigate();
 	let params = useParams();
     const errors = {};
 	/**
@@ -14,13 +12,12 @@ const StaffProfile = (props) => {
 	 */
 	const { loading, data } = StaffService.fetchOneStaff(params.staffId);
 
-	/**
-	 * Handles the edit click event
-	 */
-	const handleEdit = (e) => {
-		e.preventDefault();
-		navigate(`${ROUTE_CONSTANTS.EDIT_STAFF}${params.staffId}`);
-	};
+	// The corner "Edit" button is gone from every detail page. It was a fixed action in the top
+	// right of a record that didn't say what it edited or where it went, and it was the only way
+	// in - so viewing and editing were two separate destinations for the same record, with a
+	// round trip between them. Rows now lead straight to the record, and editing belongs beside
+	// the thing being edited rather than in a corner. The edit ROUTES are untouched and still
+	// reachable directly; only the corner button is removed.
 
 	if (loading) {
 		return <IBPageLoader />;
@@ -32,19 +29,6 @@ const StaffProfile = (props) => {
 				<h1 className="staffProfileTitle">
 					{`${data.getOneStaff.firstName} ${data.getOneStaff.lastName}`}
 				</h1>
-				<div>
-					<div className="staffProfileActions">
-						<div className="staffProfileActionItem">
-							<button
-								onClick={handleEdit}
-								className="staffProfileButton"
-								disabled={params.staffProfileId && false}
-							>
-								Edit Staff
-							</button>
-						</div>
-					</div>
-				</div>
 			</div>
 		);
 	} else {

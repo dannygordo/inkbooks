@@ -235,14 +235,11 @@ const Project = (props) => {
 		});
 	};
 
-	/**
-	 * Handles the edit click event
-	 */
-	const handleEdit = (e) => {
-		e.preventDefault();
-		//navigate(`${ROUTE_CONSTANTS.EDIT_PROJECT}${params.projectId}`);
-		console.log(selectPaletteRef.current.value);
-	};
+	// The corner "Edit Project" button is gone, along with its handler. Worth recording what that
+	// handler actually did: its navigate() call was commented out and the body was a
+	// console.log of a palette ref - so the button rendered on every project page and did
+	// literally nothing when clicked. Every field it implied you could edit is already editable
+	// in place further down this page.
 
 	/**
 	 * A helper function to remove properties from the IBImage as well as filtering out image to delete.  Passes new referenceImages array to handleProjectReferencesUpdate for mutation.
@@ -317,17 +314,6 @@ const Project = (props) => {
 			<div className="project">
 				<div className="projectTitleContainer">
 					<h1 className="projectTitle">{data.getProject.title}</h1>
-					<div className="projectActions">
-						<div className="projectActionItem">
-							<button
-								onClick={handleEdit}
-								className="projectButton"
-								disabled={params.projectId && false}
-							>
-								Edit Project
-							</button>
-						</div>
-					</div>
 				</div>
 				<div className="projectContainer" style={{ display: "flex" }}>
 					<IBCardWrapper>

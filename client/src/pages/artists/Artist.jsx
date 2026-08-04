@@ -1,7 +1,6 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import "./artist.css";
 import { ArtistService } from "../../services/ArtistService";
-import { ROUTE_CONSTANTS } from "../../constants";
 import IBPageLoader from "../../components/ibPageLoader/IBPageLoader";
 import IBAvatar from "../../components/inputs/IBAvatar";
 import ArtistPerformancePanel from "../../components/artistDashboard/ArtistPerformancePanel";
@@ -11,20 +10,18 @@ import ArtistPerformancePanel from "../../components/artistDashboard/ArtistPerfo
 // numbers) - see PRODUCTION_ROADMAP.md for why the same ArtistPerformancePanel is mounted in both
 // places with different framing rather than built twice.
 const Artist = (props) => {
-	const navigate = useNavigate();
 	let params = useParams();
 	/**
 	 * Gets artist by id
 	 */
 	const { loading, data } = ArtistService.fetchArtist(params.artistId);
 
-	/**
-	 * Handles the edit click event
-	 */
-	const handleEdit = (e) => {
-		e.preventDefault();
-		navigate(`${ROUTE_CONSTANTS.EDIT_ARTIST}${params.artistId}`);
-	};
+	// The corner "Edit" button is gone from every detail page. It was a fixed action in the top
+	// right of a record that didn't say what it edited or where it went, and it was the only way
+	// in - so viewing and editing were two separate destinations for the same record, with a
+	// round trip between them. Rows now lead straight to the record, and editing belongs beside
+	// the thing being edited rather than in a corner. The edit ROUTES are untouched and still
+	// reachable directly; only the corner button is removed.
 
 	if (loading) {
 		return <IBPageLoader />;
@@ -48,17 +45,6 @@ const Artist = (props) => {
 							{artist.title && <span>{artist.title}</span>}
 							{artist.email && <span>{artist.email}</span>}
 							{artist.phone && <span>{artist.phone}</span>}
-						</div>
-					</div>
-					<div className="artistActions">
-						<div className="artistActionItem">
-							<button
-								onClick={handleEdit}
-								className="artistButton"
-								disabled={params.artistId && false}
-							>
-								Edit Artist
-							</button>
 						</div>
 					</div>
 				</div>

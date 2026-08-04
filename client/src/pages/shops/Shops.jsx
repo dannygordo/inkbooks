@@ -1,26 +1,44 @@
 import React from "react";
 import "./shops.css";
-import { gql, useQuery } from "@apollo/client";
-import IBCard from "../../components/card/ibCard/IBCard";
-import { CircularProgress } from "@mui/material";
+import EntityList from "../../components/entityList/EntityList";
 import IBPageActionBar from "../../components/ibPageActionBar/IBPageActionBar";
 import ShopService from "../../services/ShopService";
 import IBPageLoader from "../../components/ibPageLoader/IBPageLoader";
+import { ROUTE_CONSTANTS } from "../../constants";
+import UtilsService from "../../services/UtilsService";
 
+// Was a grid of IBCard tiles. Fields preserved from IBCardHeader + IBCardShopDetails: logo, name,
+// website, email, city/state, hourly rate and shop minimum.
+//
+// The rate figures are whole dollars, not cents - Shop.hourlyRate and Shop.shopMinimum are
+// configuration a human types rather than transaction records, and were deliberately left in
+// dollars when money moved to integer cents (see server/utils/money.js). Rendered with a plain $
+// rather than through formatCents, which would read $150/hr as "$1.50".
 const Shops = () => {
 	const { loading, data } = ShopService.fetchShops();
 	if (loading) return <IBPageLoader />;
 
+	const items = (data?.getShops || []).map((shop) => ({
+		key: shop.id,
+		linkTo: `${ROUTE_CONSTANTS.SHOP}${shop.id}`,
+		avatar: shop.logo,
+		primary: shop.name,
+		secondary: shop.website || shop.email,
+		meta: [
+			{ label: "Phone", value: UtilsService.formatPhone(shop.phone) },
+			{
+				label: "Location",
+				value: [shop.city, shop.state].filter(Boolean).join(", "),
+			},
+			{ label: "Hourly", value: shop.hourlyRate ? `$${shop.hourlyRate}` : "" },
+			{ label: "Minimum", value: shop.shopMinimum ? `$${shop.shopMinimum}` : "" },
+		],
+	}));
+
 	return (
 		<div className="shops">
 			<IBPageActionBar pageType="shops" />
-			<div className="shopsContainer">
-				{data.getShops.map((shop) => {
-					return (
-						<IBCard cardData={shop} key={shop.id} cardType="shop" />
-					);
-				})}
-			</div>
+			<EntityList items={items} emptyMessage="No shops yet." />
 		</div>
 	);
 };
