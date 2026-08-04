@@ -75,7 +75,7 @@ describe('createShopCutInvoice', () => {
 		const { user: owner } = await createArtistUser();
 		const { user: otherArtist } = await createArtistUser();
 		const shop = await connectedShop();
-		const appointment = await createAppointment(owner.id, { shopId: shop.id, shopCutAmount: 50, shopCutStatus: 'unpaid' });
+		const appointment = await createAppointment(owner.id, { shopId: shop.id, shopCutCents: 5000, shopCutStatus: 'unpaid' });
 		const token = signTestToken(otherArtist);
 		const server = createTestServer();
 
@@ -111,7 +111,7 @@ describe('createShopCutInvoice', () => {
 	it('rejects a shop cut that has already been paid', async () => {
 		const { user: owner } = await createArtistUser();
 		const shop = await connectedShop();
-		const appointment = await createAppointment(owner.id, { shopId: shop.id, shopCutAmount: 50, shopCutStatus: 'paid' });
+		const appointment = await createAppointment(owner.id, { shopId: shop.id, shopCutCents: 5000, shopCutStatus: 'paid' });
 		const token = signTestToken(owner);
 		const server = createTestServer();
 
@@ -130,7 +130,7 @@ describe('createShopCutInvoice', () => {
 	it('rejects a shop that has not connected Square', async () => {
 		const { user: owner } = await createArtistUser();
 		const { shop } = await createShopAdminUser(); // squareConnected defaults to false
-		const appointment = await createAppointment(owner.id, { shopId: shop.id, shopCutAmount: 50, shopCutStatus: 'unpaid' });
+		const appointment = await createAppointment(owner.id, { shopId: shop.id, shopCutCents: 5000, shopCutStatus: 'unpaid' });
 		const token = signTestToken(owner);
 		const server = createTestServer();
 
@@ -147,7 +147,7 @@ describe('createShopCutInvoice', () => {
 	it('on success: calls Square with the grossed-up amount and marks the appointment invoice_sent', async () => {
 		const { user: owner } = await createArtistUser();
 		const shop = await connectedShop();
-		const appointment = await createAppointment(owner.id, { shopId: shop.id, shopCutAmount: 50, shopCutStatus: 'unpaid' });
+		const appointment = await createAppointment(owner.id, { shopId: shop.id, shopCutCents: 5000, shopCutStatus: 'unpaid' });
 		square.createAndPublishShopCutInvoice.mockResolvedValue({
 			invoiceId: 'inv:test123',
 			publicUrl: 'https://squareup.com/invoice/test123',
@@ -181,7 +181,7 @@ describe('markShopCutPaidManually -> confirmShopCutPaid: dual control', () => {
 		const { user: owner } = await createArtistUser();
 		const { user: otherArtist } = await createArtistUser();
 		const shop = await connectedShop();
-		const appointment = await createAppointment(owner.id, { shopId: shop.id, shopCutAmount: 50, shopCutStatus: 'unpaid' });
+		const appointment = await createAppointment(owner.id, { shopId: shop.id, shopCutCents: 5000, shopCutStatus: 'unpaid' });
 		const token = signTestToken(otherArtist);
 		const server = createTestServer();
 
@@ -200,7 +200,7 @@ describe('markShopCutPaidManually -> confirmShopCutPaid: dual control', () => {
 	it('markShopCutPaidManually moves status to pending_confirmation, NOT straight to paid', async () => {
 		const { user: owner } = await createArtistUser();
 		const shop = await connectedShop();
-		const appointment = await createAppointment(owner.id, { shopId: shop.id, shopCutAmount: 50, shopCutStatus: 'unpaid' });
+		const appointment = await createAppointment(owner.id, { shopId: shop.id, shopCutCents: 5000, shopCutStatus: 'unpaid' });
 		const token = signTestToken(owner);
 		const server = createTestServer();
 
@@ -222,7 +222,7 @@ describe('markShopCutPaidManually -> confirmShopCutPaid: dual control', () => {
 	it('confirmShopCutPaid rejects a caller below SHOP_ADMIN', async () => {
 		const { user: owner } = await createArtistUser();
 		const shop = await connectedShop();
-		const appointment = await createAppointment(owner.id, { shopId: shop.id, shopCutAmount: 50, shopCutStatus: 'pending_confirmation' });
+		const appointment = await createAppointment(owner.id, { shopId: shop.id, shopCutCents: 5000, shopCutStatus: 'pending_confirmation' });
 		const token = signTestToken(owner); // ARTIST role, not SHOP_ADMIN
 		const server = createTestServer();
 
@@ -241,7 +241,7 @@ describe('markShopCutPaidManually -> confirmShopCutPaid: dual control', () => {
 	it('confirmShopCutPaid rejects an appointment that is not awaiting confirmation', async () => {
 		const { user: owner } = await createArtistUser();
 		const { user: shopAdmin, shop } = await createShopAdminUser();
-		const appointment = await createAppointment(owner.id, { shopId: shop.id, shopCutAmount: 50, shopCutStatus: 'unpaid' });
+		const appointment = await createAppointment(owner.id, { shopId: shop.id, shopCutCents: 5000, shopCutStatus: 'unpaid' });
 		const token = signTestToken(shopAdmin);
 		const server = createTestServer();
 
@@ -262,7 +262,7 @@ describe('markShopCutPaidManually -> confirmShopCutPaid: dual control', () => {
 		const { user: shopAdmin, shop } = await createShopAdminUser();
 		const appointment = await createAppointment(owner.id, {
 			shopId: shop.id,
-			shopCutAmount: 50,
+			shopCutCents: 5000,
 			shopCutStatus: 'pending_confirmation',
 			shopCutMarkedPaidBy: owner.id,
 			shopCutMarkedPaidAt: new Date(),

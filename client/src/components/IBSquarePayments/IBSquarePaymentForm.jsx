@@ -14,12 +14,30 @@ import { APP_SETTINGS_CONSTANTS } from "../../constants";
 // comment for why.
 //
 // Props:
-// - amountCents: integer - the exact amount to charge, e.g. a project's depositAmount * 100.
+// - amountCents: integer - the exact amount to charge. This is the grand total: work + tax +
+//   fees + tip.
+// - appointmentId: optional - when present, the server persists the breakdown below against that
+//   session and recomputes its shop cut (see routes/squarePayments.js). Omitted for one-off
+//   charges with no session behind them, e.g. a project deposit.
+// - subtotalCents/taxCents/feeCents/tipCents: the components of amountCents. Passed explicitly
+//   rather than derived server-side because they are NOT derivable from a total - and the tip in
+//   particular has to be separable, since the artist keeps all of it and the shop cut is computed
+//   without it. A charge that records only its total makes that permanently unanswerable.
 // - note: optional string describing what this charge is for (shown on the Square sandbox
 //   dashboard, not to the payer).
 // - onSuccess(paymentId): called once the server confirms the charge succeeded.
 // - onError(message): called on any failure - card declined, network error, SDK load failure.
-const IBSquarePaymentForm = ({ amountCents, note, onSuccess, onError }) => {
+const IBSquarePaymentForm = ({
+	amountCents,
+	appointmentId,
+	subtotalCents,
+	taxCents,
+	feeCents,
+	tipCents,
+	note,
+	onSuccess,
+	onError,
+}) => {
 	const { user } = useAuth();
 	const cardRef = useRef(null);
 	const containerRef = useRef(null);
@@ -104,6 +122,11 @@ const IBSquarePaymentForm = ({ amountCents, note, onSuccess, onError }) => {
 					sourceId: tokenResult.token,
 					amountCents,
 					note,
+					appointmentId,
+					subtotalCents,
+					taxCents,
+					feeCents,
+					tipCents,
 				}),
 			});
 			const data = await response.json().catch(() => null);

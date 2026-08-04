@@ -120,6 +120,8 @@ module.exports = gql`
     shopMinimum: Int
     hourlyRate: Int
     flatRate: Int
+    # See models/Shop.js - percentage (40 = 40%), applied to session subtotals only.
+    shopCutPercent: Int
     logo: String
     billingType: String
     status: Int
@@ -139,6 +141,9 @@ module.exports = gql`
     shopMinimum: Int
     hourlyRate: Int
     flatRate: Int
+    # The shop's percentage cut of an artist's session work (40 = 40%), applied to
+    # Appointment.subtotalCents only - never tips. See models/Shop.js and utils/shop-cut.js.
+    shopCutPercent: Int
     logo: String
     billingType: String
     status: Int
@@ -297,6 +302,9 @@ module.exports = gql`
     # Which side's rate (shop's or the artist's own) this artist's sessions bill against at this
     # shop - see models/ArtistShopConnection.js's comment for the full reasoning.
     rateSource: String!
+    # Per-artist override of Shop.shopCutPercent. Null means "use the shop's rate", which is a
+    # different thing from 0 ("this artist owes nothing") - see utils/shop-cut.js.
+    shopCutPercent: Int
     createdAt: DateTime
     updatedAt: DateTime
   }
@@ -421,10 +429,18 @@ module.exports = gql`
     shopId: ID
     title: String
     description: String
-    total: Int
-    tip: Int
+    # All money is integer CENTS - see server/utils/money.js. These were previously total/tip,
+    # in whole dollars, which could not represent $89.50 at all - let alone tax or fees.
+    # subtotalCents is the tattoo work itself and the only figure the shop cut applies to.
+    subtotalCents: Int
+    taxCents: Int
+    feeCents: Int
+    tipCents: Int
+    totalCents: Int
     shopCutStatus: String
-    shopCutAmount: Int
+    # Deliberately NOT accepted as input - the shop cut is computed server-side from
+    # subtotalCents and the configured percentage (see utils/shop-cut.js), never supplied by a
+    # client. The old shopCutAmount was in this input type and, in practice, nothing ever sent it.
     appointmentType: String
     appointmentStatus: String
     createdAt: DateTime
@@ -454,11 +470,17 @@ module.exports = gql`
     user: User
     title: String
     description: String
-    total: Int
-    tip: Int
+    # Integer CENTS - see server/utils/money.js.
+    subtotalCents: Int
+    taxCents: Int
+    feeCents: Int
+    tipCents: Int
+    totalCents: Int
     shopCutStatus: String!
     # Shop-cut ledger fields - see PRODUCTION_ROADMAP.md's "Shop-cut ledger" section.
-    shopCutAmount: Int
+    # shopCutCents is computed from subtotalCents only: never tips, tax or processing fees.
+    shopCutCents: Int
+    shopCutPercentApplied: Int
     shopCutPaymentMethod: String
     shopCutSquareInvoiceId: String
     shopCutMarkedPaidBy: ID

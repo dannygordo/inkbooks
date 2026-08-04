@@ -56,7 +56,7 @@ const UpdateEventDialog = ({ selectedDay, event }) => {
         const newAppointment = {
             id: event.id,
             // Echoed back unchanged - no longer read from a dropdown, same reasoning as
-            // shopCutStatus/shopCutAmount below. See this file's header comment.
+            // shopCutStatus below. See this file's header comment.
             projectId: event.projectId,
             userId: user.id,
             // user.userInfo.shop is legitimately absent for an independent artist (no shop
@@ -70,9 +70,10 @@ const UpdateEventDialog = ({ selectedDay, event }) => {
             // Shop cut is no longer editable from this dialog at all (see the removed JSX block
             // below) - echoed back unchanged rather than read from a field that no longer exists,
             // same "don't touch what this view doesn't actually edit" reasoning as
-            // SessionDetail.jsx's own minimal-payload save.
+            // SessionDetail.jsx's own minimal-payload save. The amount itself is deliberately NOT
+            // sent: it's computed server-side from subtotalCents (see utils/shop-cut.js) and is
+            // no longer part of AppointmentInput at all.
             shopCutStatus: event.shopCutStatus,
-            shopCutAmount: event.shopCutAmount,
             appointmentStatus: event.appointmentStatus,
             appointmentType: event.appointmentType,
             createdAt: event.createdAt,

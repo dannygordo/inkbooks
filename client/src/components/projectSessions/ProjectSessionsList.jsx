@@ -8,6 +8,7 @@ import ArtistShopConnectionService from "../../services/ArtistShopConnectionServ
 import { useAuth } from "../../context/auth";
 import IBDateTimePicker from "../inputs/IBDateTimePicker";
 import SessionDetail from "./SessionDetail";
+import { formatCents } from "../../utils/money";
 import { ALERT_CONSTANTS } from "../../constants";
 import "./projectSessions.css";
 
@@ -129,7 +130,12 @@ const ProjectSessionsList = ({ project }) => {
 						</span>
 						<span className="projectSessionRowMeta">
 							{session.appointmentStatus === "completed" ? "Completed" : "Open"}
-							{session.total ? ` - $${session.total}` : ""}
+							{/* totalCents, not the old whole-dollar `total` - this row would
+							    otherwise render 45000 as "$45000". */}
+							{session.totalCents ? ` - ${formatCents(session.totalCents)}` : ""}
+							{session.tipCents
+								? ` (incl. ${formatCents(session.tipCents)} tip)`
+								: ""}
 						</span>
 					</div>
 				</div>

@@ -69,10 +69,22 @@
 	gap: 8px;
 }
 
-.sessionDetailTotal {
+.sessionDetailMoney {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+.sessionDetailMoneyRow {
 	display: flex;
 	align-items: center;
 	gap: 8px;
+	flex-wrap: wrap;
+}
+/* Reads as a consequence of the numbers above it, not as another field. */
+.sessionDetailShopCutNote {
+	font-size: 13px;
+	color: #666;
+	font-style: italic;
 }
 
 .sessionDetailActions {

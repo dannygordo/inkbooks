@@ -222,8 +222,8 @@ describe('updateAppointment: shopId immutability + first-time attribution', () =
 	});
 
 	// Regression: SessionDetail.jsx's minimal-payload save (see
-	// AppointmentService.UPDATE_SESSION_DETAILS - only ever sends id/appointmentDate/total/
-	// sessionNotes/appointmentStatus, deliberately never shopId) started throwing "shopId cannot
+	// AppointmentService.UPDATE_SESSION_DETAILS - only ever sends id/appointmentDate/the money
+	// components/sessionNotes/appointmentStatus, deliberately never shopId) started throwing "shopId cannot
 	// be changed" the instant convertBookingRequest began correctly setting shopId on
 	// session/consult appointments - previously this never fired since shopId was never set to
 	// begin with, so the bug existed but had no way to surface. Omitting shopId from a partial
@@ -232,7 +232,7 @@ describe('updateAppointment: shopId immutability + first-time attribution', () =
 		const { user } = await createArtistUser();
 		const { shop } = await createShopAdminUser();
 		await connectArtistToShop(user.id, shop.id);
-		const appointment = await createAppointment(user.id, { shopId: shop.id, total: 0 });
+		const appointment = await createAppointment(user.id, { shopId: shop.id, subtotalCents: 0 });
 		const token = signTestToken(user);
 		const server = createTestServer();
 
@@ -245,7 +245,7 @@ describe('updateAppointment: shopId immutability + first-time attribution', () =
 					appointmentInput: {
 						id: appointment.id,
 						appointmentDate: new Date().toISOString(),
-						total: 250,
+						subtotalCents: 25000,
 					},
 				},
 			},

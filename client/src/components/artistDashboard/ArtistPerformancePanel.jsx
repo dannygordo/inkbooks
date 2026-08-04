@@ -6,6 +6,7 @@ import { AppointmentService } from "../../services/AppointmentService";
 import ProjectService from "../../services/ProjectService";
 import ShopCutPayoutList from "./ShopCutPayoutList";
 import { ROUTE_CONSTANTS } from "../../constants";
+import { formatCents } from "../../utils/money";
 import "./artistPerformancePanel.css";
 
 // Appointment.shopCutStatus values that represent money the artist still owes the shop - see
@@ -13,8 +14,6 @@ import "./artistPerformancePanel.css";
 // deliberately excluded (nothing currently owed).
 const SHOP_CUT_OWED_STATUSES = ["unpaid", "invoice_sent", "pending_confirmation"];
 
-const formatCurrency = (amount) =>
-	`$${Math.round(amount || 0).toLocaleString()}`;
 
 const isSameMonth = (date, reference) =>
 	date.getMonth() === reference.getMonth() && date.getFullYear() === reference.getFullYear();
@@ -53,12 +52,29 @@ const ArtistPerformancePanel = ({ artistUserId, isSelf = false }) => {
 		.sort((a, b) => new Date(a.appointmentDate) - new Date(b.appointmentDate))
 		.slice(0, 5);
 
-	const revenueMTD = appointments
-		.filter((a) => isSameMonth(new Date(a.appointmentDate), now))
-		.reduce((sum, a) => sum + (a.total || 0) + (a.tip || 0), 0);
-	const revenueYTD = appointments
-		.filter((a) => isSameYear(new Date(a.appointmentDate), now))
-		.reduce((sum, a) => sum + (a.total || 0) + (a.tip || 0), 0);
+	const inMonth = appointments.filter((a) => isSameMonth(new Date(a.appointmentDate), now));
+	const inYear = appointments.filter((a) => isSameYear(new Date(a.appointmentDate), now));
+
+	// Was `total + tip`, which only worked because the old `total` happened to exclude the tip.
+	// totalCents is now what the client actually paid - subtotal + tax + fee + tip - so adding
+	// tipCents on top would double-count every tip.
+	const revenueMTD = inMonth.reduce((sum, a) => sum + (a.totalCents || 0), 0);
+	const revenueYTD = inYear.reduce((sum, a) => sum + (a.totalCents || 0), 0);
+
+	// Tips, tracked on their own. They're the artist's alone - never part of the shop cut - and
+	// they're the figure most artists actually want to watch, which is exactly why folding them
+	// into a single revenue number made them impossible to see.
+	//
+	// The average is over appointments that ACTUALLY RECEIVED a tip, not over all of them.
+	// Dividing by every appointment would drag the average toward zero with consults, cancelled
+	// sessions and anything else that was never going to be tipped, and answer a question nobody
+	// asked. This answers "when I get tipped, how much?".
+	const tipsMTD = inMonth.reduce((sum, a) => sum + (a.tipCents || 0), 0);
+	const tipsYTD = inYear.reduce((sum, a) => sum + (a.tipCents || 0), 0);
+	const tippedYTD = inYear.filter((a) => (a.tipCents || 0) > 0);
+	const averageTipYTD = tippedYTD.length
+		? Math.round(tipsYTD / tippedYTD.length)
+		: 0;
 
 	const shopCutOwedMTD = appointments
 		.filter(
@@ -66,14 +82,14 @@ const ArtistPerformancePanel = ({ artistUserId, isSelf = false }) => {
 				isSameMonth(new Date(a.appointmentDate), now) &&
 				SHOP_CUT_OWED_STATUSES.includes(a.shopCutStatus),
 		)
-		.reduce((sum, a) => sum + (a.shopCutAmount || 0), 0);
+		.reduce((sum, a) => sum + (a.shopCutCents || 0), 0);
 	const shopCutOwedYTD = appointments
 		.filter(
 			(a) =>
 				isSameYear(new Date(a.appointmentDate), now) &&
 				SHOP_CUT_OWED_STATUSES.includes(a.shopCutStatus),
 		)
-		.reduce((sum, a) => sum + (a.shopCutAmount || 0), 0);
+		.reduce((sum, a) => sum + (a.shopCutCents || 0), 0);
 
 	// Only 'completed' sessions - see PRODUCTION_ROADMAP.md's Phase 7 section: a shop cut isn't
 	// actually payable until the session itself is done, matching SessionDetail's own close-session
@@ -91,19 +107,40 @@ const ArtistPerformancePanel = ({ artistUserId, isSelf = false }) => {
 			<div className="artistPerformanceStats">
 				<div className="artistStatCard">
 					<div className="artistStatLabel">Revenue (MTD)</div>
-					<div className="artistStatValue">{formatCurrency(revenueMTD)}</div>
+					<div className="artistStatValue">{formatCents(revenueMTD)}</div>
 				</div>
 				<div className="artistStatCard">
 					<div className="artistStatLabel">Revenue (YTD)</div>
-					<div className="artistStatValue">{formatCurrency(revenueYTD)}</div>
+					<div className="artistStatValue">{formatCents(revenueYTD)}</div>
+				</div>
+				{/* Tips get their own cards rather than being folded into revenue: they're the
+				    artist's alone (never part of the shop cut), and they're the number most
+				    artists actually track. */}
+				<div className="artistStatCard">
+					<div className="artistStatLabel">Tips (MTD)</div>
+					<div className="artistStatValue">{formatCents(tipsMTD)}</div>
+				</div>
+				<div className="artistStatCard">
+					<div className="artistStatLabel">Tips (YTD)</div>
+					<div className="artistStatValue">{formatCents(tipsYTD)}</div>
+				</div>
+				<div className="artistStatCard">
+					<div className="artistStatLabel">Avg Tip (YTD)</div>
+					<div className="artistStatValue">{formatCents(averageTipYTD)}</div>
+					{/* Stated explicitly - an average that silently included un-tipped
+					    appointments would read much lower and mean something else entirely. */}
+					<div className="artistStatSubLabel">
+						across {tippedYTD.length} tipped appointment
+						{tippedYTD.length === 1 ? "" : "s"}
+					</div>
 				</div>
 				<div className="artistStatCard">
 					<div className="artistStatLabel">Shop Cut Owed (MTD)</div>
-					<div className="artistStatValue">{formatCurrency(shopCutOwedMTD)}</div>
+					<div className="artistStatValue">{formatCents(shopCutOwedMTD)}</div>
 				</div>
 				<div className="artistStatCard">
 					<div className="artistStatLabel">Shop Cut Owed (YTD)</div>
-					<div className="artistStatValue">{formatCurrency(shopCutOwedYTD)}</div>
+					<div className="artistStatValue">{formatCents(shopCutOwedYTD)}</div>
 				</div>
 				<div className="artistStatCard">
 					<div className="artistStatLabel">Active Projects</div>

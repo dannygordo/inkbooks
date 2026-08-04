@@ -5,6 +5,7 @@ const withAuth = require('../../utils/with-auth');
 const { AuthenticationError, UserInputError } = require('../../utils/errors');
 const { Constants } = require('../../utils/constants');
 const { updateAppointmentInputSchema, createAppointmentInputSchema, appointmentIdInputSchema, validate } = require('../../utils/validation');
+const { applyShopCut } = require('../../utils/shop-cut');
 
 // Same ownership shape as updateAppointment/deleteAppointment below - Admin/SHOP_ADMIN-or-better,
 // or the appointment's own artist. Shared by all three session-timer mutations so that check is
@@ -46,8 +47,11 @@ module.exports = {
             userId,
             title,
             description,
-            total,
-            tip,
+            subtotalCents,
+            taxCents,
+            feeCents,
+            tipCents,
+            totalCents,
             shopCutStatus,
             appointmentType,
             appointmentStatus,
@@ -60,7 +64,8 @@ module.exports = {
       user,
      ) => {
       const { valid, errors } = validate(createAppointmentInputSchema, {
-        appointmentDate, projectId, shopId, userId, title, description, total, tip,
+        appointmentDate, projectId, shopId, userId, title, description,
+        subtotalCents, taxCents, feeCents, tipCents, totalCents,
         shopCutStatus, appointmentType, appointmentStatus, createdAt, updatedAt,
       });
       if (!valid) {
@@ -79,14 +84,23 @@ module.exports = {
         userId,
         title,
         description,
-        total,
-        tip,
+        subtotalCents,
+        taxCents,
+        feeCents,
+        tipCents,
+        totalCents,
         shopCutStatus,
         appointmentType,
         appointmentStatus,
         createdAt,
         updatedAt
       });
+      // The shop cut is derived here, not accepted from the client - it's a financial obligation
+      // between the artist and the shop, and letting the party who owes it choose the number
+      // isn't a real ledger. Computed from subtotalCents only, so tips are never included; see
+      // utils/shop-cut.js. A no-op when there's no shopId (independent artist) or no configured
+      // percentage.
+      await applyShopCut(newAppointment);
       const appt = await newAppointment.save();
       return appt;
     }),
@@ -147,6 +161,16 @@ module.exports = {
           }
 
           const res = await Appointment.findByIdAndUpdate({_id: appointment.id}, appointment, {new: true});
+          // Recompute the shop cut whenever the figure it's derived from changes. Only on an
+          // actual subtotalCents change - not on every save - because applyShopCut is a write to
+          // a ledger field, and a notes-only or date-only save has no business touching what an
+          // artist owes. applyShopCut itself declines to touch an appointment whose cut has
+          // already been invoiced or paid, so a late price correction can't silently contradict
+          // an invoice already sitting in the artist's inbox.
+          if ('subtotalCents' in appointment) {
+            await applyShopCut(res);
+            await res.save();
+          }
           return res;
         }
         throw new AuthenticationError('Action not allowed');

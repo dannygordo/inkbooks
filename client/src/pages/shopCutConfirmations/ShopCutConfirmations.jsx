@@ -4,6 +4,7 @@ import { useAuth } from "../../context/auth";
 import { AppointmentService } from "../../services/AppointmentService";
 import IBPageLoader from "../../components/ibPageLoader/IBPageLoader";
 import { ALERT_CONSTANTS } from "../../constants";
+import { formatCents } from "../../utils/money";
 import "./shopCutConfirmations.css";
 
 // Shop-side inbox for the manual mark-paid/confirm dual-control flow - see
@@ -72,8 +73,8 @@ const ShopCutConfirmations = () => {
 									{moment.utc(item.appointmentDate).format("MMM D, YYYY")}
 								</div>
 								<div className="shopCutConfirmationAmount">
-									{typeof item.shopCutAmount === "number"
-										? `$${item.shopCutAmount.toFixed(2)}`
+									{typeof item.shopCutCents === "number"
+										? formatCents(item.shopCutCents)
 										: "Amount not set"}
 								</div>
 								<div className="shopCutConfirmationMarkedAt">

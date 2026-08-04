@@ -122,10 +122,23 @@ describe('createAppointmentInputSchema / updateAppointmentInputSchema', () => {
 		expect(result.valid).toBe(false);
 	});
 
-	it('rejects a negative shopCutAmount', () => {
+	// shopCutAmount is no longer accepted as input at all - the shop cut is computed server-side
+	// from subtotalCents (see utils/shop-cut.js), never supplied by a client. The negative-amount
+	// case it used to cover is now covered by subtotalCents below.
+	it('rejects a negative subtotalCents', () => {
 		const result = validate(createAppointmentInputSchema, {
 			...validCreate,
-			shopCutAmount: -50,
+			subtotalCents: -50,
+		});
+		expect(result.valid).toBe(false);
+	});
+
+	// Money is integer cents - a fractional cent isn't a representable amount, and letting one
+	// through here is how a rounding discrepancy gets persisted instead of caught.
+	it('rejects a fractional tipCents', () => {
+		const result = validate(createAppointmentInputSchema, {
+			...validCreate,
+			tipCents: 1050.5,
 		});
 		expect(result.valid).toBe(false);
 	});

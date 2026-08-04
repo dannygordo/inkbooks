@@ -7,8 +7,32 @@ const AppointmentSchema = new mongoose.Schema({
 	userId: {type: mongoose.Schema.Types.ObjectId},
 	title: {type: String},
 	description: {type: String},
-	total: {type: Number, default: 0},
-	tip: {type: Number, default: 0},
+	// ---------------------------------------------------------------------------------------
+	// Money. All integer CENTS - see utils/money.js for why, and scripts/migrate-money-to-cents.js
+	// for the conversion of the old whole-dollar `total`/`tip`/`shopCutAmount` fields.
+	//
+	// The breakdown is stored as individual components rather than one `total`, because the
+	// components are not interchangeable and the shop cut depends on telling them apart:
+	//
+	//   subtotalCents - the tattoo work itself. This is the artist's actual earnings and the ONLY
+	//                   figure the shop cut is computed against.
+	//   taxCents      - sales tax collected. Not income; it's remitted onward.
+	//   feeCents      - processing fees (Square's cut). Not income either.
+	//   tipCents      - the tip. Never part of the shop cut - see shopCutCents below.
+	//   totalCents    - what the client actually paid: subtotal + tax + fee + tip. Stored rather
+	//                   than derived so it always reflects the amount really charged, even if a
+	//                   component is later corrected or a payment was taken outside the app.
+	//
+	// `total` used to mean "the session's price" in some places and "everything collected" in
+	// others - ArtistPerformancePanel summed total + tip to get revenue, implying total excluded
+	// tip, while SessionDetail's "Charge via Square" charged `total` alone, implying it was the
+	// full amount due. Naming the components separately removes the ambiguity rather than picking
+	// one of the two readings and hoping every call site agrees.
+	subtotalCents: {type: Number, default: 0},
+	taxCents: {type: Number, default: 0},
+	feeCents: {type: Number, default: 0},
+	tipCents: {type: Number, default: 0},
+	totalCents: {type: Number, default: 0},
 	// Was `required: true` - broke independent artists (no shop, nothing to owe) unless every
 	// caller remembered to pass a throwaway value. 'none' is the real default for that case;
 	// the rest of the enum is the shop-cut payment lifecycle (see PRODUCTION_ROADMAP.md's
@@ -29,10 +53,24 @@ const AppointmentSchema = new mongoose.Schema({
 		enum: ['none', 'unpaid', 'invoice_sent', 'pending_confirmation', 'paid', 'received'],
 		default: 'none',
 	},
-	// The dollar amount the artist owes the shop for this appointment - separate from `total`/
-	// `tip` since the shop's cut is usually a percentage of those, computed by the client at
-	// creation time, not automatically derived here (no hardcoded split-percentage assumption).
-	shopCutAmount: {type: Number},
+	// What the artist owes the shop for this appointment, in cents.
+	//
+	// Computed from subtotalCents ONLY - never from totalCents. Tips are excluded because the
+	// artist keeps every tip, full stop; tax is excluded because it isn't income, it's money owed
+	// to the state; processing fees are excluded because they're Square's, not the artist's. The
+	// shop's cut is a share of the work, so it's a share of what the work was priced at.
+	//
+	// Previously this was a plain number in dollars that nothing in the app ever actually set -
+	// createAppointment didn't even accept it, no UI wrote it, and the only non-null values in
+	// existence came from seed data. The shop-cut payout dashboard and the Square invoice flow
+	// were both reading a field that, on real data, was always null. See utils/shop-cut.js for
+	// the computation and models/Shop.js's shopCutPercent for where the percentage comes from.
+	shopCutCents: {type: Number, default: 0},
+	// The percentage actually applied when shopCutCents was computed, captured at that moment.
+	// Stored rather than looked up on read because a shop changing its rate must not silently
+	// rewrite what artists already owe on past sessions - a ledger entry has to stay auditable
+	// against the terms in force when it was created.
+	shopCutPercentApplied: {type: Number},
 	shopCutPaymentMethod: {type: String, enum: ['square_invoice', 'manual']},
 	// Square's invoice id - set when createShopCutInvoice runs, used by the webhook handler to
 	// look this Appointment back up when invoice.payment_made fires.

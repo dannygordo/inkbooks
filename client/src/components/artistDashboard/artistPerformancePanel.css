@@ -29,6 +29,14 @@
 	font-weight: 600;
 }
 
+/* Qualifier under a stat whose meaning isn't obvious from the label alone - currently the tip
+   average, which is computed over tipped appointments only, not all of them. */
+.artistStatSubLabel {
+	font-size: 11px;
+	color: #aaa;
+	margin-top: 4px;
+}
+
 .artistPerformanceSectionTitle {
 	margin-bottom: 15px;
 }

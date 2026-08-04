@@ -28,6 +28,12 @@ const ArtistShopConnectionSchema = new mongoose.Schema(
     // rate everyone bills at), with 'own' as the explicit opt-out for an artist whose personal
     // rate should be used instead.
     rateSource: { type: String, required: true, default: 'shop', enum: ['shop', 'own'] },
+    // Per-artist override of Shop.shopCutPercent. Null (the default) means "use the shop's rate" -
+    // which is NOT the same as 0, and that distinction is the whole reason this is nullable rather
+    // than defaulting to 0: a guest artist who genuinely owes the shop nothing is a real
+    // arrangement, and it has to be expressible as something other than "unset". See
+    // utils/shop-cut.js's resolveShopCutPercent.
+    shopCutPercent: { type: Number, default: null },
   },
   { timestamps: true }
 );

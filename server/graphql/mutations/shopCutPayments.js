@@ -25,7 +25,7 @@ const {
 module.exports = {
   // Artist-initiated - only the appointment's own artist can invoice themselves for their own
   // shop cut. Requires the shop to already be Square-connected (see routes/squareOAuth.js) and
-  // the appointment to have a shopId + shopCutAmount set and not already invoiced/paid.
+  // the appointment to have a shopId + shopCutCents set and not already invoiced/paid.
   createShopCutInvoice: withAuth(async (_, args, context, info, user) => {
     const { valid, errors, data } = validate(createShopCutInvoiceInputSchema, args);
     if (!valid) {
@@ -42,7 +42,7 @@ module.exports = {
     if (!appointment.shopId) {
       throw new UserInputError('Errors', { errors: { appointmentId: 'This appointment has no shop attached.' } });
     }
-    if (!appointment.shopCutAmount || appointment.shopCutAmount <= 0) {
+    if (!appointment.shopCutCents || appointment.shopCutCents <= 0) {
       throw new UserInputError('Errors', { errors: { appointmentId: 'This appointment has no shop cut amount set.' } });
     }
     if (appointment.shopCutStatus === 'paid') {
@@ -66,7 +66,11 @@ module.exports = {
     }
 
     const paymentMethod = data.paymentMethod || 'ach';
-    const targetAmountCents = Math.round(appointment.shopCutAmount * 100);
+    // No conversion any more - shopCutCents is already the unit Square's Invoices API wants
+    // (amount_money.amount). The old `Math.round(shopCutAmount * 100)` was the only thing
+    // standing between a dollars-denominated field and a cents-denominated API, and it silently
+    // truncated any cut that wasn't a whole number of dollars.
+    const targetAmountCents = appointment.shopCutCents;
 
     const invoiceResult = await square.createAndPublishShopCutInvoice({
       shop,
@@ -113,7 +117,7 @@ module.exports = {
           errors: { appointmentIds: 'One or more appointments have no shop attached.' },
         });
       }
-      if (!appointment.shopCutAmount || appointment.shopCutAmount <= 0) {
+      if (!appointment.shopCutCents || appointment.shopCutCents <= 0) {
         throw new UserInputError('Errors', {
           errors: { appointmentIds: 'One or more appointments have no shop cut amount set.' },
         });
@@ -144,8 +148,8 @@ module.exports = {
     }
 
     const paymentMethod = data.paymentMethod || 'ach';
-    const totalAmount = appointments.reduce((sum, a) => sum + a.shopCutAmount, 0);
-    const targetAmountCents = Math.round(totalAmount * 100);
+    // Summed in cents, so a batch of N cuts is exact rather than accumulating N roundings.
+    const targetAmountCents = appointments.reduce((sum, a) => sum + (a.shopCutCents || 0), 0);
 
     const invoiceResult = await square.createAndPublishShopCutInvoice({
       shop,
@@ -210,7 +214,7 @@ module.exports = {
         to: shop.email,
         shopName: shop.name,
         artistName: artist ? `${artist.firstName} ${artist.lastName}` : 'An artist',
-        amount: appointment.shopCutAmount,
+        amountCents: appointment.shopCutCents,
       });
     }
 

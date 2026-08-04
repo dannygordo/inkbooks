@@ -46,23 +46,36 @@ export function getEffectiveRate(artist, shop, connections = []) {
 }
 
 /**
- * Computes a session's dollar total from elapsed time and an effective rate. Whole-dollar
- * rounding matches how Appointment.total is stored (Int, not Float/cents - see
- * ArtistPerformancePanel's formatCurrency usage, which treats `total` as whole dollars already).
+ * Computes a session's SUBTOTAL - the price of the tattoo work - in integer cents, from elapsed
+ * time and an effective rate.
+ *
+ * Returns cents, not dollars: every persisted money value is cents now (see utils/money.js), and
+ * this figure feeds Appointment.subtotalCents directly. It used to return whole dollars and round
+ * with Math.round, which threw away up to 99c of a computed total on every hourly session - at
+ * $150/hr, a 20-minute difference in elapsed time could vanish entirely into that rounding.
+ * Rounding once, at the cent, keeps the arithmetic honest.
+ *
+ * Named "subtotal" rather than "total" deliberately: this is the work alone. Tax, processing fees
+ * and tips are separate components (see models/Appointment.js) and none of them are derivable
+ * from elapsed time.
+ *
+ * Note the rates themselves (Shop.hourlyRate/flatRate, Artist.hourlyRate/flatRate) are still
+ * stored in whole dollars - they're configuration a human types, not transaction records, so
+ * they were left alone. The dollars-to-cents conversion happens here, at the boundary.
  *
  * @param {number} elapsedSeconds
  * @param {{billingType: string, hourlyRate: number, flatRate: number}} effectiveRate
- * @returns {number}
+ * @returns {number} integer cents
  */
-export function computeSessionTotal(elapsedSeconds, effectiveRate) {
+export function computeSessionSubtotalCents(elapsedSeconds, effectiveRate) {
 	if (!effectiveRate) {
 		return 0;
 	}
 	if (effectiveRate.billingType === 'flat_rate') {
-		return Math.round(effectiveRate.flatRate || 0);
+		return Math.round((effectiveRate.flatRate || 0) * 100);
 	}
 	const hours = Math.max(0, elapsedSeconds || 0) / 3600;
-	return Math.round(hours * (effectiveRate.hourlyRate || 0));
+	return Math.round(hours * (effectiveRate.hourlyRate || 0) * 100);
 }
 
 /**

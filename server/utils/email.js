@@ -119,8 +119,12 @@ async function sendNewMessageNotificationToArtist({ to, artistFirstName, clientN
 // comment on the same gap). This is the notification half of the manual mark-paid/confirm
 // dual-control flow (see mutations/shopCutPayments.js) - the shop still has to log in and call
 // confirmShopCutPaid themselves; this email is just the ping that something needs their action.
-async function sendShopCutMarkedPaidNotificationToShop({ to, shopName, artistName, amount }) {
-  const formattedAmount = typeof amount === 'number' ? `$${amount.toFixed(2)}` : 'their shop cut';
+async function sendShopCutMarkedPaidNotificationToShop({ to, shopName, artistName, amountCents }) {
+  // Takes cents now, not dollars - every stored money value in this codebase is integer cents
+  // (see utils/money.js). The old signature took `amount` in dollars and .toFixed(2)'d it, which
+  // would have formatted a cents value as e.g. "$8950.00".
+  const formattedAmount =
+    typeof amountCents === 'number' ? `$${(amountCents / 100).toFixed(2)}` : 'their shop cut';
   return sendEmail({
     to,
     subject: `${artistName} marked a shop cut as paid`,

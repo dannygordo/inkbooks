@@ -10,9 +10,10 @@ import IBDateTimePicker from "../inputs/IBDateTimePicker";
 import IBSquarePaymentForm from "../IBSquarePayments/IBSquarePaymentForm";
 import { useAuth } from "../../context/auth";
 import { ALERT_CONSTANTS } from "../../constants";
+import { formatCents, centsToDollars, dollarsToCents } from "../../utils/money";
 import {
 	getEffectiveRate,
-	computeSessionTotal,
+	computeSessionSubtotalCents,
 	getLiveElapsedSeconds,
 	formatElapsed,
 } from "../../utils/sessionRate";
@@ -48,7 +49,14 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 	// a booked session, so both are now editable via the same IBDateTimePicker used elsewhere.
 	const [sessionDate, setSessionDate] = useState(moment(initialAppointment.appointmentDate));
 	const [deleting, setDeleting] = useState(false);
-	const totalRef = useRef();
+	// One ref per money component. They're captured separately because they aren't derivable from
+	// each other and the shop cut depends on telling them apart - the subtotal is the artist's
+	// earnings and the only thing the cut applies to; the tip is theirs entirely; tax and fees
+	// belong to neither party. See models/Appointment.js.
+	const subtotalRef = useRef();
+	const taxRef = useRef();
+	const feeRef = useRef();
+	const tipRef = useRef();
 	// Forces a re-render every second while the timer is running so the live elapsed readout
 	// actually ticks - the underlying value is always computed fresh from
 	// accumulatedSeconds/timerStartedAt (see getLiveElapsedSeconds), never stored client-side.
@@ -72,7 +80,7 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 
 	const effectiveRate = getEffectiveRate(project?.artist, project?.artist?.shop, connections);
 	const elapsedSeconds = getLiveElapsedSeconds(appointment);
-	const suggestedTotal = computeSessionTotal(elapsedSeconds, effectiveRate);
+	const suggestedSubtotalCents = computeSessionSubtotalCents(elapsedSeconds, effectiveRate);
 	const isClosed = appointment.appointmentStatus === "completed";
 
 	const handleStart = async () => {
@@ -89,17 +97,42 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 	};
 
 	const handleUseSuggested = () => {
-		if (totalRef.current) {
-			totalRef.current.value = suggestedTotal;
+		if (subtotalRef.current) {
+			subtotalRef.current.value = centsToDollars(suggestedSubtotalCents);
 		}
 	};
 
-	const buildSavePayload = () => ({
-		id: appointment.id,
-		appointmentDate: moment(sessionDate).toISOString(),
-		total: totalRef.current?.value ? parseInt(totalRef.current.value, 10) : appointment.total,
-		sessionNotes: notes,
-	});
+	// Reads a dollar-denominated input and returns cents, falling back to the stored value when
+	// the field is empty. Note the `=== ""` check rather than a falsy one: "0" is a legitimate
+	// entry (a comped session, an untipped one) and a falsy test would silently discard it in
+	// favour of whatever was stored before.
+	const readCents = (ref, storedCents) => {
+		const raw = ref.current?.value;
+		if (raw === undefined || raw === null || raw === "") {
+			return storedCents || 0;
+		}
+		return dollarsToCents(raw);
+	};
+
+	const buildSavePayload = () => {
+		const subtotalCents = readCents(subtotalRef, appointment.subtotalCents);
+		const taxCents = readCents(taxRef, appointment.taxCents);
+		const feeCents = readCents(feeRef, appointment.feeCents);
+		const tipCents = readCents(tipRef, appointment.tipCents);
+		return {
+			id: appointment.id,
+			appointmentDate: moment(sessionDate).toISOString(),
+			subtotalCents,
+			taxCents,
+			feeCents,
+			tipCents,
+			// Derived here rather than entered - the grand total is definitionally the sum of its
+			// parts at save time. (The Square charge path overwrites this with what Square
+			// actually charged; see routes/squarePayments.js on why the charge wins there.)
+			totalCents: subtotalCents + taxCents + feeCents + tipCents,
+			sessionNotes: notes,
+		};
+	};
 
 	const handleSaveDetails = async (e) => {
 		e.preventDefault();
@@ -172,16 +205,26 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 
 	const handleChargeViaSquare = (e) => {
 		e.preventDefault();
-		const amountCents = Math.round(
-			(totalRef.current?.value ? parseInt(totalRef.current.value, 10) : appointment.total || 0) *
-				100
-		);
+		// Charge the full amount due - work + tax + fees + tip - not the subtotal alone. The old
+		// code charged `total`, which excluded the tip entirely: any tip the artist entered was
+		// recorded in InkBooks but never actually collected from the client.
+		const payload = buildSavePayload();
 		setModal({
 			isOpen: true,
 			title: `Charge for ${project?.title || "session"}`,
 			content: (
 				<IBSquarePaymentForm
-					amountCents={amountCents}
+					amountCents={payload.totalCents}
+					// The breakdown travels with the charge so the server can persist it against
+					// this session (see routes/squarePayments.js). Without appointmentId the
+					// charge succeeds but nothing is recorded against the session - which is
+					// exactly what used to happen, leaving the money visible only in Square's own
+					// dashboard and the tip unrecoverable from InkBooks' data.
+					appointmentId={appointment.id}
+					subtotalCents={payload.subtotalCents}
+					taxCents={payload.taxCents}
+					feeCents={payload.feeCents}
+					tipCents={payload.tipCents}
 					note={`Session for project ${project?.title || ""}`}
 					onSuccess={() => {
 						setModal({ ...modal, isOpen: false });
@@ -192,6 +235,11 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 							timeout: ALERT_CONSTANTS.TIMEOUT,
 							location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
 						});
+						// The server just wrote the breakdown and recomputed the shop cut against
+						// the new subtotal. Without this the view keeps showing pre-charge values.
+						if (onClosed) {
+							onClosed();
+						}
 					}}
 					onError={(message) => {
 						setAlert({
@@ -260,19 +308,68 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 				</div>
 			</div>
 
-			<div className="sessionDetailTotal">
-				<IBInput
-					id="sessionTotal"
-					label="Session Total $"
-					helperText={`Suggested from elapsed time: $${suggestedTotal}`}
-					type="number"
-					inputRef={totalRef}
-					defaultValue={appointment.total ?? suggestedTotal}
-					disabled={isClosed}
-				/>
-				<Button variant="text" onClick={handleUseSuggested} disabled={isClosed}>
-					Use Suggested
-				</Button>
+			{/* One field per money component, not a single "Session Total". They can't be
+			    derived from each other, and the shop cut depends on telling them apart: only the
+			    subtotal is the artist's earnings and only the subtotal is what the shop takes a
+			    percentage of. A tip folded into a grand total is a tip the shop can end up
+			    charging against. */}
+			<div className="sessionDetailMoney">
+				<div className="sessionDetailMoneyRow">
+					<IBInput
+						id="sessionSubtotal"
+						label="Tattoo work $"
+						helperText={`Suggested from elapsed time: ${formatCents(
+							suggestedSubtotalCents
+						)}`}
+						type="number"
+						inputRef={subtotalRef}
+						defaultValue={centsToDollars(
+							appointment.subtotalCents ?? suggestedSubtotalCents
+						)}
+						disabled={isClosed}
+					/>
+					<Button variant="text" onClick={handleUseSuggested} disabled={isClosed}>
+						Use Suggested
+					</Button>
+				</div>
+				<div className="sessionDetailMoneyRow">
+					<IBInput
+						id="sessionTip"
+						label="Tip $"
+						helperText="The artist keeps 100% of this - never part of the shop cut"
+						type="number"
+						inputRef={tipRef}
+						defaultValue={centsToDollars(appointment.tipCents)}
+						disabled={isClosed}
+					/>
+					<IBInput
+						id="sessionTax"
+						label="Tax $"
+						helperText="Not income - excluded from the shop cut"
+						type="number"
+						inputRef={taxRef}
+						defaultValue={centsToDollars(appointment.taxCents)}
+						disabled={isClosed}
+					/>
+					<IBInput
+						id="sessionFee"
+						label="Fees $"
+						helperText="Processing fees - excluded from the shop cut"
+						type="number"
+						inputRef={feeRef}
+						defaultValue={centsToDollars(appointment.feeCents)}
+						disabled={isClosed}
+					/>
+				</div>
+				{appointment.shopCutCents > 0 && (
+					<div className="sessionDetailShopCutNote">
+						Shop cut on this session:{" "}
+						{formatCents(appointment.shopCutCents)}
+						{appointment.shopCutPercentApplied
+							? ` (${appointment.shopCutPercentApplied}% of the tattoo work)`
+							: ""}
+					</div>
+				)}
 			</div>
 
 			<IBMultilineInput
@@ -293,10 +390,13 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 				>
 					Save
 				</Button>
+				{/* Disabled when there's nothing to charge. Checks the computed grand total rather
+				    than any one field, so a session that is pure tip (a touch-up the artist
+				    comped) is still chargeable. */}
 				<Button
 					variant="outlined"
 					onClick={handleChargeViaSquare}
-					disabled={!totalRef.current?.value && !appointment.total}
+					disabled={isClosed || buildSavePayload().totalCents <= 0}
 				>
 					Charge via Square
 				</Button>

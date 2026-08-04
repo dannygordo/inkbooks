@@ -4,6 +4,9 @@ const checkAuth = require('../utils/check-auth');
 const square = require('../utils/square');
 const { processSquarePaymentInputSchema, validate } = require('../utils/validation');
 const { checkRateLimit, getClientIp } = require('../utils/rate-limit');
+const Appointment = require('../models/Appointment');
+const { applyShopCut } = require('../utils/shop-cut');
+const { Constants } = require('../utils/constants');
 
 const router = express.Router();
 
@@ -45,6 +48,20 @@ router.post('/square/process-payment', express.json(), async (req, res) => {
     return res.status(400).json({ error: 'Invalid request', errors });
   }
 
+  // Loaded and authorized BEFORE the charge, not after. If this request names an appointment the
+  // caller doesn't own, that has to fail without money moving - discovering it afterwards leaves
+  // a real charge on a client's card with no record of what it was for.
+  let appointment = null;
+  if (req.body.appointmentId) {
+    appointment = await Appointment.findById(req.body.appointmentId);
+    if (!appointment) {
+      return res.status(404).json({ error: 'Appointment not found' });
+    }
+    if (user.role > Constants.ROLES.SHOP_ADMIN && String(user.id) !== String(appointment.userId)) {
+      return res.status(403).json({ error: 'Action not allowed' });
+    }
+  }
+
   try {
     const payment = await square.createSandboxPayment({
       sourceId: req.body.sourceId,
@@ -56,10 +73,42 @@ router.post('/square/process-payment', express.json(), async (req, res) => {
       idempotencyKey: crypto.randomUUID(),
       note: req.body.note || `InkBooks payment - user ${user.id}`,
     });
+    // Persist the transaction breakdown against the session.
+    //
+    // Previously this endpoint charged the card and returned - the session Appointment recorded
+    // nothing at all about the money, so the amount an artist actually collected existed only in
+    // Square's dashboard. That made the shop cut uncomputable from InkBooks' own data and made
+    // "how much did I make in tips this year" unanswerable.
+    //
+    // Stored as components rather than one figure, because they aren't recoverable from a total:
+    // tax and processing fees aren't the artist's income, and the tip is the artist's alone and
+    // is specifically excluded from the shop cut. Collapsing them into one number destroys
+    // exactly the distinctions the ledger runs on.
+    if (appointment) {
+      const subtotalCents = req.body.subtotalCents ?? 0;
+      const taxCents = req.body.taxCents ?? 0;
+      const feeCents = req.body.feeCents ?? 0;
+      const tipCents = req.body.tipCents ?? 0;
+      appointment.subtotalCents = subtotalCents;
+      appointment.taxCents = taxCents;
+      appointment.feeCents = feeCents;
+      appointment.tipCents = tipCents;
+      // The authoritative figure is what Square actually charged, not the sum of the components
+      // the client sent - those are the caller's account of the split, this is the transaction.
+      // If they disagree, the charge is the fact.
+      appointment.totalCents = req.body.amountCents;
+      // Recomputed from the subtotal that was just written, so the cut always reflects the money
+      // actually collected rather than whatever estimate existed beforehand. Tips excluded by
+      // construction - see utils/shop-cut.js.
+      await applyShopCut(appointment);
+      await appointment.save();
+    }
+
     return res.status(200).json({
       success: true,
       paymentId: payment.id,
       status: payment.status,
+      appointmentId: appointment ? String(appointment.id) : null,
     });
   } catch (err) {
     console.error('[square-payment] Failed to process payment:', err.message);

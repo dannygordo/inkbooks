@@ -4,6 +4,7 @@ import { Button, Checkbox } from "@mui/material";
 import { AppointmentService } from "../../services/AppointmentService";
 import { useAuth } from "../../context/auth";
 import { ALERT_CONSTANTS } from "../../constants";
+import { formatCents } from "../../utils/money";
 import "./shopCutPayoutList.css";
 
 /**
@@ -108,7 +109,7 @@ const ShopCutPayoutList = ({ appointments, onChanged }) => {
 
 	const selectedTotal = appointments
 		.filter((a) => selectedIds.includes(a.id))
-		.reduce((sum, a) => sum + (a.shopCutAmount || 0), 0);
+		.reduce((sum, a) => sum + (a.shopCutCents || 0), 0);
 
 	return (
 		<div className="shopCutPayoutList">
@@ -123,7 +124,7 @@ const ShopCutPayoutList = ({ appointments, onChanged }) => {
 							{new Date(appointment.appointmentDate).toLocaleDateString()}
 						</span>
 						<span className="shopCutPayoutRowAmount">
-							${appointment.shopCutAmount} owed
+							{formatCents(appointment.shopCutCents)} owed
 						</span>
 					</div>
 					<div className="shopCutPayoutRowActions">
@@ -149,7 +150,7 @@ const ShopCutPayoutList = ({ appointments, onChanged }) => {
 			<div className="shopCutPayoutBatchBar">
 				<span>
 					{selectedIds.length > 0
-						? `${selectedIds.length} selected - $${selectedTotal} total`
+						? `${selectedIds.length} selected - ${formatCents(selectedTotal)} total`
 						: "Select multiple sessions to send one combined invoice"}
 				</span>
 				<Button

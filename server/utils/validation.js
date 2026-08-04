@@ -86,12 +86,21 @@ const updateAppointmentInputSchema = z.object({
   shopId: objectIdSchema.nullish(),
   title: z.string().nullish(),
   description: z.string().nullish(),
-  total: z.number().nonnegative().nullish(),
-  tip: z.number().nonnegative().nullish(),
+  // Integer CENTS - see utils/money.js. `.int()` is load-bearing, not decoration: a fractional
+  // cent is not a representable amount of money, and letting one through here is how a rounding
+  // discrepancy gets persisted instead of caught.
+  subtotalCents: z.number().int().nonnegative().nullish(),
+  taxCents: z.number().int().nonnegative().nullish(),
+  feeCents: z.number().int().nonnegative().nullish(),
+  tipCents: z.number().int().nonnegative().nullish(),
+  totalCents: z.number().int().nonnegative().nullish(),
   shopCutStatus: z
     .enum(['none', 'unpaid', 'invoice_sent', 'pending_confirmation', 'paid', 'received'])
     .nullish(),
-  shopCutAmount: z.number().nonnegative().nullish(),
+  // shopCutAmount is gone from both input schemas: the shop cut is computed server-side from
+  // subtotalCents and the configured percentage (utils/shop-cut.js), never accepted from a
+  // client. zod strips unrecognized keys, so anything still sending it is silently dropped
+  // rather than trusted.
   appointmentType: z.enum(['consult', 'session', 'other']).nullish(),
   appointmentStatus: z
     .enum(['scheduled', 'completed', 'rescheduled', 'cancelled', 'no_show'])
@@ -144,15 +153,24 @@ const createAppointmentInputSchema = z.object({
   bookingRequestId: objectIdSchema.nullish(),
   title: z.string().nullish(),
   description: z.string().nullish(),
-  total: z.number().nonnegative().nullish(),
-  tip: z.number().nonnegative().nullish(),
+  // Integer CENTS - see utils/money.js. `.int()` is load-bearing, not decoration: a fractional
+  // cent is not a representable amount of money, and letting one through here is how a rounding
+  // discrepancy gets persisted instead of caught.
+  subtotalCents: z.number().int().nonnegative().nullish(),
+  taxCents: z.number().int().nonnegative().nullish(),
+  feeCents: z.number().int().nonnegative().nullish(),
+  tipCents: z.number().int().nonnegative().nullish(),
+  totalCents: z.number().int().nonnegative().nullish(),
   // shopCutStatus is nullish here now, not required - Appointment.js's Mongoose schema itself
   // dropped `required: true` on this field (see that file's comment) so independent artists with
   // no shopId aren't forced to send a throwaway value. Defaults to 'none' at the Mongoose layer.
   shopCutStatus: z
     .enum(['none', 'unpaid', 'invoice_sent', 'pending_confirmation', 'paid', 'received'])
     .nullish(),
-  shopCutAmount: z.number().nonnegative().nullish(),
+  // shopCutAmount is gone from both input schemas: the shop cut is computed server-side from
+  // subtotalCents and the configured percentage (utils/shop-cut.js), never accepted from a
+  // client. zod strips unrecognized keys, so anything still sending it is silently dropped
+  // rather than trusted.
   appointmentType: z.enum(['consult', 'session', 'other']),
   appointmentStatus: z.enum(['scheduled', 'completed', 'rescheduled', 'cancelled', 'no_show']),
   createdAt: dateLikeSchema,
@@ -313,6 +331,20 @@ const processSquarePaymentInputSchema = z.object({
   sourceId: z.string().trim().min(1, 'sourceId must not be empty'),
   amountCents: z.number().int().positive('amountCents must be a positive integer'),
   note: z.string().trim().max(500).nullish(),
+  // The session this charge is for, plus its component breakdown. All optional: this endpoint is
+  // also reachable for one-off charges with no Appointment behind them (a deposit, say), and
+  // rejecting those would be a regression. When appointmentId IS present the breakdown is
+  // persisted onto that Appointment - see routes/squarePayments.js.
+  //
+  // Every component is validated independently rather than being derived from amountCents,
+  // because the split is exactly what can't be recovered afterwards: a single collected total
+  // gives you no way to answer "how much of this was tip", which is the one question the shop cut
+  // depends on.
+  appointmentId: objectIdSchema.nullish(),
+  subtotalCents: z.number().int().nonnegative().nullish(),
+  taxCents: z.number().int().nonnegative().nullish(),
+  feeCents: z.number().int().nonnegative().nullish(),
+  tipCents: z.number().int().nonnegative().nullish(),
 });
 
 module.exports = {

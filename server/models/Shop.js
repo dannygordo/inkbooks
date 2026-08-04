@@ -18,6 +18,18 @@ const ShopSchema = new mongoose.Schema({
 	// which side's rate (shop's or the individual artist's) actually applies to a given
 	// connected artist's sessions.
 	flatRate: {type: Number, default: 0},
+	// The shop's percentage cut of an artist's session work, e.g. 40 for 40%. A percentage rather
+	// than a stored amount because that's how commission shops actually express it, and because a
+	// stored amount can't be re-derived or audited against the session it came from.
+	//
+	// Defaults to 0 - deliberately, so nothing starts silently billing artists a cut nobody
+	// configured. A shop that hasn't set this owes exactly what it did before: nothing. Individual
+	// artists can be given a different rate via ArtistShopConnection.shopCutPercent (booth-renters
+	// and guest artists commonly are).
+	//
+	// This is applied to Appointment.subtotalCents only - not tips, not tax, not processing fees.
+	// See utils/shop-cut.js.
+	shopCutPercent: {type: Number, default: 0},
 	logo: {type: String, default: ""},
 	billingType: {type: String, default: ""},
 	status: {type: Number},

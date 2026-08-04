@@ -35,7 +35,7 @@ export const AppointmentService = (() => {
                 appointmentType
                 appointmentDate
                 shopCutStatus
-                shopCutAmount
+                shopCutCents
                 shopCutPaymentMethod
                 shopCutSquareInvoiceId
             }
@@ -68,10 +68,13 @@ export const AppointmentService = (() => {
                 appointmentDate
                 appointmentType
                 appointmentStatus
-                total
-                tip
+                subtotalCents
+                taxCents
+                feeCents
+                tipCents
+                totalCents
                 shopCutStatus
-                shopCutAmount
+                shopCutCents
                 shopId
                 projectId
                 bookingRequestId
@@ -143,7 +146,7 @@ export const AppointmentService = (() => {
                 appointmentType
                 appointmentDate
                 shopCutStatus
-                shopCutAmount
+                shopCutCents
                 shopCutPaymentMethod
                 shopCutSquareInvoiceId
             }
@@ -180,7 +183,7 @@ export const AppointmentService = (() => {
                 id
                 appointmentDate
                 shopCutStatus
-                shopCutAmount
+                shopCutCents
             }
         }
     `;
@@ -207,7 +210,7 @@ export const AppointmentService = (() => {
                 id
                 appointmentDate
                 shopCutStatus
-                shopCutAmount
+                shopCutCents
                 shopCutPaymentMethod
                 shopCutSquareInvoiceId
             }
@@ -281,7 +284,7 @@ export const AppointmentService = (() => {
                 id
                 appointmentDate
                 title
-                shopCutAmount
+                shopCutCents
                 shopCutMarkedPaidAt
                 user {
                     id
@@ -314,8 +317,16 @@ export const AppointmentService = (() => {
                 appointmentType
                 appointmentDate
                 appointmentStatus
-                total
-                tip
+                subtotalCents
+                taxCents
+                feeCents
+                tipCents
+                totalCents
+                # SessionDetail renders the computed cut back to the artist, so they can see what
+                # a given session actually costs them before closing it.
+                shopCutCents
+                shopCutStatus
+                shopCutPercentApplied
                 timerStatus
                 timerStartedAt
                 accumulatedSeconds
@@ -416,7 +427,14 @@ export const AppointmentService = (() => {
             updateAppointment(appointmentInput: $appointmentInput) {
                 id
                 appointmentDate
-                total
+                subtotalCents
+                tipCents
+                totalCents
+                # Returned so the view can reflect the recomputed cut immediately - changing
+                # subtotalCents re-derives it server-side (see mutations/appointments.js), and
+                # without these the UI would keep showing the pre-save figure until a refetch.
+                shopCutCents
+                shopCutStatus
                 sessionNotes
                 appointmentStatus
             }
