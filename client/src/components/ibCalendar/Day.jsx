@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import UpdateEventDialog from "./UpdateEventDialog";
 import ViewEventDialog from "./ViewEventDialog";
 import { Tooltip } from "@mui/material";
+import { resolveTagColor } from "../../utils/tagColor";
 
 const Day = ({ day, rowIdx }) => {
 	const [dayEvents, setDayEvents] = useState([]);
@@ -109,7 +110,7 @@ const Day = ({ day, rowIdx }) => {
 								onClick={(e) => {
 									handleUpdateEvent(e, evt);
 								}}
-								style={{ backgroundColor: evt.user.tagColor }}
+								style={{ backgroundColor: resolveTagColor(evt.user?.tagColor) }}
 							>
 								{evt.projectId ? `${moment
 									.utc(evt.appointmentDate)

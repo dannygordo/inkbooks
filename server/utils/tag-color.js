@@ -53,9 +53,78 @@ async function pickDefaultTagColor(shopId, excludeUserId) {
   return available || TAG_COLORS[0];
 }
 
+// Assigns and PERSISTS a real tagColor for a user who still doesn't have one, using the same
+// shop-unique logic login()'s self-heal uses. Extracted here because the login hook alone turned
+// out not to be enough in practice: a shop calendar renders every shop-mate's appointments (see
+// getAppointmentsByShop), so one artist looking at the calendar can be shown colored labels for
+// half a dozen OTHER artists - none of whom have necessarily logged in since the tagColor default
+// was fixed. Their labels rendered white-on-white and read as invisible/blank, which is exactly
+// what was reported. Healing only the person who happens to be logging in can't fix that; the
+// color has to be resolvable for whoever is being *displayed*.
+//
+// Returns the user's existing color untouched when it's already real - so this is a no-op on
+// every call after the first for any given user, and never overrides a deliberate choice.
+//
+// Called from the User.tagColor field resolver - see graphql/resolvers/index.js.
+async function ensureTagColor(user) {
+  if (!user) {
+    return null;
+  }
+  if (!isUnsetTagColor(user.tagColor)) {
+    return user.tagColor;
+  }
+  // Not every parent object reaching this is a Mongoose document. login() (resolvers/users.js)
+  // returns a plain `{...user._doc, id, accessToken, ...}` literal, and a POJO has no .save() and
+  // no `id` virtual - only `_id`. Calling .save() on one would throw and take down an otherwise
+  // successful login, so both are handled explicitly rather than assumed.
+  const userId = user.id || user._id;
+  if (!userId) {
+    return DEFAULT_NO_SHOP_TAG_COLOR;
+  }
+  // Required lazily rather than at module load: utils/shop-membership.js pulls in the Artist and
+  // Staff models, and this module is itself required by resolvers those models' own files reach
+  // back into. A top-level require here creates a cycle that resolves to an empty object
+  // depending on which file Node loads first.
+  const { getShopIdsForUser } = require('./shop-membership');
+  const shopIds = await getShopIdsForUser(userId);
+  const color = await pickDefaultTagColor(shopIds[0], userId);
+  if (typeof user.save === 'function') {
+    user.tagColor = color;
+    try {
+      await user.save();
+    } catch (err) {
+      // Swallowed deliberately: a read path (a field resolver) must not fail an otherwise valid
+      // query because an opportunistic backfill write lost a race with a concurrent one. The
+      // caller still gets a usable color back, and the next read simply tries again.
+      console.error(
+        `[tag-color] Could not persist backfilled tagColor for user ${userId}:`,
+        err.message,
+      );
+    }
+    return color;
+  }
+  // POJO parent - can't persist from here. Still returns a real color so nothing renders
+  // colorless; the write happens the next time this user is loaded as a document, or when
+  // scripts/backfill-tag-colors.js runs.
+  const persisted = await User.findById(userId);
+  if (persisted && isUnsetTagColor(persisted.tagColor)) {
+    persisted.tagColor = color;
+    try {
+      await persisted.save();
+    } catch (err) {
+      console.error(
+        `[tag-color] Could not persist backfilled tagColor for user ${userId}:`,
+        err.message,
+      );
+    }
+  }
+  return persisted && !isUnsetTagColor(persisted.tagColor) ? persisted.tagColor : color;
+}
+
 module.exports = {
   TAG_COLORS,
   DEFAULT_NO_SHOP_TAG_COLOR,
   isUnsetTagColor,
   pickDefaultTagColor,
+  ensureTagColor,
 };

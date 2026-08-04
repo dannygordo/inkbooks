@@ -1,6 +1,7 @@
 import { DialogActions, DialogContent, Chip } from "@mui/material";
 import moment from "moment";
 import { useAuth } from "../../context/auth";
+import { resolveTagColor } from "../../utils/tagColor";
 
 /**
  * Read-only counterpart to UpdateEventDialog - opened by Day.jsx's handleUpdateEvent when the
@@ -30,9 +31,12 @@ const ViewEventDialog = ({ event }) => {
 		<div className="ibCalendarAddEventContainer">
 			<DialogContent dividers>
 				<div className="viewEventArtistRow">
+					{/* The chip's background was `event.user?.tagColor || "#999"` - an || fallback
+					    only catches a missing value, not a tagColor literally set to white, which
+					    is the case that actually occurred. See utils/tagColor.js. */}
 					<Chip
 						label={artistName}
-						sx={{ backgroundColor: event.user?.tagColor || "#999", color: "#fff" }}
+						sx={{ backgroundColor: resolveTagColor(event.user?.tagColor), color: "#fff" }}
 					/>
 					<span className="viewEventType">{event.appointmentType}</span>
 				</div>

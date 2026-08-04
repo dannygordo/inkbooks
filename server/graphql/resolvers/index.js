@@ -32,6 +32,7 @@ const Project = require('../../models/Project');
 const Staff = require('../../models/Staff');
 const BookingRequest = require('../../models/BookingRequest');
 const { findOrCreateConversationForMembers } = require('../../utils/conversations');
+const { ensureTagColor } = require('../../utils/tag-color');
 
 module.exports = {
   Date: DateResolver,
@@ -238,6 +239,23 @@ module.exports = {
         userInfo,
       };
     }
+  },
+  User: {
+    // Every artist must have a real tag color, and "they'll get one next time they log in" (the
+    // self-heal in resolvers/users.js's login) isn't sufficient on its own: a shop calendar shows
+    // every shop-mate's appointments, so artist A can be looking at labels for artists B through
+    // G, none of whom have necessarily logged in since the default was fixed. Those labels were
+    // rendering white text on the old '#fff' default - invisible, which is what was reported from
+    // an artist.jonas login. Healing the *viewer* can't fix the people being *viewed*, so the
+    // guarantee is enforced here, on read of the field itself, for whoever is being displayed.
+    //
+    // Same shape as the Staff.avatar resolver above: the stored value is stale/wrong, so the
+    // GraphQL field returns the corrected one and every existing query that selects tagColor gets
+    // the fix with no client change. Unlike Staff.avatar this one also writes the corrected value
+    // back (see ensureTagColor), so it converges - it's a no-op on every subsequent read for that
+    // user rather than recomputing forever. server/scripts/backfill-tag-colors.js does the same
+    // thing in bulk for anyone who never happens to be rendered.
+    tagColor: async (user) => ensureTagColor(user),
   },
   UserInfo: {
     __resolveType(user, context, info) {
