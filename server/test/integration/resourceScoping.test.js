@@ -376,6 +376,59 @@ describe('getArtist / getArtistsByShop: single-resource ownership', () => {
 		expect(errors[0].message).toMatch(/Action not allowed/);
 	});
 
+	// The artist directory and per-artist page lead to ArtistPerformancePanel - another artist's
+	// revenue, shop-cut ledger and appointment history. Artists used to reach both for any
+	// shop-mate, because the old rule was "shop-admin-or-better, self, or anyone at the same
+	// shop", and an artist is at the same shop. Now Staff-and-above only, with self as the
+	// exception that keeps an artist's own page reachable.
+	it('rejects an Artist listing the artist directory at all', async () => {
+		const { shop } = await createShopAdminUser();
+		const { user: artistUser } = await createArtistUser({ artist: { shopId: shop.id } });
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_ARTISTS },
+			{ contextValue: contextWithToken(signTestToken(artistUser)) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(data.getArtists).toBeNull();
+		expect(errors[0].message).toMatch(/Action not allowed/);
+	});
+
+	it('rejects an Artist viewing a shop-mate\'s artist page', async () => {
+		const { shop } = await createShopAdminUser();
+		const { user: viewer } = await createArtistUser({ artist: { shopId: shop.id } });
+		const { artist: peer } = await createArtistUser({ artist: { shopId: shop.id } });
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_ARTIST, variables: { artistId: peer.id } },
+			{ contextValue: contextWithToken(signTestToken(viewer)) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(data.getArtist).toBeNull();
+		expect(errors[0].message).toMatch(/Action not allowed/);
+	});
+
+	it('still allows an Artist to view their own artist page', async () => {
+		const { shop } = await createShopAdminUser();
+		const { user: artistUser, artist } = await createArtistUser({
+			artist: { shopId: shop.id },
+		});
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_ARTIST, variables: { artistId: artist.id } },
+			{ contextValue: contextWithToken(signTestToken(artistUser)) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.getArtist.id).toBe(artist.id);
+	});
+
 	it('getArtistsByShop: rejects a Staff member listing a different shop\'s artists', async () => {
 		const { shop: shopA } = await createShopAdminUser();
 		const { shop: shopB } = await createShopAdminUser();

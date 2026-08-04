@@ -12,6 +12,8 @@ import Artists from "./pages/artists/Artists";
 import Clients from "./pages/clients/Clients";
 import { AuthProvider, AuthContext, useAuth } from "./context/auth";
 import AuthRoute from "./utils/AuthRoute";
+import RoleRoute from "./utils/RoleRoute";
+import { ROLES } from "./constants/auth";
 import Projects from "./pages/projects/Projects";
 import Shops from "./pages/shops/Shops";
 import Staff from "./pages/staff/Staff";
@@ -44,6 +46,15 @@ import ArtistBookingRequests from "./pages/booking/ArtistBookingRequests";
 import ShopCutConfirmations from "./pages/shopCutConfirmations/ShopCutConfirmations";
 import Settings from "./pages/settings/Settings";
 import ConsultDetail from "./pages/consults/ConsultDetail";
+
+// An artist keeps access to their own /artist/:artistId page (and its edit form) even though the
+// directory is Staff-only. The route param is the Artist document's id, not the User's - see
+// resolvers/artists.js's getArtist, which does Artist.findById(artistId) - and login() puts that
+// same id on user.userInfo.id (resolvers/users.js sets `userInfo.id = userInfo._id`), so this is
+// the pair that actually matches. Comparing against user.id instead would silently never match
+// and lock every artist out of their own page.
+const isOwnArtistPage = (user, params) =>
+	Boolean(params?.artistId) && String(user?.userInfo?.id) === String(params.artistId);
 
 function App() {
 	const { user } = useAuth();
@@ -96,28 +107,35 @@ function App() {
 								</AuthRoute>
 							}
 						/>
+						{/* The artist directory is a management view, not a peer-browsing one: it
+						    leads to Artist.jsx, which mounts ArtistPerformancePanel - another
+						    artist's revenue, shop-cut ledger and appointment history. Staff and
+						    above only. The server enforces the same rule (see
+						    resolvers/artists.js and getAppointmentsByArtist); these guards exist
+						    so a denied artist gets redirected instead of landing on a page that
+						    renders a raw "Action not allowed" GraphQL error. */}
 						<Route
 							path="/artists"
 							element={
-								<AuthRoute>
+								<RoleRoute minRole={ROLES.STAFF}>
 									<Artists />
-								</AuthRoute>
+								</RoleRoute>
 							}
 						/>
 						<Route
 							path="/artist/:artistId"
 							element={
-								<AuthRoute>
+								<RoleRoute minRole={ROLES.STAFF} allowIf={isOwnArtistPage}>
 									<Artist />
-								</AuthRoute>
+								</RoleRoute>
 							}
 						/>
 						<Route
 							path="/artist/edit/:artistId"
 							element={
-								<AuthRoute>
+								<RoleRoute minRole={ROLES.STAFF} allowIf={isOwnArtistPage}>
 									<EditArtist />
-								</AuthRoute>
+								</RoleRoute>
 							}
 						/>
 						<Route

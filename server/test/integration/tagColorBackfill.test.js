@@ -48,7 +48,7 @@ describe('User.tagColor resolver: self-heal on read', () => {
 		const server = createTestServer();
 		const res = await server.executeOperation(
 			{ query: GET_APPOINTMENTS_BY_SHOP, variables: { shopId: String(shop.id) } },
-			contextWithToken(signTestToken(viewer)),
+			{ contextValue: contextWithToken(signTestToken(viewer)) },
 		);
 
 		expect(res.body.singleResult.errors).toBeUndefined();
@@ -70,7 +70,7 @@ describe('User.tagColor resolver: self-heal on read', () => {
 		const server = createTestServer();
 		const res = await server.executeOperation(
 			{ query: GET_APPOINTMENTS_BY_SHOP, variables: { shopId: String(shop.id) } },
-			contextWithToken(signTestToken(viewer)),
+			{ contextValue: contextWithToken(signTestToken(viewer)) },
 		);
 		const returned = res.body.singleResult.data.getAppointmentsByShop[0].user.tagColor;
 
@@ -94,7 +94,7 @@ describe('User.tagColor resolver: self-heal on read', () => {
 		const server = createTestServer();
 		const res = await server.executeOperation(
 			{ query: GET_APPOINTMENTS_BY_SHOP, variables: { shopId: String(shop.id) } },
-			contextWithToken(signTestToken(viewer)),
+			{ contextValue: contextWithToken(signTestToken(viewer)) },
 		);
 
 		expect(res.body.singleResult.data.getAppointmentsByShop[0].user.tagColor).toBe('#2ea2dc');

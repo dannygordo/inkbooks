@@ -6,7 +6,7 @@ const ArtistShopConnection = require('../../models/ArtistShopConnection');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 const { AuthenticationError } = require('../../utils/errors');
-const { getShopIdsForUser, getArtistIdsForShops } = require('../../utils/shop-membership');
+const { getShopIdsForUser, getArtistIdsForShops, sharesShopWith } = require('../../utils/shop-membership');
 
 // getAppointmentsByShop is called for real by Artist- and Staff-role users viewing their own
 // shop's calendar (see client/src/components/ibCalendar/IBCalendar.jsx), not just Shop Admins -
@@ -58,9 +58,19 @@ module.exports = {
     // "the artist themselves, or shop-admin-or-better" convention already used by
     // getArtistShopConnections/getBookingRequests (see resolvers/artistShopConnections.js /
     // resolvers/bookingRequests.js) - not a new pattern invented for this fix.
+    // Widened slightly from "shop-admin-or-better or the artist themselves": Staff at the same
+    // shop are now allowed too. The artist directory and per-artist dashboard are being scoped to
+    // Staff-and-above (see resolvers/artists.js), and Staff being able to open a page whose
+    // central panel then errors out is worse than either allowing or denying it outright. Staff
+    // at a DIFFERENT shop stay denied - role alone can't express that, hence sharesShopWith.
+    // ARTIST-role callers are unaffected and still only ever see their own history.
     getAppointmentsByArtist: withAuth(async (_, { userId }, context, info, user) => {
         if (user.role > Constants.ROLES.SHOP_ADMIN && String(user.id) !== String(userId)) {
-          throw new AuthenticationError('Action not allowed');
+          const isSameShopStaff =
+            user.role <= Constants.ROLES.SHOP_STAFF && (await sharesShopWith(user.id, userId));
+          if (!isSameShopStaff) {
+            throw new AuthenticationError('Action not allowed');
+          }
         }
         try {
             const appointments = await Appointment.find({userId: userId}).sort({ updatedAt: 1 });

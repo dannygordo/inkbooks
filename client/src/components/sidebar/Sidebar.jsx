@@ -541,7 +541,14 @@ export default function Sidebar() {
 							sx={{ opacity: open ? 1 : 0 }}
 						/>
 					</ListItemButton>
-					{!isClient && (
+					{/* Was `!isClient`, which let every artist browse the full artist directory and
+					    open any other artist's page - and Artist.jsx mounts ArtistPerformancePanel,
+					    so that included a shop-mate's revenue, shop-cut ledger and appointment
+					    history. Artists have no reason to see each other's books; that's a shop
+					    management view. Gated to Staff and above (Admin 1 / Shop Admin 10 /
+					    Staff 15) to match. An artist reaches their own numbers through the
+					    dashboard on Home.jsx, which mounts the same panel scoped to themselves. */}
+					{isStaffOrBetter && (
 						<ListItemButton
 							selected={selectedIndex === 2}
 							onClick={(event) =>

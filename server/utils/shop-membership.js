@@ -67,4 +67,21 @@ async function getMemberUserIdsForShop(shopId) {
   return Array.from(memberIds);
 }
 
-module.exports = { getShopIdsForUser, getArtistIdsForShops, getMemberUserIdsForShop };
+// True when two users are affiliated with at least one shop in common. Used to answer "may this
+// staff member look at this artist?" without a flat role gate: Staff at one shop have no business
+// reading an artist's books at a different shop, and role alone can't express that.
+async function sharesShopWith(userId, otherUserId) {
+  const [mine, theirs] = await Promise.all([
+    getShopIdsForUser(userId),
+    getShopIdsForUser(otherUserId),
+  ]);
+  const mineSet = new Set(mine.map(String));
+  return theirs.some((id) => mineSet.has(String(id)));
+}
+
+module.exports = {
+  getShopIdsForUser,
+  getArtistIdsForShops,
+  getMemberUserIdsForShop,
+  sharesShopWith,
+};
