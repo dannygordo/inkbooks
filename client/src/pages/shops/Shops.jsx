@@ -14,6 +14,13 @@ import UtilsService from "../../services/UtilsService";
 // configuration a human types rather than transaction records, and were deliberately left in
 // dollars when money moved to integer cents (see server/utils/money.js). Rendered with a plain $
 // rather than through formatCents, which would read $150/hr as "$1.50".
+const SHOP_COLUMNS = [
+	{ key: "phone", label: "Phone", width: "140px" },
+	{ key: "location", label: "Location", width: "160px" },
+	{ key: "hourly", label: "Hourly", width: "100px" },
+	{ key: "minimum", label: "Minimum", width: "100px" },
+];
+
 const Shops = () => {
 	const { loading, data } = ShopService.fetchShops();
 	if (loading) return <IBPageLoader />;
@@ -24,21 +31,18 @@ const Shops = () => {
 		avatar: shop.logo,
 		primary: shop.name,
 		secondary: shop.website || shop.email,
-		meta: [
-			{ label: "Phone", value: UtilsService.formatPhone(shop.phone) },
-			{
-				label: "Location",
-				value: [shop.city, shop.state].filter(Boolean).join(", "),
-			},
-			{ label: "Hourly", value: shop.hourlyRate ? `$${shop.hourlyRate}` : "" },
-			{ label: "Minimum", value: shop.shopMinimum ? `$${shop.shopMinimum}` : "" },
-		],
+		values: {
+			phone: UtilsService.formatPhone(shop.phone),
+			location: [shop.city, shop.state].filter(Boolean).join(", "),
+			hourly: shop.hourlyRate ? `$${shop.hourlyRate}` : "",
+			minimum: shop.shopMinimum ? `$${shop.shopMinimum}` : "",
+		},
 	}));
 
 	return (
 		<div className="shops">
 			<IBPageActionBar pageType="shops" />
-			<EntityList items={items} emptyMessage="No shops yet." />
+			<EntityList columns={SHOP_COLUMNS} items={items} emptyMessage="No shops yet." />
 		</div>
 	);
 };

@@ -16,6 +16,14 @@ import UtilsService from '../../services/UtilsService';
 // they weren't being shown - surfaced here as a Location column rather than silently dropped,
 // since the query fetches them and a directory is exactly where "which one is the local one"
 // gets asked.
+// Fixed widths so the header and every row resolve to the same grid - see EntityList.
+const CLIENT_COLUMNS = [
+  { key: 'phone', label: 'Phone', width: '140px' },
+  { key: 'location', label: 'Location', width: '160px' },
+  { key: 'instagram', label: 'Instagram', width: '150px' },
+  { key: 'facebook', label: 'Facebook', width: '150px' },
+];
+
 const Clients = () => {
   const { loading, data } = ClientService.fetchClients();
   if (loading) return <IBPageLoader />;
@@ -30,21 +38,18 @@ const Clients = () => {
     avatar: client.avatar,
     primary: `${client.firstName} ${client.lastName}`,
     secondary: client.email,
-    meta: [
-      { label: 'Phone', value: UtilsService.formatPhone(client.phone) },
-      {
-        label: 'Location',
-        value: [client.city, client.state].filter(Boolean).join(', '),
-      },
-      { label: 'Instagram', value: client.instagram },
-      { label: 'Facebook', value: client.facebook },
-    ],
+    values: {
+      phone: UtilsService.formatPhone(client.phone),
+      location: [client.city, client.state].filter(Boolean).join(', '),
+      instagram: client.instagram,
+      facebook: client.facebook,
+    },
   }));
 
   return (
     <div className="clients">
       <IBPageActionBar pageType='clients' />
-      <EntityList items={items} emptyMessage="No clients yet." />
+      <EntityList columns={CLIENT_COLUMNS} items={items} emptyMessage="No clients yet." />
     </div>
   );
 }

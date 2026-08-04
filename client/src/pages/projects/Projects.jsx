@@ -20,6 +20,13 @@ import UtilsService from '../../services/UtilsService';
 // what crashed the Projects page for every project until the Project.client resolver was fixed.
 // Optional-chained here so a project with a missing relation renders a row with a gap rather than
 // taking the page down.
+const PROJECT_COLUMNS = [
+  { key: 'artist', label: 'Artist', width: '160px' },
+  { key: 'client', label: 'Client', width: '160px' },
+  { key: 'status', label: 'Status', width: '120px' },
+  { key: 'deposit', label: 'Deposit', width: '100px' },
+];
+
 const Projects = () => {
   const { loading, data } = ProjectService.fetchProjects();
   if (loading) return <IBPageLoader />;
@@ -30,41 +37,29 @@ const Projects = () => {
     avatar: project.artist?.avatar,
     primary: project.title,
     secondary: project.description,
-    meta: [
-      {
-        label: 'Artist',
-        value: project.artist
-          ? `${project.artist.firstName} ${project.artist.lastName}`
-          : '',
-      },
-      {
-        label: 'Client',
-        value: project.client
-          ? `${project.client.firstName} ${project.client.lastName}`
-          : '',
-      },
-      {
-        label: 'Status',
-        value: UtilsService.prettyConstantsListValue(
-          APP_SETTINGS_CONSTANTS.PROJECT_STATUS,
-          project.status
-        ),
-      },
-      {
-        // Project.depositAmount is still whole dollars, unlike every other money field in the
-        // app - it predates the move to integer cents and nothing writes it (deposits are now
-        // recorded per-appointment; see models/Appointment.js). Rendered as-is rather than run
-        // through formatCents, which would turn $200 into $2.00. Flagged for migration.
-        label: 'Deposit',
-        value: project.depositAmount ? `$${project.depositAmount}` : '',
-      },
-    ],
+    values: {
+      artist: project.artist
+        ? `${project.artist.firstName} ${project.artist.lastName}`
+        : '',
+      client: project.client
+        ? `${project.client.firstName} ${project.client.lastName}`
+        : '',
+      status: UtilsService.prettyConstantsListValue(
+        APP_SETTINGS_CONSTANTS.PROJECT_STATUS,
+        project.status
+      ),
+      // Project.depositAmount is still whole dollars, unlike every other money field in the app -
+      // it predates the move to integer cents and nothing writes it (deposits are now recorded
+      // per-appointment; see models/Appointment.js). Rendered as-is rather than through
+      // formatCents, which would turn $200 into $2.00. Flagged for migration.
+      deposit: project.depositAmount ? `$${project.depositAmount}` : '',
+    },
   }));
 
   return (
     <div className="projects">
       <IBPageActionBar pageType='projects' />
-      <EntityList items={items} emptyMessage="No projects yet." />
+      <EntityList columns={PROJECT_COLUMNS} items={items} emptyMessage="No projects yet." />
     </div>
   )
 }

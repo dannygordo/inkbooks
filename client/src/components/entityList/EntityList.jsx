@@ -10,24 +10,26 @@ import "./entityList.css";
  *
  * Why lists rather than cards. A card is a fixed-height tile roughly 300px square showing five or
  * six labelled fields; a shop with forty clients gets forty tiles and a page you scroll for a
- * while to find one name. The same forty as rows fit on one or two screens, sort into scannable
- * columns, and let the eye run down a single axis instead of tracking a grid. Cards are a good
- * shape for a handful of things you browse and a bad one for a directory you search - and every
- * one of these pages is a directory.
+ * while to find one name. The same forty as rows fit on one or two screens and let the eye run
+ * down a single axis. Cards suit a handful of things you browse; every one of these pages is a
+ * directory.
  *
- * Nothing the cards displayed is dropped. The fields move from stacked icon rows inside a tile to
- * a primary line, a secondary line, and a set of labelled meta values on the right.
+ * COLUMNS ARE DECLARED, NOT INFERRED. The first version of this rendered each row's values as
+ * flex items, so every column was as wide as its own content and nothing lined up from one row to
+ * the next - a phone number under an email under a name, all starting at different x positions.
+ * That defeats the entire reason for using a list: you scan a column by holding your eye still
+ * and letting the rows move past it, which only works if the column doesn't move.
  *
- * Deliberately a data-driven list rather than a component per entity: five near-identical lists
- * is exactly how the card components ended up as six files that each render the same three divs
- * with different field names. Each page maps its own records to a common row shape and this
- * renders them.
+ * So the caller declares `columns` once, every row is laid out on the same CSS grid built from
+ * them, and a header labels each one at the top instead of every value carrying its own label.
+ * Fixed widths rather than fractional ones: `1fr` columns re-solve against their content, which
+ * would put the header and body on different grids the moment one row had a longer email.
  *
- * @param {Array} items - row descriptors:
- *   { key, linkTo, avatar, primary, secondary, meta: [{label, value}], tagColor }
+ * @param {Array} columns - [{ key, label, width }] - width is any CSS length
+ * @param {Array} items - [{ key, linkTo, avatar, primary, secondary, values: {colKey: value}, tagColor }]
  * @param {string} emptyMessage
  */
-const EntityList = ({ items, emptyMessage = "Nothing here yet." }) => {
+const EntityList = ({ columns = [], items, emptyMessage = "Nothing here yet." }) => {
 	const navigate = useNavigate();
 	const [hoveredKey, setHoveredKey] = useState(null);
 
@@ -35,26 +37,48 @@ const EntityList = ({ items, emptyMessage = "Nothing here yet." }) => {
 		return <div className="entityListEmpty">{emptyMessage}</div>;
 	}
 
+	// Avatar, then the name column taking whatever is left, then one track per declared column.
+	// minmax(0, 1fr) rather than 1fr on the name: a bare 1fr floors at the content's min width,
+	// so a long project title would push the columns rightward and break the alignment this
+	// exists to guarantee. minmax(0, ...) lets it actually shrink and ellipse.
+	const gridTemplate = `40px minmax(0, 1fr) ${columns
+		.map((c) => c.width || "160px")
+		.join(" ")}`;
+
 	return (
 		<div className="entityList">
+			<div className="entityListHeader" style={{ gridTemplateColumns: gridTemplate }}>
+				{/* Two empty cells for the avatar and name tracks - the name column's heading would
+				    just say "Name" above an obvious list of names. */}
+				<span />
+				<span />
+				{columns.map((column) => (
+					<span key={column.key} className="entityHeaderCell">
+						{column.label}
+					</span>
+				))}
+			</div>
+
 			{items.map((item) => (
 				<div
 					key={item.key}
-					className={
-						item.linkTo ? "entityRow entityRowClickable" : "entityRow"
-					}
-					// Tinted by tag colour where the row belongs to a person who has one - same
-					// treatment as every other list showing artist data (see utils/tagColor.js).
-					// Rows without one (a shop, a project) get no tint and simply reserve the
-					// same 4px so the column doesn't stagger.
-					style={item.tagColor ? tagColorRowStyle(item.tagColor, hoveredKey === item.key) : undefined}
+					className={item.linkTo ? "entityRow entityRowClickable" : "entityRow"}
+					style={{
+						gridTemplateColumns: gridTemplate,
+						// Tinted by tag colour where the row belongs to someone who has one - same
+						// treatment as every other list showing artist data (see utils/tagColor.js).
+						// Rows without one (a shop, a project) still reserve the 4px border so the
+						// left edge doesn't stagger.
+						...(item.tagColor
+							? tagColorRowStyle(item.tagColor, hoveredKey === item.key)
+							: {}),
+					}}
 					onMouseEnter={() => setHoveredKey(item.key)}
 					onMouseLeave={() => setHoveredKey(null)}
 					onClick={item.linkTo ? () => navigate(item.linkTo) : undefined}
 				>
-					{/* Kept from the cards. An avatar is how people actually recognise a row in a
-					    list of names, and dropping it in the name of density would make this
-					    harder to scan, not easier. */}
+					{/* Kept from the cards. An avatar is how people recognise a row in a list of
+					    names; dropping it for density would make this harder to scan, not easier. */}
 					<IBAvatar size={40} imgUrl={item.avatar} label={item.primary} />
 					<div className="entityRowText">
 						<span className="entityRowPrimary">{item.primary}</span>
@@ -62,20 +86,26 @@ const EntityList = ({ items, emptyMessage = "Nothing here yet." }) => {
 							<span className="entityRowSecondary">{item.secondary}</span>
 						)}
 					</div>
-					<div className="entityRowMeta">
-						{(item.meta || [])
-							// Empty values are dropped rather than rendered as a label with
-							// nothing under it. The cards showed a bare icon with blank text for
-							// every unfilled field - a client with no Instagram got an Instagram
-							// icon and empty space, which reads as a rendering fault.
-							.filter((m) => m && m.value !== null && m.value !== undefined && m.value !== "")
-							.map((m) => (
-								<span className="entityRowMetaItem" key={m.label}>
-									<span className="entityRowMetaLabel">{m.label}</span>
-									<span className="entityRowMetaValue">{m.value}</span>
-								</span>
-							))}
-					</div>
+					{columns.map((column) => {
+						const value = item.values ? item.values[column.key] : null;
+						return (
+							<span
+								key={column.key}
+								className="entityRowCell"
+								// Carried for the narrow-screen layout, where the grid collapses and
+								// each value needs its own label back - the header is off-grid there.
+								data-label={column.label}
+							>
+								{/* An em dash, not an empty cell. A blank in a grid of aligned
+								    values reads as a rendering fault; a dash reads as "not set",
+								    which is the fact. The cards drew a bare icon with nothing next
+								    to it, which was the same problem with more ink. */}
+								{value === null || value === undefined || value === ""
+									? "—"
+									: value}
+							</span>
+						);
+					})}
 				</div>
 			))}
 		</div>

@@ -13,6 +13,15 @@ import UtilsService from "../../services/UtilsService";
 // Every field the card showed is still here: avatar and name from IBCardHeader, then email,
 // phone, Instagram and Facebook from IBCardArtistDetails. `title` moves to the secondary line,
 // which is where the card had it too.
+// Widths are fixed rather than fractional so the header and every row resolve to the same grid -
+// see EntityList's own comment on why 1fr columns would drift apart.
+const ARTIST_COLUMNS = [
+	{ key: "email", label: "Email", width: "220px" },
+	{ key: "phone", label: "Phone", width: "140px" },
+	{ key: "instagram", label: "Instagram", width: "150px" },
+	{ key: "facebook", label: "Facebook", width: "150px" },
+];
+
 const Artists = () => {
 	const { loading, data } = ArtistService.fetchArtists();
 	if (loading) {
@@ -29,12 +38,12 @@ const Artists = () => {
 		avatar: artist.user?.avatar || artist.avatar,
 		primary: `${artist.firstName} ${artist.lastName}`,
 		secondary: artist.title,
-		meta: [
-			{ label: "Email", value: artist.email },
-			{ label: "Phone", value: UtilsService.formatPhone(artist.phone) },
-			{ label: "Instagram", value: artist.instagram },
-			{ label: "Facebook", value: artist.facebook },
-		],
+		values: {
+			email: artist.email,
+			phone: UtilsService.formatPhone(artist.phone),
+			instagram: artist.instagram,
+			facebook: artist.facebook,
+		},
 	}));
 
 	return (
@@ -42,7 +51,11 @@ const Artists = () => {
 			<IBPageActionBar
 				pageType={APP_SETTINGS_CONSTANTS.PAGE_TYPES.ARTISTS}
 			/>
-			<EntityList items={items} emptyMessage="No artists at this shop yet." />
+			<EntityList
+				columns={ARTIST_COLUMNS}
+				items={items}
+				emptyMessage="No artists at this shop yet."
+			/>
 		</div>
 	);
 };

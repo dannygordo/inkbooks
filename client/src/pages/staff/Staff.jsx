@@ -43,6 +43,13 @@ const FETCH_STAFF_QUERY = gql`
   }
 `;
 
+const STAFF_COLUMNS = [
+  { key: 'email', label: 'Email', width: '220px' },
+  { key: 'phone', label: 'Phone', width: '140px' },
+  { key: 'shop', label: 'Shop', width: '160px' },
+  { key: 'location', label: 'Location', width: '160px' },
+];
+
 const Staff = () => {
   const { loading, data } = useQuery(FETCH_STAFF_QUERY);
   if (loading) return <IBPageLoader />;
@@ -57,21 +64,18 @@ const Staff = () => {
     avatar: staff.user?.avatar || staff.avatar,
     primary: `${staff.firstName} ${staff.lastName}`,
     secondary: staff.title,
-    meta: [
-      { label: 'Email', value: staff.email },
-      { label: 'Phone', value: UtilsService.formatPhone(staff.phone) },
-      { label: 'Shop', value: staff.shop?.name },
-      {
-        label: 'Location',
-        value: [staff.city, staff.state].filter(Boolean).join(', '),
-      },
-    ],
+    values: {
+      email: staff.email,
+      phone: UtilsService.formatPhone(staff.phone),
+      shop: staff.shop?.name,
+      location: [staff.city, staff.state].filter(Boolean).join(', '),
+    },
   }));
 
   return (
     <div className="staff">
       <IBPageActionBar pageType='staff' />
-      <EntityList items={items} emptyMessage="No staff yet." />
+      <EntityList columns={STAFF_COLUMNS} items={items} emptyMessage="No staff yet." />
     </div>
   )
 }

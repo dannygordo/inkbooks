@@ -7,17 +7,37 @@
 	width: 100%;
 }
 
+/* Header and rows share one grid template, passed inline from the component so both are built
+   from the same column declaration. Two grids that happened to agree would drift the first time
+   one was edited. */
+.entityListHeader {
+	display: grid;
+	align-items: center;
+	gap: 14px;
+	padding: 0 16px 6px 20px;
+	font-size: 11px;
+	font-weight: 500;
+	letter-spacing: 0.3px;
+	text-transform: uppercase;
+	color: #777;
+}
+
+.entityHeaderCell {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 /* border-left transparent so an untinted row (a shop, a project) reserves the same 4px as a
-   tag-coloured one and the column doesn't stagger. Same reason as the dashboard rows. */
+   tag-coloured one and the left edge doesn't stagger. */
 .entityRow {
-	display: flex;
+	display: grid;
 	align-items: center;
 	gap: 14px;
 	padding: 12px 16px;
 	border-left: 4px solid transparent;
 	border-radius: 6px;
 	background-color: #fff;
-	border-bottom: 1px solid #f0f0f0;
 	transition: background-color 140ms ease, box-shadow 140ms ease;
 }
 
@@ -30,14 +50,13 @@
 	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
-/* min-width: 0 is load-bearing - without it a flex child refuses to shrink below its content's
-   intrinsic width, so a long project description would push the meta columns off the row instead
-   of ellipsing. */
+/* min-width: 0 is load-bearing on a grid child too - without it the track refuses to shrink below
+   its content's intrinsic width, so a long description would widen the name column and push every
+   value column out of alignment. */
 .entityRowText {
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
-	flex: 1;
 	min-width: 0;
 }
 
@@ -57,33 +76,13 @@
 	white-space: nowrap;
 }
 
-.entityRowMeta {
-	display: flex;
-	align-items: center;
-	gap: 22px;
-	flex-shrink: 0;
-}
-
-.entityRowMetaItem {
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
-	min-width: 0;
-}
-
-.entityRowMetaLabel {
-	font-size: 11px;
-	font-weight: 500;
-	letter-spacing: 0.3px;
-	text-transform: uppercase;
-	color: #777;
-}
-
-.entityRowMetaValue {
+/* tabular-nums so a column of phone numbers or amounts lines up digit-for-digit, not just at its
+   left edge - the point of a column is that you can compare down it. */
+.entityRowCell {
 	font-size: 13px;
 	color: #333;
 	font-variant-numeric: tabular-nums;
-	max-width: 200px;
+	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -95,17 +94,36 @@
 	padding: 16px 0;
 }
 
-/* Below roughly a tablet the meta columns stop fitting alongside the name. They wrap under it
-   rather than being hidden - the cards were unusable on a narrow screen for the opposite reason
-   (one tile per row, endless scrolling), and dropping data to preserve a layout would repeat that
-   mistake in a different direction. */
-@media (max-width: 820px) {
-	.entityRow {
-		flex-wrap: wrap;
+/* Below roughly a tablet there isn't width for aligned columns, so the grid collapses to stacked
+   rows and each value takes its label back via data-label. The header is hidden because it
+   labels tracks that no longer exist - leaving it would put five headings above a single stacked
+   row and align with nothing. Values are never dropped to preserve the layout; that's the mistake
+   the card grid made in the other direction. */
+@media (max-width: 900px) {
+	.entityListHeader {
+		display: none;
 	}
-	.entityRowMeta {
-		width: 100%;
-		gap: 18px;
-		padding-left: 54px;
+
+	.entityRow {
+		grid-template-columns: 40px minmax(0, 1fr) !important;
+		row-gap: 8px;
+	}
+
+	.entityRowCell {
+		grid-column: 2;
+		display: flex;
+		justify-content: space-between;
+		gap: 12px;
+		white-space: normal;
+	}
+
+	.entityRowCell::before {
+		content: attr(data-label);
+		font-size: 11px;
+		font-weight: 500;
+		letter-spacing: 0.3px;
+		text-transform: uppercase;
+		color: #777;
+		flex-shrink: 0;
 	}
 }
