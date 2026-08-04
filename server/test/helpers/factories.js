@@ -11,6 +11,8 @@ const Shop = require('../../models/Shop');
 const Project = require('../../models/Project');
 const Appointment = require('../../models/Appointment');
 const ArtistShopConnection = require('../../models/ArtistShopConnection');
+const BookingRequest = require('../../models/BookingRequest');
+const mongoose = require('mongoose');
 const { Constants } = require('../../utils/constants');
 
 let counter = 0;
@@ -129,6 +131,24 @@ async function connectArtistToShop(artistUserId, shopId, overrides = {}) {
 	}).save();
 }
 
+// BookingRequest requires conversationId and guestToken alongside the obvious fields - both are
+// real requirements of the guest-intake flow (see models/BookingRequest.js) and neither has a
+// default, so a test building one by hand silently fails validation on save. Generating throwaway
+// values here keeps that detail in one place rather than in every test that needs a consult with
+// a client attached.
+async function createBookingRequest(artistUserId, clientId, overrides = {}) {
+	return new BookingRequest({
+		artistId: artistUserId,
+		clientId,
+		conversationId: new mongoose.Types.ObjectId(),
+		guestToken: unique('token'),
+		description: 'Test booking request',
+		status: 'consult_booked',
+		source: 'artist_created',
+		...overrides,
+	}).save();
+}
+
 async function createProject(artistId, clientId, overrides = {}) {
 	return new Project({
 		title: unique('Project'),
@@ -167,4 +187,5 @@ module.exports = {
 	connectArtistToShop,
 	createProject,
 	createAppointment,
+	createBookingRequest,
 };

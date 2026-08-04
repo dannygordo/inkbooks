@@ -29,6 +29,19 @@ const { percentOfCents } = require('./money');
  * The tax and fee exclusions are my reading of standard practice, not something that was
  * specified - they're worth confirming against how the shop actually operates before this goes
  * anywhere near real money. The tip exclusion was specified explicitly.
+ *
+ *   Deposits    a deposit credited to a session is DEDUCTED before the cut is computed, so the
+ *               cut follows what the session actually charged. Specified explicitly: "if the
+ *               session cost is $200 and a $100 deposit was applied, the session total is $100
+ *               and the shop cut should be based on the $100."
+ *
+ *               The consequence worth stating out loud: this only leaves the shop whole if the
+ *               cut was taken on the deposit at the consult that collected it. It is - a consult
+ *               holding a deposit gets subtotalCents set to the deposit amount, so applyShopCut
+ *               charges it there (see mutations/deposits.js). Across the two appointments the
+ *               shop's cut totals the same as it would on the undiscounted price. Change one of
+ *               those halves without the other and the shop quietly loses its cut on every
+ *               deposit ever taken.
  */
 
 /**
@@ -81,8 +94,22 @@ async function applyShopCut(appointment) {
     return appointment;
   }
   const percent = await resolveShopCutPercent(appointment.userId, appointment.shopId);
-  // subtotalCents ONLY - see this file's header comment.
-  const cut = percentOfCents(appointment.subtotalCents, percent);
+  // subtotalCents ONLY, minus any deposit credited to this appointment.
+  //
+  // The deposit deduction is a deliberate rule, and it's the one place the cut is computed on
+  // less than the work was priced at: a $200 session with a $100 deposit applied is a $100
+  // session for shop-cut purposes. That isn't the shop giving up half its cut - the deposit was
+  // itself a payment when it was collected at the consult, and the cut was taken on it there.
+  // Taking it again here would charge the artist twice on the same $100.
+  //
+  // Clamped at zero because a deposit larger than the session it's applied to is a real case
+  // (a $500 deposit against a $300 final sitting), and a negative shop cut would read as the
+  // shop owing the artist money.
+  const cuttableCents = Math.max(
+    0,
+    (appointment.subtotalCents || 0) - (appointment.depositCreditCents || 0),
+  );
+  const cut = percentOfCents(cuttableCents, percent);
   appointment.shopCutCents = cut;
   appointment.shopCutPercentApplied = percent;
   appointment.shopCutStatus = cut > 0 ? 'unpaid' : 'none';

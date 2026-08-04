@@ -19,6 +19,9 @@ const MONEY_FIELDS = [
   'shopCutEarnedCents',
   'shopCutOutstandingCents',
   'shopCutAwaitingConfirmationCents',
+  'depositsCollectedCents',
+  'depositsAppliedCents',
+  'depositsOutstandingCents',
 ];
 
 const ARTIST_ROW_MONEY_FIELDS = [

@@ -33,6 +33,49 @@ const AppointmentSchema = new mongoose.Schema({
 	feeCents: {type: Number, default: 0},
 	tipCents: {type: Number, default: 0},
 	totalCents: {type: Number, default: 0},
+
+	// --- Deposits ---------------------------------------------------------------------------
+	// A deposit is normally taken at the consult, before anyone knows how many sittings the work
+	// will need, and is credited against the client's final session.
+	//
+	// It is recorded on the appointment that COLLECTED it, not on the Project, for two reasons.
+	// The money has a date and a payer and belongs to the transaction that took it - that's what
+	// makes it auditable against Square. And a consult often exists before its Project does (a
+	// consult that never converts has no Project at all), so a Project-level field would have
+	// nowhere to live at the moment the money actually changes hands.
+	//
+	// SINGLE USE is the property that matters most here, and it's enforced by state on this
+	// document rather than by counting applications elsewhere: a deposit is 'available' until it
+	// is applied, then 'applied' forever. Answering "has this been spent" by summing credits
+	// across other appointments would be one missed query away from letting the same $200 be
+	// credited to two different sessions.
+	depositCents: {type: Number, default: 0},
+	// 'none' when no deposit was taken. Deliberately a status rather than a nullable
+	// depositAppliedAt: it makes the three states nameable in a query and impossible to confuse
+	// with "a deposit of zero was taken".
+	depositStatus: {
+		type: String,
+		enum: ['none', 'available', 'applied', 'refunded'],
+		default: 'none',
+	},
+	depositCollectedAt: {type: Date},
+	// Which appointment consumed it, and when. Kept as a trail rather than just flipping the
+	// status, so "where did that deposit go" is answerable from the deposit's own record.
+	depositAppliedToAppointmentId: {type: mongoose.Schema.Types.ObjectId},
+	depositAppliedAt: {type: Date},
+	depositAppliedBy: {type: mongoose.Schema.Types.ObjectId},
+
+	// The other side of the same transaction: a credit applied TO this appointment, and the
+	// deposit it came from. Stored on both documents on purpose - the deposit needs to know it's
+	// spent, and the session needs to know why its total is lower than its subtotal, and neither
+	// question should require walking the other way round.
+	//
+	// The credit REDUCES what the client owes on this session, and the shop cut is computed on
+	// the reduced figure - see utils/shop-cut.js. That's a deliberate rule: a $200 session with a
+	// $100 deposit applied is a $100 session for shop-cut purposes, because the shop already took
+	// its cut on the deposit at the consult that collected it.
+	depositCreditCents: {type: Number, default: 0},
+	depositCreditFromAppointmentId: {type: mongoose.Schema.Types.ObjectId},
 	// Was `required: true` - broke independent artists (no shop, nothing to owe) unless every
 	// caller remembered to pass a throwaway value. 'none' is the real default for that case;
 	// the rest of the enum is the shop-cut payment lifecycle (see PRODUCTION_ROADMAP.md's

@@ -106,6 +106,34 @@ const ShopAnalyticsPanel = ({ shopId, canSeeMoney }) => {
 									}
 								/>
 							</div>
+
+							<h2 className="analyticsSectionTitle">Deposits</h2>
+							<div className="analyticsStatGrid">
+								<StatCard
+									label="Deposits collected"
+									value={formatCents(analytics.depositsCollectedCents)}
+									// Stated because it's the question this card invites: no, this
+									// is not extra money on top of revenue. recordDeposit writes
+									// the deposit into the collecting appointment's total, so it's
+									// already counted above - this breaks out how much of revenue
+									// it was.
+									subLabel="already included in revenue"
+								/>
+								<StatCard
+									label="Deposits applied"
+									value={formatCents(analytics.depositsAppliedCents)}
+									subLabel="credited against sessions"
+								/>
+								{/* The one figure here that is NOT earnings. Money taken for work
+								    that hasn't happened - the shop owes the client that work, and
+								    treating it as profit is how a shop spends money it still has
+								    to earn. */}
+								<StatCard
+									label="Deposits outstanding"
+									value={formatCents(analytics.depositsOutstandingCents)}
+									subLabel="held against work not yet done"
+								/>
+							</div>
 						</>
 					)}
 

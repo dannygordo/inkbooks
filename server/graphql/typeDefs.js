@@ -463,6 +463,11 @@ module.exports = gql`
     # Deliberately NOT timerStatus/timerStartedAt/accumulatedSeconds - see models/Appointment.js's
     # comment on why those are only ever changed via the dedicated startSessionTimer/
     # stopSessionTimer/resetSessionTimer mutations, never through this generic update input.
+    #
+    # Deposit fields are excluded for the same reason, and more firmly: a deposit's single-use
+    # guarantee depends on it only ever changing through recordDeposit/applyDeposit, where the
+    # status transition is atomic. Exposing depositStatus on a general-purpose update input would
+    # let a client flip an applied deposit back to available and spend it twice.
     sessionNotes: String
   }
 
@@ -491,6 +496,17 @@ module.exports = gql`
     feeCents: Int
     tipCents: Int
     totalCents: Int
+    # --- Deposits. See models/Appointment.js. ---
+    # Recorded on the appointment that COLLECTED the deposit (normally the consult).
+    depositCents: Int
+    depositStatus: String
+    depositCollectedAt: DateTime
+    depositAppliedToAppointmentId: ID
+    depositAppliedAt: DateTime
+    # The other side: a credit applied TO this appointment, reducing what the client owes on it.
+    # The shop cut is computed on the subtotal AFTER this is deducted - see utils/shop-cut.js.
+    depositCreditCents: Int
+    depositCreditFromAppointmentId: ID
     shopCutStatus: String!
     # Shop-cut ledger fields - see PRODUCTION_ROADMAP.md's "Shop-cut ledger" section.
     # shopCutCents is computed from subtotalCents only: never tips, tax or processing fees.
@@ -578,6 +594,12 @@ module.exports = gql`
     shopCutEarnedCents: Int
     shopCutOutstandingCents: Int
     shopCutAwaitingConfirmationCents: Int
+    # Deposits. Collected counts toward revenue on the day taken and is already INSIDE
+    # revenueCents - this is a breakdown of that figure, not an addition to it. Outstanding is a
+    # liability: money held against work not yet done.
+    depositsCollectedCents: Int
+    depositsAppliedCents: Int
+    depositsOutstandingCents: Int
 
     # Activity - always returned, whatever the caller's role.
     completedSessionCount: Int!
@@ -678,6 +700,10 @@ module.exports = gql`
 
     # Dashboard analytics. start is inclusive and end is exclusive, so consecutive ranges neither
     # overlap nor drop an appointment sitting exactly on a boundary.
+    # Unspent deposits belonging to the same CLIENT as this appointment - see
+    # resolvers/deposits.js on why it's scoped by client rather than by project.
+    getAvailableDeposits(appointmentId: ID!): [Appointment]
+
     getShopAnalytics(shopId: ID!, start: DateTime!, end: DateTime!): Analytics
     getArtistAnalytics(userId: ID!, start: DateTime!, end: DateTime!): Analytics
   }
@@ -841,6 +867,15 @@ module.exports = gql`
     # Shop-side client notes - see the comment on Client.notes. Deliberately NOT available to the
     # client whose record it is, even though getClient lets them read their own row.
     updateClientNotes(notes: [IBNoteInput], clientId: ID!): Client
+
+    ######### Deposits ############
+    # Records a deposit taken on an appointment (normally a consult). Also sets that appointment's
+    # subtotal/total to the deposit, so it counts as revenue on the day it was taken and the shop
+    # cut is charged on it there - see mutations/deposits.js.
+    recordDeposit(appointmentId: ID!, depositCents: Int!): Appointment
+    # Spends an available deposit against a session, exactly once. Reduces that session's total
+    # and recomputes its shop cut on the reduced figure.
+    applyDeposit(depositAppointmentId: ID!, targetAppointmentId: ID!): Appointment
     updateProjectTags(tags: [String], projectId: ID!): Project
 
     ######### Conversations ###########

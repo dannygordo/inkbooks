@@ -80,6 +80,42 @@
 	gap: 8px;
 	flex-wrap: wrap;
 }
+/* An unspent deposit the client already paid. Presented as an offer with an explicit warning
+   rather than as another number, because applying it is irreversible. */
+.sessionDetailDeposits {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 12px 14px;
+	border: 1px solid #b6e6c3;
+	background-color: #e6f6ea;
+	border-radius: 6px;
+}
+.sessionDetailDepositsLabel {
+	font-size: 13px;
+	font-weight: 600;
+}
+.sessionDetailDepositRow {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	font-size: 14px;
+}
+.sessionDetailDepositsHint {
+	font-size: 12px;
+	color: #555;
+	font-style: italic;
+}
+/* The settled state - the deposit is spent and the total below already reflects it. */
+.sessionDetailDepositApplied {
+	font-size: 13px;
+	color: #555;
+	padding: 10px 14px;
+	background-color: #f4f4f4;
+	border-radius: 6px;
+}
+
 /* Reads as a consequence of the numbers above it, not as another field. */
 .sessionDetailShopCutNote {
 	font-size: 13px;

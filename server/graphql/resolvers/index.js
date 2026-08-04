@@ -19,6 +19,8 @@ const bookingRequestResolvers = require('./bookingRequests');
 const bookingRequestMutations = require('../mutations/bookingRequests');
 const artistShopConnectionResolvers = require('./artistShopConnections');
 const analyticsResolvers = require('./analytics');
+const depositResolvers = require('./deposits');
+const depositMutations = require('../mutations/deposits');
 const artistShopConnectionMutations = require('../mutations/artistShopConnections');
 const shopCutPaymentMutations = require('../mutations/shopCutPayments');
 const Artist = require('../../models/Artist');
@@ -50,7 +52,8 @@ module.exports = {
     ...appointmentResolvers.Query,
     ...bookingRequestResolvers.Query,
     ...artistShopConnectionResolvers.Query,
-    ...analyticsResolvers.Query
+    ...analyticsResolvers.Query,
+    ...depositResolvers.Query
   },
   Mutation: {
     ...usersResolvers.Mutation,
@@ -64,7 +67,8 @@ module.exports = {
     ...appointmentMutations,
     ...bookingRequestMutations,
     ...artistShopConnectionMutations,
-    ...shopCutPaymentMutations
+    ...shopCutPaymentMutations,
+    ...depositMutations
   },
   Project: {
     artist: async(project, args, context, info) => {

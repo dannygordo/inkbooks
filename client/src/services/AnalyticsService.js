@@ -23,6 +23,9 @@ export const AnalyticsService = (() => {
 		shopCutEarnedCents
 		shopCutOutstandingCents
 		shopCutAwaitingConfirmationCents
+		depositsCollectedCents
+		depositsAppliedCents
+		depositsOutstandingCents
 	`;
 
 	const _ACTIVITY_FIELDS = `

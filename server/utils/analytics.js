@@ -34,6 +34,12 @@ const { getArtistIdsForShops } = require('./shop-membership');
  *   average tip  over appointments that ACTUALLY received a tip, not all of them. Dividing by
  *                every completed session drags the figure toward zero with untipped ones and
  *                answers a question nobody asked.
+ *   deposits     counted as revenue when COLLECTED, never again when applied. recordDeposit
+ *                writes the deposit into the collecting appointment's subtotal/total, so it's
+ *                already inside revenue - depositsCollectedCents is a breakdown of that figure,
+ *                not an addition to it. depositsOutstandingCents is deliberately separate and
+ *                deliberately labelled: unapplied deposits are money held against work not yet
+ *                done, which is a liability, and it's the number most easily mistaken for profit.
  *   shop cut     three separate buckets rather than one total, because they're three different
  *                situations: earned (paid/received - money the shop actually has), outstanding
  *                (unpaid/invoice_sent - money owed), and awaiting confirmation
@@ -123,6 +129,27 @@ async function computeAnalytics({ shopId, artistUserId, start, end }) {
       $sum: { $cond: [{ $eq: ['$appointmentType', 'consult'] }, 1, 0] },
     },
     appointmentCount: { $sum: 1 },
+    // --- Deposits ---------------------------------------------------------------------------
+    // Counted when COLLECTED, not when applied. recordDeposit sets the collecting appointment's
+    // subtotal/total to the deposit, so it's already inside revenueCents above - these two are
+    // the breakdown, not an addition to it. Adding them to revenue would double-count.
+    //
+    // Not gated on appointmentStatus, unlike revenue. A consult that collected a deposit is money
+    // in the till on the day it was taken regardless of whether anyone remembered to mark the
+    // consult 'completed' afterwards - and unlike a booked session, there's no sense in which the
+    // deposit hasn't happened yet.
+    depositsCollectedCents: { $sum: { $ifNull: ['$depositCents', 0] } },
+    // Credits spent against sessions in this window. Reduces what clients owed, not revenue -
+    // the money was already recognised when it was taken.
+    depositsAppliedCents: { $sum: { $ifNull: ['$depositCreditCents', 0] } },
+    // Money held against work not yet done. This is a LIABILITY, not earnings: the shop is
+    // holding it on account and owes the client the work. Kept visible precisely because it's the
+    // figure most easily mistaken for profit.
+    depositsOutstandingCents: {
+      $sum: {
+        $cond: [{ $eq: ['$depositStatus', 'available'] }, { $ifNull: ['$depositCents', 0] }, 0],
+      },
+    },
     // Counted separately from tipsCents because the average is over tipped appointments only -
     // see this file's header.
     tippedCount: {
@@ -223,6 +250,9 @@ async function computeAnalytics({ shopId, artistUserId, start, end }) {
     shopCutEarnedCents: totals.shopCutEarnedCents || 0,
     shopCutOutstandingCents: totals.shopCutOutstandingCents || 0,
     shopCutAwaitingConfirmationCents: totals.shopCutAwaitingConfirmationCents || 0,
+    depositsCollectedCents: totals.depositsCollectedCents || 0,
+    depositsAppliedCents: totals.depositsAppliedCents || 0,
+    depositsOutstandingCents: totals.depositsOutstandingCents || 0,
     completedSessionCount: totals.completedSessionCount || 0,
     consultCount: totals.consultCount || 0,
     appointmentCount: totals.appointmentCount || 0,

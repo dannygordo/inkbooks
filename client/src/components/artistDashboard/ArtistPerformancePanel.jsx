@@ -210,6 +210,18 @@ const ArtistPerformancePanel = ({ artistUserId, isSelf = false }) => {
 							}`}
 						/>
 						<StatCard
+							label="Deposits taken"
+							value={formatCents(analytics.depositsCollectedCents)}
+							subLabel="already included in revenue"
+						/>
+						{/* Not earnings - money held against work still to do. Kept on the
+						    artist's own dashboard because they're the one who owes that work. */}
+						<StatCard
+							label="Deposits unspent"
+							value={formatCents(analytics.depositsOutstandingCents)}
+							subLabel="held against work not yet done"
+						/>
+						<StatCard
 							label="Shop cut owed"
 							value={formatCents(analytics.shopCutOutstandingCents)}
 						/>

@@ -11,6 +11,7 @@ import IBSquarePaymentForm from "../IBSquarePayments/IBSquarePaymentForm";
 import { useAuth } from "../../context/auth";
 import { ALERT_CONSTANTS } from "../../constants";
 import { formatCents, centsToDollars, dollarsToCents } from "../../utils/money";
+import DepositService from "../../services/DepositService";
 import {
 	getEffectiveRate,
 	computeSessionSubtotalCents,
@@ -77,6 +78,41 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 		AppointmentService.UPDATE_SESSION_DETAILS
 	);
 	const [deleteAppointment] = useMutation(AppointmentService.DELETE_APPOINTMENT);
+	const [applyDeposit, { loading: applyingDeposit }] = useMutation(DepositService.APPLY_DEPOSIT);
+
+	// Deposits this client has already paid and not yet spent. Skipped once this session already
+	// carries a credit - there's nothing to offer, and the server refuses a second one anyway.
+	const { data: depositData } = DepositService.getAvailableDeposits(appointment.id, {
+		skip: Boolean(appointment.depositCreditCents),
+	});
+	const availableDeposits = depositData?.getAvailableDeposits || [];
+
+	const handleApplyDeposit = (depositAppointmentId) => async () => {
+		try {
+			const { data } = await applyDeposit({
+				variables: { depositAppointmentId, targetAppointmentId: appointment.id },
+			});
+			setAppointment((prev) => ({ ...prev, ...data.applyDeposit }));
+			setAlert({
+				isAlert: true,
+				severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
+				message: "Deposit applied.",
+				timeout: ALERT_CONSTANTS.TIMEOUT,
+				location: ALERT_CONSTANTS.DISPLAY_MODAL,
+			});
+		} catch (err) {
+			// The realistic failure is "already applied" - two tabs, or a double click that beat
+			// the button's disabled state. The server settles it atomically; this just reports
+			// what it said rather than pretending the click worked.
+			setAlert({
+				isAlert: true,
+				severity: ALERT_CONSTANTS.SEVERITY.ERROR,
+				message: err.graphQLErrors?.[0]?.message || err.message,
+				timeout: ALERT_CONSTANTS.TIMEOUT,
+				location: ALERT_CONSTANTS.DISPLAY_MODAL,
+			});
+		}
+	};
 
 	const effectiveRate = getEffectiveRate(project?.artist, project?.artist?.shop, connections);
 	const elapsedSeconds = getLiveElapsedSeconds(appointment);
@@ -127,9 +163,15 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 			feeCents,
 			tipCents,
 			// Derived here rather than entered - the grand total is definitionally the sum of its
-			// parts at save time. (The Square charge path overwrites this with what Square
-			// actually charged; see routes/squarePayments.js on why the charge wins there.)
-			totalCents: subtotalCents + taxCents + feeCents + tipCents,
+			// parts at save time, MINUS any deposit already credited to this session. Clamped at
+			// zero: a deposit larger than the final sitting is a real case, and a negative total
+			// would be the shop owing the client money, which this flow can't hand back.
+			// (The Square charge path overwrites this with what Square actually charged; see
+			// routes/squarePayments.js on why the charge wins there.)
+			totalCents: Math.max(
+				0,
+				subtotalCents + taxCents + feeCents + tipCents - (appointment.depositCreditCents || 0)
+			),
 			sessionNotes: notes,
 		};
 	};
@@ -361,6 +403,49 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 						disabled={isClosed}
 					/>
 				</div>
+				{/* Deposits. Two mutually exclusive states: one is already applied to this
+				    session, or there are unspent ones available to apply. Never both - the server
+				    refuses a second credit, and the query is skipped once a credit exists. */}
+				{appointment.depositCreditCents > 0 ? (
+					<div className="sessionDetailDepositApplied">
+						{formatCents(appointment.depositCreditCents)} deposit applied - already paid,
+						deducted from this session's total.
+					</div>
+				) : (
+					availableDeposits.length > 0 &&
+					!isClosed && (
+						<div className="sessionDetailDeposits">
+							<span className="sessionDetailDepositsLabel">
+								Deposit available to apply
+							</span>
+							{availableDeposits.map((deposit) => (
+								<div key={deposit.id} className="sessionDetailDepositRow">
+									<span>
+										{formatCents(deposit.depositCents)} taken{" "}
+										{deposit.depositCollectedAt
+											? moment(deposit.depositCollectedAt).format("MMM D, YYYY")
+											: ""}
+										{deposit.appointmentType === "consult" ? " at consult" : ""}
+									</span>
+									<Button
+										size="small"
+										variant="outlined"
+										disabled={applyingDeposit}
+										onClick={handleApplyDeposit(deposit.id)}
+									>
+										Apply to this session
+									</Button>
+								</div>
+							))}
+							{/* Said plainly because it's the rule that surprises people: applying
+							    is one-way. The deposit is spent the moment this is clicked. */}
+							<span className="sessionDetailDepositsHint">
+								A deposit can only be applied once, and can't be moved afterwards.
+							</span>
+						</div>
+					)
+				)}
+
 				{appointment.shopCutCents > 0 && (
 					<div className="sessionDetailShopCutNote">
 						Shop cut on this session:{" "}

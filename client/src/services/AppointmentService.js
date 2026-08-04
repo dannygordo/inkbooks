@@ -340,6 +340,12 @@ export const AppointmentService = (() => {
                 shopCutCents
                 shopCutStatus
                 shopCutPercentApplied
+                # Deposits - both sides. depositCents/depositStatus describe a deposit this
+                # appointment COLLECTED; depositCreditCents describes one applied TO it.
+                depositCents
+                depositStatus
+                depositCreditCents
+                depositCreditFromAppointmentId
                 timerStatus
                 timerStartedAt
                 accumulatedSeconds
