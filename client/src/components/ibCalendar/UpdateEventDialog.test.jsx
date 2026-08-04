@@ -38,7 +38,7 @@ function baseEvent(overrides = {}) {
 		appointmentDate: "2026-08-01T12:00:00.000Z",
 		createdAt: "2026-07-01T12:00:00.000Z",
 		shopCutStatus: "none",
-		shopCutAmount: null,
+		shopCutCents: 0,
 		...overrides,
 	};
 }
@@ -76,7 +76,7 @@ describe("UpdateEventDialog", () => {
 	// Regression test locking in the shop-cut panel's removal (see UpdateEventDialog.jsx's own
 	// comment) - it used to render whenever event.shopId was set; confirms it doesn't come back.
 	it("never shows a shop-cut panel, even when the appointment has a shopId", async () => {
-		const event = baseEvent({ shopId: "shop-1", shopCutStatus: "unpaid", shopCutAmount: 80 });
+		const event = baseEvent({ shopId: "shop-1", shopCutStatus: "unpaid", shopCutCents: 8000 });
 		renderDialog({ event });
 
 		await screen.findByDisplayValue("Sleeve session 2");
