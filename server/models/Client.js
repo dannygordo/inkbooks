@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const IBNoteSchema = require('./IBNote');
 
 const ClientSchema = new mongoose.Schema({
     firstName: {type: String, required: true},
@@ -12,7 +13,16 @@ const ClientSchema = new mongoose.Schema({
     instagram: {type: String, default: ""},
     facebook: {type: String, default: ""},
     avatar: {type: String, default: ""},
-    userId: {type: mongoose.Schema.Types.ObjectId, required: true}
+    userId: {type: mongoose.Schema.Types.ObjectId, required: true},
+    // Notes about the client, as opposed to Project.notes (about one piece of work) or
+    // Appointment.sessionNotes (about one sitting). Same embedded IBNote sub-document those two
+    // already use - allergies, how they handle long sittings, healing history, anything that
+    // outlives a single project.
+    //
+    // Deliberately shop-side, not client-visible: see the note on Client.notes in
+    // graphql/typeDefs.js. A shop needs to be able to write "cancels a lot" without that being a
+    // message to the client.
+    notes: {type: [IBNoteSchema]}
 
 }, {
     timestamps: true

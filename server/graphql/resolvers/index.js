@@ -166,6 +166,30 @@ module.exports = {
     avatar: async(client, args, context, info) => {
       const user = await User.findById(client.userId);
       return user ? user.avatar : client.avatar;
+    },
+    // --- Client dashboard (client/src/components/clientDashboard) -------------------------
+    // Resolved on demand rather than denormalized onto Client, so there's nothing to keep in
+    // sync when a project or appointment changes.
+    //
+    // Project.clientId is the Client sub-document's own _id, NOT the client's User._id - see the
+    // Project.client resolver above, where the same trap is written up in full. Filtering on
+    // client.userId here would match nothing, silently, for every client on the platform.
+    projects: async(client) => {
+      return Project.find({ clientId: client._id }).sort({ createdAt: -1 });
+    },
+    // A client's appointments are reached through their projects: Appointment has no clientId of
+    // its own, only projectId.
+    //
+    // Known gap, stated rather than hidden: a consult created from a booking request has no
+    // Project at all (see models/Appointment.js's bookingRequestId comment), so it is genuinely
+    // unreachable this way and won't appear on the dashboard. Closing that needs a real clientId
+    // on Appointment, which is a schema change well beyond this feature.
+    appointments: async(client) => {
+      const projectIds = await Project.find({ clientId: client._id }).distinct('_id');
+      if (projectIds.length === 0) {
+        return [];
+      }
+      return Appointment.find({ projectId: { $in: projectIds } }).sort({ appointmentDate: -1 });
     }
   },
   BookingRequest: {

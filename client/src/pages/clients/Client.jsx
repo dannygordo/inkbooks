@@ -4,6 +4,7 @@ import ClientService  from "../../services/ClientService";
 import { ROUTE_CONSTANTS } from "../../constants";
 import IBPageLoader from "../../components/ibPageLoader/IBPageLoader";
 import IBCardShowError from "../../components/card/ibCardShowError/IBCardShowError";
+import ClientDashboard from "../../components/clientDashboard/ClientDashboard";
 
 const Client = (props) => {
 	const navigate = useNavigate();
@@ -45,6 +46,10 @@ const Client = (props) => {
 						</div>
 					</div>
 				</div>
+				{/* Was a name and an Edit button and nothing else. Same component a client sees
+				    for themselves on Home.jsx, scoped differently - isSelf=false, so the
+				    shop-side notes section renders here and not there. */}
+				<ClientDashboard clientId={params.clientId} isSelf={false} />
 			</div>
 		);
 	} else {

@@ -198,6 +198,17 @@ module.exports = gql`
     avatar: String
     userId: ID!
     user: User
+    # Everything below powers the client dashboard (client/src/components/clientDashboard).
+    # Resolved on demand rather than stored, so nothing has to be kept in sync - see
+    # resolvers/index.js's Client field resolvers.
+    projects: [Project]
+    appointments: [Appointment]
+    # SHOP-SIDE notes about the client - allergies, sitting tolerance, healing history. NOT
+    # visible to the client themselves: the whole value of a note like "cancels a lot" or
+    # "needed a break every 20 minutes" depends on it being a candid internal record rather than
+    # a message to the person it's about. ClientDashboard renders this section only in the
+    # artist/staff view, and updateClientNotes below refuses a client editing their own.
+    notes: [IBNote]
   }
   input ClientInput {
     id: ID!
@@ -390,6 +401,10 @@ module.exports = gql`
     tags: [String]
     status: String!
     depositAmount: Int
+    # The model has always had Mongoose timestamps enabled (see models/Project.js) - these were
+    # simply never exposed. The client dashboard shows when a project was started.
+    createdAt: DateTime
+    updatedAt: DateTime
   }
   input ProjectInput {
     id: ID!
@@ -750,6 +765,9 @@ module.exports = gql`
     deleteProject(projectId: ID!): String!
     updateProject(project: ProjectInput): Project
     updateProjectNotes(notes: [IBNoteInput], projectId: ID!): Project
+    # Shop-side client notes - see the comment on Client.notes. Deliberately NOT available to the
+    # client whose record it is, even though getClient lets them read their own row.
+    updateClientNotes(notes: [IBNoteInput], clientId: ID!): Client
     updateProjectTags(tags: [String], projectId: ID!): Project
 
     ######### Conversations ###########

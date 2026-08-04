@@ -1,0 +1,123 @@
+/* Mirrors artistPerformancePanel.css's stat-card layout rather than inventing a second visual
+   language for the same idea - these are the same kind of summary panel, mounted on a different
+   subject. */
+.clientDashboard {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+}
+
+.clientDashboardStats {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 16px;
+}
+
+.clientStatCard {
+	flex: 1 1 160px;
+	min-width: 160px;
+	padding: 16px 18px;
+	border: 1px solid #eee;
+	border-radius: 8px;
+	background-color: #fff;
+}
+
+.clientStatLabel {
+	font-size: 13px;
+	color: #999;
+	margin-bottom: 6px;
+}
+
+.clientStatValue {
+	font-size: 22px;
+	font-weight: 600;
+}
+
+/* Qualifier under a figure whose basis isn't obvious from the label - the tip average is over
+   tipped sessions only, and "total spent" counts completed sessions only. Both would be
+   misleading without it. */
+.clientStatSubLabel {
+	font-size: 11px;
+	color: #aaa;
+	margin-top: 4px;
+}
+
+.clientDashboardSectionTitle {
+	font-size: 18px;
+	font-weight: 600;
+	margin-bottom: 12px;
+}
+
+.clientDashboardEmpty {
+	color: #999;
+	font-style: italic;
+}
+
+.clientDashboardList {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.clientDashboardListRow {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding-bottom: 10px;
+	border-bottom: 1px solid #f2f2f2;
+}
+
+.clientDashboardListRow:last-child {
+	border-bottom: none;
+	padding-bottom: 0;
+}
+
+.clientDashboardListPrimary {
+	font-weight: 500;
+}
+
+.clientDashboardListMeta {
+	font-size: 13px;
+	color: #777;
+}
+
+.clientDashboardNotesHeader {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+/* Stated on the surface, not just in the code: whoever is typing a note needs to know who can
+   read it before they write it, not after. */
+.clientDashboardNotesHint {
+	font-size: 12px;
+	color: #999;
+	font-style: italic;
+	margin-bottom: 14px;
+}
+
+.clientDashboardNoteForm {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 10px;
+	margin-bottom: 18px;
+}
+
+.clientDashboardNoteRow {
+	padding-bottom: 10px;
+	border-bottom: 1px solid #f2f2f2;
+}
+
+.clientDashboardNoteRow:last-child {
+	border-bottom: none;
+	padding-bottom: 0;
+}
+
+.clientDashboardNoteBody {
+	margin: 0 0 4px;
+	white-space: pre-wrap;
+}

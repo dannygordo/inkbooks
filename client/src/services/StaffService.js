@@ -51,7 +51,18 @@ const StaffService = (() => {
                     title
                     status
                     shopId
-					user
+					# Was a bare "user". That's an object type and can't be selected without
+					# subfields, so GraphQL rejects the whole document - meaning this query has
+					# never executed at all and the Staff list has always failed with "Field user
+					# of type User must have a selection of subfields". Found by validating every
+					# gql document in this app against the real server schema; unrelated to the
+					# work that surfaced it.
+					user {
+						id
+						firstName
+						lastName
+						avatar
+					}
 				}
 			}
 		`;
