@@ -23,7 +23,9 @@ const ARTIST_COLUMNS = [
 ];
 
 const Artists = () => {
-	const { loading, data } = ArtistService.fetchArtists();
+	// refetch is handed to the action bar so a newly created artist appears immediately - the
+	// create mutation has no way to know this list query exists, let alone update its cache.
+	const { loading, data, refetch } = ArtistService.fetchArtists();
 	if (loading) {
 		return <IBPageLoader />;
 	}
@@ -50,6 +52,7 @@ const Artists = () => {
 		<div className="artists">
 			<IBPageActionBar
 				pageType={APP_SETTINGS_CONSTANTS.PAGE_TYPES.ARTISTS}
+				onCreated={refetch}
 			/>
 			<EntityList
 				columns={ARTIST_COLUMNS}

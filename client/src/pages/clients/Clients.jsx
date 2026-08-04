@@ -25,7 +25,8 @@ const CLIENT_COLUMNS = [
 ];
 
 const Clients = () => {
-  const { loading, data } = ClientService.fetchClients();
+  // refetch is handed to the action bar so a newly created client appears immediately.
+  const { loading, data, refetch } = ClientService.fetchClients();
   if (loading) return <IBPageLoader />;
 
   const items = (data?.getClients || []).map((client) => ({
@@ -48,7 +49,7 @@ const Clients = () => {
 
   return (
     <div className="clients">
-      <IBPageActionBar pageType='clients' />
+      <IBPageActionBar pageType='clients' onCreated={refetch} />
       <EntityList columns={CLIENT_COLUMNS} items={items} emptyMessage="No clients yet." />
     </div>
   );

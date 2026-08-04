@@ -22,6 +22,7 @@ const analyticsResolvers = require('./analytics');
 const depositResolvers = require('./deposits');
 const passwordResolvers = require('./passwords');
 const passwordMutations = require('../mutations/passwords');
+const accountMutations = require('../mutations/accounts');
 const depositMutations = require('../mutations/deposits');
 const artistShopConnectionMutations = require('../mutations/artistShopConnections');
 const shopCutPaymentMutations = require('../mutations/shopCutPayments');
@@ -72,7 +73,8 @@ module.exports = {
     ...artistShopConnectionMutations,
     ...shopCutPaymentMutations,
     ...depositMutations,
-    ...passwordMutations
+    ...passwordMutations,
+    ...accountMutations
   },
   Project: {
     artist: async(project, args, context, info) => {

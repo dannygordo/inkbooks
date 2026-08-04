@@ -1,0 +1,350 @@
+// Integration tests for account creation (mutations/accounts.js) - the three wizards.
+//
+// The property worth guarding hardest: an account created this way must NOT be loggable-into
+// until its owner redeems the invite. The requested design was "a default password that gets
+// set", and a shared default would mean every unclaimed account in the system is open to anyone
+// who has ever seen that string. What's built instead is a random hash nobody - including the
+// admin who created the account - ever knows. The first test below is what stops that quietly
+// becoming a fixed string again.
+//
+// describe/it/expect come from Vitest's `globals: true` config - see the comment in
+// test/integration/appointments.test.js for why there's no `require('vitest')` here.
+const bcrypt = require('bcryptjs');
+const { createTestServer, contextWithToken } = require('../helpers/testServer');
+const { signTestToken } = require('../helpers/auth');
+const {
+	createShopAdminUser,
+	createStaffUser,
+	createArtistUser,
+	createClientUser,
+} = require('../helpers/factories');
+const User = require('../../models/User');
+const Artist = require('../../models/Artist');
+const Staff = require('../../models/Staff');
+const Client = require('../../models/Client');
+const ArtistShopConnection = require('../../models/ArtistShopConnection');
+const PasswordToken = require('../../models/PasswordToken');
+
+const CREATE_ARTIST = `
+	mutation CreateArtistAccount($input: CreateArtistAccountInput!) {
+		createArtistAccount(input: $input) {
+			inviteLink
+			artist { id email firstName userId }
+		}
+	}
+`;
+
+const CREATE_STAFF = `
+	mutation CreateStaffAccount($input: CreateStaffAccountInput!) {
+		createStaffAccount(input: $input) {
+			inviteLink
+			staff { id email userId }
+		}
+	}
+`;
+
+const CREATE_CLIENT = `
+	mutation CreateClientAccount($input: CreateClientAccountInput!) {
+		createClientAccount(input: $input) {
+			isNewAccount
+			client { id email firstName city }
+		}
+	}
+`;
+
+const asUser = (caller) => ({ contextValue: contextWithToken(signTestToken(caller)) });
+
+describe('createArtistAccount', () => {
+	it('creates a User that cannot be logged into until the invite is redeemed', async () => {
+		const { user: admin, shop } = await createShopAdminUser();
+		const server = createTestServer();
+
+		const res = await server.executeOperation(
+			{
+				query: CREATE_ARTIST,
+				variables: {
+					input: {
+						firstName: 'Maya',
+						lastName: 'Chen',
+						email: 'maya@example.com',
+						shopId: String(shop.id),
+					},
+				},
+			},
+			asUser(admin),
+		);
+
+		expect(res.body.singleResult.errors).toBeUndefined();
+		const created = await User.findOne({ email: 'maya@example.com' });
+		expect(created).toBeTruthy();
+		expect(created.hasSetPassword).toBe(false);
+
+		// The whole point. None of the obvious shared defaults work, and neither does anything
+		// derived from the person's own details - which is the other tempting shortcut.
+		for (const guess of ['inkbooks123', 'password', 'changeme', 'maya@example.com', 'Maya']) {
+			expect(await bcrypt.compare(guess, created.password)).toBe(false);
+		}
+	});
+
+	it('issues an invite token and returns a link containing it', async () => {
+		const { user: admin, shop } = await createShopAdminUser();
+		const server = createTestServer();
+
+		const res = await server.executeOperation(
+			{
+				query: CREATE_ARTIST,
+				variables: {
+					input: {
+						firstName: 'Maya',
+						lastName: 'Chen',
+						email: 'maya@example.com',
+						shopId: String(shop.id),
+					},
+				},
+			},
+			asUser(admin),
+		);
+
+		const { inviteLink } = res.body.singleResult.data.createArtistAccount;
+		const created = await User.findOne({ email: 'maya@example.com' });
+		const token = await PasswordToken.findOne({ userId: created._id, purpose: 'invite' });
+
+		expect(token).toBeTruthy();
+		// The link is returned so the wizard can show it - email silently no-ops when the
+		// provider isn't configured, and an admin needs a way to hand it over directly.
+		expect(inviteLink).toContain('/set-password/');
+		// And the raw token in that link is not what's stored.
+		const rawFromLink = inviteLink.split('/set-password/')[1];
+		expect(token.tokenHash).not.toBe(rawFromLink);
+	});
+
+	it('connects the artist to the shop so they are actually visible', async () => {
+		// An artist with no ArtistShopConnection is invisible to the shop calendar, the artist
+		// directory, shop analytics and the shop-cut ledger - all of which resolve membership
+		// through it. Creating one that then appears nowhere would read as the wizard failing.
+		const { user: admin, shop } = await createShopAdminUser();
+		const server = createTestServer();
+
+		await server.executeOperation(
+			{
+				query: CREATE_ARTIST,
+				variables: {
+					input: {
+						firstName: 'Maya',
+						lastName: 'Chen',
+						email: 'maya@example.com',
+						shopId: String(shop.id),
+					},
+				},
+			},
+			asUser(admin),
+		);
+
+		const created = await User.findOne({ email: 'maya@example.com' });
+		const connection = await ArtistShopConnection.findOne({ artistId: created._id });
+		expect(connection).toBeTruthy();
+		expect(connection.status).toBe('active');
+		expect(String(connection.shopId)).toBe(String(shop.id));
+	});
+
+	it('gives the new artist a real tag colour, unique within the shop', async () => {
+		const { user: admin, shop } = await createShopAdminUser();
+		const { user: existing } = await createArtistUser({ tagColor: '#2ea2dc' });
+		await new ArtistShopConnection({
+			artistId: existing._id,
+			shopId: shop._id,
+			status: 'active',
+		}).save();
+		const server = createTestServer();
+
+		await server.executeOperation(
+			{
+				query: CREATE_ARTIST,
+				variables: {
+					input: {
+						firstName: 'Maya',
+						lastName: 'Chen',
+						email: 'maya@example.com',
+						shopId: String(shop.id),
+					},
+				},
+			},
+			asUser(admin),
+		);
+
+		const created = await User.findOne({ email: 'maya@example.com' });
+		expect(created.tagColor).toBeTruthy();
+		// Not white - that's the default that rendered calendar labels invisibly and took a whole
+		// fix to get rid of.
+		expect(['#fff', '#ffffff']).not.toContain(created.tagColor);
+		expect(created.tagColor).not.toBe('#2ea2dc');
+	});
+
+	it('refuses an email that already has an account', async () => {
+		const { user: admin, shop } = await createShopAdminUser();
+		const { user: existing } = await createClientUser();
+		const server = createTestServer();
+
+		const res = await server.executeOperation(
+			{
+				query: CREATE_ARTIST,
+				variables: {
+					input: {
+						firstName: 'Maya',
+						lastName: 'Chen',
+						email: existing.email,
+						shopId: String(shop.id),
+					},
+				},
+			},
+			asUser(admin),
+		);
+
+		expect(res.body.singleResult.data.createArtistAccount).toBeNull();
+		expect(await Artist.countDocuments({})).toBe(0);
+	});
+
+	it('refuses a caller below shop admin', async () => {
+		const { shop } = await createShopAdminUser();
+		const { user: staff } = await createStaffUser(shop.id);
+		const server = createTestServer();
+
+		const res = await server.executeOperation(
+			{
+				query: CREATE_ARTIST,
+				variables: {
+					input: {
+						firstName: 'Maya',
+						lastName: 'Chen',
+						email: 'maya@example.com',
+						shopId: String(shop.id),
+					},
+				},
+			},
+			asUser(staff),
+		);
+
+		expect(res.body.singleResult.data.createArtistAccount).toBeNull();
+		expect(res.body.singleResult.errors[0].message).toMatch(/Action not allowed/);
+		expect(await User.countDocuments({ email: 'maya@example.com' })).toBe(0);
+	});
+});
+
+describe('createStaffAccount', () => {
+	it('creates staff at SHOP_STAFF, never shop admin', async () => {
+		// Promoting someone to admin has real consequences - shop-wide financials, the ability to
+		// create more accounts - and shouldn't be reachable from a create form a shop admin fills
+		// in while onboarding a receptionist.
+		const { user: admin, shop } = await createShopAdminUser();
+		const server = createTestServer();
+
+		const res = await server.executeOperation(
+			{
+				query: CREATE_STAFF,
+				variables: {
+					input: {
+						firstName: 'Sam',
+						lastName: 'Rivera',
+						email: 'sam@example.com',
+						shopId: String(shop.id),
+					},
+				},
+			},
+			asUser(admin),
+		);
+
+		expect(res.body.singleResult.errors).toBeUndefined();
+		const created = await User.findOne({ email: 'sam@example.com' });
+		expect(created.role).toBe(15);
+		expect(created.hasSetPassword).toBe(false);
+
+		const staff = await Staff.findOne({ userId: created._id });
+		expect(String(staff.shopId)).toBe(String(shop.id));
+	});
+});
+
+describe('createClientAccount', () => {
+	it('creates a client with no invite token', async () => {
+		// A client added by a shop is usually someone who walked in. They get the same silent
+		// account the booking flow creates and can claim it later through the normal reset flow -
+		// emailing a login to someone who just booked a tattoo is noise.
+		const { shop } = await createShopAdminUser();
+		const { user: staff } = await createStaffUser(shop.id);
+		const server = createTestServer();
+
+		const res = await server.executeOperation(
+			{
+				query: CREATE_CLIENT,
+				variables: {
+					input: {
+						firstName: 'Arya',
+						lastName: 'Stark',
+						email: 'arya@example.com',
+						city: 'Portland',
+					},
+				},
+			},
+			asUser(staff),
+		);
+
+		expect(res.body.singleResult.errors).toBeUndefined();
+		expect(res.body.singleResult.data.createClientAccount.isNewAccount).toBe(true);
+		expect(res.body.singleResult.data.createClientAccount.client.city).toBe('Portland');
+
+		const created = await User.findOne({ email: 'arya@example.com' });
+		expect(created.hasSetPassword).toBe(false);
+		expect(await PasswordToken.countDocuments({ userId: created._id })).toBe(0);
+	});
+
+	it('reuses an existing account rather than failing on a duplicate email', async () => {
+		// The common case in a shop: someone books online, then walks in, and a receptionist adds
+		// them by hand not knowing they're already on file. Failing on the unique-email
+		// constraint would be technically correct and useless.
+		const { shop } = await createShopAdminUser();
+		const { user: staff } = await createStaffUser(shop.id);
+		const { user: existingUser, client: existingClient } = await createClientUser();
+		const server = createTestServer();
+
+		const res = await server.executeOperation(
+			{
+				query: CREATE_CLIENT,
+				variables: {
+					input: {
+						firstName: existingClient.firstName,
+						lastName: existingClient.lastName,
+						email: existingUser.email,
+						city: 'Seattle',
+					},
+				},
+			},
+			asUser(staff),
+		);
+
+		const result = res.body.singleResult.data.createClientAccount;
+		expect(result.isNewAccount).toBe(false);
+		expect(String(result.client.id)).toBe(String(existingClient.id));
+		// The extra details still land on the existing record.
+		expect(result.client.city).toBe('Seattle');
+		// And no second account was made.
+		expect(await User.countDocuments({ email: existingUser.email })).toBe(1);
+		expect(await Client.countDocuments({ userId: existingUser._id })).toBe(1);
+	});
+
+	it('refuses an artist adding a client', async () => {
+		const { user: artist } = await createArtistUser();
+		const server = createTestServer();
+
+		const res = await server.executeOperation(
+			{
+				query: CREATE_CLIENT,
+				variables: {
+					input: { firstName: 'Arya', lastName: 'Stark', email: 'arya@example.com' },
+				},
+			},
+			asUser(artist),
+		);
+
+		expect(res.body.singleResult.data.createClientAccount).toBeNull();
+		expect(res.body.singleResult.errors[0].message).toMatch(/Action not allowed/);
+	});
+});

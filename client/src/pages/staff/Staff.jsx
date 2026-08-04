@@ -51,7 +51,8 @@ const STAFF_COLUMNS = [
 ];
 
 const Staff = () => {
-  const { loading, data } = useQuery(FETCH_STAFF_QUERY);
+  // refetch is handed to the action bar so a newly created staff member appears immediately.
+  const { loading, data, refetch } = useQuery(FETCH_STAFF_QUERY);
   if (loading) return <IBPageLoader />;
 
   const items = (data?.getStaff || []).map((staff) => ({
@@ -74,7 +75,7 @@ const Staff = () => {
 
   return (
     <div className="staff">
-      <IBPageActionBar pageType='staff' />
+      <IBPageActionBar pageType='staff' onCreated={refetch} />
       <EntityList columns={STAFF_COLUMNS} items={items} emptyMessage="No staff yet." />
     </div>
   )

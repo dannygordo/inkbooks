@@ -627,6 +627,63 @@ module.exports = gql`
     firstName: String
   }
 
+  # --- Account creation (the three wizards) ---------------------------------------------------
+  # Each creates a User alongside the profile record. Nothing did that before: createArtist and
+  # createStaff took a userId and expected one to exist, and no UI ever created one.
+  input CreateArtistAccountInput {
+    firstName: String!
+    lastName: String!
+    email: String!
+    title: String
+    phone: String
+    instagram: String
+    facebook: String
+    hourlyRate: Int
+    shopId: ID
+  }
+  input CreateStaffAccountInput {
+    firstName: String!
+    lastName: String!
+    email: String!
+    title: String
+    phone: String
+    instagram: String
+    facebook: String
+    # Required - a staff member with no shop has nothing to administer.
+    shopId: ID!
+  }
+  input CreateClientAccountInput {
+    firstName: String!
+    lastName: String!
+    email: String!
+    phone: String
+    address: String
+    city: String
+    state: String
+    zip: String
+    instagram: String
+    facebook: String
+  }
+  # inviteLink is returned so the wizard can display it. utils/email.js no-ops when the provider
+  # isn't configured, so an invite can "succeed" with nothing actually sent - handing the link
+  # back is the difference between an admin who can paste it into a text message and one left
+  # wondering why the new hire never heard anything.
+  type ArtistAccountResult {
+    artist: Artist!
+    inviteLink: String!
+  }
+  type StaffAccountResult {
+    staff: Staff!
+    inviteLink: String!
+  }
+  # No invite for clients - see mutations/accounts.js. isNewAccount is false when the email
+  # already had an account (they booked online before), so the wizard can say the record was
+  # updated rather than implying it created one.
+  type ClientAccountResult {
+    client: Client!
+    isNewAccount: Boolean!
+  }
+
   type Query {
     ######### Appointments ############
 
@@ -757,6 +814,11 @@ module.exports = gql`
     # would make an intercepted email grant a session outright rather than a password the real
     # owner can immediately reset.
     setPasswordWithToken(token: String!, newPassword: String!): Boolean!
+
+    ######### Account creation ############
+    createArtistAccount(input: CreateArtistAccountInput!): ArtistAccountResult!
+    createStaffAccount(input: CreateStaffAccountInput!): StaffAccountResult!
+    createClientAccount(input: CreateClientAccountInput!): ClientAccountResult!
 
     ######### Artists ###########
 

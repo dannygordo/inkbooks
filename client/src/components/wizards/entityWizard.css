@@ -1,0 +1,81 @@
+/* Matches AppointmentWizard's dialog sizing (see ibCalendar.css's appointmentWizardDialogContent)
+   so the two wizards in this app are the same size and don't resize step to step. */
+.entityWizard {
+	width: 560px;
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	box-shadow: 0px 24px 38px 3px rgb(0 0 0 / 14%), 0px 9px 46px 8px rgb(0 0 0 / 12%),
+		0px 11px 15px -7px rgb(0 0 0 / 20%);
+	border-radius: 8px;
+}
+
+.entityWizardContent {
+	box-sizing: border-box;
+	display: flex;
+	flex-direction: column;
+	padding: 24px 28px !important;
+}
+
+.entityWizardActions {
+	padding: 16px 28px !important;
+	gap: 10px;
+}
+
+.entityWizardProgress {
+	font-size: 11px;
+	font-weight: 500;
+	letter-spacing: 0.3px;
+	text-transform: uppercase;
+	color: #777;
+}
+
+.entityWizardTitle {
+	margin: 4px 0 2px;
+	font-size: 18px;
+	font-weight: 500;
+}
+
+.entityWizardSubtitle {
+	margin: 0 0 10px;
+	font-size: 13px;
+	color: #555;
+}
+
+.entityWizardError {
+	margin-top: 12px;
+	font-size: 13px;
+	color: #861d15;
+}
+
+/* The final screen after a successful create. */
+.entityWizardDone {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.entityWizardDoneTitle {
+	font-size: 18px;
+	font-weight: 500;
+	margin: 0;
+}
+
+/* The invite link, shown because utils/email.js silently no-ops when unconfigured - an admin
+   needs to be able to hand this over directly rather than trust that a mail went out. Monospace
+   and wrapped so a long token is readable and selectable rather than truncated. */
+.entityWizardInviteBox {
+	padding: 12px 14px;
+	background-color: #f4f4f4;
+	border-radius: 6px;
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-size: 12px;
+	word-break: break-all;
+	user-select: all;
+}
+
+.entityWizardHint {
+	font-size: 13px;
+	color: #555;
+	margin: 0;
+}
