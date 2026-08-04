@@ -658,34 +658,16 @@ export default function Sidebar() {
 							sx={{ opacity: open ? 1 : 0 }}
 						/>
 					</ListItemButton>
-					{!isClient && (
-						<ListItemButton
-							selected={selectedIndex === 6}
-							onClick={(event) =>
-								handleListItemClick(event, 6, "reports")
-							}
-							key="Reports"
-							sx={{
-								minHeight: 48,
-								justifyContent: open ? "initial" : "center",
-								px: 2.5,
-							}}
-						>
-							<ListItemIcon
-								sx={{
-									minWidth: 0,
-									mr: open ? 3 : "auto",
-									justifyContent: "center",
-								}}
-							>
-								<Assessment />
-							</ListItemIcon>
-							<ListItemText
-								primary="Reports"
-								sx={{ opacity: open ? 1 : 0 }}
-							/>
-						</ListItemButton>
-					)}
+					{/* The "Reports" item is gone. It led to a nine-line page that rendered the
+					    word "Reports" and nothing else - the only nav entry in the app pointing at
+					    an empty page, so every click on it was a small lie.
+					
+					    Not replaced with a real Reports page, deliberately: reporting already IS
+					    the dashboard. Home mounts ShopAnalyticsPanel for staff and
+					    ArtistPerformancePanel for artists, both with a date-range picker, so a
+					    Reports page today would be the same figures at a second URL. If one is
+					    wanted later it should be something Home isn't - period-over-period
+					    comparison, or exports - rather than a duplicate. */}
 					<ListItemButton
 						selected={selectedIndex === 7}
 						onClick={(event) =>

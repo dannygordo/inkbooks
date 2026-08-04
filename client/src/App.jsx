@@ -18,10 +18,6 @@ import Projects from "./pages/projects/Projects";
 import Shops from "./pages/shops/Shops";
 import Staff from "./pages/staff/Staff";
 import Appointments from "./pages/appointments/Appointments";
-import Reports from "./pages/reports/Reports";
-import Account from "./pages/account/Account";
-import Portfolio from "./pages/portfolio/Portfolio";
-import Payments from "./pages/payments/Payments";
 import Artist from "./pages/artists/Artist";
 import EditArtist from "./components/artist/edit/EditArtist";
 import Client from "./pages/clients/Client";
@@ -218,22 +214,22 @@ function App() {
 								</AuthRoute>
 							}
 						/>
-						<Route
-							path="/reports"
-							element={
-								<AuthRoute>
-									<Reports />
-								</AuthRoute>
-							}
-						/>
-						<Route
-							path="/account"
-							element={
-								<AuthRoute>
-									<Account />
-								</AuthRoute>
-							}
-						/>
+						{/* /reports, /account, /portfolio and /payments are gone, along with the four
+						    pages behind them. Each was nine lines rendering its own name and
+						    nothing else. Only Reports was linked from the sidebar; the other three
+						    had their nav entries commented out, so they were reachable by URL
+						    alone.
+
+						    Not rebuilt, deliberately. Reporting already IS the dashboard - Home
+						    mounts the shop and artist analytics panels with a date-range picker,
+						    so a Reports page today would be the same numbers at a second URL.
+						    Payments duplicates the shop-cut payout list and the Square section on
+						    the shop page. Account duplicates Profile. Portfolio is the only one
+						    naming something that doesn't exist anywhere yet, and a placeholder
+						    isn't an implementation of it.
+
+						    All four are one `git revert` away if any of them was a placeholder
+						    someone was actively working toward. */}
 						<Route
 							path="/shops"
 							element={
@@ -255,22 +251,6 @@ function App() {
 							element={
 								<AuthRoute>
 									<EditShop />
-								</AuthRoute>
-							}
-						/>
-						<Route
-							path="/portfolio"
-							element={
-								<AuthRoute>
-									<Portfolio />
-								</AuthRoute>
-							}
-						/>
-						<Route
-							path="/payments"
-							element={
-								<AuthRoute>
-									<Payments />
 								</AuthRoute>
 							}
 						/>

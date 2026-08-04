@@ -122,7 +122,7 @@ export const APP_SETTINGS_CONSTANTS = {
 		PROJECTS: "projects",
 		APPOINTMENTS: "appointments",
 		SHOPS: "shops",
-		REPORTS: "reports",
+		// REPORTS removed with the page - see App.jsx.
 	},
 	CARD_TYPES: {
 		ARTIST: "artist",
