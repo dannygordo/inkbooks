@@ -1,4 +1,5 @@
 const { Constants } = require('./constants');
+const { UserInputError } = require('./errors');
 
 /**
  * Archiving: what "remove this person" means now that the delete mutations are gone.
@@ -64,4 +65,51 @@ function archiveFilter(includeArchived, filter = {}) {
   return includeArchived ? filter : excludeArchived(filter);
 }
 
-module.exports = { ARCHIVED, notArchived, excludeArchived, archiveFilter, isArchived };
+/**
+ * Refuses an update that would archive or unarchive a record as a side effect.
+ *
+ * Archiving has to have exactly one door. Artist/Staff/Client all carry `status` on their update
+ * input, so `updateArtist({ status: 4 })` could archive someone without the confirmation, without
+ * the archive mutation's own checks, and without anything in the UI saying it happened - and the
+ * reverse, an update that quietly brings an archived person back onto the roster.
+ *
+ * Today no edit form picks a status at all: they load a record and echo `status` back unchanged,
+ * so the value round-trips and this never fires. That's exactly why it's worth writing down. A
+ * field that nothing sets deliberately is one someone will start setting deliberately later,
+ * having never read this file.
+ *
+ * Deliberately NOT done by stripping `status` from the input. ARTIST_STATUS also has INACTIVE and
+ * BOOKS_CLOSED, which are ordinary editable values an artist settings screen should be able to
+ * set. Silently dropping a field the caller sent is its own trap - this refuses loudly instead,
+ * and only for the one transition that has a dedicated mutation.
+ *
+ * @param {object} existing - the stored document
+ * @param {number|undefined} nextStatus - status from the update input; absent means "don't touch"
+ * @param {string} archiveMutationName - named in the error, so the caller knows where to go
+ */
+function assertNoArchiveTransition(existing, nextStatus, archiveMutationName) {
+  if (nextStatus === undefined || nextStatus === null) {
+    return;
+  }
+  const wasArchived = isArchived(existing);
+  const willBeArchived = nextStatus === ARCHIVED;
+  if (wasArchived === willBeArchived) {
+    return;
+  }
+  throw new UserInputError('Errors', {
+    errors: {
+      status: willBeArchived
+        ? `Use ${archiveMutationName} to archive this record, not an update.`
+        : `Use un${archiveMutationName} to restore this record, not an update.`,
+    },
+  });
+}
+
+module.exports = {
+  ARCHIVED,
+  notArchived,
+  excludeArchived,
+  archiveFilter,
+  isArchived,
+  assertNoArchiveTransition,
+};

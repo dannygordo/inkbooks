@@ -54,6 +54,12 @@ const GET_CLIENTS_INCLUDING_ARCHIVED = `
 const GET_ARTISTS_BY_SHOP = `
 	query A($shopId: ID!) { getArtistsByShop(shopId: $shopId) { id } }
 `;
+const UPDATE_CLIENT = `
+	mutation A($client: ClientInput) { updateClient(client: $client) { id status phone } }
+`;
+const UPDATE_ARTIST = `
+	mutation A($artist: ArtistInput) { updateArtist(artist: $artist) { id status } }
+`;
 const SHOP_ANALYTICS = `
 	query A($shopId: ID!, $start: DateTime!, $end: DateTime!) {
 		getShopAnalytics(shopId: $shopId, start: $start, end: $end) { revenueCents tipsCents }
@@ -380,6 +386,113 @@ describe('archiving never touches the money', () => {
 
 		const after = await server.executeOperation({ query: GET_CLIENTS }, asUser(shopAdmin));
 		expect(after.body.singleResult.data.getClients.map((c) => c.id)).toContain(client.id);
+	});
+});
+
+describe('archiving has one door', () => {
+	// Artist, Staff and Client all carry `status` on their update input, so updateX({ status: 4 })
+	// was a second way to archive someone - bypassing the confirmation, the archive mutation's own
+	// checks, and anything in the UI saying it happened. The reverse too: an update quietly putting
+	// an archived person back on the roster.
+	//
+	// No edit form picks a status today; they load a record and echo the value back unchanged. That
+	// is exactly why this is worth a test rather than a comment - a field nothing sets deliberately
+	// is one somebody starts setting deliberately later, having never read the mutation.
+	it('refuses archiving a client through updateClient', async () => {
+		const { shopAdmin, client } = await shopWithEarningArtist();
+		const server = createTestServer();
+
+		const res = await server.executeOperation(
+			{
+				query: UPDATE_CLIENT,
+				variables: {
+					client: { id: client.id, status: Constants.CLIENT_STATUS.ARCHIVED },
+				},
+			},
+			asUser(shopAdmin),
+		);
+
+		expect(res.body.singleResult.errors[0].extensions.errors.status).toMatch(/archiveClient/);
+		const stored = await Client.findById(client.id);
+		expect(stored.status).not.toBe(Constants.CLIENT_STATUS.ARCHIVED);
+	});
+
+	it('refuses un-archiving a client through updateClient', async () => {
+		const { shopAdmin, client } = await shopWithEarningArtist();
+		const server = createTestServer();
+
+		await server.executeOperation(
+			{ query: ARCHIVE_CLIENT, variables: { clientId: client.id } },
+			asUser(shopAdmin),
+		);
+
+		const res = await server.executeOperation(
+			{
+				query: UPDATE_CLIENT,
+				variables: { client: { id: client.id, status: Constants.CLIENT_STATUS.ACTIVE } },
+			},
+			asUser(shopAdmin),
+		);
+
+		expect(res.body.singleResult.errors[0].extensions.errors.status).toMatch(/unarchiveClient/);
+		const stored = await Client.findById(client.id);
+		expect(stored.status).toBe(Constants.CLIENT_STATUS.ARCHIVED);
+	});
+
+	it('refuses archiving an artist through updateArtist', async () => {
+		const { shopAdmin, artist } = await shopWithEarningArtist();
+		const server = createTestServer();
+
+		const res = await server.executeOperation(
+			{
+				query: UPDATE_ARTIST,
+				variables: {
+					artist: { id: artist.id, status: Constants.ARTIST_STATUS.ARCHIVED },
+				},
+			},
+			asUser(shopAdmin),
+		);
+
+		expect(res.body.singleResult.errors[0].extensions.errors.status).toMatch(/archiveArtist/);
+		const stored = await Artist.findById(artist.id);
+		expect(stored.status).not.toBe(Constants.ARTIST_STATUS.ARCHIVED);
+	});
+
+	it('still allows the other artist statuses through an ordinary update', async () => {
+		// The check is narrow on purpose. BOOKS_CLOSED and INACTIVE are ordinary editable values -
+		// stripping `status` from the input entirely would have taken those with it, and silently
+		// dropping a field the caller sent is its own trap.
+		const { shopAdmin, artist } = await shopWithEarningArtist();
+		const server = createTestServer();
+
+		const res = await server.executeOperation(
+			{
+				query: UPDATE_ARTIST,
+				variables: {
+					artist: { id: artist.id, status: Constants.ARTIST_STATUS.BOOKS_CLOSED },
+				},
+			},
+			asUser(shopAdmin),
+		);
+
+		expect(res.body.singleResult.errors).toBeUndefined();
+		const stored = await Artist.findById(artist.id);
+		expect(stored.status).toBe(Constants.ARTIST_STATUS.BOOKS_CLOSED);
+	});
+
+	it('leaves an ordinary edit that sends no status alone', async () => {
+		// The common case, and the one that must not start erroring: an edit form that changes a
+		// phone number and never mentions status.
+		const { shopAdmin, client } = await shopWithEarningArtist();
+		const server = createTestServer();
+
+		const res = await server.executeOperation(
+			{ query: UPDATE_CLIENT, variables: { client: { id: client.id, phone: '555-0142' } } },
+			asUser(shopAdmin),
+		);
+
+		expect(res.body.singleResult.errors).toBeUndefined();
+		expect(res.body.singleResult.data.updateClient.phone).toBe('555-0142');
 	});
 });
 

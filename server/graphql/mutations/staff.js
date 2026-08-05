@@ -2,6 +2,8 @@ const Staff = require('../../models/Staff');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 const { assertCanAccessShop } = require('../../utils/shop-membership');
+const { assertNoArchiveTransition } = require('../../utils/archiving');
+const { UserInputError } = require('../../utils/errors');
 
 module.exports = {
   createStaff: withAuth(async (
@@ -72,13 +74,15 @@ module.exports = {
     return staff;
   }, Constants.ROLES.SHOP_ADMIN),
   updateStaff: withAuth(async (_, args, context, info, user) => {
+    // Outside the try - see the matching note in mutations/artists.js on why.
+    const staff = args.staff;
+    const existing = await Staff.findById(staff.id).select('shopId status');
+    if (!existing) {
+      throw new UserInputError('Errors', { errors: { id: 'Staff not found' } });
+    }
+    await assertCanAccessShop(user, existing.shopId);
+    assertNoArchiveTransition(existing, staff.status, 'archiveStaff');
     try{
-      const staff = args.staff;
-      const existing = await Staff.findById(staff.id).select('shopId');
-      if (!existing) {
-        throw new Error('Staff not found');
-      }
-      await assertCanAccessShop(user, existing.shopId);
       const res = await Staff.findByIdAndUpdate({_id: staff.id}, staff, {new: true});
       return res;
     } catch (err) {

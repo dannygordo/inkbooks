@@ -7,6 +7,7 @@ const {
   assertCanAccessClient,
   linkClientToUsersShops,
 } = require('../../utils/shop-membership');
+const { assertNoArchiveTransition } = require('../../utils/archiving');
 
 module.exports = {
   createClient: withAuth(async (
@@ -73,13 +74,15 @@ module.exports = {
   // The minRole was the whole check here too - any shop admin could rewrite any client's name,
   // email, phone and address anywhere on the platform.
   updateClient: withAuth(async (_, args, context, info, user) => {
+    // Outside the try - see the matching note in mutations/artists.js on why.
+    const client = args.client;
+    const existing = await Client.findById(client.id);
+    if (!existing) {
+      throw new UserInputError('Errors', { errors: { id: 'Client not found' } });
+    }
+    await assertCanAccessClient(user, existing);
+    assertNoArchiveTransition(existing, client.status, 'archiveClient');
     try{
-      const client = args.client;
-      const existing = await Client.findById(client.id);
-      if (!existing) {
-        throw new Error('Client not found');
-      }
-      await assertCanAccessClient(user, existing);
       const res = await Client.findByIdAndUpdate({_id: client.id}, client, {new: true});
       return res;
     } catch (err) {

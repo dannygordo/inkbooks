@@ -5,6 +5,7 @@ const { Constants } = require('../../utils/constants');
 const { AuthenticationError, UserInputError } = require('../../utils/errors');
 const { updateArtistRateSettingsInputSchema, validate } = require('../../utils/validation');
 const { assertCanAccessShop, assertCanManageArtist } = require('../../utils/shop-membership');
+const { assertNoArchiveTransition } = require('../../utils/archiving');
 
 module.exports = {
   createArtist: withAuth(async (
@@ -103,15 +104,23 @@ module.exports = {
     return artist;
   }, Constants.ROLES.SHOP_ADMIN),
   updateArtist: withAuth(async (_, args, context, info, user) => {
+    // Everything up to the write sits OUTSIDE the try. The catch below rewraps whatever it
+    // catches as a plain Error, which flattens a UserInputError's extensions - so an
+    // authorization or validation failure would reach the client as an opaque server error
+    // instead of the message it carries.
+    const artist = args.artist;
+    // status is selected explicitly: `.select('userId')` alone left it undefined, so the archive
+    // check below would have read every record as unarchived and never fired.
+    const existing = await Artist.findById(artist.id).select('userId status');
+    if (!existing) {
+      throw new UserInputError('Errors', { errors: { id: 'Artist not found' } });
+    }
+    // A shop admin editing an artist's profile - including their hourly rate - must share a
+    // shop with them. The minRole was the entire check before this.
+    await assertCanManageArtist(user, existing.userId);
+    // Archiving has one door, and this isn't it - see utils/archiving.js.
+    assertNoArchiveTransition(existing, artist.status, 'archiveArtist');
     try{
-      const artist = args.artist;
-      const existing = await Artist.findById(artist.id).select('userId');
-      if (!existing) {
-        throw new Error('Artist not found');
-      }
-      // A shop admin editing an artist's profile - including their hourly rate - must share a
-      // shop with them. The minRole was the entire check before this.
-      await assertCanManageArtist(user, existing.userId);
       const res = await Artist.findByIdAndUpdate({_id: artist.id}, artist, {new: true});
       return res;
     } catch (err) {

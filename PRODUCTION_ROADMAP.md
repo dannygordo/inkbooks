@@ -145,6 +145,15 @@ don't believe: "remove this person" reads as "lose their history", and someone w
 about to lose a year of revenue records will leave departed artists on the roster forever instead -
 which is the outcome archiving exists to prevent.
 
+Archiving has one door. Artist/Staff/Client all carry `status` on their update input, so
+`updateX({ status: 4 })` was a second way in - bypassing the confirmation, the archive mutation's
+own checks, and anything in the UI saying it happened, plus the reverse (an update quietly putting
+somebody back on the roster). `assertNoArchiveTransition` refuses that specific transition in both
+directions. Deliberately narrow rather than stripping `status` from the input: `BOOKS_CLOSED` and
+`INACTIVE` are ordinary editable values, and silently dropping a field a caller sent is its own
+trap. Nothing in the UI sets a status today, which is precisely why it's enforced and tested rather
+than noted - a field nothing sets deliberately is one somebody starts setting later.
+
 Still open: a redaction action for GDPR/CCPA erasure requests, which must null the PII in place and
 keep the financial row - tax retention runs the other way, so deletion is the wrong tool even
 there.
