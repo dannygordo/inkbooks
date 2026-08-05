@@ -726,3 +726,171 @@ describe('getBookingRequests', () => {
 		expect(data.getBookingRequests[0].source).toBe('public_form');
 	});
 });
+
+// Converting a consult into a session means the consult HAPPENED. Nothing used to record that:
+// the consult stayed 'scheduled' at its originally-booked date, which left it sitting in the
+// artist's upcoming list as a meeting they had already had - and, because utils/analytics.js
+// buckets by appointmentDate, dated its deposit revenue to a period the money wasn't earned in.
+describe('convertBookingRequest: closing out the consult', () => {
+	// Local copy rather than the identically-named helpers inside the two describe blocks above:
+	// those are scoped to their own blocks and are not visible here. fakeIp/bookingInput ARE
+	// module-level, so only the submit step needs repeating.
+	async function submitRequest(artistUserId) {
+		const server = createTestServer();
+		const response = await server.executeOperation(
+			{ query: CREATE_BOOKING_REQUEST, variables: { bookingRequestInput: bookingInput(artistUserId) } },
+			{ contextValue: { req: { headers: {}, ip: fakeIp() } } },
+		);
+		return BookingRequest.findById(response.body.singleResult.data.createBookingRequest.id);
+	}
+
+	// Books a consult for `daysOut` days from now, then converts that same request to a session.
+	// Returns the consult document as it stands afterwards.
+	async function consultThenSession(daysOut) {
+		const { user: artistUser } = await createArtistUser();
+		const bookingRequest = await submitRequest(artistUser.id);
+		const server = createTestServer();
+		const asArtist = { contextValue: contextWithToken(signTestToken(artistUser)) };
+
+		const consultDate = new Date(Date.now() + daysOut * 24 * 60 * 60 * 1000);
+		const consultRes = await server.executeOperation(
+			{
+				query: CONVERT_BOOKING_REQUEST,
+				variables: {
+					bookingRequestId: bookingRequest.id,
+					outcome: 'consult_booked',
+					appointmentInput: {
+						appointmentDate: consultDate.toISOString(),
+						appointmentStatus: 'scheduled',
+					},
+				},
+			},
+			asArtist,
+		);
+		expect(consultRes.body.singleResult.errors).toBeUndefined();
+		const consultId = consultRes.body.singleResult.data.convertBookingRequest.resultingAppointmentId;
+
+		const sessionRes = await server.executeOperation(
+			{
+				query: CONVERT_BOOKING_REQUEST,
+				variables: {
+					bookingRequestId: bookingRequest.id,
+					outcome: 'session_booked',
+					appointmentInput: {
+						appointmentDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+						appointmentStatus: 'scheduled',
+					},
+					projectTitle: 'Sleeve',
+				},
+			},
+			asArtist,
+		);
+		expect(sessionRes.body.singleResult.errors).toBeUndefined();
+
+		return {
+			consult: await Appointment.findById(consultId),
+			consultDate,
+			sessionId: sessionRes.body.singleResult.data.convertBookingRequest.resultingAppointmentId,
+			artistUser,
+			server,
+		};
+	}
+
+	it('marks the consult completed', async () => {
+		const { consult } = await consultThenSession(7);
+		expect(consult.appointmentStatus).toBe('completed');
+	});
+
+	it('pulls a future-dated consult back to the conversion moment', async () => {
+		// The consult was booked a week out but the conversion is happening now, so the meeting
+		// happened now. This is the money-correctness half: a deposit is recorded against this
+		// consult, and analytics buckets by appointmentDate - leaving it a week out would book
+		// this month's revenue into next month.
+		const before = Date.now();
+		const { consult, consultDate } = await consultThenSession(7);
+		const after = Date.now();
+
+		expect(consult.appointmentDate.getTime()).toBeLessThan(consultDate.getTime());
+		expect(consult.appointmentDate.getTime()).toBeGreaterThanOrEqual(before);
+		expect(consult.appointmentDate.getTime()).toBeLessThanOrEqual(after);
+	});
+
+	it('leaves a past-dated consult where it was', async () => {
+		// The mirror image, and the reason this only ever moves the date backward. A consult held
+		// last week and only converted today really did happen last week; rewriting it to today
+		// would move revenue OUT of the period it belongs to - the same bug, pointed the other way.
+		const { consult, consultDate } = await consultThenSession(-7);
+		expect(consult.appointmentStatus).toBe('completed');
+		expect(consult.appointmentDate.getTime()).toBe(consultDate.getTime());
+	});
+
+	it('does not close out the new session', async () => {
+		// resultingAppointmentId is overwritten to point at the session, so a guard that only
+		// looked at "the request's resulting appointment" would close out the session on a second
+		// conversion. The session is in the future and hasn't happened.
+		const { sessionId } = await consultThenSession(7);
+		const session = await Appointment.findById(sessionId);
+		expect(session.appointmentType).toBe('session');
+		expect(session.appointmentStatus).toBe('scheduled');
+	});
+
+	it('keeps the converted consult out of the upcoming list', async () => {
+		// The point of the whole thing, asserted through the query the dashboard actually calls.
+		const { artistUser, server } = await consultThenSession(7);
+
+		const response = await server.executeOperation(
+			{
+				query: `
+					query Upcoming($userId: ID!) {
+						getAppointmentsByArtist(userId: $userId, filter: { upcomingOnly: true }) {
+							items { id appointmentType appointmentStatus }
+						}
+					}
+				`,
+				variables: { userId: artistUser.id },
+			},
+			{ contextValue: contextWithToken(signTestToken(artistUser)) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		const types = data.getAppointmentsByArtist.items.map((a) => a.appointmentType);
+		expect(types).toContain('session');
+		expect(types).not.toContain('consult');
+	});
+
+	it('excludes a completed appointment from upcoming even when its date is still ahead', async () => {
+		// Independent of the date rewrite above. A consult closed out by any other route - or one
+		// whose date was never pulled back - must still not read as upcoming. Marking it completed
+		// is the rule; the date change is a separate correctness fix that happens to also help.
+		const { user: artistUser } = await createArtistUser();
+		const server = createTestServer();
+		const future = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+		await new Appointment({
+			userId: artistUser.id,
+			title: 'Already dealt with',
+			appointmentType: 'consult',
+			appointmentStatus: 'completed',
+			appointmentDate: future,
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		}).save();
+
+		const response = await server.executeOperation(
+			{
+				query: `
+					query Upcoming($userId: ID!) {
+						getAppointmentsByArtist(userId: $userId, filter: { upcomingOnly: true }) {
+							items { id }
+						}
+					}
+				`,
+				variables: { userId: artistUser.id },
+			},
+			{ contextValue: contextWithToken(signTestToken(artistUser)) },
+		);
+
+		expect(response.body.singleResult.errors).toBeUndefined();
+		expect(response.body.singleResult.data.getAppointmentsByArtist.items).toHaveLength(0);
+	});
+});

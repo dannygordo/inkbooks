@@ -371,6 +371,46 @@ module.exports = {
 
     const appointment = await new Appointment(apptData).save();
 
+    // Close out the consult this session came from.
+    //
+    // Booking a session out of a consult means the consult HAPPENED - the artist and the client
+    // met, agreed the work, and (usually) money changed hands. But nothing here used to say so.
+    // The consult stayed 'scheduled' with its originally-booked date, which caused two distinct
+    // problems, one cosmetic and one financial:
+    //
+    //   1. It kept showing up as an upcoming appointment. Every "upcoming" list is
+    //      `appointmentDate >= now` (see appointmentFilterToQuery in resolvers/appointments.js),
+    //      and a consult booked for next Tuesday that actually happened today is still ahead of
+    //      now. The artist saw a meeting they had already had sitting in their schedule.
+    //
+    //   2. Worse: it dated the deposit wrong. A deposit is recorded against this consult (see
+    //      BookSessionDatesForm), and utils/analytics.js buckets every figure by appointmentDate,
+    //      not createdAt - deliberately, so "how did March go" means work done in March. A
+    //      consult scheduled for next month but held early therefore booked its deposit revenue
+    //      into NEXT month. The money was real, correctly recorded, and in the wrong period.
+    //
+    // Both are fixed by the same two writes, and the date one is the reason this belongs here
+    // rather than in the UI: it has to happen in the same operation that takes the deposit.
+    //
+    // The date only ever moves BACKWARD, never forward. If the consult was scheduled for last
+    // week and is only being converted now (an artist catching up on paperwork), its real date is
+    // still last week - that is when the meeting happened, and rewriting it to today would move
+    // revenue out of the period it belongs to, which is the exact bug this is fixing, mirrored.
+    // Only a consult whose scheduled date is still in the future gets pulled back to now.
+    if (data.outcome === 'session_booked' && bookingRequest.resultingAppointmentId) {
+      const consult = await Appointment.findById(bookingRequest.resultingAppointmentId);
+      // Guarded on type: resultingAppointmentId is overwritten below to point at the new session,
+      // so a request converted twice would otherwise "close out" a session as if it were a
+      // consult. Only ever act on something that is actually a consult and not already closed.
+      if (consult && consult.appointmentType === 'consult' && consult.appointmentStatus !== 'completed') {
+        consult.appointmentStatus = 'completed';
+        if (consult.appointmentDate && consult.appointmentDate > now) {
+          consult.appointmentDate = now;
+        }
+        await consult.save();
+      }
+    }
+
     bookingRequest.status = data.outcome;
     bookingRequest.resultingAppointmentId = appointment.id;
     await bookingRequest.save();

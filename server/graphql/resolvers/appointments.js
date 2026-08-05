@@ -68,6 +68,22 @@ function appointmentFilterToQuery(filter) {
     query.appointmentDate = dateBounds;
   }
 
+  // "Upcoming" is two conditions, not one: still ahead of now, AND not already dealt with.
+  //
+  // Only the date half existed, which is how a consult that had already been converted into a
+  // session went on sitting in the artist's upcoming list - it was over, but its originally-booked
+  // date was still in the future. convertBookingRequest now closes that consult out and pulls its
+  // date back to the conversion moment (see mutations/bookingRequests.js), which alone would keep
+  // it out of this list - but only by a few milliseconds of clock ordering, which is not a rule.
+  // This is the rule. A completed, cancelled or no-show appointment is not upcoming at any date.
+  //
+  // Skipped when the caller asked for a specific appointmentStatus, since "upcoming AND
+  // completed" is a coherent question to ask (it isn't asked today) and silently returning
+  // nothing would be a worse answer than the empty set they'd actually get.
+  if (filter.upcomingOnly && !filter.appointmentStatus) {
+    query.appointmentStatus = { $nin: ['completed', 'cancelled', 'no_show'] };
+  }
+
   if (filter.appointmentStatus) {
     query.appointmentStatus = filter.appointmentStatus;
   }
