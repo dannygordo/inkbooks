@@ -8,6 +8,12 @@ const {
   getArtistIdsForShops,
   assertCanManageArtist,
 } = require('../../utils/shop-membership');
+const { paginate, normalizePage } = require('../../utils/pagination');
+
+function emptyProjectPage(page) {
+  const { limit, offset } = normalizePage(page);
+  return { items: [], pageInfo: { totalCount: 0, hasMore: false, limit, offset } };
+}
 
 const resolvers = {
   Query: {
@@ -19,7 +25,7 @@ const resolvers = {
     // shop's artists. Client sees only their own projects - note Project.clientId is the Client
     // sub-document's own _id, not the client's User._id (see resolvers/index.js's Project.client
     // resolver), so this looks up the caller's own Client doc first.
-    getProjects: withAuth(async (_, __, context, info, user) => {
+    getProjects: withAuth(async (_, { page }, context, info, user) => {
       try {
         let filter = {};
         // No unscoped branch, for anyone. The staff test is `<= SHOP_STAFF` rather than
@@ -31,18 +37,17 @@ const resolvers = {
           const shopIds = await getShopIdsForUser(user.id);
           const artistIds = await getArtistIdsForShops(shopIds);
           if (artistIds.length === 0) {
-            return [];
+            return emptyProjectPage(page);
           }
           filter = { artistId: { $in: artistIds } };
         } else {
           const myClient = await Client.findOne({ userId: user.id }).select('_id');
           if (!myClient) {
-            return [];
+            return emptyProjectPage(page);
           }
           filter = { clientId: myClient.id };
         }
-        const projects = await Project.find(filter).sort({ createdAt: -1 });
-        return projects;
+        return await paginate(Project, filter, { sort: { createdAt: -1 }, page });
       } catch (err) {
         rethrow(err);
       }

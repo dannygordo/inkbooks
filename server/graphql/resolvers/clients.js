@@ -9,6 +9,7 @@ const {
   canAccessClient,
 } = require('../../utils/shop-membership');
 const { archiveFilter } = require('../../utils/archiving');
+const { paginate, normalizePage } = require('../../utils/pagination');
 const { UserInputError, rethrow } = require('../../utils/errors');
 
 module.exports = {
@@ -24,7 +25,7 @@ module.exports = {
     // Both are needed. Project.clientId is the Client sub-document's own _id, not the client's
     // User._id (see resolvers/index.js's Project.client resolver), which is what the distinct
     // below relies on.
-    getClients: withAuth(async (_, { includeArchived }, context, info, user) => {
+    getClients: withAuth(async (_, { includeArchived, page }, context, info, user) => {
       try {
         const shopIds = await getShopIdsForUser(user.id);
         const artistIds =
@@ -42,10 +43,12 @@ module.exports = {
           or.push({ _id: { $in: clientIdsFromProjects } });
         }
         if (or.length === 0) {
-          return [];
+          const { limit, offset } = normalizePage(page);
+          return { items: [], pageInfo: { totalCount: 0, hasMore: false, limit, offset } };
         }
-        return await Client.find(archiveFilter(includeArchived, { $or: or })).sort({
-          lastName: 1,
+        return await paginate(Client, archiveFilter(includeArchived, { $or: or }), {
+          sort: { lastName: 1 },
+          page,
         });
       } catch (err) {
         rethrow(err);
