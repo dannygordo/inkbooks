@@ -39,16 +39,16 @@ const GET_CONVERSATIONS_BY_SHOP_ID = `
 	}
 `;
 const CREATE_MESSAGE = `
-	mutation CreateMessage($conversationId: ID!, $senderId: ID!, $message: String!, $createdAt: DateTime, $updatedAt: DateTime) {
-		createMessage(conversationId: $conversationId, senderId: $senderId, message: $message, createdAt: $createdAt, updatedAt: $updatedAt) {
+	mutation CreateMessage($conversationId: ID!, $senderId: ID!, $message: String!) {
+		createMessage(conversationId: $conversationId, senderId: $senderId, message: $message) {
 			id
 			user { id firstName userInfo { id firstName } }
 		}
 	}
 `;
 const CREATE_CONVERSATION = `
-	mutation CreateConversation($members: [ID!], $createdAt: DateTime, $updatedAt: DateTime) {
-		createConversation(members: $members, createdAt: $createdAt, updatedAt: $updatedAt) { id }
+	mutation CreateConversation($members: [ID!]) {
+		createConversation(members: $members) { id }
 	}
 `;
 
@@ -135,8 +135,6 @@ describe('getConversationsByShopId: real shop-membership matching', () => {
 				query: CREATE_CONVERSATION,
 				variables: {
 					members: [staffAtA.id, clientUser.id],
-					createdAt: new Date().toISOString(),
-					updatedAt: new Date().toISOString(),
 				},
 			},
 			{ contextValue: contextWithToken(signTestToken(staffAtA)) },
@@ -179,8 +177,6 @@ describe('Message.user resolver: no crash for staff senders, no crash on missing
 				query: CREATE_CONVERSATION,
 				variables: {
 					members: [staffUser.id, clientUser.id],
-					createdAt: new Date().toISOString(),
-					updatedAt: new Date().toISOString(),
 				},
 			},
 			{ contextValue: contextWithToken(signTestToken(staffUser)) },
@@ -194,8 +190,6 @@ describe('Message.user resolver: no crash for staff senders, no crash on missing
 					conversationId,
 					senderId: staffUser.id,
 					message: 'hello from staff',
-					createdAt: new Date().toISOString(),
-					updatedAt: new Date().toISOString(),
 				},
 			},
 			{ contextValue: contextWithToken(signTestToken(staffUser)) },
@@ -217,8 +211,6 @@ describe('createMessage: no impersonation, membership required', () => {
 				query: CREATE_CONVERSATION,
 				variables: {
 					members: [artistUser.id, clientUser.id],
-					createdAt: new Date().toISOString(),
-					updatedAt: new Date().toISOString(),
 				},
 			},
 			{ contextValue: contextWithToken(signTestToken(artistUser)) },
@@ -232,8 +224,6 @@ describe('createMessage: no impersonation, membership required', () => {
 					conversationId,
 					senderId: clientUser.id,
 					message: 'pretending to be the client',
-					createdAt: new Date().toISOString(),
-					updatedAt: new Date().toISOString(),
 				},
 			},
 			{ contextValue: contextWithToken(signTestToken(artistUser)) },
@@ -256,8 +246,6 @@ describe('createMessage: no impersonation, membership required', () => {
 				query: CREATE_CONVERSATION,
 				variables: {
 					members: [artistUser.id, clientUser.id],
-					createdAt: new Date().toISOString(),
-					updatedAt: new Date().toISOString(),
 				},
 			},
 			{ contextValue: contextWithToken(signTestToken(artistUser)) },
@@ -271,8 +259,6 @@ describe('createMessage: no impersonation, membership required', () => {
 					conversationId,
 					senderId: outsider.id,
 					message: 'butting in',
-					createdAt: new Date().toISOString(),
-					updatedAt: new Date().toISOString(),
 				},
 			},
 			{ contextValue: contextWithToken(signTestToken(outsider)) },
@@ -298,8 +284,6 @@ describe('createConversation: caller must be a member', () => {
 				query: CREATE_CONVERSATION,
 				variables: {
 					members: [artistUser.id, clientUser.id],
-					createdAt: new Date().toISOString(),
-					updatedAt: new Date().toISOString(),
 				},
 			},
 			{ contextValue: contextWithToken(signTestToken(outsider)) },
@@ -321,8 +305,6 @@ describe('createConversation: caller must be a member', () => {
 				query: CREATE_CONVERSATION,
 				variables: {
 					members: [artistUser.id, clientUser.id],
-					createdAt: new Date().toISOString(),
-					updatedAt: new Date().toISOString(),
 				},
 			},
 			{ contextValue: contextWithToken(signTestToken(artistUser)) },

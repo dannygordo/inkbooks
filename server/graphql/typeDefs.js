@@ -1221,11 +1221,8 @@ module.exports = gql`
 
     ######### Conversations ###########
 
-    createConversation(
-      members: [ID!]
-      createdAt: DateTime
-      updatedAt: DateTime
-    ): Conversation!
+    # Server-stamped timestamps, same as createMessage.
+    createConversation(members: [ID!]): Conversation!
     updateConversation(conversation: ConversationInput): Conversation
 
     ######### Messages ###########
@@ -1246,12 +1243,13 @@ module.exports = gql`
     # Handled, not merely seen. See models/Notification.js on why these are different.
     markNotificationsDone(notificationIds: [ID!]!): Int!
     markConversationRead(conversationId: ID!): Conversation!
+    # No createdAt/updatedAt. The server stamps them - a message's timestamp decides where it sits
+    # in the thread and whether it counts as unread, and neither may be caller-controlled. See
+    # mutations/messages.js.
     createMessage(
       conversationId: ID!
       senderId: ID!
       message: String!
-      createdAt: DateTime
-      updatedAt: DateTime
     ): Message!
     updateMessage(message: MessageInput): Message
 

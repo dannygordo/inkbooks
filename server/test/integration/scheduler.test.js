@@ -11,7 +11,12 @@ const ScheduledRun = require('../../models/ScheduledRun');
 const Notification = require('../../models/Notification');
 const { createArtistUser, createShopAdminUser } = require('../helpers/factories');
 const { runOnce, claim, periodStartFor } = require('../../utils/scheduler');
-const { sendDueEmails, findOrphanedEmails, ORPHAN_AFTER_MS } = require('../../utils/notification-jobs');
+const {
+	sendDueEmails,
+	findOrphanedEmails,
+	ORPHAN_AFTER_MS,
+	DIGEST_ORPHAN_AFTER_MS,
+} = require('../../utils/notification-jobs');
 const { notify, markRead } = require('../../utils/notifications');
 
 const HOUR = 60 * 60 * 1000;
@@ -111,19 +116,26 @@ describe('the email sweep', () => {
 		throw new Error('provider exploded');
 	};
 
+	// The recipient is an ARTIST, not a shop admin. This file tests the IMMEDIATE email path, and
+	// a shop admin's money default is digest (see utils/notification-preferences.js) - so using one
+	// here would leave every notification in 'digest' state and the sweep would correctly find
+	// nothing, which looks like the sweep being broken rather than like the wrong fixture.
+	//
+	// Worth stating because that is exactly how these tests failed once: they were written before
+	// preferences existed, when everything queued as 'pending'.
 	async function queuedNotification() {
-		const { user: artist } = await createArtistUser();
-		const { user: admin } = await createShopAdminUser();
+		const { user: sender } = await createArtistUser();
+		const { user: recipient } = await createArtistUser();
 		const [n] = await notify({
-			actorId: artist.id,
-			recipientIds: [admin.id],
+			actorId: sender.id,
+			recipientIds: [recipient.id],
 			type: 'deposit_collected',
 			category: 'money',
 			subjectType: 'appointment',
-			subjectId: artist.id,
+			subjectId: sender.id,
 			title: '$200 deposit collected',
 		});
-		return { notification: n, admin, artist };
+		return { notification: n, admin: recipient, artist: sender };
 	}
 
 	it('does not send while the grace is still running', async () => {
@@ -217,7 +229,7 @@ describe('the email sweep', () => {
 describe('orphaned email detection', () => {
 	it('finds nothing when the sweep is keeping up', async () => {
 		const { user: artist } = await createArtistUser();
-		const { user: admin } = await createShopAdminUser();
+		const { user: admin } = await createArtistUser();
 		await notify({
 			actorId: artist.id,
 			recipientIds: [admin.id],
@@ -236,7 +248,9 @@ describe('orphaned email detection', () => {
 		// nothing else in the app would ever mention it: the notifications still look right
 		// in-app, and the only symptom is email that quietly stopped arriving.
 		const { user: artist } = await createArtistUser();
-		const { user: admin } = await createShopAdminUser();
+		// Artist, not shop admin - the orphan sweep looks for 'pending', and a shop admin's money
+		// default is digest. See the note on queuedNotification above.
+		const { user: admin } = await createArtistUser();
 		const [n] = await notify({
 			actorId: artist.id,
 			recipientIds: [admin.id],
@@ -256,9 +270,38 @@ describe('orphaned email detection', () => {
 		expect((await findOrphanedEmails()).orphaned).toBe(1);
 	});
 
-	it('does not count one that already sent', async () => {
+	it('finds a digest that has missed a full cycle', async () => {
+		// The digest path is the DEFAULT for every shop admin, and until this existed it had no
+		// failure detection at all - the orphan sweep watched only 'pending'. A stuck digest looks
+		// exactly like a working one from in-app; the only symptom is a summary that stops arriving.
 		const { user: artist } = await createArtistUser();
 		const { user: admin } = await createShopAdminUser();
+		const [n] = await notify({
+			actorId: artist.id,
+			recipientIds: [admin.id],
+			type: 'deposit_collected',
+			category: 'money',
+			subjectType: 'appointment',
+			subjectId: artist.id,
+			title: 'waiting on a digest',
+		});
+		expect(n.emailStatus).toBe('digest');
+
+		// Fresh: legitimately waiting for their chosen hour, not stuck.
+		expect((await findOrphanedEmails()).digestStuck).toBe(0);
+
+		await Notification.updateOne(
+			{ _id: n._id },
+			{ $set: { createdAt: new Date(Date.now() - DIGEST_ORPHAN_AFTER_MS - 60 * 1000) } },
+		);
+		expect((await findOrphanedEmails()).digestStuck).toBe(1);
+	});
+
+	it('does not count one that already sent', async () => {
+		const { user: artist } = await createArtistUser();
+		// Artist, not shop admin - the orphan sweep looks for 'pending', and a shop admin's money
+		// default is digest. See the note on queuedNotification above.
+		const { user: admin } = await createArtistUser();
 		const [n] = await notify({
 			actorId: artist.id,
 			recipientIds: [admin.id],

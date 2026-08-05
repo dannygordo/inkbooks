@@ -17,6 +17,10 @@ const { sendDailyDigests } = require('./digest');
 // (NOTIFICATIONS_DESIGN.md §5, §12).
 const ORPHAN_AFTER_MS = 60 * 60 * 1000;
 
+// A digest legitimately waits until the recipient's chosen hour, so the threshold has to clear a
+// full day. 25 hours means a whole cycle was missed, which is a failure rather than patience.
+const DIGEST_ORPHAN_AFTER_MS = 25 * 60 * 60 * 1000;
+
 /**
  * Sends the emails whose grace has expired and which nobody read in time.
  *
@@ -123,7 +127,22 @@ async function findOrphanedEmails({ now = new Date() } = {}) {
     emailStatus: 'pending',
     emailAfter: { $lte: cutoff },
   });
-  return { orphaned: count };
+
+  // Digests get their own, longer horizon.
+  //
+  // A row sits in 'digest' legitimately until the recipient's chosen hour comes round, so anything
+  // under a day is normal. Past 25 hours it is not: the digest job has missed a full cycle, and
+  // nothing else would ever say so - the notifications look right in-app and the only symptom is
+  // a summary email that quietly stopped arriving.
+  //
+  // This was a real gap. The sweep originally watched only 'pending', so the entire digest path -
+  // which is the DEFAULT for every shop admin - had no failure detection at all.
+  const digestStuck = await Notification.countDocuments({
+    emailStatus: 'digest',
+    createdAt: { $lte: new Date(now.getTime() - DIGEST_ORPHAN_AFTER_MS) },
+  });
+
+  return { orphaned: count, digestStuck };
 }
 
 /**
@@ -159,14 +178,20 @@ function notificationJobs({ onReport = console.warn } = {}) {
       name: 'notification-email-orphans',
       everyMs: 60 * 60 * 1000,
       run: async () => {
-        const { orphaned } = await findOrphanedEmails();
+        const { orphaned, digestStuck } = await findOrphanedEmails();
         if (orphaned > 0) {
           onReport(
             `[notifications] ${orphaned} email(s) queued over an hour ago and still unsent. ` +
               'The send sweep is not completing - see utils/notification-jobs.js.',
           );
         }
-        return `orphaned=${orphaned}`;
+        if (digestStuck > 0) {
+          onReport(
+            `[notifications] ${digestStuck} notification(s) waiting on a digest for over a day. ` +
+              'The digest job has missed a full cycle - see utils/digest.js.',
+          );
+        }
+        return `orphaned=${orphaned} digestStuck=${digestStuck}`;
       },
     },
   ];
@@ -177,4 +202,5 @@ module.exports = {
   findOrphanedEmails,
   notificationJobs,
   ORPHAN_AFTER_MS,
+  DIGEST_ORPHAN_AFTER_MS,
 };

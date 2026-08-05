@@ -187,8 +187,8 @@ const createConversationInputSchema = z.object({
   // applied to updateConversationInputSchema above rather than leaving create less strict than
   // update.
   members: z.array(objectIdSchema).min(1, 'A conversation must have at least one member'),
-  createdAt: dateLikeSchema,
-  updatedAt: dateLikeSchema,
+  // No createdAt/updatedAt. Server-stamped - see mutations/conversations.js, and the same
+  // reasoning that took them off createMessage.
 });
 
 const createMessageInputSchema = z.object({
@@ -197,8 +197,10 @@ const createMessageInputSchema = z.object({
   // GraphQL's `message: String!` only guarantees non-null, not non-empty - an empty string ""
   // passes GraphQL fine. Message.js's Mongoose schema doesn't require this field at all.
   message: z.string().trim().min(1, 'Message cannot be empty'),
-  createdAt: dateLikeSchema,
-  updatedAt: dateLikeSchema,
+  // No createdAt/updatedAt. They used to be required here AND ignored by the resolver, which
+  // stamps its own (see mutations/messages.js on why a client-supplied message timestamp is
+  // unsound). Validating a field as required and then throwing it away is the worst of both:
+  // callers must supply something, and whatever they supply means nothing.
 });
 
 /**

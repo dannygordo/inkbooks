@@ -227,40 +227,26 @@ describe('marking read', () => {
 });
 
 describe('server-stamped timestamps', () => {
-	it('ignores a createdAt supplied by the caller', async () => {
-		// createMessage used to store whatever createdAt it was given. A message with a past
-		// timestamp sorts into the middle of an old thread and lands behind the reader's
-		// lastReadAt - born already-read, and permanently invisible as a notification. The read
-		// model is only exact because this isn't possible.
+	// There is deliberately no test that sending a createdAt is REJECTED. The argument is gone from
+	// the schema, so refusing it is GraphQL's job, not this codebase's - and a test carrying a
+	// knowingly-invalid document would also make scripts/verify.sh's "every document validates"
+	// check unable to tell a deliberate one from an accident. What is worth asserting is that the
+	// stamp is real, which is below.
+
+	it('stamps a message with the time it actually arrived', async () => {
 		const { artist, client, conversation } = await twoPersonConversation();
 		const server = createTestServer();
 		await markConversationRead(conversation.id, artist.id);
 
-		const longAgo = new Date('2020-01-01T00:00:00.000Z');
-		const res = await server.executeOperation(
-			{
-				query: `
-					mutation Backdated($conversationId: ID!, $senderId: ID!, $message: String!, $createdAt: DateTime) {
-						createMessage(conversationId: $conversationId, senderId: $senderId, message: $message, createdAt: $createdAt) {
-							id
-						}
-					}
-				`,
-				variables: {
-					conversationId: String(conversation.id),
-					senderId: String(client.id),
-					message: 'backdated',
-					createdAt: longAgo.toISOString(),
-				},
-			},
-			asUser(client),
-		);
-		expect(res.body.singleResult.errors).toBeUndefined();
+		const before = Date.now();
+		const sent = await say(server, client, conversation.id, 'now');
+		const after = Date.now();
 
-		const stored = await Message.findById(res.body.singleResult.data.createMessage.id);
-		expect(stored.createdAt.getTime()).toBeGreaterThan(longAgo.getTime());
+		const stored = await Message.findById(sent.id);
+		expect(stored.createdAt.getTime()).toBeGreaterThanOrEqual(before);
+		expect(stored.createdAt.getTime()).toBeLessThanOrEqual(after);
 
-		// And therefore it counts, which is the point.
+		// And therefore it counts as unread, which is the point.
 		const unread = await server.executeOperation({ query: UNREAD_TOTAL }, asUser(artist));
 		expect(unread.body.singleResult.data.getUnreadMessageCount).toBe(1);
 	});

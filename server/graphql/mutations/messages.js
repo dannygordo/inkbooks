@@ -18,13 +18,7 @@ module.exports = {
     // preserve" reasoning).
     createMessage: withAuth(async (
       _,
-      {
-        conversationId,
-        senderId,
-        message,
-        createdAt,
-        updatedAt
-      },
+      { conversationId, senderId, message },
       context,
       info,
       user,
@@ -39,7 +33,7 @@ module.exports = {
       if (!isMember) {
         throw new AuthenticationError('Action not allowed');
       }
-      const { valid, errors } = validate(createMessageInputSchema, { conversationId, senderId, message, createdAt, updatedAt });
+      const { valid, errors } = validate(createMessageInputSchema, { conversationId, senderId, message });
       if (!valid) {
         throw new UserInputError('Errors', { errors });
       }

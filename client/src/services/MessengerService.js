@@ -126,19 +126,11 @@ const MessengerService = (() => {
 	};
 
 	const _CREATE_MESSAGE_MUTATION = gql`
-		mutation CreateMessage(
-			$conversationId: ID!
-			$senderId: ID!
-			$message: String!
-			$createdAt: DateTime
-			$updatedAt: DateTime
-		) {
+		mutation CreateMessage($conversationId: ID!, $senderId: ID!, $message: String!) {
 			createMessage(
 				conversationId: $conversationId
 				senderId: $senderId
 				message: $message
-				createdAt: $createdAt
-				updatedAt: $updatedAt
 			) {
 				id
 				conversationId

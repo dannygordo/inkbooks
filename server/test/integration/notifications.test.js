@@ -131,6 +131,9 @@ describe('the actor rule', () => {
 });
 
 describe('read and done', () => {
+	// These assert on emailStatus, so the recipient has to be someone whose money default is
+	// IMMEDIATE - an artist. A shop admin digests money, so the same event would sit in 'digest'
+	// and the cancel-on-read assertions would be testing the wrong path.
 	async function oneNotification(recipient, actor) {
 		const [n] = await notify({
 			...baseEvent,
@@ -145,13 +148,16 @@ describe('read and done', () => {
 		// Reading "shop cut invoice issued" is not paying it. An inbox with only read state gets
 		// used as if read means handled, and then means nothing.
 		const { user: artist } = await createArtistUser();
-		const { user: admin } = await createShopAdminUser();
+		const { user: admin } = await createArtistUser();
 		const n = await oneNotification(admin, artist);
 
 		await markRead(admin.id, [n._id]);
 		const afterRead = await Notification.findById(n._id);
 		expect(afterRead.readAt).toBeTruthy();
-		expect(afterRead.doneAt).toBeNull();
+		// Falsy, not null. Mongoose returns undefined for a path with no value and no default -
+		// there is no stored null to find. Both mean "not set", and a Mongo query for `null`
+		// matches either, so nothing downstream cares; only the assertion did.
+		expect(afterRead.doneAt).toBeFalsy();
 
 		await markDone(admin.id, [n._id]);
 		const afterDone = await Notification.findById(n._id);
@@ -163,7 +169,7 @@ describe('read and done', () => {
 		// earlier read with the later one - so marking something done next week would claim you
 		// first saw it next week. For a money notification that is a corrupted audit trail.
 		const { user: artist } = await createArtistUser();
-		const { user: admin } = await createShopAdminUser();
+		const { user: admin } = await createArtistUser();
 		const n = await oneNotification(admin, artist);
 
 		const readAt = new Date(Date.now() - 60 * 60 * 1000);
@@ -179,7 +185,7 @@ describe('read and done', () => {
 		// Handling a thing from elsewhere in the app is normal; "done but never seen" is a state no
 		// interface can render.
 		const { user: artist } = await createArtistUser();
-		const { user: admin } = await createShopAdminUser();
+		const { user: admin } = await createArtistUser();
 		const n = await oneNotification(admin, artist);
 
 		await markDone(admin.id, [n._id]);
@@ -191,7 +197,7 @@ describe('read and done', () => {
 		// The whole reason the email waits. Somebody who has already seen and dealt with a thing
 		// should not be emailed about it three minutes later.
 		const { user: artist } = await createArtistUser();
-		const { user: admin } = await createShopAdminUser();
+		const { user: admin } = await createArtistUser();
 		const n = await oneNotification(admin, artist);
 
 		expect((await Notification.findById(n._id)).emailStatus).toBe('pending');
@@ -203,7 +209,7 @@ describe('read and done', () => {
 		// Rewriting 'sent' to 'cancelled' would record something that didn't happen - the email has
 		// already left.
 		const { user: artist } = await createArtistUser();
-		const { user: admin } = await createShopAdminUser();
+		const { user: admin } = await createArtistUser();
 		const n = await oneNotification(admin, artist);
 		await Notification.updateOne({ _id: n._id }, { $set: { emailStatus: 'sent' } });
 
@@ -219,7 +225,7 @@ describe('read and done', () => {
 
 		const changed = await markRead(stranger.id, [n._id]);
 		expect(changed).toBe(0);
-		expect((await Notification.findById(n._id)).readAt).toBeNull();
+		expect((await Notification.findById(n._id)).readAt).toBeFalsy();
 	});
 });
 

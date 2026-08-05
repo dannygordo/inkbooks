@@ -14,28 +14,22 @@ module.exports = {
     // new, unsolicited thread in two unrelated users' Messenger inboxes. Added a minimal
     // safeguard even though this mutation currently has no real caller - "fix the Conversation
     // logic" shouldn't mean "except the parts nothing uses yet."
-    createConversation: withAuth(async (
-      _,
-      {
-        members,
-        createdAt,
-        updatedAt
-      },
-      context,
-      info,
-      user,
-    ) => {
-      const { valid, errors } = validate(createConversationInputSchema, { members, createdAt, updatedAt });
+    createConversation: withAuth(async (_, { members }, context, info, user) => {
+      const { valid, errors } = validate(createConversationInputSchema, { members });
       if (!valid) {
         throw new UserInputError('Errors', { errors });
       }
       if (!(members || []).some((memberId) => String(memberId) === String(user.id))) {
         throw new AuthenticationError('Action not allowed');
       }
+      // Server-stamped, same as message timestamps. A conversation's createdAt orders it in the
+      // messenger list, and "when was this created" is not a thing a caller gets to assert - the
+      // same reasoning that took createdAt off createMessage.
+      const now = new Date();
       const newConversation = new Conversation({
         members,
-        createdAt,
-        updatedAt
+        createdAt: now,
+        updatedAt: now,
       });
       const conversation = await newConversation.save();
       return conversation;

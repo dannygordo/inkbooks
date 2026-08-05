@@ -48,15 +48,11 @@ const CREATE_MESSAGE = gql`
     $conversationId: ID!
     $senderId: ID!
     $message: String!
-    $createdAt: DateTime
-    $updatedAt: DateTime
   ) {
     createMessage(
       conversationId: $conversationId
       senderId: $senderId
       message: $message
-      createdAt: $createdAt
-      updatedAt: $updatedAt
     ) {
       id
     }
@@ -196,14 +192,11 @@ const ArtistBookingRequests = () => {
     if (!message || !selected) {
       return;
     }
-    const now = new Date().toISOString();
     createMessage({
       variables: {
         conversationId: selected.conversation.id,
         senderId: user.id,
         message,
-        createdAt: now,
-        updatedAt: now,
       },
     });
   };

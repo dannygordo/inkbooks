@@ -37,8 +37,8 @@ const GET_CLIENT = `query GetClient($clientId: ID!) { getClient(clientId: $clien
 const GET_PROJECT = `query GetProject($projectId: ID!) { getProject(projectId: $projectId) { id } }`;
 const GET_CONVERSATION = `query GetConversation($conversationId: ID!) { getConversation(conversationId: $conversationId) { id } }`;
 const CREATE_CONVERSATION = `
-	mutation CreateConversation($members: [ID!], $createdAt: DateTime, $updatedAt: DateTime) {
-		createConversation(members: $members, createdAt: $createdAt, updatedAt: $updatedAt) { id }
+	mutation CreateConversation($members: [ID!]) {
+		createConversation(members: $members) { id }
 	}
 `;
 
@@ -569,8 +569,6 @@ describe('getConversation: member-only', () => {
 				query: CREATE_CONVERSATION,
 				variables: {
 					members: [artistUser.id, clientUser.id],
-					createdAt: new Date().toISOString(),
-					updatedAt: new Date().toISOString(),
 				},
 			},
 			{ contextValue: contextWithToken(signTestToken(artistUser)) },
@@ -597,8 +595,6 @@ describe('getConversation: member-only', () => {
 				query: CREATE_CONVERSATION,
 				variables: {
 					members: [artistUser.id, clientUser.id],
-					createdAt: new Date().toISOString(),
-					updatedAt: new Date().toISOString(),
 				},
 			},
 			{ contextValue: contextWithToken(signTestToken(artistUser)) },

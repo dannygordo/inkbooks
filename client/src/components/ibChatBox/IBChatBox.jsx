@@ -90,8 +90,9 @@ const IBChatBox = ({ widget, conversation, setActiveMessages, messages, isInputD
 			conversationId: newMessage.conversationId,
 			senderId: newMessage.senderId,
 			message: newMessage.message,
-			createdAt: newMessage.createdAt,
-			updatedAt: newMessage.updatedAt,
+			// No timestamps. The server stamps them - a client-supplied one decides thread order
+			// and unread state, neither of which may be caller-controlled. The local `newMessage`
+			// above still carries them for the optimistic render only.
 		},
 		}).then(({ data: { createMessage: msg } }) => {
 			console.log(msg);
