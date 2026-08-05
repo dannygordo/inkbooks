@@ -1,6 +1,6 @@
 import { useState } from "react";
 import moment from "moment";
-import { useMutation } from "@apollo/client";
+import { useApolloClient, useMutation } from "@apollo/client";
 import { Button, IconButton } from "@mui/material";
 import { Add, Close } from "@mui/icons-material";
 import IBDateTimePicker from "../inputs/IBDateTimePicker";
@@ -58,6 +58,12 @@ const BookSessionDatesForm = ({
 
 	const [convertBookingRequest] = useMutation(BookingRequestService.CONVERT_BOOKING_REQUEST_MUTATION);
 	const [createAppointment] = useMutation(AppointmentService.CREATE_APPOINTMENT);
+	// See AppointmentService.CALENDAR_REFETCH_QUERIES - by operation name, all of them, because
+	// refetchQueries skips whatever isn't mounted and this form is reached from two different
+	// places (the consult page and the calendar's event dialog) watching different queries.
+	const client = useApolloClient();
+	const refetchAppointments = () =>
+		client.refetchQueries({ include: AppointmentService.CALENDAR_REFETCH_QUERIES });
 	const [recordDeposit] = useMutation(DepositService.RECORD_DEPOSIT);
 
 	const updateDate = (index, val) => {
@@ -147,6 +153,13 @@ const BookSessionDatesForm = ({
 					return;
 				}
 			}
+
+			// One refresh at the end, after every appointment and the deposit have landed - rather
+			// than a refetch per createAppointment inside the loop above, which would fire N
+			// identical round trips for a multi-sitting booking and still miss the deposit. None
+			// of these mutations refreshed anything before, so a session booked from a consult
+			// only appeared on the calendar after a hard reload.
+			await refetchAppointments();
 
 			if (onSuccess) {
 				onSuccess(projectId);

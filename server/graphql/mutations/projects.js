@@ -42,14 +42,13 @@ module.exports = {
         notes,
         tags,
         status,
-        depositAmount,
     },
   ) => {
     // Supersedes the old manual title/description empty-string checks - createProjectInputSchema
     // covers those plus the enum/non-negative checks updateProject already had.
     const { valid, errors } = validate(createProjectInputSchema, {
       title, description, placement, size, palette, artistId, clientId, referenceImages,
-      bodyImages, designImages, materialsUsed, notes, tags, status, depositAmount,
+      bodyImages, designImages, materialsUsed, notes, tags, status,
     });
     if (!valid) {
       throw new UserInputError('Errors', { errors });
@@ -69,7 +68,6 @@ module.exports = {
         notes: remapIdToMongoId(notes),
         tags,
         status,
-        depositAmount,
     });
     const project = await newProject.save();
     // The artist's shop has now demonstrably worked with this client, so record it. This is the

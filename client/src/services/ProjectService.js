@@ -105,7 +105,15 @@ const ProjectService = (() => {
 				}
 				tags
 				status
-				depositAmount
+				# depositAmount is the DEPRECATED whole-dollar field (see server/models/Project.js)
+				# and nothing has written it since money moved to integer cents - so it is always
+				# null, and a UI reading it always concludes no deposit was taken. Which is exactly
+				# what pages/projects/Project.jsx did: the real deposit sat on the consult
+				# appointment, the dashboard read it correctly from there, and the project page
+				# said "None taken" about the same money. The list query on this same service was
+				# moved to the two fields below and these two detail queries were missed.
+				depositCollectedCents
+				depositAvailableCents
 			}
 		}
 	`;
@@ -414,7 +422,15 @@ const ProjectService = (() => {
 				}
 				tags
 				status
-				depositAmount
+				# depositAmount is the DEPRECATED whole-dollar field (see server/models/Project.js)
+				# and nothing has written it since money moved to integer cents - so it is always
+				# null, and a UI reading it always concludes no deposit was taken. Which is exactly
+				# what pages/projects/Project.jsx did: the real deposit sat on the consult
+				# appointment, the dashboard read it correctly from there, and the project page
+				# said "None taken" about the same money. The list query on this same service was
+				# moved to the two fields below and these two detail queries were missed.
+				depositCollectedCents
+				depositAvailableCents
 			}
 		}
 	`;

@@ -79,7 +79,6 @@ const updateProjectInputSchema = z.object({
   notes: z.array(z.any()).nullish(),
   tags: z.array(z.string()).nullish(),
   status: z.enum(['open', 'in_progress', 'waitlist', 'cancelled', 'completed']),
-  depositAmount: z.number().int().nonnegative().nullish(),
 });
 
 const updateAppointmentInputSchema = z.object({

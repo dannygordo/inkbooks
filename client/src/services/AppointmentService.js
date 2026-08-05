@@ -1,4 +1,5 @@
 import { gql, useQuery } from "@apollo/client";
+import { getOperationName } from "@apollo/client/utilities";
 
 export const AppointmentService = (() => {
     // Takes the month the calendar is actually showing. This used to fetch a shop's ENTIRE
@@ -26,7 +27,7 @@ export const AppointmentService = (() => {
                             avatar
                         }
                     }
-                    depositAmount
+                    depositCollectedCents
                 }
                 shopId
                 user {
@@ -214,7 +215,7 @@ export const AppointmentService = (() => {
                             avatar
                         }
                     }
-                    depositAmount
+                    depositCollectedCents
                 }
                 shopId
                 user {
@@ -542,7 +543,38 @@ export const AppointmentService = (() => {
         }
     `;
 
+    /**
+     * Every query that draws appointments, by operation name - to hand to a mutation's
+     * `refetchQueries` after anything that creates, moves or removes one.
+     *
+     * BY NAME, and ALL of them, deliberately.
+     *
+     * By name because the object form (`{ query, variables }`) refetches the query with exactly
+     * the variables given, and those variables have to stay in lockstep with whatever the
+     * watching component happens to be passing. AppointmentWizard did this and passed
+     * `{ shopId }`, which matched the calendar's watch right up until these queries gained
+     * `filter` and `page`. After that it fired a real request whose result landed in the cache
+     * under a key nothing was watching - so saving an appointment did nothing visible until a
+     * hard reload. A name has no variables to drift.
+     *
+     * All of them because `refetchQueries` only touches queries that are currently ACTIVE.
+     * Naming one that isn't mounted costs nothing - no request is made - so there is no reason
+     * for a caller to work out which calendar or dashboard the user is looking at. That
+     * branching was itself a place to be wrong: an appointment created from the calendar also
+     * belongs in the artist's "upcoming" list, and the wizard's shopId-or-userId ternary could
+     * only ever refresh one of the two.
+     *
+     * Read off the documents rather than written as literals, so renaming an operation can't
+     * leave a string here pointing at nothing.
+     */
+    const _CALENDAR_REFETCH_QUERIES = [
+        _FETCH_APPOINTMENTS_BY_SHOP,
+        _FETCH_APPOINTMENTS_BY_ARTIST,
+        _FETCH_APPOINTMENTS_BY_ARTIST_FOR_CALENDAR,
+    ].map(getOperationName);
+
     return {
+        CALENDAR_REFETCH_QUERIES: _CALENDAR_REFETCH_QUERIES,
         FETCH_APPOINTMENTS_BY_SHOP: _FETCH_APPOINTMENTS_BY_SHOP,
         FETCH_APPOINTMENTS_BY_ARTIST: _FETCH_APPOINTMENTS_BY_ARTIST,
         FETCH_APPOINTMENTS_BY_ARTIST_FOR_CALENDAR: _FETCH_APPOINTMENTS_BY_ARTIST_FOR_CALENDAR,

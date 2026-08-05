@@ -7,6 +7,7 @@ import ProjectService from '../../services/ProjectService';
 import IBPageLoader from '../../components/ibPageLoader/IBPageLoader';
 import { APP_SETTINGS_CONSTANTS, ROUTE_CONSTANTS } from '../../constants';
 import UtilsService from '../../services/UtilsService';
+import { formatCents } from '../../utils/money';
 
 // Was a grid of IBCard tiles. Fields preserved from IBCardHeader + IBCardProjectDetails: title,
 // truncated description, artist, client, status and deposit.
@@ -53,11 +54,13 @@ const Projects = () => {
         APP_SETTINGS_CONSTANTS.PROJECT_STATUS,
         project.status
       ),
-      // Project.depositAmount is still whole dollars, unlike every other money field in the app -
-      // it predates the move to integer cents and nothing writes it (deposits are now recorded
-      // per-appointment; see models/Appointment.js). Rendered as-is rather than through
-      // formatCents, which would turn $200 into $2.00. Flagged for migration.
-      deposit: project.depositAmount ? `$${project.depositAmount}` : '',
+      // Reads depositCollectedCents, which fetchProjects has been selecting all along - this
+      // column read the deprecated whole-dollar depositAmount instead, and since nothing has
+      // written that field since money moved to integer cents, the deposit column was blank for
+      // every project in the list regardless of what was actually collected.
+      deposit: project.depositCollectedCents
+        ? formatCents(project.depositCollectedCents)
+        : '',
     },
   }));
 

@@ -107,6 +107,11 @@ const UpdateEventDialog = ({ selectedDay, event }) => {
 					...newAppointment
 				},
 			},
+			// Apollo normalizes by id, so editing a field the calendar already shows re-renders on
+			// its own - but MOVING an appointment changes which month's list it belongs to, and
+			// list membership is not something normalization can work out. Without this, dragging
+			// an appointment into another month left a copy visible in the old one until reload.
+			refetchQueries: AppointmentService.CALENDAR_REFETCH_QUERIES,
 		})
 			.then(() => {
 				setModal({ ...modal, isOpen: false });
@@ -170,17 +175,12 @@ const UpdateEventDialog = ({ selectedDay, event }) => {
                 variables: {
                     appointmentId: event.id,
                 },
-                update: (cache, { data }) => {
-                    //const cacheId = cache.identify(data.createAppointment);
-                    cache.modify({
-                        fields: {
-                            getAppointmentsByShop: (existingFieldData, { DELETE }) => {
-                                return DELETE;
-                                //return [...existingFieldData, toReference(cacheId)];
-                            }
-                        }
-                    });
-                },
+                // Was a cache.modify that DELETEd the `getAppointmentsByShop` field. That evicted
+                // exactly one query's cache entry, so a deleted appointment vanished from a
+                // shop-affiliated artist's calendar and stayed put on an independent artist's -
+                // which reads getAppointmentsByArtist instead. Same refetch list as every other
+                // path here now; whichever queries are actually mounted get refreshed.
+                refetchQueries: AppointmentService.CALENDAR_REFETCH_QUERIES,
             }).then((res) => {
                 setAlert({
                     isAlert: true,

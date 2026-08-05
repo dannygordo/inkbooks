@@ -409,10 +409,6 @@ module.exports = gql`
     notes: [IBNote]
     tags: [String]
     status: String!
-    # DEPRECATED - whole dollars, from before the move to integer cents, no longer written by
-    # anything. Use depositCollectedCents/depositAvailableCents below, which read the real
-    # deposit off the appointment that collected it. See models/Project.js.
-    depositAmount: Int
     bookingRequestId: ID
     # Deposits taken at this project's consult. Resolved rather than stored, so they can't drift
     # from the appointment records that actually hold them - see resolvers/index.js.
@@ -442,7 +438,6 @@ module.exports = gql`
     notes: [IBNoteInput]
     tags: [String]
     status: String!
-    depositAmount: Int
   }
   input RegisterInput {
     email: String!
@@ -1092,7 +1087,6 @@ module.exports = gql`
       notes: [IBNoteInput]
       tags: [String]
       status: String!
-      depositAmount: Int
     ): Project!
     updateProject(project: ProjectInput): Project
     updateProjectNotes(notes: [IBNoteInput], projectId: ID!): Project

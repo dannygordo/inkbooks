@@ -132,13 +132,11 @@ const AppointmentWizard = ({ selectedDay }) => {
 		return (found.email || "").trim().toLowerCase() === normalizedEmail ? found : null;
 	}, [matchData, normalizedEmail]);
 
-	// Whichever appointments query IBCalendar.jsx is actually watching (shop-scoped vs.
-	// artist-scoped, per-artist) - refetching it after any of the creation paths below is
-	// simpler and less error-prone than replicating cache.modify separately for each mutation
-	// that ultimately creates an Appointment.
-	const appointmentsRefetch = shopId
-		? { query: AppointmentService.FETCH_APPOINTMENTS_BY_SHOP, variables: { shopId } }
-		: { query: AppointmentService.FETCH_APPOINTMENTS_BY_ARTIST_FOR_CALENDAR, variables: { userId: user.id } };
+	// Refreshes every appointment list there is - see AppointmentService.CALENDAR_REFETCH_QUERIES
+	// for why it's by operation name and why it doesn't branch on shopId. This used to be a
+	// `{ query, variables: { shopId } }` descriptor, which is what made saving an appointment do
+	// nothing visible until a hard reload.
+	const appointmentsRefetch = AppointmentService.CALENDAR_REFETCH_QUERIES;
 
 	const closeModal = () => setModal({ ...modal, isOpen: false });
 
@@ -201,7 +199,7 @@ const AppointmentWizard = ({ selectedDay }) => {
 						appointmentDate: UtilsService.formatDateToISO(startDateTime),
 					},
 				},
-				refetchQueries: [appointmentsRefetch],
+				refetchQueries: appointmentsRefetch,
 				awaitRefetchQueries: true,
 			});
 			showSuccessAlert("Appointment saved.");
@@ -254,7 +252,7 @@ const AppointmentWizard = ({ selectedDay }) => {
 						appointmentStatus: "scheduled",
 					},
 				},
-				refetchQueries: [appointmentsRefetch],
+				refetchQueries: appointmentsRefetch,
 				awaitRefetchQueries: true,
 			});
 			showSuccessAlert(type === "session" ? "Session saved." : "Consult saved.");
@@ -302,7 +300,7 @@ const AppointmentWizard = ({ selectedDay }) => {
 						appointmentDate: UtilsService.formatDateToISO(startDateTime),
 					},
 				},
-				refetchQueries: [appointmentsRefetch],
+				refetchQueries: appointmentsRefetch,
 				awaitRefetchQueries: true,
 			});
 			showSuccessAlert("Session saved.");

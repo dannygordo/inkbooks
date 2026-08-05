@@ -17,12 +17,15 @@ const ProjectSchema = new mongoose.Schema({
 	notes: {type: [IBNoteSchema]},
 	tags: {type: [String]},
 	status: {type: String, required: true},
-	// DEPRECATED - whole dollars, from before money moved to integer cents, and no longer written
-	// by anything. A real deposit is recorded on the appointment that collected it (see
-	// models/Appointment.js's depositCents), because the money has a date and a payer and belongs
-	// to the transaction that took it. Left in place only so existing documents keep validating;
-	// nothing reads it for a decision. Remove once no stored project still carries one.
-	depositAmount: {type: Number},
+	// depositAmount (whole dollars, pre-integer-cents) used to sit here, deprecated and unwritten.
+	// "Deprecated but harmless" turned out to be wrong: three separate UI reads were still
+	// pointing at it - the project page's deposit readout, the projects list's deposit column, and
+	// the calendar's project selection - and since nothing had written it in a long time, all
+	// three confidently reported that no deposit had been taken while the money sat correctly on
+	// the consult appointment and showed up correctly on the dashboard. A field that can only
+	// produce a wrong answer is worse than a missing one, which is why it's gone rather than
+	// commented. The real figures are Project.depositCollectedCents / depositAvailableCents,
+	// resolved from the appointment that took the money (see graphql/resolvers/index.js).
 	// Set by convertBookingRequest when this Project is created from a booking request. Without
 	// it there was no path from a Project back to the consult that collected its deposit - the
 	// consult carries bookingRequestId and the Project carried nothing, so the two halves of the
