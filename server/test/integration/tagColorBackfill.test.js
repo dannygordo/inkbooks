@@ -24,10 +24,12 @@ const User = require('../../models/User');
 const GET_APPOINTMENTS_BY_SHOP = `
 	query GetAppointmentsByShop($shopId: ID!) {
 		getAppointmentsByShop(shopId: $shopId) {
-			id
-			user {
+			items {
 				id
-				tagColor
+				user {
+					id
+					tagColor
+				}
 			}
 		}
 	}
@@ -52,7 +54,7 @@ describe('User.tagColor resolver: self-heal on read', () => {
 		);
 
 		expect(res.body.singleResult.errors).toBeUndefined();
-		const returned = res.body.singleResult.data.getAppointmentsByShop[0].user.tagColor;
+		const returned = res.body.singleResult.data.getAppointmentsByShop.items[0].user.tagColor;
 		expect(returned).toBeTruthy();
 		expect(['#fff', '#ffffff', '#FFF', '#FFFFFF']).not.toContain(returned);
 		// Unique within the shop - must not be handed the viewer's own color.
@@ -72,7 +74,7 @@ describe('User.tagColor resolver: self-heal on read', () => {
 			{ query: GET_APPOINTMENTS_BY_SHOP, variables: { shopId: String(shop.id) } },
 			{ contextValue: contextWithToken(signTestToken(viewer)) },
 		);
-		const returned = res.body.singleResult.data.getAppointmentsByShop[0].user.tagColor;
+		const returned = res.body.singleResult.data.getAppointmentsByShop.items[0].user.tagColor;
 
 		// The point of writing back rather than computing on every read: the stored document is
 		// actually repaired, so this converges instead of recomputing forever.
@@ -97,7 +99,7 @@ describe('User.tagColor resolver: self-heal on read', () => {
 			{ contextValue: contextWithToken(signTestToken(viewer)) },
 		);
 
-		expect(res.body.singleResult.data.getAppointmentsByShop[0].user.tagColor).toBe('#2ea2dc');
+		expect(res.body.singleResult.data.getAppointmentsByShop.items[0].user.tagColor).toBe('#2ea2dc');
 		const stored = await User.findById(chosen.id);
 		expect(stored.tagColor).toBe('#2ea2dc');
 	});

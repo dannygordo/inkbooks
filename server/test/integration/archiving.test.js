@@ -40,17 +40,17 @@ const ARCHIVE_STAFF = `mutation A($staffId: ID!) { archiveStaff(staffId: $staffI
 const ARCHIVE_CLIENT = `mutation A($clientId: ID!) { archiveClient(clientId: $clientId) { id status } }`;
 const UNARCHIVE_CLIENT = `mutation A($clientId: ID!) { unarchiveClient(clientId: $clientId) { id status } }`;
 
-const GET_ARTISTS = `{ getArtists { id } }`;
-const GET_STAFF = `{ getStaff { id } }`;
-const GET_CLIENTS = `{ getClients { id } }`;
+const GET_ARTISTS = `{ getArtists { items { id } } }`;
+const GET_STAFF = `{ getStaff { items { id } } }`;
+const GET_CLIENTS = `{ getClients { items { id } } }`;
 const GET_ARTISTS_INCLUDING_ARCHIVED = `
-	query A($includeArchived: Boolean) { getArtists(includeArchived: $includeArchived) { id } }
+	query A($includeArchived: Boolean) { getArtists(includeArchived: $includeArchived) { items { id } } }
 `;
 const GET_STAFF_INCLUDING_ARCHIVED = `
-	query A($includeArchived: Boolean) { getStaff(includeArchived: $includeArchived) { id } }
+	query A($includeArchived: Boolean) { getStaff(includeArchived: $includeArchived) { items { id } } }
 `;
 const GET_CLIENTS_INCLUDING_ARCHIVED = `
-	query A($includeArchived: Boolean) { getClients(includeArchived: $includeArchived) { id } }
+	query A($includeArchived: Boolean) { getClients(includeArchived: $includeArchived) { items { id } } }
 `;
 const GET_ARTISTS_BY_SHOP = `
 	query A($shopId: ID!) { getArtistsByShop(shopId: $shopId) { id } }
@@ -77,7 +77,7 @@ const ARTIST_ANALYTICS = `
 	}
 `;
 const APPOINTMENTS_BY_SHOP = `
-	query A($shopId: ID!) { getAppointmentsByShop(shopId: $shopId) { id totalCents } }
+	query A($shopId: ID!) { getAppointmentsByShop(shopId: $shopId) { items { id totalCents } } }
 `;
 
 // Widest range assertValidRange allows (ten years, see resolvers/analytics.js) that still contains
@@ -118,7 +118,7 @@ describe('archiving removes someone from the directories', () => {
 		const server = createTestServer();
 
 		const before = await server.executeOperation({ query: GET_ARTISTS }, asUser(shopAdmin));
-		expect(before.body.singleResult.data.getArtists.map((a) => a.id)).toContain(artist.id);
+		expect(before.body.singleResult.data.getArtists.items.map((a) => a.id)).toContain(artist.id);
 
 		const archived = await server.executeOperation(
 			{ query: ARCHIVE_ARTIST, variables: { artistId: artist.id } },
@@ -130,7 +130,7 @@ describe('archiving removes someone from the directories', () => {
 		);
 
 		const after = await server.executeOperation({ query: GET_ARTISTS }, asUser(shopAdmin));
-		expect(after.body.singleResult.data.getArtists.map((a) => a.id)).not.toContain(artist.id);
+		expect(after.body.singleResult.data.getArtists.items.map((a) => a.id)).not.toContain(artist.id);
 
 		// Flagged, not removed - the distinction the whole change is about.
 		expect(await Artist.findById(artist.id)).not.toBeNull();
@@ -147,7 +147,7 @@ describe('archiving removes someone from the directories', () => {
 		);
 
 		const after = await server.executeOperation({ query: GET_STAFF }, asUser(shopAdmin));
-		expect(after.body.singleResult.data.getStaff.map((s) => s.id)).not.toContain(staff.id);
+		expect(after.body.singleResult.data.getStaff.items.map((s) => s.id)).not.toContain(staff.id);
 		expect(await Staff.findById(staff.id)).not.toBeNull();
 	});
 
@@ -161,7 +161,7 @@ describe('archiving removes someone from the directories', () => {
 		);
 
 		const after = await server.executeOperation({ query: GET_CLIENTS }, asUser(shopAdmin));
-		expect(after.body.singleResult.data.getClients.map((c) => c.id)).not.toContain(client.id);
+		expect(after.body.singleResult.data.getClients.items.map((c) => c.id)).not.toContain(client.id);
 		expect(await Client.findById(client.id)).not.toBeNull();
 	});
 
@@ -178,13 +178,13 @@ describe('archiving removes someone from the directories', () => {
 		);
 
 		const hidden = await server.executeOperation({ query: GET_ARTISTS }, asUser(shopAdmin));
-		expect(hidden.body.singleResult.data.getArtists.map((a) => a.id)).not.toContain(artist.id);
+		expect(hidden.body.singleResult.data.getArtists.items.map((a) => a.id)).not.toContain(artist.id);
 
 		const shown = await server.executeOperation(
 			{ query: GET_ARTISTS_INCLUDING_ARCHIVED, variables: { includeArchived: true } },
 			asUser(shopAdmin),
 		);
-		expect(shown.body.singleResult.data.getArtists.map((a) => a.id)).toContain(artist.id);
+		expect(shown.body.singleResult.data.getArtists.items.map((a) => a.id)).toContain(artist.id);
 	});
 
 	it('shows archived staff and clients when asked', async () => {
@@ -205,13 +205,13 @@ describe('archiving removes someone from the directories', () => {
 			{ query: GET_STAFF_INCLUDING_ARCHIVED, variables: { includeArchived: true } },
 			asUser(shopAdmin),
 		);
-		expect(staffShown.body.singleResult.data.getStaff.map((s) => s.id)).toContain(staff.id);
+		expect(staffShown.body.singleResult.data.getStaff.items.map((s) => s.id)).toContain(staff.id);
 
 		const clientsShown = await server.executeOperation(
 			{ query: GET_CLIENTS_INCLUDING_ARCHIVED, variables: { includeArchived: true } },
 			asUser(shopAdmin),
 		);
-		expect(clientsShown.body.singleResult.data.getClients.map((c) => c.id)).toContain(client.id);
+		expect(clientsShown.body.singleResult.data.getClients.items.map((c) => c.id)).toContain(client.id);
 	});
 
 	it('keeps an archived artist out of the booking picker even so', async () => {
@@ -250,7 +250,7 @@ describe('archiving removes someone from the directories', () => {
 			Constants.ARTIST_STATUS.ACTIVE,
 		);
 		const after = await server.executeOperation({ query: GET_ARTISTS }, asUser(shopAdmin));
-		expect(after.body.singleResult.data.getArtists.map((a) => a.id)).toContain(artist.id);
+		expect(after.body.singleResult.data.getArtists.items.map((a) => a.id)).toContain(artist.id);
 	});
 
 	it('shows someone with no status set at all, rather than hiding them', async () => {
@@ -264,7 +264,7 @@ describe('archiving removes someone from the directories', () => {
 		const server = createTestServer();
 
 		const res = await server.executeOperation({ query: GET_ARTISTS }, asUser(shopAdmin));
-		expect(res.body.singleResult.data.getArtists.map((a) => a.id)).toContain(artist.id);
+		expect(res.body.singleResult.data.getArtists.items.map((a) => a.id)).toContain(artist.id);
 	});
 });
 
@@ -352,7 +352,7 @@ describe('archiving never touches the money', () => {
 			{ query: APPOINTMENTS_BY_SHOP, variables: { shopId: shop.id } },
 			asUser(shopAdmin),
 		);
-		expect(res.body.singleResult.data.getAppointmentsByShop.map((a) => a.id)).toContain(
+		expect(res.body.singleResult.data.getAppointmentsByShop.items.map((a) => a.id)).toContain(
 			appointment.id,
 		);
 	});
@@ -391,7 +391,7 @@ describe('archiving never touches the money', () => {
 		);
 
 		const after = await server.executeOperation({ query: GET_CLIENTS }, asUser(shopAdmin));
-		expect(after.body.singleResult.data.getClients.map((c) => c.id)).toContain(client.id);
+		expect(after.body.singleResult.data.getClients.items.map((c) => c.id)).toContain(client.id);
 	});
 });
 

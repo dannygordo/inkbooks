@@ -24,17 +24,17 @@ const Appointment = require('../../models/Appointment');
 
 const GET_APPOINTMENTS_BY_ARTIST = `
 	query GetAppointmentsByArtist($userId: ID!) {
-		getAppointmentsByArtist(userId: $userId) {
+		getAppointmentsByArtist(userId: $userId) { items {
 			id
-		}
+		} }
 	}
 `;
 
 const GET_APPOINTMENTS_BY_SHOP = `
 	query GetAppointmentsByShop($shopId: ID!) {
-		getAppointmentsByShop(shopId: $shopId) {
+		getAppointmentsByShop(shopId: $shopId) { items {
 			id
-		}
+		} }
 	}
 `;
 
@@ -453,7 +453,7 @@ describe('getAppointmentsByArtist: ownership', () => {
 
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeUndefined();
-		expect(data.getAppointmentsByArtist).toHaveLength(1);
+		expect(data.getAppointmentsByArtist.items).toHaveLength(1);
 	});
 
 	it("rejects a different artist reading someone else's appointments", async () => {
@@ -469,7 +469,8 @@ describe('getAppointmentsByArtist: ownership', () => {
 		);
 
 		const { errors, data } = response.body.singleResult;
-		expect(data.getAppointmentsByArtist).toBeNull();
+		// AppointmentPage! is non-null, so the thrown error nulls all of `data`.
+		expect(data).toBeNull();
 		expect(errors[0].message).toMatch(/Action not allowed/);
 	});
 
@@ -486,7 +487,8 @@ describe('getAppointmentsByArtist: ownership', () => {
 		);
 
 		const { errors, data } = response.body.singleResult;
-		expect(data.getAppointmentsByArtist).toBeNull();
+		// AppointmentPage! is non-null, so the thrown error nulls all of `data`.
+		expect(data).toBeNull();
 		expect(errors[0].message).toMatch(/Action not allowed/);
 	});
 
@@ -508,7 +510,7 @@ describe('getAppointmentsByArtist: ownership', () => {
 
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeUndefined();
-		expect(data.getAppointmentsByArtist).toHaveLength(1);
+		expect(data.getAppointmentsByArtist.items).toHaveLength(1);
 	});
 
 	it("refuses a Shop Admin the appointments of an artist at a different shop", async () => {
@@ -526,7 +528,8 @@ describe('getAppointmentsByArtist: ownership', () => {
 		);
 
 		const { errors, data } = response.body.singleResult;
-		expect(data.getAppointmentsByArtist).toBeNull();
+		// AppointmentPage! is non-null, so the thrown error nulls all of `data`.
+		expect(data).toBeNull();
 		expect(errors[0].message).toMatch(/Action not allowed/);
 	});
 });
@@ -545,7 +548,7 @@ describe('getAppointmentsByShop: ownership', () => {
 
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeUndefined();
-		expect(data.getAppointmentsByShop).toHaveLength(1);
+		expect(data.getAppointmentsByShop.items).toHaveLength(1);
 	});
 
 	// This is the real regression case: client/src/components/ibCalendar/IBCalendar.jsx calls
@@ -566,7 +569,7 @@ describe('getAppointmentsByShop: ownership', () => {
 
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeUndefined();
-		expect(data.getAppointmentsByShop).toHaveLength(1);
+		expect(data.getAppointmentsByShop.items).toHaveLength(1);
 	});
 
 	it('allows an artist connected to that shop to read its calendar', async () => {
@@ -584,7 +587,7 @@ describe('getAppointmentsByShop: ownership', () => {
 
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeUndefined();
-		expect(data.getAppointmentsByShop).toHaveLength(1);
+		expect(data.getAppointmentsByShop.items).toHaveLength(1);
 	});
 
 	it('rejects an artist with no connection to that shop', async () => {
@@ -600,7 +603,8 @@ describe('getAppointmentsByShop: ownership', () => {
 		);
 
 		const { errors, data } = response.body.singleResult;
-		expect(data.getAppointmentsByShop).toBeNull();
+		// AppointmentPage! is non-null, so the thrown error nulls all of `data`.
+		expect(data).toBeNull();
 		expect(errors[0].message).toMatch(/Action not allowed/);
 	});
 
@@ -617,7 +621,8 @@ describe('getAppointmentsByShop: ownership', () => {
 		);
 
 		const { errors, data } = response.body.singleResult;
-		expect(data.getAppointmentsByShop).toBeNull();
+		// AppointmentPage! is non-null, so the thrown error nulls all of `data`.
+		expect(data).toBeNull();
 		expect(errors[0].message).toMatch(/Action not allowed/);
 	});
 });

@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import './clients.css';
 import EntityList from '../../components/entityList/EntityList';
+import EntityListPager from '../../components/entityList/EntityListPager';
 import IBPageActionBar from '../../components/ibPageActionBar/IBPageActionBar';
 import IBPageLoader from '../../components/ibPageLoader/IBPageLoader';
 import ClientService from '../../services/ClientService';
@@ -18,6 +19,9 @@ import { CLIENT_STATUS } from '../../constants';
 // since the query fetches them and a directory is exactly where "which one is the local one"
 // gets asked.
 // Fixed widths so the header and every row resolve to the same grid - see EntityList.
+// See Artists.jsx on the size.
+const PAGE_SIZE = 50;
+
 const CLIENT_COLUMNS = [
   { key: 'phone', label: 'Phone', width: '140px' },
   { key: 'location', label: 'Location', width: '160px' },
@@ -28,10 +32,14 @@ const CLIENT_COLUMNS = [
 const Clients = () => {
   // refetch is handed to the action bar so a newly created client appears immediately.
   const [showArchived, setShowArchived] = useState(false);
-  const { loading, data, refetch } = ClientService.fetchClients(showArchived);
+  const [offset, setOffset] = useState(0);
+  const { loading, data, refetch } = ClientService.fetchClients(showArchived, {
+    limit: PAGE_SIZE,
+    offset,
+  });
   if (loading) return <IBPageLoader />;
 
-  const items = (data?.getClients || []).map((client) => ({
+  const items = (data?.getClients?.items || []).map((client) => ({
     key: client.id,
     linkTo: `${ROUTE_CONSTANTS.CLIENT}${client.id}`,
     // Client.avatar is a GraphQL field resolver returning the live User avatar, not the stale
@@ -59,11 +67,19 @@ const Clients = () => {
         <input
           type="checkbox"
           checked={showArchived}
-          onChange={(e) => setShowArchived(e.target.checked)}
+          onChange={(e) => {
+            setShowArchived(e.target.checked);
+            setOffset(0);
+          }}
         />
         Show archived
       </label>
       <EntityList columns={CLIENT_COLUMNS} items={items} emptyMessage="No clients yet." />
+      <EntityListPager
+        pageInfo={data?.getClients?.pageInfo}
+        onChange={setOffset}
+        noun="client"
+      />
     </div>
   );
 }

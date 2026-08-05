@@ -163,3 +163,31 @@
 	margin: 0;
 	cursor: pointer;
 }
+
+/* Page controls, rendered by the list PAGES rather than by EntityList - see EntityListPager.jsx
+   on why paging isn't the list component's business. */
+.entityListPager {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	margin: 12px 4px 0;
+	color: #bbb;
+	font-size: 14px;
+}
+/* When there's nothing to navigate, the count stands alone rather than sitting opposite two
+   disabled buttons. */
+.entityListPagerCountOnly {
+	justify-content: flex-start;
+}
+.entityListCount {
+	white-space: nowrap;
+}
+.entityListPagerButtons {
+	display: flex;
+	gap: 8px;
+}
+.entityListPagerButtons button {
+	padding: 6px 14px;
+	font-size: 14px;
+}

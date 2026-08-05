@@ -163,66 +163,69 @@ const ProjectService = (() => {
 		});
 	}
 
-	const _fetchProjects = () => {
+	const _fetchProjects = (page) => {
 		const FETCH_PROJECTS_QUERY = gql`
-			{
-				getProjects {
-					id
-					title
-					description
-					placement
-					size
-					palette
-					artistId
-					artist {
-						firstName
-						lastName
-						email
-						avatar
+			query GetProjects($page: PageInput) {
+				getProjects(page: $page) {
+					items {
 						id
-					}
-					clientId
-					client {
-						firstName
-						lastName
-						email
-						avatar
-						id
-					}
-					referenceImages {
-						url
-						avatar
 						title
-						uploadedByDisplayName
+						description
+						placement
+						size
+						palette
+						artistId
+						artist {
+							firstName
+							lastName
+							email
+							avatar
+							id
+						}
+						clientId
+						client {
+							firstName
+							lastName
+							email
+							avatar
+							id
+						}
+						referenceImages {
+							url
+							avatar
+							title
+							uploadedByDisplayName
+							tags
+							updatedAt
+							createdAt
+						}
+						bodyImages
+						designImages {
+							url
+							avatar
+							uploadedByDisplayName
+							updatedAt
+							createdAt
+						}
+						materialsUsed
+						notes {
+							author
+							note
+							createdAt
+							updatedAt
+						}
 						tags
-						updatedAt
-						createdAt
+						status
+						# depositAmount is deprecated (whole dollars, unwritten) - the real figures are
+						# below, resolved from the appointment that collected the deposit.
+						depositCollectedCents
+						depositAvailableCents
 					}
-					bodyImages
-					designImages {
-						url
-						avatar
-						uploadedByDisplayName
-						updatedAt
-						createdAt
-					}
-					materialsUsed
-					notes {
-						author
-						note
-						createdAt
-						updatedAt
-					}
-					tags
-					status
-					# depositAmount is deprecated (whole dollars, unwritten) - the real figures are
-					# below, resolved from the appointment that collected the deposit.
-					depositCollectedCents
-					depositAvailableCents
+					pageInfo { totalCount hasMore limit offset }
 				}
 			}
 		`;
-		return useQuery(FETCH_PROJECTS_QUERY);
+		return useQuery(FETCH_PROJECTS_QUERY, { variables: { page } });
 	};
 
 	const _updateProject = (project) => {

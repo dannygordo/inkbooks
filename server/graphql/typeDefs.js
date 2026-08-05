@@ -712,11 +712,87 @@ module.exports = gql`
     isNewAccount: Boolean!
   }
 
+  # ---- Pagination -------------------------------------------------------------------------
+  #
+  # Offset, not cursors. These are directories: people want a total, want to jump to a page, and
+  # the sort is stable enough that offset drift doesn't matter. Cursors suit feeds - forward-only,
+  # shifting under you, nobody asking "how many". See utils/pagination.js.
+  #
+  # Omitting the page argument gives a bounded default rather than everything. Before this, no list query had
+  # any bound at all: getAppointmentsByShop returned a shop's entire appointment history so the
+  # browser could filter it down to the thirty days on screen.
+  input PageInput {
+    limit: Int
+    offset: Int
+  }
+
+  type PageInfo {
+    totalCount: Int!
+    hasMore: Boolean!
+    # Echoed back because they may not be what was asked for - an over-large limit is clamped to
+    # utils/pagination.js's MAX_LIMIT, and a caller that doesn't know that would page wrongly.
+    limit: Int!
+    offset: Int!
+  }
+
+  type ClientPage {
+    items: [Client!]!
+    pageInfo: PageInfo!
+  }
+  type ArtistPage {
+    items: [Artist!]!
+    pageInfo: PageInfo!
+  }
+  type StaffPage {
+    items: [Staff!]!
+    pageInfo: PageInfo!
+  }
+  type ProjectPage {
+    items: [Project!]!
+    pageInfo: PageInfo!
+  }
+  type AppointmentPage {
+    items: [Appointment!]!
+    pageInfo: PageInfo!
+  }
+
+  # What an appointment list is actually being asked for. One filter rather than a query per
+  # screen: the calendar wants a month, the dashboard wants "upcoming" and "recently completed",
+  # the payout list wants "completed and unpaid". All of those were the SAME fetch-everything call
+  # with four different client-side filters over it - which is why an artist's dashboard used to
+  # download their entire career to render two lists of five.
+  input AppointmentFilter {
+    # Half-open [from, to) on appointmentDate, matching utils/analytics.js's convention.
+    from: DateTime
+    to: DateTime
+    appointmentStatus: String
+    shopCutStatus: String
+    # true = appointmentDate >= now. Separate from the from/to bounds because "upcoming" has to mean "ahead of
+    # right now" at the moment the query runs, not at the moment the client rendered.
+    upcomingOnly: Boolean
+  }
+
   type Query {
     ######### Appointments ############
 
-    getAppointmentsByShop(shopId: ID!): [Appointment]
-    getAppointmentsByArtist(userId: ID!): [Appointment]
+    # The shop calendar. Was unbounded: it returned every appointment the shop had ever had so the
+    # browser could filter down to the thirty days on screen (see ibCalendar/Day.jsx). A shop doing
+    # 300 sessions a year was shipping thousands of rows, each carrying totals, tips and shop-cut
+    # amounts, to draw one month.
+    getAppointmentsByShop(shopId: ID!, filter: AppointmentFilter, page: PageInput): AppointmentPage!
+    # An artist's own appointments. Same problem as the shop calendar and then some: the dashboard
+    # fetched an artist's entire career and ran four separate client-side passes over it - upcoming,
+    # recently completed, payout candidates, plus the calendar's own filter. Those are four
+    # questions, so the filter takes their shapes rather than the caller slicing an array.
+    getAppointmentsByArtist(userId: ID!, filter: AppointmentFilter, page: PageInput): AppointmentPage!
+    # Every shop cut this artist still owes. DELIBERATELY UNPAGINATED, unlike everything else here.
+    #
+    # The task is "settle what I owe", not "browse my history": the shop admin selects rows or
+    # invoices the lot, and a batch action over a paged list is ambiguous in a way that costs money
+    # - does "invoice all" mean this page or everything? The set is also self-limiting, since
+    # settling a row removes it. If it ever grows unreasonable that's a symptom worth seeing, not a
+    # scrolling problem to hide.
+    getShopCutPayoutCandidates(userId: ID!): [Appointment!]!
     getAppointment(appointmentId: ID!): Appointment
     getAppointmentsByProject(projectId: ID!): [Appointment]
 
@@ -731,7 +807,7 @@ module.exports = gql`
     # includeArchived: archived people have to stay reachable or unarchiving them is impossible -
     # there'd be no way to find who you wanted back. Hidden by default, askable for. See
     # utils/archiving.js.
-    getArtists(includeArchived: Boolean): [Artist]
+    getArtists(includeArchived: Boolean, page: PageInput): ArtistPage!
     getArtist(artistId: ID!): Artist
     getArtistsByShop(shopId: ID!): [Artist]
 
@@ -742,13 +818,25 @@ module.exports = gql`
 
     ######### Staff ###########
     
-    getStaff(includeArchived: Boolean): [Staff]
+    getStaff(includeArchived: Boolean, page: PageInput): StaffPage!
     getOneStaff(staffId: ID!): Staff
     
     ######### Clients ###########
     
-    getClients(includeArchived: Boolean): [Client]
+    getClients(includeArchived: Boolean, page: PageInput): ClientPage!
     getClient(clientId: ID!): Client
+    # "Do we already have this person?" - by email, for the booking wizard.
+    #
+    # Exists because the wizard used to answer this by scanning the client list it had already
+    # fetched. That worked while the list was everything; once getClients paged, it could only
+    # match the first page - and a MISS is not harmless there. The wizard would ask for a name,
+    # createClientAccount would find the existing record by email anyway, and the typed name would
+    # overwrite the real one.
+    #
+    # Scoped like getClient: null for an email belonging to another shop's client, rather than
+    # leaking their name and phone to whoever can guess an address. Creating them is still correct
+    # in that case - createClientAccount links the existing person to this shop.
+    findClientByEmail(email: String!): Client
     
     ######### Users ###########
     
@@ -757,7 +845,7 @@ module.exports = gql`
     
     ######### Projects ###########
     
-    getProjects: [Project]
+    getProjects(page: PageInput): ProjectPage!
     getProjectsByArtist(artistId: ID!): [Project]
     getProject(projectId: ID!): Project
 

@@ -1,5 +1,6 @@
-import React from 'react'
+import React, { useState } from 'react'
 import EntityList from '../../components/entityList/EntityList';
+import EntityListPager from '../../components/entityList/EntityListPager';
 import IBPageActionBar from '../../components/ibPageActionBar/IBPageActionBar';
 import './projects.css';
 import ProjectService from '../../services/ProjectService';
@@ -20,6 +21,9 @@ import UtilsService from '../../services/UtilsService';
 // what crashed the Projects page for every project until the Project.client resolver was fixed.
 // Optional-chained here so a project with a missing relation renders a row with a gap rather than
 // taking the page down.
+// See Artists.jsx on the size.
+const PAGE_SIZE = 50;
+
 const PROJECT_COLUMNS = [
   { key: 'artist', label: 'Artist', width: '160px' },
   { key: 'client', label: 'Client', width: '160px' },
@@ -28,10 +32,11 @@ const PROJECT_COLUMNS = [
 ];
 
 const Projects = () => {
-  const { loading, data } = ProjectService.fetchProjects();
+  const [offset, setOffset] = useState(0);
+  const { loading, data } = ProjectService.fetchProjects({ limit: PAGE_SIZE, offset });
   if (loading) return <IBPageLoader />;
 
-  const items = (data?.getProjects || []).map((project) => ({
+  const items = (data?.getProjects?.items || []).map((project) => ({
     key: project.id,
     linkTo: `${ROUTE_CONSTANTS.PROJECT}${project.id}`,
     avatar: project.artist?.avatar,
@@ -60,6 +65,11 @@ const Projects = () => {
     <div className="projects">
       <IBPageActionBar pageType='projects' />
       <EntityList columns={PROJECT_COLUMNS} items={items} emptyMessage="No projects yet." />
+      <EntityListPager
+        pageInfo={data?.getProjects?.pageInfo}
+        onChange={setOffset}
+        noun="project"
+      />
     </div>
   )
 }

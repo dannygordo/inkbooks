@@ -39,7 +39,7 @@ const CONNECT = `
 	}
 `;
 
-const GET_ARTISTS = `{ getArtists { id shopId shop { id name } } }`;
+const GET_ARTISTS = `{ getArtists { items { id shopId shop { id name } } } }`;
 const GET_ARTISTS_BY_SHOP = `
 	query A($shopId: ID!) { getArtistsByShop(shopId: $shopId) { id } }
 `;
@@ -65,7 +65,7 @@ describe('a connected artist is visible to their shop', () => {
 		const res = await server.executeOperation({ query: GET_ARTISTS }, asUser(shopAdmin));
 
 		expect(res.body.singleResult.errors).toBeUndefined();
-		expect(res.body.singleResult.data.getArtists.map((a) => a.id)).toContain(artist.id);
+		expect(res.body.singleResult.data.getArtists.items.map((a) => a.id)).toContain(artist.id);
 	});
 
 	it('appears in getArtistsByShop, which feeds the booking flow', async () => {

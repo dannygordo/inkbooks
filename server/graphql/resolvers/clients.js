@@ -6,6 +6,7 @@ const {
   getShopIdsForUser,
   getArtistIdsForShops,
   assertCanAccessClient,
+  canAccessClient,
 } = require('../../utils/shop-membership');
 const { archiveFilter } = require('../../utils/archiving');
 const { UserInputError, rethrow } = require('../../utils/errors');
@@ -50,6 +51,21 @@ module.exports = {
         rethrow(err);
       }
     }),
+    // See the note in typeDefs.js. Returns null rather than throwing for "not ours": the wizard
+    // asks this on every keystroke-settled email, and a not-found is the normal answer, not an
+    // error. canAccessClient is what stops it becoming an email-to-name oracle for other shops'
+    // clients.
+    findClientByEmail: withAuth(async (_, { email }, context, info, user) => {
+      const normalized = String(email || '').trim().toLowerCase();
+      if (!normalized) {
+        return null;
+      }
+      const client = await Client.findOne({ email: normalized });
+      if (!client) {
+        return null;
+      }
+      return (await canAccessClient(user, client)) ? client : null;
+    }, Constants.ROLES.SHOP_STAFF),
     // Was withAuth with no restriction at all - any authenticated user could pass an arbitrary
     // clientId and read that client's contact info. Same rule as getClients above, for one row.
     getClient: withAuth(async (_, { clientId }, context, info, user) => {

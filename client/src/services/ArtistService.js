@@ -65,35 +65,38 @@ export const ArtistService = (() => {
 
 	// includeArchived: archived artists are hidden by default but have to stay reachable, or
 	// there'd be no way to find someone to restore them. See server/utils/archiving.js.
-	const _fetchArtists = (includeArchived = false) => {
+	const _fetchArtists = (includeArchived = false, page) => {
 		const FETCH_ARTISTS_QUERY = gql`
-			query GetArtists($includeArchived: Boolean) {
-				getArtists(includeArchived: $includeArchived) {
-					id
-					firstName
-					lastName
-					email
-					title
-					phone
-					address
-					city
-					state
-					zip
-					instagram
-					facebook
-					avatar
-					startDate
-					hourlyRate
-					shopId
-					userId
-					status
-					user{
+			query GetArtists($includeArchived: Boolean, $page: PageInput) {
+				getArtists(includeArchived: $includeArchived, page: $page) {
+					items {
+						id
+						firstName
+						lastName
+						email
+						title
+						phone
+						address
+						city
+						state
+						zip
+						instagram
+						facebook
 						avatar
+						startDate
+						hourlyRate
+						shopId
+						userId
+						status
+						user{
+							avatar
+						}
 					}
+					pageInfo { totalCount hasMore limit offset }
 				}
 			}
 		`;
-		return useQuery(FETCH_ARTISTS_QUERY, { variables: { includeArchived } });
+		return useQuery(FETCH_ARTISTS_QUERY, { variables: { includeArchived, page } });
 	};
 
 	const _updateArtist = (artist) => {

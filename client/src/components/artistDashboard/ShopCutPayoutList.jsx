@@ -20,8 +20,11 @@ import "./shopCutPayoutList.css";
  * viewing someone else's numbers couldn't use these buttons even if they were shown.
  *
  * Props:
- * - appointments: completed, shopCutStatus === 'unpaid' sessions with a shopId (already filtered
- *   by the caller - see ArtistPerformancePanel.jsx)
+ * - appointments: everything this artist still owes, straight from getShopCutPayoutCandidates.
+ *   Deliberately unpaginated - the task is settling a debt, and "invoice all" over a paged list is
+ *   ambiguous about what it covers. The completed/unpaid/has-a-shop filtering used to happen in
+ *   ArtistPerformancePanel; it's in the resolver now, where it can't drift from the shop-cut
+ *   ledger's own definition of what's payable.
  * - onChanged(): called after any successful action, so the parent can refetch and this list
  *   naturally drops rows that are no longer unpaid
  */

@@ -1,4 +1,4 @@
-import { gql, useQuery, useMutation } from "@apollo/client";
+import { gql, useQuery, useMutation, useLazyQuery } from "@apollo/client";
 
 const ClientService = (() => {
     const _fetchClient = (clientId) => {
@@ -35,29 +35,32 @@ const ClientService = (() => {
 	};
 
 	// See ArtistService's matching comment on includeArchived.
-	const _fetchClients = (includeArchived = false) => {
+	const _fetchClients = (includeArchived = false, page) => {
 		const FETCH_CLIENTS_QUERY = gql`
-			query GetClients($includeArchived: Boolean) {
-				getClients(includeArchived: $includeArchived) {
-					id
-					firstName
-					lastName
-					email
-					phone
-					address
-					city
-					state
-					zip
-					instagram
-					facebook
-					avatar
-					userId
-					# Needed to mute and label an archived row when the list is showing them.
-					status
+			query GetClients($includeArchived: Boolean, $page: PageInput) {
+				getClients(includeArchived: $includeArchived, page: $page) {
+					items {
+						id
+						firstName
+						lastName
+						email
+						phone
+						address
+						city
+						state
+						zip
+						instagram
+						facebook
+						avatar
+						userId
+						# Needed to mute and label an archived row when the list is showing them.
+						status
+					}
+					pageInfo { totalCount hasMore limit offset }
 				}
 			}
 		`;
-		return useQuery(FETCH_CLIENTS_QUERY, { variables: { includeArchived } });
+		return useQuery(FETCH_CLIENTS_QUERY, { variables: { includeArchived, page } });
 	};
 
 	const _updateClient = (client) => {
@@ -165,6 +168,28 @@ const ClientService = (() => {
 		}
 	`;
 
+	// "Do we already have this person?", by email, for the booking wizard.
+	//
+	// The wizard used to answer this by scanning the client list it had already fetched. That was
+	// fine while the list was everything; once getClients paged it could only match the first page,
+	// and a MISS is not harmless - the wizard asks for a name, createClientAccount finds the
+	// existing record by email anyway, and the typed name overwrites the real one.
+	//
+	// Lazy, not eager: this fires when an email has actually been typed, not on mount.
+	const _FIND_CLIENT_BY_EMAIL = gql`
+		query FindClientByEmail($email: String!) {
+			findClientByEmail(email: $email) {
+				id
+				firstName
+				lastName
+				email
+				phone
+			}
+		}
+	`;
+
+	const _useLazyFindClientByEmail = () => useLazyQuery(_FIND_CLIENT_BY_EMAIL);
+
 	const _ARCHIVE_CLIENT_MUTATION = gql`
 		mutation ArchiveClient($clientId: ID!) {
 			archiveClient(clientId: $clientId) { id status }
@@ -183,6 +208,7 @@ const ClientService = (() => {
 		fetchClientDashboard: _fetchClientDashboard,
 		FETCH_CLIENT_DASHBOARD: _FETCH_CLIENT_DASHBOARD,
 		UPDATE_CLIENT_NOTES: _UPDATE_CLIENT_NOTES,
+		useLazyFindClientByEmail: _useLazyFindClientByEmail,
 		ARCHIVE_CLIENT_MUTATION: _ARCHIVE_CLIENT_MUTATION,
 		UNARCHIVE_CLIENT_MUTATION: _UNARCHIVE_CLIENT_MUTATION,
 	};

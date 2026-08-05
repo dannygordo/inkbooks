@@ -11,7 +11,9 @@ const {
   getArtistIdsForShops,
   sharesShopWith,
   assertCanAccessShop,
+  assertCanManageArtist,
 } = require('../../utils/shop-membership');
+const { paginate } = require('../../utils/pagination');
 
 // getAppointmentsByShop is called for real by Artist- and Staff-role users viewing their own
 // shop's calendar (see client/src/components/ibCalendar/IBCalendar.jsx), not just Shop Admins -
@@ -28,6 +30,51 @@ async function callerBelongsToShop(user, shopId) {
     ArtistShopConnection.exists({ artistId: user.id, shopId }),
   ]);
   return Boolean(isStaffHere || isConnectedArtist);
+}
+
+
+/**
+ * Turns an AppointmentFilter into a Mongo filter.
+ *
+ * One filter rather than a query per screen. The calendar wants a month, the dashboard wants
+ * "upcoming" and "recently completed", the payout list wants "completed and unpaid" - all four
+ * used to be the same fetch-everything call with four different client-side passes over the
+ * result, which is why an artist's dashboard downloaded their entire career to render two lists
+ * of five.
+ *
+ * Half-open [from, to) on dates, matching utils/analytics.js - so consecutive months don't both
+ * claim the appointment that lands exactly on the boundary.
+ */
+function appointmentFilterToQuery(filter) {
+  if (!filter) {
+    return {};
+  }
+  const query = {};
+
+  const dateBounds = {};
+  if (filter.from) {
+    dateBounds.$gte = new Date(filter.from);
+  }
+  if (filter.to) {
+    dateBounds.$lt = new Date(filter.to);
+  }
+  // upcomingOnly is resolved HERE, at query time, rather than by the caller passing
+  // `from: <now>`. "Upcoming" has to mean ahead of the moment the query runs; a client that
+  // computed `now` when it rendered would drift, and a cached one would drift badly.
+  if (filter.upcomingOnly) {
+    dateBounds.$gte = new Date();
+  }
+  if (Object.keys(dateBounds).length > 0) {
+    query.appointmentDate = dateBounds;
+  }
+
+  if (filter.appointmentStatus) {
+    query.appointmentStatus = filter.appointmentStatus;
+  }
+  if (filter.shopCutStatus) {
+    query.shopCutStatus = filter.shopCutStatus;
+  }
+  return query;
 }
 
 module.exports = {
@@ -48,16 +95,14 @@ module.exports = {
     // this financial data is exactly what that dashboard now surfaces prominently, which is what
     // made the gap worth fixing rather than just noting. Not a flat role gate - see
     // callerBelongsToShop above for why.
-    getAppointmentsByShop: withAuth(async (_, { shopId }, context, info, user) => {
+    getAppointmentsByShop: withAuth(async (_, { shopId, filter, page }, context, info, user) => {
       if (!(await callerBelongsToShop(user, shopId))) {
         throw new AuthenticationError('Action not allowed');
       }
-      try {
-        const appointments = await Appointment.find({shopId: shopId}).sort({ appointmentDate: 1 });
-        return appointments;
-      } catch (err) {
-        rethrow(err);
-      }
+      return paginate(Appointment, { shopId, ...appointmentFilterToQuery(filter) }, {
+        sort: { appointmentDate: 1 },
+        page,
+      });
     }),
     // Was withAuth with no ownership check at all - any authenticated user could pass an
     // arbitrary userId and read that artist's entire appointment/financial history. Same
@@ -70,7 +115,7 @@ module.exports = {
     // central panel then errors out is worse than either allowing or denying it outright. Staff
     // at a DIFFERENT shop stay denied - role alone can't express that, hence sharesShopWith.
     // ARTIST-role callers are unaffected and still only ever see their own history.
-    getAppointmentsByArtist: withAuth(async (_, { userId }, context, info, user) => {
+    getAppointmentsByArtist: withAuth(async (_, { userId, filter, page }, context, info, user) => {
         // The artist themselves, or Staff-and-above who share a shop with them. A shop admin is
         // in that second group and takes the same shared-shop check as anyone else - previously
         // `role > SHOP_ADMIN` let them skip it and read any artist's financial history.
@@ -81,13 +126,36 @@ module.exports = {
             throw new AuthenticationError('Action not allowed');
           }
         }
-        try {
-            const appointments = await Appointment.find({userId: userId}).sort({ updatedAt: 1 });
-            return appointments;
-        } catch (err) {
-          rethrow(err);
-        }
+        // Sorted by appointmentDate, not updatedAt. Every caller of this is asking a
+        // date-shaped question - the next few, the most recent few, a month - and updatedAt
+        // ordering made "the first N" mean "the N most recently edited", which is not a thing
+        // anybody wants to see. It only went unnoticed because the client re-sorted the whole
+        // array itself after fetching all of it.
+        return paginate(Appointment, { userId, ...appointmentFilterToQuery(filter) }, {
+          sort: { appointmentDate: filter && filter.upcomingOnly ? 1 : -1 },
+          page,
+        });
       }),
+    /**
+     * Every shop cut this artist still owes.
+     *
+     * Deliberately unpaginated - see the note in typeDefs.js. The task is settling a debt, not
+     * browsing history, and a batch "invoice all" over a paged list is ambiguous about what it
+     * covers.
+     *
+     * 'unpaid' only: invoice_sent and pending_confirmation already have an action in flight, and
+     * showing them here would invite invoicing the same session twice. Requires a shopId, since a
+     * cut with no shop attached is an independent artist's session and owed to nobody.
+     */
+    getShopCutPayoutCandidates: withAuth(async (_, { userId }, context, info, user) => {
+      await assertCanManageArtist(user, userId, Constants.ROLES.SHOP_STAFF);
+      return Appointment.find({
+        userId,
+        appointmentStatus: 'completed',
+        shopCutStatus: 'unpaid',
+        shopId: { $ne: null },
+      }).sort({ appointmentDate: 1 });
+    }),
     // Was withAuth with no restriction at all - any authenticated user could pass an arbitrary
     // appointmentId and read its full detail, including total/tip/shopCutAmount. Allowed:
     // shop-admin-or-better, the assigned artist (Appointment.userId, matching

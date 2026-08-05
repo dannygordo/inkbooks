@@ -160,7 +160,7 @@ describe('money is not visible across shops', () => {
 
 		const response = await server.executeOperation(
 			{
-				query: `query A($shopId: ID!) { getAppointmentsByShop(shopId: $shopId) { id totalCents tipCents } }`,
+				query: `query A($shopId: ID!) { getAppointmentsByShop(shopId: $shopId) { items { id totalCents tipCents } } }`,
 				variables: { shopId: shopA.id },
 			},
 			asOutsideAdmin(adminB),
@@ -227,7 +227,7 @@ describe('client records are not visible across shops', () => {
 		const server = createTestServer();
 
 		const response = await server.executeOperation(
-			{ query: `{ getClients { id email } }` },
+			{ query: `{ getClients { items { id email } } }` },
 			asOutsideAdmin(adminB),
 		);
 
@@ -235,7 +235,7 @@ describe('client records are not visible across shops', () => {
 		// an empty list rather than a refusal.
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeUndefined();
-		expect(data.getClients.map((c) => c.id)).not.toContain(clientA.id);
+		expect(data.getClients.items.map((c) => c.id)).not.toContain(clientA.id);
 	});
 
 	it("refuses a single client at another shop", async () => {
@@ -290,13 +290,13 @@ describe('work and schedule are not visible across shops', () => {
 		const server = createTestServer();
 
 		const response = await server.executeOperation(
-			{ query: `{ getProjects { id } }` },
+			{ query: `{ getProjects { items { id } } }` },
 			asOutsideAdmin(adminB),
 		);
 
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeUndefined();
-		expect(data.getProjects.map((p) => p.id)).not.toContain(projectA.id);
+		expect(data.getProjects.items.map((p) => p.id)).not.toContain(projectA.id);
 	});
 
 	it("refuses a single project at another shop", async () => {

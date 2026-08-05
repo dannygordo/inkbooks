@@ -494,7 +494,7 @@ describe('getProjectsByArtist: ownership', () => {
 // not null - the exact shape that would have caught this originally (ProjectService.js's real
 // FETCH_PROJECTS_QUERY does select `client { ... }` the same way).
 describe('Project.client field resolver', () => {
-	const GET_PROJECTS = `{ getProjects { id client { id firstName lastName } } }`;
+	const GET_PROJECTS = `{ getProjects { items { id client { id firstName lastName } } } }`;
 
 	it('resolves the actual Client sub-document, not null', async () => {
 		const { user: artistUser } = await createArtistUser();
@@ -509,7 +509,7 @@ describe('Project.client field resolver', () => {
 
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeUndefined();
-		const found = data.getProjects.find((p) => p.id === project.id);
+		const found = data.getProjects.items.find((p) => p.id === project.id);
 		expect(found).toBeDefined();
 		expect(found.client).not.toBeNull();
 		expect(found.client.id).toBe(client.id);

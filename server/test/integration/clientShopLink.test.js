@@ -44,7 +44,7 @@ const UPDATE_CLIENT = `
 `;
 
 const GET_CLIENT = `query GetClient($clientId: ID!) { getClient(clientId: $clientId) { id } }`;
-const GET_CLIENTS = `{ getClients { id } }`;
+const GET_CLIENTS = `{ getClients { items { id } } }`;
 
 const asUser = (user) => ({ contextValue: contextWithToken(signTestToken(user)) });
 
@@ -198,7 +198,7 @@ describe('the shop link does not leak across shops', () => {
 
 		const { errors, data } = res.body.singleResult;
 		expect(errors).toBeUndefined();
-		const ids = data.getClients.map((c) => c.id);
+		const ids = data.getClients.items.map((c) => c.id);
 		expect(ids).toContain(mine.id);
 		expect(ids).not.toContain(theirs.id);
 	});
@@ -213,7 +213,7 @@ describe('the shop link does not leak across shops', () => {
 
 		for (const admin of [adminA, adminB]) {
 			const res = await server.executeOperation({ query: GET_CLIENTS }, asUser(admin));
-			expect(res.body.singleResult.data.getClients.map((c) => c.id)).toContain(shared.id);
+			expect(res.body.singleResult.data.getClients.items.map((c) => c.id)).toContain(shared.id);
 		}
 	});
 });

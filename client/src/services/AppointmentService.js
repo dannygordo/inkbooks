@@ -1,9 +1,15 @@
 import { gql, useQuery } from "@apollo/client";
 
 export const AppointmentService = (() => {
+    // Takes the month the calendar is actually showing. This used to fetch a shop's ENTIRE
+    // appointment history so Day.jsx could filter it down to one day - see
+    // server/utils/pagination.js. limit is deliberately high rather than paged: a month is a
+    // bounded set the calendar has to render all of at once, so paging it would just mean
+    // stitching pages back together in the browser.
     const _FETCH_APPOINTMENTS_BY_SHOP = gql`
-        query GetAppointmentsByShop($shopId: ID!) {
-            getAppointmentsByShop(shopId: $shopId) {
+        query GetAppointmentsByShop($shopId: ID!, $filter: AppointmentFilter, $page: PageInput) {
+            getAppointmentsByShop(shopId: $shopId, filter: $filter, page: $page) {
+              items {
                 id
                 projectId
                 userId
@@ -39,6 +45,8 @@ export const AppointmentService = (() => {
                 shopCutPaymentMethod
                 shopCutSquareInvoiceId
             }
+              pageInfo { totalCount hasMore limit offset }
+            }
         }
     `;
     // skip when there's no shopId - an independent artist (no shop connection at all, a real
@@ -47,12 +55,19 @@ export const AppointmentService = (() => {
     // user.userInfo.shop.id before this even ran (see that file's own fix) - this guard is what
     // actually stops the query from firing with an undefined shopId against a resolver that
     // expects a real one.
-    const _getAppointmentsByShop = (shopId) => {
+    // range is { from, to } covering exactly the grid the calendar is drawing - see
+    // IBCalendar.jsx. Skipped without one as well as without a shopId: firing this unbounded
+    // would fetch the shop's whole history, which is the thing the range exists to stop.
+    const _getAppointmentsByShop = (shopId, range) => {
         return useQuery(_FETCH_APPOINTMENTS_BY_SHOP, {
 			variables: {
 				shopId,
+				filter: range,
+				// A month of one shop's appointments, in one response. Paging it would just mean
+				// stitching the pages back together in the browser to draw the grid.
+				page: { limit: 200 },
 			},
-			skip: !shopId,
+			skip: !shopId || !range,
 		});
     }
 
@@ -61,8 +76,9 @@ export const AppointmentService = (() => {
     // (any status, any date), with MTD/YTD revenue and shop-cut totals computed client-side rather
     // than added as new server aggregation resolvers for this first pass.
     const _FETCH_APPOINTMENTS_BY_ARTIST = gql`
-        query GetAppointmentsByArtist($userId: ID!) {
-            getAppointmentsByArtist(userId: $userId) {
+        query GetAppointmentsByArtist($userId: ID!, $filter: AppointmentFilter, $page: PageInput) {
+            getAppointmentsByArtist(userId: $userId, filter: $filter, page: $page) {
+              items {
                 id
                 title
                 appointmentDate
@@ -92,6 +108,8 @@ export const AppointmentService = (() => {
                     title
                 }
             }
+              pageInfo { totalCount hasMore limit offset }
+            }
         }
     `;
     // fetchPolicy: 'cache-and-network' - was left at Apollo's default 'cache-first'. This is a
@@ -106,6 +124,61 @@ export const AppointmentService = (() => {
     // loading flash on a normal visit) but always fires a real network request behind it too, so
     // a dashboard visit is guaranteed to reflect whatever was created elsewhere in the same
     // session.
+    // Three narrow calls replace one fat one. The dashboard used to fetch an artist's ENTIRE
+    // career and run four client-side passes over it - upcoming, recently completed, payout
+    // candidates, plus the calendar's own filter - which meant every dashboard visit downloaded
+    // every appointment that artist had ever had. Each of these now asks the server the question
+    // the screen is actually asking. See server/graphql/typeDefs.js's AppointmentFilter.
+    const _getUpcomingAppointments = (userId, limit = 5) => {
+        return useQuery(_FETCH_APPOINTMENTS_BY_ARTIST, {
+            variables: { userId, filter: { upcomingOnly: true }, page: { limit } },
+            skip: !userId,
+            fetchPolicy: "cache-and-network",
+        });
+    };
+
+    const _getCompletedAppointments = (userId, limit = 5) => {
+        return useQuery(_FETCH_APPOINTMENTS_BY_ARTIST, {
+            variables: {
+                userId,
+                filter: { appointmentStatus: "completed" },
+                page: { limit },
+            },
+            skip: !userId,
+            fetchPolicy: "cache-and-network",
+        });
+    };
+
+    const _FETCH_SHOP_CUT_PAYOUT_CANDIDATES = gql`
+        query GetShopCutPayoutCandidates($userId: ID!) {
+            getShopCutPayoutCandidates(userId: $userId) {
+                id
+                title
+                appointmentDate
+                appointmentStatus
+                totalCents
+                subtotalCents
+                shopId
+                shopCutStatus
+                shopCutCents
+                shopCutPaymentMethod
+                shopCutSquareInvoiceId
+                userId
+                user { id firstName lastName tagColor }
+            }
+        }
+    `;
+
+    // Everything owed, unpaginated on purpose - the task is settling a debt, and a batch
+    // "invoice all" over a paged list is ambiguous about what it covers. See typeDefs.js.
+    const _getShopCutPayoutCandidates = (userId) => {
+        return useQuery(_FETCH_SHOP_CUT_PAYOUT_CANDIDATES, {
+            variables: { userId },
+            skip: !userId,
+            fetchPolicy: "cache-and-network",
+        });
+    };
+
     const _getAppointmentsByArtist = (userId) => {
         return useQuery(_FETCH_APPOINTMENTS_BY_ARTIST, {
             variables: { userId },
@@ -122,8 +195,9 @@ export const AppointmentService = (() => {
     // lean for ArtistPerformancePanel's dashboard use case and doesn't select the project/client/
     // user detail a calendar day cell needs to render an event (see ibCalendar/Day.jsx).
     const _FETCH_APPOINTMENTS_BY_ARTIST_FOR_CALENDAR = gql`
-        query GetAppointmentsByArtistForCalendar($userId: ID!) {
-            getAppointmentsByArtist(userId: $userId) {
+        query GetAppointmentsByArtistForCalendar($userId: ID!, $filter: AppointmentFilter, $page: PageInput) {
+            getAppointmentsByArtist(userId: $userId, filter: $filter, page: $page) {
+              items {
                 id
                 projectId
                 userId
@@ -159,12 +233,14 @@ export const AppointmentService = (() => {
                 shopCutPaymentMethod
                 shopCutSquareInvoiceId
             }
+              pageInfo { totalCount hasMore limit offset }
+            }
         }
     `;
-    const _getAppointmentsByArtistForCalendar = (userId) => {
+    const _getAppointmentsByArtistForCalendar = (userId, range) => {
         return useQuery(_FETCH_APPOINTMENTS_BY_ARTIST_FOR_CALENDAR, {
-            variables: { userId },
-            skip: !userId,
+            variables: { userId, filter: range, page: { limit: 200 } },
+            skip: !userId || !range,
         });
     };
 
@@ -471,6 +547,9 @@ export const AppointmentService = (() => {
         FETCH_APPOINTMENTS_BY_ARTIST: _FETCH_APPOINTMENTS_BY_ARTIST,
         FETCH_APPOINTMENTS_BY_ARTIST_FOR_CALENDAR: _FETCH_APPOINTMENTS_BY_ARTIST_FOR_CALENDAR,
         getAppointmentsByArtist: _getAppointmentsByArtist,
+        getUpcomingAppointments: _getUpcomingAppointments,
+        getCompletedAppointments: _getCompletedAppointments,
+        getShopCutPayoutCandidates: _getShopCutPayoutCandidates,
         getAppointmentsByArtistForCalendar: _getAppointmentsByArtistForCalendar,
         CREATE_APPOINTMENT: _CREATE_APPOINTMENT,
         UPDATE_APPOINTMENT: _UPDATE_APPOINTMENT,

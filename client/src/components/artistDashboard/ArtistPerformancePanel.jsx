@@ -106,9 +106,10 @@ const AppointmentRow = ({ appt, onNavigate, showEarnings = false }) => {
  *   - pages/home/Home.jsx: an artist's own view of their own numbers (isSelf=true).
  *   - pages/artists/Artist.jsx: a shop admin/staff's view into one specific artist (isSelf=false).
  *
- * All MTD/YTD math is computed client-side from getAppointmentsByArtist's full result set - fine
- * at today's data volume, but worth revisiting as a dedicated server-side aggregation resolver if
- * an artist's appointment history grows large enough that fetching every row becomes expensive.
+ * The figures come from server-side aggregation (server/utils/analytics.js), and each of the three
+ * lists comes from its own narrow query. That "worth revisiting if the history grows large" note
+ * that used to sit here was too generous: it wasn't a scaling concern, it was every dashboard
+ * visit downloading every appointment the artist had ever had in order to show five of them.
  */
 const ArtistPerformancePanel = ({ artistUserId, isSelf = false }) => {
 	const navigate = useNavigate();
@@ -128,21 +129,25 @@ const ArtistPerformancePanel = ({ artistUserId, isSelf = false }) => {
 	// reads as data loss rather than as a definition.
 	const { data: analyticsData, loading: analyticsLoading } =
 		AnalyticsService.getArtistAnalytics(artistUserId, range);
-	const { data: apptData, loading: apptLoading, refetch: refetchAppointments } =
-		AppointmentService.getAppointmentsByArtist(artistUserId);
 
-	if (apptLoading && !apptData) {
+	// Three narrow queries, not one fat fetch plus four client-side passes. This used to load the
+	// artist's ENTIRE appointment history to render two lists of five and a payout list - see
+	// services/AppointmentService.js. Each of these now asks the question the section below it is
+	// actually asking, which is also why the sorting is right: the server orders upcoming
+	// soonest-first and completed newest-first, rather than the browser re-sorting everything.
+	const { data: upcomingData, loading: upcomingLoading } =
+		AppointmentService.getUpcomingAppointments(artistUserId, APPOINTMENT_LIST_LIMIT);
+	const { data: completedData, loading: completedLoading } =
+		AppointmentService.getCompletedAppointments(artistUserId, APPOINTMENT_LIST_LIMIT);
+	const { data: payoutData, refetch: refetchAppointments } =
+		AppointmentService.getShopCutPayoutCandidates(artistUserId);
+
+	if ((upcomingLoading && !upcomingData) || (completedLoading && !completedData)) {
 		return <IBPageLoader />;
 	}
 
-	const now = new Date();
-	const appointments = (apptData && apptData.getAppointmentsByArtist) || [];
 	const analytics = analyticsData?.getArtistAnalytics;
-
-	const upcoming = appointments
-		.filter((a) => new Date(a.appointmentDate) >= now)
-		.sort((a, b) => new Date(a.appointmentDate) - new Date(b.appointmentDate))
-		.slice(0, APPOINTMENT_LIST_LIMIT);
+	const upcoming = upcomingData?.getAppointmentsByArtist?.items || [];
 
 	// The mirror of `upcoming`, and deliberately built the same way: same row component, same
 	// clickability rules, same limit - just sorted newest-first, because the useful end of a
@@ -154,22 +159,18 @@ const ArtistPerformancePanel = ({ artistUserId, isSelf = false }) => {
 	// completed-sessions list. Keying on status rather than type means a completed appointment
 	// that isn't strictly typed as a session still shows up instead of silently vanishing, which
 	// is the safer failure direction for a list an artist checks against their own memory.
-	const completed = appointments
-		.filter((a) => a.appointmentStatus === "completed")
-		.sort((a, b) => new Date(b.appointmentDate) - new Date(a.appointmentDate))
-		.slice(0, APPOINTMENT_LIST_LIMIT);
+	const completed = completedData?.getAppointmentsByArtist?.items || [];
 
 	// Only 'completed' sessions - see PRODUCTION_ROADMAP.md's Phase 7 section: a shop cut isn't
 	// actually payable until the session itself is done, matching SessionDetail's own close-session
 	// gate (appointmentStatus: 'completed'). 'unpaid' only (not invoice_sent/pending_confirmation -
 	// those already have an action in flight, nothing new to do here until they resolve).
 	// Not range-scoped either: what an artist owes is what they owe, not what they owed in March.
-	const payoutCandidates = appointments.filter(
-		(a) =>
-			a.appointmentStatus === "completed" &&
-			a.shopCutStatus === "unpaid" &&
-			a.shopId,
-	);
+	// Everything owed, straight from the server - deliberately not paged, since the task is
+	// settling the debt rather than browsing it. The completed/unpaid/has-a-shop filtering that
+	// used to happen here now lives in the resolver, where it can't drift from the shop-cut
+	// ledger's own definition of what's payable.
+	const payoutCandidates = payoutData?.getShopCutPayoutCandidates || [];
 
 	return (
 		<div className="artistPerformancePanel">

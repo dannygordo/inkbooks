@@ -8,6 +8,14 @@ const {
 } = require('../../utils/shop-membership');
 const { excludeArchived, archiveFilter } = require('../../utils/archiving');
 const { findArtistsForShops, getActiveShopIdForArtist } = require('../../utils/artist-shop');
+const { paginateArray, normalizePage } = require('../../utils/pagination');
+
+// A caller with no shops still gets a well-formed page rather than a bare array, so the client has
+// exactly one response shape to read whatever the answer turns out to be.
+function emptyPage(page) {
+  const { limit, offset } = normalizePage(page);
+  return { items: [], pageInfo: { totalCount: 0, hasMore: false, limit, offset } };
+}
 
 module.exports = {
   Query: {
@@ -25,12 +33,12 @@ module.exports = {
     // history. Artists have no reason to see each other's books; they reach their own numbers
     // through Home.jsx's dashboard, which mounts the same panel scoped to themselves.
     // Shop-scoping for Staff is unchanged below.
-    getArtists: withAuth(async (_, { includeArchived }, context, info, user) => {
+    getArtists: withAuth(async (_, { includeArchived, page }, context, info, user) => {
       try {
         // No unscoped branch, for anyone - see utils/shop-membership.js's role rule.
         const shopIds = await getShopIdsForUser(user.id);
         if (shopIds.length === 0) {
-          return [];
+          return emptyPage(page);
         }
         // Resolved through ArtistShopConnection, not Artist.shopId. Those were two separate
         // sources of truth and this query read the one that connectArtistToShop never writes -
@@ -39,8 +47,14 @@ module.exports = {
         //
         // Archived artists drop out of the directory but keep every appointment, project and
         // dollar they earned - see utils/archiving.js.
+        // Paged in memory rather than by Mongo. findArtistsForShops resolves the roster through
+        // ArtistShopConnection first (see utils/artist-shop.js), so the set can't be expressed as
+        // one Mongo filter over Artist - and a shop's roster is bounded by how many people work
+        // there, which isn't a number that gets away from anyone. The directories over genuinely
+        // unbounded collections - clients, projects - page in the database.
         const artists = await findArtistsForShops(shopIds, archiveFilter(includeArchived));
-        return artists.sort((a, b) => new Date(a.startDate || 0) - new Date(b.startDate || 0));
+        artists.sort((a, b) => new Date(a.startDate || 0) - new Date(b.startDate || 0));
+        return paginateArray(artists, page);
       } catch (err) {
         rethrow(err);
       }

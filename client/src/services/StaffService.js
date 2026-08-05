@@ -32,42 +32,45 @@ const StaffService = (() => {
 	};
 
 	// See ArtistService's matching comment on includeArchived.
-	const _fetchStaff = (includeArchived = false) => {
+	const _fetchStaff = (includeArchived = false, page) => {
 		const FETCH_STAFF_QUERY = gql`
-			query GetStaff($includeArchived: Boolean) {
-				getStaff(includeArchived: $includeArchived) {
-					id
-					firstName
-					lastName
-					email
-					phone
-					address
-					city
-					state
-					zip
-					instagram
-					facebook
-					avatar
-					userId
-                    title
-                    status
-                    shopId
-					# Was a bare "user". That's an object type and can't be selected without
-					# subfields, so GraphQL rejects the whole document - meaning this query has
-					# never executed at all and the Staff list has always failed with "Field user
-					# of type User must have a selection of subfields". Found by validating every
-					# gql document in this app against the real server schema; unrelated to the
-					# work that surfaced it.
-					user {
+			query GetStaff($includeArchived: Boolean, $page: PageInput) {
+				getStaff(includeArchived: $includeArchived, page: $page) {
+					items {
 						id
 						firstName
 						lastName
+						email
+						phone
+						address
+						city
+						state
+						zip
+						instagram
+						facebook
 						avatar
+						userId
+	                    title
+	                    status
+	                    shopId
+						# Was a bare "user". That's an object type and can't be selected without
+						# subfields, so GraphQL rejects the whole document - meaning this query has
+						# never executed at all and the Staff list has always failed with "Field user
+						# of type User must have a selection of subfields". Found by validating every
+						# gql document in this app against the real server schema; unrelated to the
+						# work that surfaced it.
+						user {
+							id
+							firstName
+							lastName
+							avatar
+						}
 					}
+					pageInfo { totalCount hasMore limit offset }
 				}
 			}
 		`;
-		return useQuery(FETCH_STAFF_QUERY, { variables: { includeArchived } });
+		return useQuery(FETCH_STAFF_QUERY, { variables: { includeArchived, page } });
 	};
 
 	const _updateStaff = (staff) => {

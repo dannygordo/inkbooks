@@ -20,10 +20,10 @@ const {
 const { Constants } = require('../../utils/constants');
 
 const GET_SHOPS = `{ getShops { id } }`;
-const GET_STAFF = `{ getStaff { id shopId } }`;
-const GET_ARTISTS = `{ getArtists { id shopId } }`;
-const GET_CLIENTS = `{ getClients { id } }`;
-const GET_PROJECTS = `{ getProjects { id clientId artistId } }`;
+const GET_STAFF = `{ getStaff { items { id shopId } } }`;
+const GET_ARTISTS = `{ getArtists { items { id shopId } } }`;
+const GET_CLIENTS = `{ getClients { items { id } } }`;
+const GET_PROJECTS = `{ getProjects { items { id clientId artistId } } }`;
 const GET_CONVERSATIONS_BY_MEMBER_ID = `
 	query GetConversationsByMemberId($memberId: ID!) {
 		getConversationsByMemberId(memberId: $memberId) { id }
@@ -113,7 +113,7 @@ describe('getStaff: shop-affiliation scoping', () => {
 
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeUndefined();
-		const shopIds = data.getStaff.map((s) => s.shopId);
+		const shopIds = data.getStaff.items.map((s) => s.shopId);
 		expect(shopIds).toContain(shopA.id);
 		expect(shopIds).not.toContain(shopB.id);
 	});
@@ -135,7 +135,7 @@ describe('getArtists: shop-affiliation scoping', () => {
 
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeUndefined();
-		const ids = data.getArtists.map((a) => a.id);
+		const ids = data.getArtists.items.map((a) => a.id);
 		expect(ids).toContain(artistA.id);
 		expect(ids).not.toContain(artistB.id);
 	});
@@ -158,7 +158,7 @@ describe('getClients: shop-affiliation scoping (via shared Projects)', () => {
 
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeUndefined();
-		const ids = data.getClients.map((c) => c.id);
+		const ids = data.getClients.items.map((c) => c.id);
 		expect(ids).toContain(clientOfA.id);
 		expect(ids).not.toContain(clientOfB.id);
 	});
@@ -184,7 +184,7 @@ describe('getClients: shop-affiliation scoping (via shared Projects)', () => {
 
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeUndefined();
-		const ids = data.getClients.map((c) => c.id);
+		const ids = data.getClients.items.map((c) => c.id);
 		expect(ids).toContain(clientOfA.id);
 		expect(ids).not.toContain(clientOfB.id);
 	});
@@ -206,8 +206,8 @@ describe('getProjects: role-scoped visibility', () => {
 
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeUndefined();
-		expect(data.getProjects).toHaveLength(1);
-		expect(data.getProjects[0].clientId).toBe(clientA.id);
+		expect(data.getProjects.items).toHaveLength(1);
+		expect(data.getProjects.items[0].clientId).toBe(clientA.id);
 	});
 
 	it('shows an Artist only their own projects', async () => {
@@ -225,8 +225,8 @@ describe('getProjects: role-scoped visibility', () => {
 
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeUndefined();
-		expect(data.getProjects).toHaveLength(1);
-		expect(data.getProjects[0].artistId).toBe(artistA.id);
+		expect(data.getProjects.items).toHaveLength(1);
+		expect(data.getProjects.items[0].artistId).toBe(artistA.id);
 	});
 
 	// Was "a SHOP_ADMIN-or-better user sees every project", called as the global ADMIN. There is
@@ -251,7 +251,7 @@ describe('getProjects: role-scoped visibility', () => {
 
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeUndefined();
-		const ids = data.getProjects.map((p) => p.id);
+		const ids = data.getProjects.items.map((p) => p.id);
 		expect(ids).toContain(mine.id);
 		expect(ids).not.toContain(theirs.id);
 	});
@@ -405,7 +405,9 @@ describe('getArtist / getArtistsByShop: single-resource ownership', () => {
 		);
 
 		const { errors, data } = response.body.singleResult;
-		expect(data.getArtists).toBeNull();
+		// getArtists returns ArtistPage! now - non-null - so a thrown error nulls the whole
+		// `data`, not just the field. Same rule as accounts.test.js's note.
+		expect(data).toBeNull();
 		expect(errors[0].message).toMatch(/Action not allowed/);
 	});
 

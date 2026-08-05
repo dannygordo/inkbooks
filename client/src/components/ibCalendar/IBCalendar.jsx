@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../context/auth';
 import { useCalendar } from '../../context/calendar';
 import { AppointmentService } from '../../services/AppointmentService';
@@ -21,9 +21,37 @@ const IBCalendar = () => {
     // instead of showing their own appointments, since getAppointmentsByShop has nothing to query
     // without a shopId and there was no fallback query at all.
     const shopId = user.userInfo?.shop?.id;
-    const { data: shopData } = AppointmentService.getAppointmentsByShop(shopId);
+
+    // Fetch exactly the days on screen, and no more. This used to fetch EVERY appointment the shop
+    // had ever had so Day.jsx could filter down to one day at a time - see server/utils/pagination.js.
+    //
+    // Derived from the rendered grid rather than from the month number, because the grid isn't the
+    // month: getMonth() returns five weeks starting on the week that contains the 1st, so it spills
+    // into the previous and next months. Asking for the calendar month would leave the leading and
+    // trailing cells mysteriously empty.
+    //
+    // Half-open [from, to), matching the server - so the last day is included by adding a day to
+    // its start rather than by trying to name the last instant of it.
+    const range = useMemo(() => {
+        const weeks = currentMonth;
+        if (!weeks || weeks.length === 0) {
+            return null;
+        }
+        const firstCell = weeks[0][0];
+        const lastCell = weeks[weeks.length - 1][weeks[weeks.length - 1].length - 1];
+        if (!firstCell || !lastCell) {
+            return null;
+        }
+        return {
+            from: firstCell.clone().startOf('day').toISOString(),
+            to: lastCell.clone().add(1, 'day').startOf('day').toISOString(),
+        };
+    }, [currentMonth]);
+
+    const { data: shopData } = AppointmentService.getAppointmentsByShop(shopId, range);
     const { data: artistData } = AppointmentService.getAppointmentsByArtistForCalendar(
-        shopId ? undefined : user.id
+        shopId ? undefined : user.id,
+        range
     );
 
     useEffect(() => {
@@ -34,9 +62,9 @@ const IBCalendar = () => {
         // Found via manual testing. Removed - they added no functional value; setSavedEvents
         // below already uses the full array correctly and doesn't depend on them.
         if (shopId && shopData) {
-            setSavedEvents(shopData.getAppointmentsByShop);
+            setSavedEvents(shopData.getAppointmentsByShop.items);
         } else if (!shopId && artistData) {
-            setSavedEvents(artistData.getAppointmentsByArtist);
+            setSavedEvents(artistData.getAppointmentsByArtist.items);
         }
     }, [shopId, shopData, artistData])
     useEffect(() => {

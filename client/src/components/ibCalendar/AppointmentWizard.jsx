@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { DialogActions, DialogContent } from "@mui/material";
 import moment from "moment";
 import { useMutation } from "@apollo/client";
@@ -84,7 +84,9 @@ const AppointmentWizard = ({ selectedDay }) => {
 	const [projectMode, setProjectMode] = useState("existing"); // 'existing' | 'new'
 	const [existingProjectId, setExistingProjectId] = useState("");
 
-	const { data: clientsData, loading: clientsLoading } = ClientService.fetchClients();
+	// The full client list used to be fetched here purely so the email match below could scan it.
+	// That's a server lookup now, so this component no longer pulls a client directory it never
+	// renders.
 	const { data: projectsData, loading: projectsLoading } = ProjectService.fetchProjectsByArtist(
 		user.id
 	);
@@ -97,18 +99,38 @@ const AppointmentWizard = ({ selectedDay }) => {
 		BookingRequestService.CONVERT_BOOKING_REQUEST_MUTATION
 	);
 
-	// Client-side only - matches the typed email (case-insensitive) against the artist's already-
-	// fetched client list. No new query: ClientService.fetchClients() is already loaded for this
-	// wizard's own purposes (previously the "existing client" dropdown's data source).
+	// Asks the server, rather than scanning a fetched list.
+	//
+	// This used to match against ClientService.fetchClients()'s result. That worked while the list
+	// was every client; once it paged, the match could only ever find someone on the first page -
+	// and a miss here is not cosmetic. The wizard would ask for a first and last name,
+	// createClientAccount would find the existing person by email regardless, and the freshly
+	// typed name would overwrite the real one. See findClientByEmail in server/resolvers/clients.js.
 	const normalizedEmail = clientEmail.trim().toLowerCase();
+	const [findClientByEmail, { data: matchData }] = ClientService.useLazyFindClientByEmail();
+
+	useEffect(() => {
+		if (!normalizedEmail || !normalizedEmail.includes("@")) {
+			return undefined;
+		}
+		// Debounced: this runs per keystroke otherwise, and an email is only meaningful once
+		// somebody has stopped typing it.
+		const timer = setTimeout(() => {
+			findClientByEmail({ variables: { email: normalizedEmail } });
+		}, 350);
+		return () => clearTimeout(timer);
+	}, [normalizedEmail, findClientByEmail]);
+
+	// Guarded against a stale response: the query is debounced and asynchronous, so a result for a
+	// previously-typed address can land after the field has moved on. Without this the wizard
+	// could prefill somebody else's name.
 	const matchedClient = useMemo(() => {
-		if (!normalizedEmail) {
+		const found = matchData?.findClientByEmail;
+		if (!found) {
 			return null;
 		}
-		return (clientsData?.getClients || []).find(
-			(c) => (c.email || "").trim().toLowerCase() === normalizedEmail
-		);
-	}, [normalizedEmail, clientsData]);
+		return (found.email || "").trim().toLowerCase() === normalizedEmail ? found : null;
+	}, [matchData, normalizedEmail]);
 
 	// Whichever appointments query IBCalendar.jsx is actually watching (shop-scoped vs.
 	// artist-scoped, per-artist) - refetching it after any of the creation paths below is
@@ -341,9 +363,9 @@ const AppointmentWizard = ({ selectedDay }) => {
 	}
 
 	if (step === "client-email") {
-		if (clientsLoading) {
-			return <IBPageLoader />;
-		}
+		// No loading gate here any more: there's no list to wait for. The email lookup resolves
+		// after the field is typed and only ever adds a "Found:" line - blocking the step on it
+		// would make the user wait to type.
 		return (
 			<DialogContent dividers className="appointmentWizardDialogContent">
 				<IBInput
