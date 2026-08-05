@@ -20,7 +20,7 @@ import MailIcon from "@mui/icons-material/Mail";
 import PriceCheckIcon from "@mui/icons-material/PriceCheck";
 import SettingsIcon from "@mui/icons-material/Settings";
 import { AuthContext } from "../../context/auth";
-import { APP_SETTINGS_CONSTANTS, ROUTE_CONSTANTS, ROLES } from "../../constants";
+import { APP_SETTINGS_CONSTANTS, ROUTE_CONSTANTS, ROLES, roleLabel } from "../../constants";
 import InputBase from "@mui/material/InputBase";
 import { useNavigate } from "react-router-dom";
 import IBAvatar from "../inputs/IBAvatar";
@@ -486,6 +486,52 @@ export default function Sidebar() {
 						)}
 					</IconButton>
 				</DrawerHeader>
+				<Divider />
+				{/* Who you're signed in as, above the nav.
+				    Nothing in the app said this. The avatar in the app bar was the only clue, and an
+				    avatar with no name is a coin-flip when a shop admin and an artist share a
+				    machine at the front desk - which is exactly when acting as the wrong person
+				    costs something, since role decides who sees the money.
+				    Collapses to the avatar alone when the drawer is closed: the name would be
+				    clipped mid-word at 56px, which reads as a rendering bug rather than as a
+				    deliberately compact state. */}
+				<Box
+					sx={{
+						display: "flex",
+						alignItems: "center",
+						gap: 1.5,
+						px: open ? 2.5 : 0,
+						py: 1.75,
+						justifyContent: open ? "flex-start" : "center",
+					}}
+				>
+					<IBAvatar
+						size={open ? 40 : 32}
+						imgUrl={user?.avatar}
+						label={`${user?.firstName ?? ""} ${user?.lastName ?? ""}`}
+					/>
+					{open && (
+						<Box sx={{ minWidth: 0 }}>
+							<Typography
+								noWrap
+								title={`${user?.firstName ?? ""} ${user?.lastName ?? ""}`}
+								sx={{ fontSize: 14, fontWeight: 600, lineHeight: 1.3 }}
+							>
+								{user?.firstName} {user?.lastName}
+							</Typography>
+							{/* Two separate facts, and the shop is the one that stops a shop admin
+							    at two studios wondering which set of books they're looking at. */}
+							<Typography
+								noWrap
+								sx={{ fontSize: 12, lineHeight: 1.4, opacity: 0.65 }}
+							>
+								{[roleLabel(user?.role), user?.userInfo?.shop?.name]
+									.filter(Boolean)
+									.join(" · ")}
+							</Typography>
+						</Box>
+					)}
+				</Box>
 				<Divider />
 				<List>
 					<ListItemButton

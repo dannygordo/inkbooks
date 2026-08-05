@@ -15,6 +15,24 @@ export const ROLES = {
 	CLIENT: 30,
 };
 
+// Display names, keyed off ROLES itself rather than written as a second literal list of numbers.
+// A hand-written `{ 10: "Shop Admin" }` would be a second place the numbers live, and the comment
+// at the top of this file is about what happens when the same role has two definitions.
+export const ROLE_LABELS = {
+	[ROLES.ADMIN]: "Admin",
+	[ROLES.SHOP_ADMIN]: "Shop Admin",
+	[ROLES.SHOP_STAFF]: "Shop Staff",
+	[ROLES.ARTIST]: "Artist",
+	[ROLES.CLIENT]: "Client",
+};
+
+// Falls back to nothing rather than to a guess. An unrecognised role number means the token is
+// older than this build or something is wrong; labelling it "Client" (the safe-looking default)
+// would put a confident, wrong word on screen.
+export function roleLabel(role) {
+	return ROLE_LABELS[role] || "";
+}
+
 export const AUTH_ERROR_MESSAGES = {
 	TOKEN_IS_INVALID: "Token is invalid",
 	AUTH_FAILED: "You are not authenticated",
