@@ -7,6 +7,7 @@ const {
   assertCanAccessShop,
 } = require('../../utils/shop-membership');
 const { excludeArchived } = require('../../utils/archiving');
+const { findArtistsForShops, getActiveShopIdForArtist } = require('../../utils/artist-shop');
 
 module.exports = {
   Query: {
@@ -31,11 +32,15 @@ module.exports = {
         if (shopIds.length === 0) {
           return [];
         }
+        // Resolved through ArtistShopConnection, not Artist.shopId. Those were two separate
+        // sources of truth and this query read the one that connectArtistToShop never writes -
+        // so an artist connected through the real connect flow was authorized at the shop but
+        // absent from its own directory. See utils/artist-shop.js.
+        //
         // Archived artists drop out of the directory but keep every appointment, project and
         // dollar they earned - see utils/archiving.js.
-        return await Artist.find(excludeArchived({ shopId: { $in: shopIds } })).sort({
-          startDate: 1,
-        });
+        const artists = await findArtistsForShops(shopIds, excludeArchived());
+        return artists.sort((a, b) => new Date(a.startDate || 0) - new Date(b.startDate || 0));
       } catch (err) {
         throw new Error(err);
       }
@@ -56,10 +61,13 @@ module.exports = {
         const isSelf = String(user.id) === String(artist.userId);
         if (!isSelf) {
           // Staff, but not Artists or Clients - and only Staff at this artist's own shop. Role
-          // alone can't express "same shop", which is why both halves are checked.
-          const shopIds = await getShopIdsForUser(user.id);
-          const sameShop =
-            artist.shopId && shopIds.map(String).includes(String(artist.shopId));
+          // alone can't express "same shop", which is why both halves are checked. "This artist's
+          // shop" comes from their active connection, not the old Artist.shopId field.
+          const [shopIds, artistShopId] = await Promise.all([
+            getShopIdsForUser(user.id),
+            getActiveShopIdForArtist(artist.userId),
+          ]);
+          const sameShop = artistShopId && shopIds.map(String).includes(String(artistShopId));
           if (user.role > Constants.ROLES.SHOP_STAFF || !sameShop) {
             throw new AuthenticationError('Action not allowed');
           }
@@ -77,10 +85,10 @@ module.exports = {
     getArtistsByShop: withAuth(async (_, { shopId }, context, info, user) => {
       await assertCanAccessShop(user, shopId);
       try {
-        const artists = await Artist.find(excludeArchived({ shopId })).sort({ firstName: 1 });
-        if (artists) {
-          return artists;
-        } throw new Error('Artists not found');
+        const artists = await findArtistsForShops([shopId], excludeArchived());
+        return artists.sort((a, b) =>
+          String(a.firstName || '').localeCompare(String(b.firstName || '')),
+        );
       } catch (err) {
         throw new Error(err);
       }

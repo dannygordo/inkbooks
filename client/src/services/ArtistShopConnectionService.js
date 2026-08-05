@@ -43,9 +43,18 @@ const ArtistShopConnectionService = (() => {
 	// wired up on the client). connectArtistToShop only returns the raw connection record (no
 	// shop name/website) - Settings.jsx follows up with ShopService.useLazyShop to get those for
 	// display and to update the cached user.
+	// confirmTransfer: an artist works at one shop at a time, so connecting to a new shop ends the
+	// old connection. Without the flag the server refuses and returns the name of the shop being
+	// left in extensions.transfer, so Settings.jsx can name it in the confirmation rather than
+	// warning vaguely about "your current shop". Sending it unconditionally would defeat the
+	// point - it's only set on the second call, after the person has said yes.
 	const _CONNECT_ARTIST_TO_SHOP_MUTATION = gql`
-		mutation ($artistId: ID!, $shopId: ID!) {
-			connectArtistToShop(artistId: $artistId, shopId: $shopId) {
+		mutation ($artistId: ID!, $shopId: ID!, $confirmTransfer: Boolean) {
+			connectArtistToShop(
+				artistId: $artistId
+				shopId: $shopId
+				confirmTransfer: $confirmTransfer
+			) {
 				id
 				artistId
 				shopId

@@ -50,6 +50,57 @@ module.exports = {
       throw new UserInputError('Errors', { errors: { shopId: 'Shop not found' } });
     }
 
+    // An artist works at ONE shop at a time. That's a product decision, not a technical limit -
+    // and enforcing it here rather than tolerating multiples is what makes "which shop does this
+    // artist work at" answerable with no precedence rule. Artist.shop/shopId are resolved from
+    // this single active connection (see utils/artist-shop.js).
+    //
+    // The realistic way an artist ends up connected twice isn't a guest spot, it's mundane: they
+    // move shops and nobody remembers to disconnect them from the old one, because leaving a shop
+    // isn't an event anyone thinks to record in software. So connecting somewhere new is treated
+    // as exactly that record.
+    //
+    // Refused unless the caller has confirmed. The refusal carries the name of the shop being
+    // left in extensions.transfer so the client can name it before asking - a message that says
+    // "you'll be disconnected from your current shop" without saying which one is not a warning
+    // anyone can act on. Safe by default: a caller that knows nothing about confirmTransfer can
+    // never silently move an artist off their shop.
+    const existingElsewhere = await ArtistShopConnection.find({
+      artistId: data.artistId,
+      status: 'active',
+      shopId: { $ne: data.shopId },
+    });
+
+    if (existingElsewhere.length > 0 && !data.confirmTransfer) {
+      const currentShops = await Shop.find({
+        _id: { $in: existingElsewhere.map((c) => c.shopId) },
+      }).select('name');
+      const names = currentShops.map((c) => c.name).filter(Boolean);
+      throw new UserInputError('Errors', {
+        errors: {
+          confirmTransfer:
+            `This will disconnect ${names.length === 1 ? names[0] : 'the current shop'} and ` +
+            `connect ${shop.name}. Confirm to continue.`,
+        },
+        // Structured alongside the message so the client can build its own dialog rather than
+        // parsing prose - see Settings.jsx.
+        transfer: {
+          requiresConfirmation: true,
+          currentShops: currentShops.map((c) => ({ id: String(c._id), name: c.name })),
+          newShop: { id: String(shop._id), name: shop.name },
+        },
+      });
+    }
+
+    // Confirmed (or nothing to leave). Ending the old connection first means there is never a
+    // moment where two are active, even if the second write fails.
+    if (existingElsewhere.length > 0) {
+      await ArtistShopConnection.updateMany(
+        { artistId: data.artistId, status: 'active', shopId: { $ne: data.shopId } },
+        { $set: { status: 'disconnected', disconnectedAt: new Date() } },
+      );
+    }
+
     const connection = await ArtistShopConnection.findOneAndUpdate(
       { artistId: data.artistId, shopId: data.shopId },
       { artistId: data.artistId, shopId: data.shopId, status: 'active', disconnectedAt: null },

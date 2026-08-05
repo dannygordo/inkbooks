@@ -279,6 +279,10 @@ const reassignBookingRequestInputSchema = z.object({
 const artistShopConnectionInputSchema = z.object({
   artistId: objectIdSchema,
   shopId: objectIdSchema,
+  // Only meaningful on connect: the caller has been told which shop this artist is leaving and
+  // has said to go ahead. Optional so a first-time connect (nothing to leave) needs no ceremony -
+  // see connectArtistToShop in graphql/mutations/artistShopConnections.js.
+  confirmTransfer: z.boolean().nullish(),
 });
 
 // Which side's rate an artist's sessions bill against at a given shop - see

@@ -38,3 +38,50 @@
 	margin-top: 8px;
 	font-size: 14px;
 }
+
+/* Two buttons side by side in .settingsActions - Disconnect next to Move, Cancel next to
+   Continue. Without this they butt straight up against each other. */
+.settingsActions button + button {
+	margin-left: 10px;
+}
+
+/* A quieter button for the non-destructive choice in a pair. Inherits .ibButton's shadow and
+   transition via App.css's element-level button rules; only the fill differs. */
+.ibButtonSecondary {
+	background-color: transparent;
+	border: 1px solid #888;
+	color: #ddd;
+}
+
+/* The move-shops confirmation. Deliberately blocking: it names the shop being left, and the
+   whole reason it exists is that the person should read it before continuing. */
+.settingsConfirmBackdrop {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.6);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 1300;
+}
+.settingsConfirmDialog {
+	background: #1e1e1e;
+	color: #ddd;
+	border-radius: 10px;
+	padding: 28px;
+	max-width: 520px;
+	margin: 20px;
+	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+.settingsConfirmDialog h2 {
+	margin: 0 0 16px;
+	font-size: 22px;
+}
+.settingsConfirmDialog p {
+	margin: 0 0 12px;
+	line-height: 1.5;
+}
+.settingsConfirmNote {
+	color: #999;
+	font-size: 14px;
+}

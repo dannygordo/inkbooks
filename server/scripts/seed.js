@@ -202,7 +202,6 @@ async function seed() {
     email: artist1User.email,
     phone: '555-010-0103',
     userId: artist1User._id,
-    shopId: shop._id,
     title: 'Fine Line / Botanical',
     hourlyRate: 175,
     status: Constants.ARTIST_STATUS.ACTIVE,
@@ -227,7 +226,6 @@ async function seed() {
     email: artist2User.email,
     phone: '555-010-0104',
     userId: artist2User._id,
-    shopId: shop._id,
     title: 'Traditional / Blackwork',
     hourlyRate: 160,
     status: Constants.ARTIST_STATUS.ACTIVE,
@@ -252,11 +250,12 @@ async function seed() {
     firstName: 'Robin',
     lastName: 'Ashby',
     email: independentArtistUser.email,
-    // Deliberately no shopId - that's the whole point of this fixture. userId is NOT optional
-    // though (every Artist has a real User account regardless of shop affiliation - see
-    // Artist.userId: ID! in typeDefs.js) - this was missing in an earlier version of this script,
-    // which crashed getArtists for every Shop-Admin-or-better caller the moment it ran (Mongoose
-    // allows userId to be unset, but nothing in this app's real data model ever should).
+    // Deliberately no ArtistShopConnection below - that's the whole point of this fixture, and
+    // it's now the only thing that would make them shop-affiliated (Artist.shopId is no longer
+    // read or written - see utils/artist-shop.js). userId is NOT optional though: every Artist
+    // has a real User account regardless of shop affiliation (Artist.userId: ID! in typeDefs.js).
+    // It was missing in an earlier version of this script, which crashed getArtists for every
+    // Shop-Admin-or-better caller the moment it ran.
     userId: independentArtistUser._id,
     phone: '555-010-0105',
     title: 'Guest Spot / Illustrative',

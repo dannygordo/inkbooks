@@ -2,56 +2,41 @@ const mongoose = require('mongoose');
 const Staff = require('../models/Staff');
 const Client = require('../models/Client');
 const Project = require('../models/Project');
-const Artist = require('../models/Artist');
 const ArtistShopConnection = require('../models/ArtistShopConnection');
 const { Constants } = require('./constants');
+const { getConnectedArtistUserIds } = require('./artist-shop');
 const { AuthenticationError } = require('./errors');
 
 // Shared helpers for scoping the shop-wide "browse everything" list queries (getShops/getStaff/
 // getArtists/getClients) to a non-admin caller's own shop(s), instead of returning every shop's
 // data on the platform to any authenticated user. checkAuth's JWT payload only carries
 // {id, email, username, role} - no userType - so, same as callerBelongsToShop in
-// resolvers/appointments.js, this checks real DB relationships (Staff/Artist/ArtistShopConnection)
-// rather than branching on a userType this code doesn't have.
+// resolvers/appointments.js, this checks real DB relationships (Staff/ArtistShopConnection) rather
+// than branching on a userType this code doesn't have.
 
-// Returns the shopId(s) (as strings) this user is affiliated with - either as Staff, or as an
-// Artist (via the legacy single Artist.shopId field, or an active ArtistShopConnection).
+// Returns the shopId(s) (as strings) this user is affiliated with - as Staff, or as an Artist via
+// an active ArtistShopConnection.
 async function getShopIdsForUser(userId) {
-  const [staffRows, ownArtist, connections] = await Promise.all([
+  // Artist.shopId used to be unioned in here as a second source of membership. It isn't any more -
+  // ArtistShopConnection is the only answer to "which shop does this artist work at" (see
+  // utils/artist-shop.js for what the two-source split cost). Staff.shopId stays: staff are shop
+  // employees by definition and that relationship is a plain foreign key on purpose.
+  const [staffRows, connections] = await Promise.all([
     Staff.find({ userId }).select('shopId'),
-    Artist.findOne({ userId }).select('shopId'),
     ArtistShopConnection.find({ artistId: userId, status: 'active' }).select('shopId'),
   ]);
   const shopIds = new Set();
   staffRows.forEach((s) => shopIds.add(String(s.shopId)));
-  if (ownArtist && ownArtist.shopId) {
-    shopIds.add(String(ownArtist.shopId));
-  }
   connections.forEach((c) => shopIds.add(String(c.shopId)));
   return Array.from(shopIds);
 }
 
-// Returns the artistIds (each one the artist's own User._id, matching the convention Project/
-// BookingRequest/ArtistShopConnection all already use) affiliated with the given shopId(s), via
-// the same two relationships as above. Used to scope getClients - Client has no shopId of its
-// own, so the only path from "a shop" to "its clients" is through the Projects that shop's
-// artists have with them.
+// The artistIds (each one the artist's own User._id, matching the convention Project/
+// BookingRequest/ArtistShopConnection all already use) connected to the given shopId(s). Kept as a
+// named export because a dozen call sites read better for it, but it's now a straight alias - see
+// utils/artist-shop.js.
 async function getArtistIdsForShops(shopIds) {
-  if (!shopIds || shopIds.length === 0) {
-    return [];
-  }
-  const [directArtists, connections] = await Promise.all([
-    Artist.find({ shopId: { $in: shopIds } }).select('userId'),
-    ArtistShopConnection.find({ shopId: { $in: shopIds }, status: 'active' }).select('artistId'),
-  ]);
-  const artistIds = new Set();
-  directArtists.forEach((a) => {
-    if (a.userId) {
-      artistIds.add(String(a.userId));
-    }
-  });
-  connections.forEach((c) => artistIds.add(String(c.artistId)));
-  return Array.from(artistIds);
+  return getConnectedArtistUserIds(shopIds);
 }
 
 // Returns every User._id affiliated with the given shopId - both Staff and Artists (via the same
@@ -77,7 +62,7 @@ async function getMemberUserIdsForShop(shopId) {
  *
  * NOBODY reaches a shop they aren't assigned to. There is no global role and no exemption - not
  * for ADMIN, not for support, not for the person who wrote this. Every question about shop-scoped
- * data is answered by a real relationship in the database (Staff.shopId, Artist.shopId,
+ * data is answered by a real relationship in the database (Staff.shopId,
  * ArtistShopConnection.shopId), never by a role number.
  *
  * Roles still exist, and still answer a different question: how much of their OWN shop somebody

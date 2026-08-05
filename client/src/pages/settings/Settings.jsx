@@ -36,6 +36,11 @@ const Settings = () => {
 	// comment - connectArtistToShop/disconnectArtistFromShop existed server-side with no caller).
 	const [shopIdToConnect, setShopIdToConnect] = useState("");
 	const [shopActionError, setShopActionError] = useState(null);
+	// Set when the server refuses a connect because it would move this artist off their current
+	// shop. Holds the shop names involved so the confirmation can name them - null the rest of the
+	// time, which is also what closes the dialog.
+	const [pendingTransfer, setPendingTransfer] = useState(null);
+	const [showMoveForm, setShowMoveForm] = useState(false);
 	const [connectArtistToShop, { loading: connecting }] = useMutation(
 		ArtistShopConnectionService.CONNECT_ARTIST_TO_SHOP_MUTATION
 	);
@@ -47,6 +52,34 @@ const Settings = () => {
 	// connect to fetch those two fields and update the cached user with them.
 	const [fetchShopName] = ShopService.useLazyShop();
 
+	// Shared by the first attempt and the confirmed retry - the only difference between them is
+	// confirmTransfer, so the success path isn't written twice.
+	const runConnect = async (targetShopId, confirmTransfer) => {
+		await connectArtistToShop({
+			variables: { artistId: user.id, shopId: targetShopId, confirmTransfer },
+		});
+		const { data } = await fetchShopName({ variables: { shopId: targetShopId } });
+		updateCurrentUser({
+			...user,
+			userInfo: {
+				...user.userInfo,
+				shop: data?.getShop
+					? { id: data.getShop.id, name: data.getShop.name, website: data.getShop.website }
+					: { id: targetShopId },
+			},
+		});
+		setShopIdToConnect("");
+		setPendingTransfer(null);
+		setShowMoveForm(false);
+		setAlert({
+			isAlert: true,
+			severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
+			message: "Connected to shop.",
+			timeout: ALERT_CONSTANTS.TIMEOUT,
+			location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
+		});
+	};
+
 	const handleConnectToShop = async (e) => {
 		e.preventDefault();
 		setShopActionError(null);
@@ -56,26 +89,28 @@ const Settings = () => {
 			return;
 		}
 		try {
-			await connectArtistToShop({ variables: { artistId: user.id, shopId: trimmedShopId } });
-			const { data } = await fetchShopName({ variables: { shopId: trimmedShopId } });
-			updateCurrentUser({
-				...user,
-				userInfo: {
-					...user.userInfo,
-					shop: data?.getShop
-						? { id: data.getShop.id, name: data.getShop.name, website: data.getShop.website }
-						: { id: trimmedShopId },
-				},
-			});
-			setShopIdToConnect("");
-			setAlert({
-				isAlert: true,
-				severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
-				message: "Connected to shop.",
-				timeout: ALERT_CONSTANTS.TIMEOUT,
-				location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
-			});
+			await runConnect(trimmedShopId, false);
 		} catch (err) {
+			// An artist works at one shop at a time, so connecting somewhere new ends the current
+			// connection. The server refuses the first attempt and hands back which shop is being
+			// left; this turns that into a confirmation naming both shops rather than a generic
+			// "are you sure". See mutations/artistShopConnections.js.
+			const transfer = err.graphQLErrors?.[0]?.extensions?.transfer;
+			if (transfer?.requiresConfirmation) {
+				setPendingTransfer({ ...transfer, targetShopId: trimmedShopId });
+				return;
+			}
+			setShopActionError(err.graphQLErrors?.[0]?.message || err.message);
+		}
+	};
+
+	const handleConfirmTransfer = async () => {
+		const target = pendingTransfer;
+		setShopActionError(null);
+		try {
+			await runConnect(target.targetShopId, true);
+		} catch (err) {
+			setPendingTransfer(null);
 			setShopActionError(err.graphQLErrors?.[0]?.message || err.message);
 		}
 	};
@@ -232,11 +267,79 @@ const Settings = () => {
 		return <IBPageLoader />;
 	}
 
+	// One form, rendered either as the first-time connect or as the move-shops form. IBInput is
+	// uncontrolled (defaultValue only - see its own prop list), so onChange keeps shopIdToConnect
+	// in sync and there's no value prop to feed back.
+	const connectForm = (submitLabel) => (
+		<form onSubmit={handleConnectToShop}>
+			<IBInput
+				id="shopIdToConnect"
+				label="Shop ID"
+				onChange={(e) => setShopIdToConnect(e.target.value)}
+				placeholder="Ask your shop for their Shop ID"
+			/>
+			{shopActionError && <div className="settingsError">{shopActionError}</div>}
+			<div className="settingsActions">
+				<button type="submit" className="ibButton" disabled={connecting}>
+					{connecting ? "Connecting..." : submitLabel}
+				</button>
+			</div>
+		</form>
+	);
+
 	return (
 		<div className="settings">
 			<div className="settingsTitleContainer">
 				<h1 className="settingsTitle">Settings</h1>
 			</div>
+			{/* Names both shops rather than warning generically. "You'll be disconnected from your
+			    current shop" isn't something anyone can act on - the whole point of the
+			    confirmation is that the person can see which shop they're about to lose. */}
+			{pendingTransfer && (
+				<div className="settingsConfirmBackdrop" role="dialog" aria-modal="true">
+					<div className="settingsConfirmDialog">
+						<h2>Move to {pendingTransfer.newShop?.name}?</h2>
+						<p>
+							You're currently connected to{" "}
+							<strong>
+								{pendingTransfer.currentShops?.map((c) => c.name).join(", ") ||
+									"another shop"}
+							</strong>
+							.
+						</p>
+						<p>
+							Connecting to <strong>{pendingTransfer.newShop?.name}</strong> will end that
+							connection. You'll no longer be associated with{" "}
+							{pendingTransfer.currentShops?.length === 1
+								? pendingTransfer.currentShops[0].name
+								: "your current shop"}
+							, and their calendar, rates and shop-cut ledger will no longer apply to your
+							work.
+						</p>
+						<p className="settingsConfirmNote">
+							Your past appointments, projects and earnings stay exactly as they are.
+						</p>
+						<div className="settingsActions">
+							<button
+								type="button"
+								className="ibButtonSecondary"
+								onClick={() => setPendingTransfer(null)}
+								disabled={connecting}
+							>
+								Cancel
+							</button>
+							<button
+								type="button"
+								className="ibButton"
+								onClick={handleConfirmTransfer}
+								disabled={connecting}
+							>
+								{connecting ? "Moving..." : "Continue"}
+							</button>
+						</div>
+					</div>
+				</div>
+			)}
 			<div className="settingsContainer">
 				<IBCardWrapper>
 					<div>
@@ -262,28 +365,37 @@ const Settings = () => {
 								>
 									{disconnecting ? "Disconnecting..." : "Disconnect from Shop"}
 								</button>
+								{/* Moving shops without disconnecting first is the normal case - people
+								    change shops, they don't think to file paperwork about leaving the
+								    old one. This is the path that produces the transfer confirmation
+								    below; without it the guard would only ever be reachable by an
+								    admin, and an artist who moved would have to know to disconnect
+								    first. */}
+								{!showMoveForm && (
+									<button
+										type="button"
+										className="ibButtonSecondary"
+										onClick={() => {
+											setShopActionError(null);
+											setShowMoveForm(true);
+										}}
+									>
+										Move to a Different Shop
+									</button>
+								)}
 							</div>
+							{showMoveForm && (
+								<div style={{ marginTop: 20 }}>
+									<h6 style={{ color: "#bbb", marginBottom: 15 }}>
+										Connecting to a different shop ends your connection to{" "}
+										{user.userInfo?.shop?.name || "your current shop"}.
+									</h6>
+									{connectForm("Move to This Shop")}
+								</div>
+							)}
 						</div>
 					) : (
-						<form onSubmit={handleConnectToShop}>
-							{/* IBInput is uncontrolled (defaultValue only - see its own prop list), same as
-							    every other form field on this page - onChange still fires normally and
-							    keeps shopIdToConnect in sync for handleConnectToShop to read at submit
-							    time; there's no need to feed a value prop back in since this form
-							    unmounts entirely the moment shopId becomes truthy below. */}
-							<IBInput
-								id="shopIdToConnect"
-								label="Shop ID"
-								onChange={(e) => setShopIdToConnect(e.target.value)}
-								placeholder="Ask your shop for their Shop ID"
-							/>
-							{shopActionError && <div className="settingsError">{shopActionError}</div>}
-							<div className="settingsActions">
-								<button type="submit" className="ibButton" disabled={connecting}>
-									{connecting ? "Connecting..." : "Connect to Shop"}
-								</button>
-							</div>
-						</form>
+						connectForm("Connect to Shop")
 					)}
 				</IBCardWrapper>
 

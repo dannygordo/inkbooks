@@ -833,7 +833,12 @@ module.exports = gql`
     resetSessionTimer(appointmentId: ID!): Appointment!
 
     ######### Artist-Shop Connections ###########
-    connectArtistToShop(artistId: ID!, shopId: ID!): ArtistShopConnection!
+    # An artist works at one shop at a time, so connecting to a new one ends the connection to
+    # the old one. When there is an old one, this refuses unless confirmTransfer is true, and the
+    # refusal carries the name of the shop being left in extensions.transfer so the client can
+    # say which one before asking. Safe by default: a caller that knows nothing about the flag can
+    # never silently move an artist off their shop.
+    connectArtistToShop(artistId: ID!, shopId: ID!, confirmTransfer: Boolean): ArtistShopConnection!
     disconnectArtistFromShop(artistId: ID!, shopId: ID!): ArtistShopConnection!
     setArtistShopRateSource(artistId: ID!, shopId: ID!, rateSource: String!): ArtistShopConnection!
 

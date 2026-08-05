@@ -25,6 +25,7 @@ const {
   assertCanAccessShop,
 } = require('../../utils/shop-membership');
 const { DEFAULT_NO_SHOP_TAG_COLOR, isUnsetTagColor, pickDefaultTagColor } = require('../../utils/tag-color');
+const { findArtistsForShops } = require('../../utils/artist-shop');
 
 function generateToken(user) {
   return jwt.sign(
@@ -317,7 +318,8 @@ module.exports = {
       try {
         let usrIds = [];
         let usrs = [];
-        const artists = await Artist.find({shopId: shopId});
+        // Via connections, not Artist.shopId - see utils/artist-shop.js.
+        const artists = await findArtistsForShops([shopId]);
         if(artists) {
           artists.map((artist) => {
             usrIds.push(artist.userId);

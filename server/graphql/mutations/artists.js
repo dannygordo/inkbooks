@@ -1,4 +1,5 @@
 const Artist = require('../../models/Artist');
+const ArtistShopConnection = require('../../models/ArtistShopConnection');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 const { AuthenticationError, UserInputError } = require('../../utils/errors');
@@ -50,11 +51,24 @@ module.exports = {
       startDate,
       endDate,
       hourlyRate,
-      shopId,
+      // shopId is accepted (it's what says which shop to put them at) but deliberately not stored
+      // on the Artist row - the connection below is the membership record. See
+      // utils/artist-shop.js.
       userId,
       status,
     });
     const artist = await newArtist.save();
+    // Without this the artist would be invisible everywhere: the directory, the shop calendar's
+    // colour list, shop analytics and the shop-cut ledger all resolve membership through
+    // connections. createArtistAccount (mutations/accounts.js) already did this; this
+    // lower-level mutation didn't, and used to rely on the stored shopId that nothing reads now.
+    if (shopId && userId) {
+      await ArtistShopConnection.findOneAndUpdate(
+        { artistId: userId, shopId },
+        { artistId: userId, shopId, status: 'active', disconnectedAt: null },
+        { upsert: true, setDefaultsOnInsert: true },
+      );
+    }
     return artist;
   }, Constants.ROLES.SHOP_ADMIN),
   /**

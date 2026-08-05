@@ -151,7 +151,9 @@ module.exports = {
           instagram: input.instagram || '',
           facebook: input.facebook || '',
           hourlyRate: input.hourlyRate,
-          shopId,
+          // Deliberately NOT setting Artist.shopId. The ArtistShopConnection created below is the
+          // only record of which shop this artist works at - see utils/artist-shop.js for what
+          // having two of them cost.
           userId: newUser._id,
           status: Constants.ARTIST_STATUS.ACTIVE,
           startDate: new Date(),

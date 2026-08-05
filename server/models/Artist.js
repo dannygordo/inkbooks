@@ -24,6 +24,10 @@ const ArtistSchema = new mongoose.Schema(
     flatRate: { type: Number },
     billingType: { type: String, enum: ['hourly', 'flat_rate'], default: 'hourly' },
     avatar: { type: String, default: "" },
+    // DEPRECATED - no longer read or written anywhere. Which shop an artist works at is
+    // ArtistShopConnection, full stop (see utils/artist-shop.js). This field is left in place so
+    // scripts/backfill-artist-connections.js has something to read and so no data is destroyed
+    // before that has run everywhere; drop it once there's confidence nothing regressed.
     shopId: { type: mongoose.Schema.Types.ObjectId },
     userId: { type: mongoose.Schema.Types.ObjectId },
     status: { type: Number },

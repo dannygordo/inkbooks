@@ -53,6 +53,15 @@ async function createArtistUser(overrides = {}) {
 		status: Constants.ARTIST_STATUS.ACTIVE,
 		...overrides.artist,
 	}).save();
+	// `{ artist: { shopId } }` reads as "this artist works at this shop", and a dozen tests already
+	// say it that way. That used to be literally true - Artist.shopId was the membership record.
+	// It isn't any more: ArtistShopConnection is (see utils/artist-shop.js), and Artist.shopId is
+	// deprecated. So the option keeps its meaning by creating the connection too, rather than every
+	// call site having to remember a second line. The stored field is still written, which is what
+	// lets the backfill script be tested against realistic legacy rows.
+	if (artist.shopId) {
+		await connectArtistToShop(user._id, artist.shopId);
+	}
 	return { user, artist };
 }
 
@@ -125,13 +134,17 @@ async function createClientUser(overrides = {}) {
 
 // artistId is the artist's own User._id, not the Artist collection's own _id - matching the
 // convention documented in models/ArtistShopConnection.js.
+// Upsert, not insert. ArtistShopConnection has a unique index on {artistId, shopId} and reuses one
+// document per pair across disconnect/reconnect cycles (see the model). Several tests both pass
+// `{ artist: { shopId } }` to createArtistUser AND call this for the same pair - since
+// createArtistUser now creates the connection itself, a plain save() would collide on the index and
+// fail the fixture rather than the assertion.
 async function connectArtistToShop(artistUserId, shopId, overrides = {}) {
-	return new ArtistShopConnection({
-		artistId: artistUserId,
-		shopId,
-		status: 'active',
-		...overrides,
-	}).save();
+	return ArtistShopConnection.findOneAndUpdate(
+		{ artistId: artistUserId, shopId },
+		{ artistId: artistUserId, shopId, status: 'active', ...overrides },
+		{ new: true, upsert: true, setDefaultsOnInsert: true },
+	);
 }
 
 // BookingRequest requires conversationId and guestToken alongside the obvious fields - both are

@@ -39,6 +39,7 @@ const Staff = require('../../models/Staff');
 const BookingRequest = require('../../models/BookingRequest');
 const { findOrCreateConversationForMembers } = require('../../utils/conversations');
 const { ensureTagColor } = require('../../utils/tag-color');
+const { getActiveShopIdForArtist } = require('../../utils/artist-shop');
 
 module.exports = {
   Date: DateResolver,
@@ -199,8 +200,21 @@ module.exports = {
     }
   },
   Artist: {
+    // Derived from the artist's active ArtistShopConnection rather than read off Artist.shopId.
+    // Those were two sources of truth for the same fact, and this resolver read the one that
+    // connectArtistToShop doesn't write - so an artist connected through the real flow appeared
+    // to the whole client as an INDEPENDENT artist. The client sets Appointment.shopId from this
+    // field (see UpdateEventDialog.jsx/AppointmentWizard.jsx), so their sessions were being
+    // written with no shop at all: no shop cut, and the revenue missing from the shop's books.
+    // See utils/artist-shop.js.
     shop: async(artist, args, context, info) => {
-      return (await Shop.findById(artist.shopId));
+      const shopId = await getActiveShopIdForArtist(artist.userId);
+      return shopId ? (await Shop.findById(shopId)) : null;
+    },
+    // Same source as `shop` above. Kept as a field so existing callers that only need the id
+    // don't have to fetch the whole Shop, but it is NOT the stored Artist.shopId any more.
+    shopId: async(artist, args, context, info) => {
+      return getActiveShopIdForArtist(artist.userId);
     },
     user: async(artist, args, context, info) => {
       return (await User.findById(artist.userId));

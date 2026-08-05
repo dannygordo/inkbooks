@@ -142,7 +142,51 @@ shops, and shop B's admin (a real, legitimate user) attempting every read and wr
 one surface at a time, plus the counterweight cases proving a shop admin still has full reach
 inside their own shop.
 
-### Artist-centric tenancy model — finalized design (pre-launch, no real user data to migrate)
+### Artist-centric tenancy: membership is ArtistShopConnection, full stop — DONE
+
+**The half-finished state, and what it cost.** `Artist.shopId` was the original "which shop does
+this artist work at" foreign key. `ArtistShopConnection` replaced it — but only for authorization.
+The directories (`getArtists`, `getArtistsByShop`, `getUserTagColors`) and the `Artist.shop` field
+resolver were never moved and went on reading the old field. Two answers to one question, agreeing
+only because `createArtistAccount` and the seed happened to write both.
+
+`connectArtistToShop` — the mutation that exists specifically to connect an artist to a shop —
+writes only the connection. So an artist connected that way was authorized at the shop, missing
+from its directory, and had a null `Artist.shop`, which the entire client reads as "independent
+artist". The client sets `Appointment.shopId` from that field (`UpdateEventDialog.jsx`,
+`AppointmentWizard.jsx`), so **every appointment they booked was written with no shop: no shop cut
+computed, and the session absent from the shop's revenue.** Silently, with nothing erroring.
+
+**Now:** `utils/artist-shop.js` is the single place that answers it. `Artist.shop` and
+`Artist.shopId` are field resolvers over the active connection; the stored `Artist.shopId` is
+deprecated, no longer read or written, and left on the model only so
+`scripts/backfill-artist-connections.js` has something to read.
+
+**One active connection, enforced on the write.** An artist works at one shop at a time — a
+product decision, and enforcing it is what makes "which shop" answerable with no precedence rule.
+Connecting to a new shop disconnects the old one, and `connectArtistToShop` refuses unless
+`confirmTransfer: true`, returning the name of the shop being left in `extensions.transfer` so the
+UI can name it. Safe by default: a caller that knows nothing about the flag can never silently move
+an artist off their shop. Settings.jsx has a "Move to a Different Shop" path and a confirmation
+naming both shops — without that path the guard would only ever be reachable by an admin.
+
+The realistic way an artist ends up connected twice isn't a guest spot, it's mundane: they move
+shops and nobody remembers to disconnect them from the old one. Connecting somewhere new is now
+exactly that record.
+
+**Before deploying:** run `node scripts/backfill-artist-connections.js` (report), then `--apply`.
+Any artist whose membership exists only as a stored `shopId` becomes independent without it.
+
+**Deliberately not built** (and not wanted per the shop-context-switcher decision): concurrent
+multi-shop artists, invite-link shop bootstrapping, the searchable shop directory, and
+request/accept connection flows. An artist genuinely working at two shops uses InkBooks as an
+independent.
+
+**Known cost:** `Artist.shop`/`shopId` are now per-artist connection lookups, so a directory of N
+artists does N+1 queries. Fine at current list sizes; the fix when it matters is a DataLoader, and
+it belongs with pagination rather than on its own.
+
+### Artist-centric tenancy model — original design notes (superseded in part by the above)
 
 The original plan assumed the current shop-centric schema (`Artist.shopId` as a hard foreign key — an artist *belongs to* a shop) was staying as-is. It isn't. Below is the finalized design from a dedicated design conversation, ready to implement.
 
