@@ -2,6 +2,7 @@ const Staff = require('../../models/Staff');
 const withAuth = require('../../utils/with-auth');
 const { AuthenticationError } = require('../../utils/errors');
 const { getShopIdsForUser } = require('../../utils/shop-membership');
+const { excludeArchived } = require('../../utils/archiving');
 
 module.exports = {
   Query: {
@@ -16,7 +17,9 @@ module.exports = {
         if (shopIds.length === 0) {
           return [];
         }
-        return await Staff.find({ shopId: { $in: shopIds } }).sort({ lastName: 1 });
+        return await Staff.find(excludeArchived({ shopId: { $in: shopIds } })).sort({
+          lastName: 1,
+        });
       } catch (err) {
         throw new Error(err);
       }

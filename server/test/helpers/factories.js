@@ -73,10 +73,9 @@ async function createShopAdminUser(overrides = {}) {
 		email: user.email,
 		userId: user._id,
 		shopId: shop._id,
-		// Staff.status is a required Number with no dedicated STAFF_STATUS constant in
-		// utils/constants.js (unlike Artist, which has ARTIST_STATUS) - 1 is just a plain valid
-		// value, not a reference to any specific named status.
-		status: 1,
+		// Constants.STAFF_STATUS.ACTIVE. This was a bare `1` with a comment explaining that Staff
+		// had no named statuses - it does now, added with archiving (see utils/archiving.js).
+		status: Constants.STAFF_STATUS.ACTIVE,
 		...overrides.staff,
 	}).save();
 	return { user, staff, shop };
@@ -98,7 +97,7 @@ async function createStaffUser(shopId, overrides = {}) {
 		email: user.email,
 		userId: user._id,
 		shopId,
-		status: 1,
+		status: Constants.STAFF_STATUS.ACTIVE,
 		...overrides.staff,
 	}).save();
 	return { user, staff };

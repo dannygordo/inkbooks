@@ -121,6 +121,8 @@ async function seed() {
     // have shopCutCents values consistent with this rate.
     shopCutPercent: 20,
     billingType: 'percentage',
+    // Shop.status, which is its own unnamed field - not STAFF_STATUS, which happens to share the
+    // value 1.
     status: 1,
   }).save();
 
@@ -155,7 +157,7 @@ async function seed() {
     phone: '555-010-0101',
     userId: shopAdminUser._id,
     shopId: shop._id,
-    status: 1,
+    status: Constants.STAFF_STATUS.ACTIVE,
     title: 'Owner',
   }).save();
 
@@ -178,7 +180,7 @@ async function seed() {
     phone: '555-010-0102',
     userId: staffUser._id,
     shopId: shop._id,
-    status: 1,
+    status: Constants.STAFF_STATUS.ACTIVE,
     title: 'Front Desk',
   }).save();
 
@@ -291,6 +293,7 @@ async function seed() {
       email: def.email,
       phone: def.phone,
       userId: clientUser._id,
+      status: Constants.CLIENT_STATUS.ACTIVE,
       // These are the shop's walk-in clients, so they carry the link the client wizard and the
       // public booking form both write in the real app - without it the shop couldn't so much as
       // correct a typo in their email. See models/Client.js.

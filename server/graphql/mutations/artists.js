@@ -57,6 +57,37 @@ module.exports = {
     const artist = await newArtist.save();
     return artist;
   }, Constants.ROLES.SHOP_ADMIN),
+  /**
+   * Takes an artist off the roster without touching anything they did.
+   *
+   * Replaces deleteArtist, which removed the Artist row and left the User row, their projects and
+   * their appointments behind - money attached to a person who no longer existed. This sets a
+   * status and nothing else. Their completed sessions still count toward shop revenue, still
+   * render on the calendar in their own colour, and their shop-cut ledger still reconciles.
+   */
+  archiveArtist: withAuth(async (_, { artistId }, context, info, user) => {
+    const artist = await Artist.findById(artistId);
+    if (!artist) {
+      throw new UserInputError('Errors', { errors: { artistId: 'Artist not found' } });
+    }
+    await assertCanManageArtist(user, artist.userId);
+    artist.status = Constants.ARTIST_STATUS.ARCHIVED;
+    await artist.save();
+    return artist;
+  }, Constants.ROLES.SHOP_ADMIN),
+  // Undo, for the archive-by-mistake case and for an artist who comes back. Deliberately restores
+  // to ACTIVE rather than to whatever the status was before - remembering the prior value means
+  // storing it, and "they're back and taking work" is the only reason to press this.
+  unarchiveArtist: withAuth(async (_, { artistId }, context, info, user) => {
+    const artist = await Artist.findById(artistId);
+    if (!artist) {
+      throw new UserInputError('Errors', { errors: { artistId: 'Artist not found' } });
+    }
+    await assertCanManageArtist(user, artist.userId);
+    artist.status = Constants.ARTIST_STATUS.ACTIVE;
+    await artist.save();
+    return artist;
+  }, Constants.ROLES.SHOP_ADMIN),
   updateArtist: withAuth(async (_, args, context, info, user) => {
     try{
       const artist = args.artist;

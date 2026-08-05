@@ -48,6 +48,28 @@ module.exports = {
     await linkClientToUsersShops(client._id, user.id);
     return client;
   }, Constants.ROLES.CLIENT),
+  // Same shape as archiveArtist - see the note there. A client's projects, appointments and the
+  // money on them are untouched; they simply stop appearing in the client list and in pickers.
+  archiveClient: withAuth(async (_, { clientId }, context, info, user) => {
+    const client = await Client.findById(clientId);
+    if (!client) {
+      throw new Error('Client not found');
+    }
+    await assertCanAccessClient(user, client);
+    client.status = Constants.CLIENT_STATUS.ARCHIVED;
+    await client.save();
+    return client;
+  }, Constants.ROLES.SHOP_ADMIN),
+  unarchiveClient: withAuth(async (_, { clientId }, context, info, user) => {
+    const client = await Client.findById(clientId);
+    if (!client) {
+      throw new Error('Client not found');
+    }
+    await assertCanAccessClient(user, client);
+    client.status = Constants.CLIENT_STATUS.ACTIVE;
+    await client.save();
+    return client;
+  }, Constants.ROLES.SHOP_ADMIN),
   // The minRole was the whole check here too - any shop admin could rewrite any client's name,
   // email, phone and address anywhere on the platform.
   updateClient: withAuth(async (_, args, context, info, user) => {

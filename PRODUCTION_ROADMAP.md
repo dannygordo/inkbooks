@@ -114,12 +114,28 @@ every record of their kind on the platform, none had a caller in the client, and
 possible caller was the global role that no longer exists. Scoping them would have meant inventing
 a feature to justify keeping a query that returns every email address in the system.
 
-**The delete mutations moved down, not away.** `deleteShop`/`deleteStaff`/`deleteArtist`/
-`deleteClient`/`deleteProject`/`deleteAppointment`/`deleteConversation`/`deleteMessage` were all
-`ADMIN`-gated, which after this change would have meant nobody could ever call them. They're now
-`SHOP_ADMIN` scoped to the caller's own shop. The `//TODO: revisit rule that allows a user to
-delete` comments on each of them still stand — soft-status instead of hard delete remains the
-better long-term answer, and is still open.
+**Deletes are gone; archiving replaced them.** All eight `delete*` mutations were removed except
+`deleteAppointment`, which survives because two real buttons call it (the calendar event modal and
+the session view) and clearing an empty scheduled slot is legitimate - it now refuses any
+appointment that is completed, has money recorded, holds or has consumed a deposit, or has a shop
+cut in flight, pointing the caller at the `cancelled`/`no_show` statuses instead.
+
+Removing a person is `archiveArtist`/`archiveStaff`/`archiveClient` (each with an `unarchive`
+counterpart). Status 4 = ARCHIVED across all three, unset reads as active so pre-existing rows
+aren't hidden. The rule that matters, stated in `utils/archiving.js` and enforced by
+`test/integration/archiving.test.js`: **archiving never touches history.** An archived artist's
+completed sessions still count toward shop and artist revenue and still render on the calendar. A
+shop's Q3 total must not move because somebody left - that failure would look like a plausible
+number rather than an error, which is why it gets its own test rather than a comment.
+
+Deleting rows was worse than it looked: `Project.client` is nullable, so a deleted client left
+projects silently pointing at nothing; the `User` row outlived its profile, producing a login with
+a role and no profile (the exact bug that made the old `platformadmin` unable to log in); and
+appointments kept totals, shop cuts and Square invoice ids with nobody attached.
+
+Still open: a redaction action for GDPR/CCPA erasure requests, which must null the PII in place and
+keep the financial row - tax retention runs the other way, so deletion is the wrong tool even
+there.
 
 **Coverage:** `server/test/integration/shopIsolation.test.js` is the boundary test — two complete
 shops, and shop B's admin (a real, legitimate user) attempting every read and write against shop A

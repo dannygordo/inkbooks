@@ -12,10 +12,31 @@ module.exports.Constants = {
         ARTIST: 20,
         CLIENT: 30
     },
+    // ARCHIVED is what "delete this person" now means - see the note on the Mutation type in
+    // graphql/typeDefs.js for why the delete* mutations went away. It is deliberately NOT the same
+    // as INACTIVE: an inactive artist is still at the shop and might come back next week, an
+    // archived one is off the roster and out of every picker. Archiving never touches history -
+    // their completed appointments still count toward shop revenue and still render on the
+    // calendar in their own colour, because the money changed hands and revenue that moves when
+    // you archive somebody is worse than useless.
     ARTIST_STATUS: {
         ACTIVE: 1,
         INACTIVE: 2,
-        BOOKS_CLOSED: 3
+        BOOKS_CLOSED: 3,
+        ARCHIVED: 4
+    },
+    // Staff.status has always been a bare required Number with no named values (see
+    // models/Staff.js) - 1 was just "some valid number" everywhere it was written. These name the
+    // two that now actually mean something; anything else stays legal and reads as active.
+    STAFF_STATUS: {
+        ACTIVE: 1,
+        ARCHIVED: 4
+    },
+    // Client had no status field at all until archiving needed one. Same two values, same
+    // numbering as the other two, so "4 means archived" is one fact rather than three.
+    CLIENT_STATUS: {
+        ACTIVE: 1,
+        ARCHIVED: 4
     },
     PROJECT_STATUS: {
         COMPLETED: 1,

@@ -49,6 +49,28 @@ module.exports = {
     const staff = await newStaff.save();
     return staff;
   }, Constants.ROLES.SHOP_ADMIN),
+  // Same shape as archiveArtist - see the note there. Scoped by the staff member's own shopId
+  // rather than by shared artists, since Staff.shopId is a direct relationship.
+  archiveStaff: withAuth(async (_, { staffId }, context, info, user) => {
+    const staff = await Staff.findById(staffId);
+    if (!staff) {
+      throw new Error('Staff not found');
+    }
+    await assertCanAccessShop(user, staff.shopId);
+    staff.status = Constants.STAFF_STATUS.ARCHIVED;
+    await staff.save();
+    return staff;
+  }, Constants.ROLES.SHOP_ADMIN),
+  unarchiveStaff: withAuth(async (_, { staffId }, context, info, user) => {
+    const staff = await Staff.findById(staffId);
+    if (!staff) {
+      throw new Error('Staff not found');
+    }
+    await assertCanAccessShop(user, staff.shopId);
+    staff.status = Constants.STAFF_STATUS.ACTIVE;
+    await staff.save();
+    return staff;
+  }, Constants.ROLES.SHOP_ADMIN),
   updateStaff: withAuth(async (_, args, context, info, user) => {
     try{
       const staff = args.staff;

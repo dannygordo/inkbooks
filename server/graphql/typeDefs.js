@@ -203,6 +203,9 @@ module.exports = gql`
     # never describe someone tattooed at two of them. This is one of the two things that make a
     # client "ours" - see models/Client.js and canAccessClient in utils/shop-membership.js.
     shopIds: [ID]
+    # Constants.CLIENT_STATUS. Absent means active - the field was added with archiving, so every
+    # client predating it is unset. See utils/archiving.js.
+    status: Int
     # Everything below powers the client dashboard (client/src/components/clientDashboard).
     # Resolved on demand rather than stored, so nothing has to be kept in sync - see
     # resolvers/index.js's Client field resolvers.
@@ -790,6 +793,17 @@ module.exports = gql`
     getArtistAnalytics(userId: ID!, start: DateTime!, end: DateTime!): Analytics
   }
   type Mutation {
+    # Archiving is what "remove this person" means. It sets a status and touches nothing else:
+    # their projects, appointments and the money on those appointments are untouched, still count
+    # toward revenue, and still render on the calendar. What changes is that they stop appearing
+    # in the directories and pickers. See utils/archiving.js.
+    archiveArtist(artistId: ID!): Artist
+    unarchiveArtist(artistId: ID!): Artist
+    archiveStaff(staffId: ID!): Staff
+    unarchiveStaff(staffId: ID!): Staff
+    archiveClient(clientId: ID!): Client
+    unarchiveClient(clientId: ID!): Client
+
     # deleteAppointment is the only surviving delete* mutation, and it now refuses anything
     # carrying money or a completed record - see mutations/appointments.js. It stays because two
     # real buttons call it (UpdateEventDialog.jsx, SessionDetail.jsx); removing an empty

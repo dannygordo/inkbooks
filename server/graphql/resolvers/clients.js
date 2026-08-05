@@ -7,6 +7,7 @@ const {
   getArtistIdsForShops,
   assertCanAccessClient,
 } = require('../../utils/shop-membership');
+const { excludeArchived } = require('../../utils/archiving');
 
 module.exports = {
   Query: {
@@ -41,7 +42,7 @@ module.exports = {
         if (or.length === 0) {
           return [];
         }
-        return await Client.find({ $or: or }).sort({ lastName: 1 });
+        return await Client.find(excludeArchived({ $or: or })).sort({ lastName: 1 });
       } catch (err) {
         throw new Error(err);
       }

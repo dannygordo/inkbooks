@@ -32,6 +32,13 @@ const ClientSchema = new mongoose.Schema({
     // and project creation. Never removed - a shop that has worked with someone keeps the ability
     // to see their own history with them.
     shopIds: {type: [mongoose.Schema.Types.ObjectId], default: []},
+    // Constants.CLIENT_STATUS. Absent means active - this field was added with archiving, so
+    // every client that predates it has no value, and treating "unset" as anything other than
+    // active would silently hide them all. Archiving is what "delete this client" means now (see
+    // the note on the Mutation type in graphql/typeDefs.js): they drop out of the client list and
+    // out of new-project pickers, and everything already attached to them - projects,
+    // appointments, the money on those appointments - is untouched and still counts.
+    status: {type: Number},
     // Notes about the client, as opposed to Project.notes (about one piece of work) or
     // Appointment.sessionNotes (about one sitting). Same embedded IBNote sub-document those two
     // already use - allergies, how they handle long sittings, healing history, anything that

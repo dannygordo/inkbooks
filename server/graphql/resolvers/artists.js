@@ -6,6 +6,7 @@ const {
   getShopIdsForUser,
   assertCanAccessShop,
 } = require('../../utils/shop-membership');
+const { excludeArchived } = require('../../utils/archiving');
 
 module.exports = {
   Query: {
@@ -30,7 +31,11 @@ module.exports = {
         if (shopIds.length === 0) {
           return [];
         }
-        return await Artist.find({ shopId: { $in: shopIds } }).sort({ startDate: 1 });
+        // Archived artists drop out of the directory but keep every appointment, project and
+        // dollar they earned - see utils/archiving.js.
+        return await Artist.find(excludeArchived({ shopId: { $in: shopIds } })).sort({
+          startDate: 1,
+        });
       } catch (err) {
         throw new Error(err);
       }
@@ -72,7 +77,7 @@ module.exports = {
     getArtistsByShop: withAuth(async (_, { shopId }, context, info, user) => {
       await assertCanAccessShop(user, shopId);
       try {
-        const artists = await Artist.find({ shopId: shopId }).sort({ firstName: 1 });
+        const artists = await Artist.find(excludeArchived({ shopId })).sort({ firstName: 1 });
         if (artists) {
           return artists;
         } throw new Error('Artists not found');

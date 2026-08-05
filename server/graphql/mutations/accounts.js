@@ -223,7 +223,7 @@ module.exports = {
           facebook: input.facebook || '',
           userId: newUser._id,
           shopId: input.shopId,
-          status: 1,
+          status: Constants.STAFF_STATUS.ACTIVE,
         }).save();
 
         return { staff, inviteLink };
