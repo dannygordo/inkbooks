@@ -114,6 +114,15 @@ const ProjectService = (() => {
 				# moved to the two fields below and these two detail queries were missed.
 				depositCollectedCents
 				depositAvailableCents
+				# How each deposit was actually taken. Recorded so a shop can reconcile the cash
+				# drawer and the Square dashboard against the books; showing it here is what makes
+				# that possible without opening the database.
+				deposits {
+					id
+					depositCents
+					depositPaymentMethod
+					depositCollectedAt
+				}
 			}
 		}
 	`;
@@ -431,6 +440,15 @@ const ProjectService = (() => {
 				# moved to the two fields below and these two detail queries were missed.
 				depositCollectedCents
 				depositAvailableCents
+				# How each deposit was actually taken. Recorded so a shop can reconcile the cash
+				# drawer and the Square dashboard against the books; showing it here is what makes
+				# that possible without opening the database.
+				deposits {
+					id
+					depositCents
+					depositPaymentMethod
+					depositCollectedAt
+				}
 			}
 		}
 	`;

@@ -59,6 +59,21 @@ const AppointmentSchema = new mongoose.Schema({
 		default: 'none',
 	},
 	depositCollectedAt: {type: Date},
+	// HOW the deposit was taken. Not cosmetic: at the end of the day a shop reconciles the cash
+	// drawer against what the books say was taken in cash, and a $200 deposit that Square never
+	// saw is either a cash payment or a mistake. Without this field those two are the same record.
+	//
+	// Deliberately has no default and is only set when a deposit is actually recorded - a
+	// consult that never took one shouldn't read as "paid in cash, amount zero".
+	depositPaymentMethod: {
+		type: String,
+		enum: ['cash', 'square'],
+	},
+	// Square's own payment id, when the deposit was charged rather than handed over. This is the
+	// thing that makes a deposit auditable against Square's dashboard rather than just asserted
+	// in InkBooks - which was the entire problem with a bare "type the amount" text box: the app
+	// recorded that money had been taken and had no way of knowing whether it actually had.
+	depositSquarePaymentId: {type: String},
 	// Which appointment consumed it, and when. Kept as a trail rather than just flipping the
 	// status, so "where did that deposit go" is answerable from the deposit's own record.
 	depositAppliedToAppointmentId: {type: mongoose.Schema.Types.ObjectId},

@@ -528,6 +528,8 @@ module.exports = gql`
     # Recorded on the appointment that COLLECTED the deposit (normally the consult).
     depositCents: Int
     depositStatus: String
+    depositPaymentMethod: String
+    depositSquarePaymentId: String
     depositCollectedAt: DateTime
     depositAppliedToAppointmentId: ID
     depositAppliedAt: DateTime
@@ -1128,7 +1130,16 @@ module.exports = gql`
     # Records a deposit taken on an appointment (normally a consult). Also sets that appointment's
     # subtotal/total to the deposit, so it counts as revenue on the day it was taken and the shop
     # cut is charged on it there - see mutations/deposits.js.
-    recordDeposit(appointmentId: ID!, depositCents: Int!): Appointment
+    # paymentMethod is required: a deposit that doesn't say how it was taken can't be reconciled
+    # against the cash drawer or against Square. squarePaymentId is required when the method is
+    # 'square' - see mutations/deposits.js, which refuses the combination that would claim a card
+    # payment with no transaction behind it.
+    recordDeposit(
+      appointmentId: ID!
+      depositCents: Int!
+      paymentMethod: String!
+      squarePaymentId: String
+    ): Appointment
     # Spends an available deposit against a session, exactly once. Reduces that session's total
     # and recomputes its shop cut on the reduced figure.
     applyDeposit(depositAppointmentId: ID!, targetAppointmentId: ID!): Appointment

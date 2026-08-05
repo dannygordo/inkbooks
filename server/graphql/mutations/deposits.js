@@ -61,11 +61,31 @@ module.exports = {
    * silently overwriting - the applied credit on the other side would then disagree with the
    * amount recorded here, and a ledger that disagrees with itself is worse than one that says no.
    */
-  recordDeposit: withAuth(async (_, { appointmentId, depositCents }, context, info, user) => {
+  recordDeposit: withAuth(async (
+    _,
+    { appointmentId, depositCents, paymentMethod, squarePaymentId },
+    context,
+    info,
+    user,
+  ) => {
     try {
       if (!Number.isInteger(depositCents) || depositCents <= 0) {
         throw new UserInputError('Errors', {
           errors: { depositCents: 'Deposit must be a positive whole number of cents' },
+        });
+      }
+      if (!['cash', 'square'].includes(paymentMethod)) {
+        throw new UserInputError('Errors', {
+          errors: { paymentMethod: 'Choose how the deposit was taken - cash or Square.' },
+        });
+      }
+      // A 'square' deposit with no payment id is an assertion that a card was charged, with
+      // nothing behind it - which is exactly the state the old free-text amount box left every
+      // deposit in. Cash is allowed to be an assertion, because cash IS one; card is not,
+      // because there is a system of record for it and it should agree.
+      if (paymentMethod === 'square' && !squarePaymentId) {
+        throw new UserInputError('Errors', {
+          errors: { squarePaymentId: 'A Square deposit needs the payment it was collected by.' },
         });
       }
       const appointment = await loadOwnedAppointment(appointmentId, user, 'appointmentId');
@@ -81,6 +101,11 @@ module.exports = {
       appointment.depositCents = depositCents;
       appointment.depositStatus = 'available';
       appointment.depositCollectedAt = appointment.depositCollectedAt || new Date();
+      appointment.depositPaymentMethod = paymentMethod;
+      // Cleared rather than left behind when a deposit is re-recorded as cash - a stale Square id
+      // on a cash deposit would point reconciliation at a payment that has nothing to do with it.
+      appointment.depositSquarePaymentId =
+        paymentMethod === 'square' ? squarePaymentId : undefined;
       // The deposit IS the money taken at this appointment - so it's this appointment's subtotal
       // and its total. A consult that collected $200 is a $200 transaction; leaving those at zero
       // would make the deposit invisible to every revenue figure in the app, since analytics sums

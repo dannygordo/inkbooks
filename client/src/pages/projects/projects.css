@@ -64,3 +64,9 @@
     margin-top: 20px;
     flex-wrap: wrap;
 }
+/* The deposit's payment method, inline after the amount. Muted: it's a qualifier on the figure,
+   not a second figure. */
+.projectDepositMethod {
+	color: #6b6b6b;
+	font-weight: 400;
+}

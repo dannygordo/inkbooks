@@ -24,3 +24,33 @@
 	gap: 8px;
 	margin-top: 4px;
 }
+
+/* Payment method, shown only once a deposit amount has been entered. */
+.bookSessionDepositMethod {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	flex-wrap: wrap;
+	margin: -6px 0 12px;
+}
+
+.bookSessionDepositMethodLabel {
+	font-size: 13px;
+	font-weight: 600;
+	color: #333;
+}
+
+.bookSessionDepositMethodHint {
+	font-size: 12px;
+	color: #6b6b6b;
+}
+
+/* The card step. States plainly that the booking already happened, because the card charge is the
+   only thing still outstanding and someone abandoning this screen needs to know the sessions are
+   real either way. */
+.bookSessionDepositBooked {
+	margin: 0 0 12px;
+	font-size: 14px;
+	color: #2e7d32;
+	font-weight: 600;
+}

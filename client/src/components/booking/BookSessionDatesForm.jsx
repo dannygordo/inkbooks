@@ -1,15 +1,16 @@
 import { useState } from "react";
 import moment from "moment";
 import { useApolloClient, useMutation } from "@apollo/client";
-import { Button, IconButton } from "@mui/material";
+import { Button, IconButton, ToggleButton, ToggleButtonGroup } from "@mui/material";
 import { Add, Close } from "@mui/icons-material";
 import IBDateTimePicker from "../inputs/IBDateTimePicker";
 import IBInput from "../inputs/IBInput";
 import BookingRequestService from "../../services/BookingRequestService";
 import { AppointmentService } from "../../services/AppointmentService";
 import DepositService from "../../services/DepositService";
+import IBSquarePaymentForm from "../IBSquarePayments/IBSquarePaymentForm";
 import { useAuth } from "../../context/auth";
-import { dollarsToCents } from "../../utils/money";
+import { dollarsToCents, formatCents } from "../../utils/money";
 import "./bookSessionDatesForm.css";
 
 /**
@@ -53,8 +54,19 @@ const BookSessionDatesForm = ({
 	//
 	// Optional: plenty of jobs don't take one.
 	const [depositDollars, setDepositDollars] = useState("");
+	// How the money was taken. No default, deliberately - "cash" preselected is a wrong answer
+	// that gets accepted by everyone in a hurry, and the whole point of recording the method is
+	// that the shop can reconcile the drawer against it. The Confirm button stays disabled until
+	// this is answered, but only when there's actually a deposit to describe.
+	const [depositMethod, setDepositMethod] = useState(null);
+	// Set once the sessions are booked and a Square deposit still needs charging. Holds what the
+	// card form needs; its presence is what swaps the form out for the card field.
+	const [pendingCardDeposit, setPendingCardDeposit] = useState(null);
 	const [error, setError] = useState(null);
 	const [submitting, setSubmitting] = useState(false);
+
+	const depositCents = depositDollars ? dollarsToCents(depositDollars) : 0;
+	const needsMethod = depositCents > 0 && Boolean(consultAppointmentId);
 
 	const [convertBookingRequest] = useMutation(BookingRequestService.CONVERT_BOOKING_REQUEST_MUTATION);
 	const [createAppointment] = useMutation(AppointmentService.CREATE_APPOINTMENT);
@@ -65,6 +77,34 @@ const BookSessionDatesForm = ({
 	const refetchAppointments = () =>
 		client.refetchQueries({ include: AppointmentService.CALENDAR_REFETCH_QUERIES });
 	const [recordDeposit] = useMutation(DepositService.RECORD_DEPOSIT);
+
+	// Square confirmed the charge. Only now does the deposit exist in InkBooks, and it carries the
+	// payment id that makes it reconcilable against Square's dashboard rather than merely claimed.
+	const handleCardDepositSuccess = async (paymentId) => {
+		try {
+			await recordDeposit({
+				variables: {
+					appointmentId: consultAppointmentId,
+					depositCents: pendingCardDeposit.depositCents,
+					paymentMethod: "square",
+					squarePaymentId: paymentId,
+				},
+			});
+			await refetchAppointments();
+			if (onSuccess) {
+				onSuccess(pendingCardDeposit.projectId);
+			}
+		} catch (err) {
+			// The card HAS been charged at this point. Saying so plainly matters more than a tidy
+			// error: the money left the client's account and the shop needs to know the record
+			// didn't land, because the fix is a refund or a manual entry, not a retry of the card.
+			setError(
+				`The card was charged, but recording the deposit failed: ${
+					err.graphQLErrors?.[0]?.message || err.message
+				}. Don't charge again - record this deposit manually.`
+			);
+		}
+	};
 
 	const updateDate = (index, val) => {
 		setSessionDates((prev) => prev.map((d, i) => (i === index ? val : d)));
@@ -137,11 +177,27 @@ const BookSessionDatesForm = ({
 			// A failure here doesn't roll back the booking. The sessions are real and on the
 			// calendar; losing them because a deposit amount was mistyped would be a far worse
 			// outcome than an unrecorded deposit, which can be added afterwards.
-			const depositCents = depositDollars ? dollarsToCents(depositDollars) : 0;
+			//
+			// Cash is recorded here and now, because cash IS an assertion - somebody handed over
+			// notes and the artist is saying so. A card is not: it has a system of record, and a
+			// "Square" deposit with no Square payment behind it is a number typed into a box
+			// wearing a payment method's name. So the card path books the sessions, then hands
+			// off to the card field below and records the deposit only once Square confirms the
+			// charge - see handleCardDepositSuccess.
 			if (depositCents > 0 && consultAppointmentId) {
+				if (depositMethod === "square") {
+					await refetchAppointments();
+					setPendingCardDeposit({ depositCents, projectId });
+					setSubmitting(false);
+					return;
+				}
 				try {
 					await recordDeposit({
-						variables: { appointmentId: consultAppointmentId, depositCents },
+						variables: {
+							appointmentId: consultAppointmentId,
+							depositCents,
+							paymentMethod: "cash",
+						},
 					});
 				} catch (depositErr) {
 					setError(
@@ -170,6 +226,47 @@ const BookSessionDatesForm = ({
 			setSubmitting(false);
 		}
 	};
+
+	// The sessions are already booked by this point; only the card charge is outstanding. Shown
+	// instead of the form rather than beside it, so there is no Confirm button left to press that
+	// would do the booking a second time.
+	if (pendingCardDeposit) {
+		return (
+			<div className="bookSessionDatesForm">
+				<p className="bookSessionDepositBooked">
+					Sessions booked. Take the {formatCents(pendingCardDeposit.depositCents)} deposit
+					to finish.
+				</p>
+				<IBSquarePaymentForm
+					amountCents={pendingCardDeposit.depositCents}
+					// No appointmentId, deliberately. Passing one makes the payment route write
+					// session money fields and recompute a shop cut against the consult (see
+					// routes/squarePayments.js) - which is a different transaction shape from a
+					// deposit. recordDeposit owns the deposit bookkeeping, including its own shop
+					// cut, and handleCardDepositSuccess calls it once the charge lands.
+					subtotalCents={pendingCardDeposit.depositCents}
+					taxCents={0}
+					feeCents={0}
+					tipCents={0}
+					note="InkBooks deposit"
+					onSuccess={handleCardDepositSuccess}
+					onError={(message) => setError(message)}
+				/>
+				{error && <div className="bookingRequestError">{error}</div>}
+				{/* No Cancel here. The sessions exist; backing out of this screen doesn't unbook
+				    them, and offering "Cancel" would imply it does. The deposit can be recorded
+				    later from the consult if the card fails now. */}
+				<div className="bookSessionDatesFormButtons">
+					<Button
+						type="button"
+						onClick={() => onSuccess && onSuccess(pendingCardDeposit.projectId)}
+					>
+						Skip the deposit for now
+					</Button>
+				</div>
+			</div>
+		);
+	}
 
 	return (
 		<form className="bookSessionDatesForm" onSubmit={handleSubmit}>
@@ -206,18 +303,53 @@ const BookSessionDatesForm = ({
 			    transaction the money belongs to, and a deposit floating free of the appointment
 			    that took it is exactly what the ledger design avoids. */}
 			{consultAppointmentId && (
-				<IBInput
-					label="Deposit taken today $"
-					type="number"
-					placeholder="0"
-					helperText="Optional - credited against the client's final session"
-					onChange={(e) => setDepositDollars(e.target.value)}
-				/>
+				<>
+					<IBInput
+						label="Deposit taken today $"
+						type="number"
+						placeholder="0"
+						helperText="Optional - credited against the client's final session"
+						onChange={(e) => setDepositDollars(e.target.value)}
+					/>
+					{/* Only asked once there's an amount. A payment-method question above an empty
+					    deposit field is a question about nothing. */}
+					{needsMethod && (
+						<div className="bookSessionDepositMethod">
+							<span className="bookSessionDepositMethodLabel">
+								How was it taken?
+							</span>
+							<ToggleButtonGroup
+								exclusive
+								size="small"
+								value={depositMethod}
+								onChange={(_, next) => next && setDepositMethod(next)}
+							>
+								<ToggleButton value="cash">Cash</ToggleButton>
+								<ToggleButton value="square">Card (Square)</ToggleButton>
+							</ToggleButtonGroup>
+							<span className="bookSessionDepositMethodHint">
+								{depositMethod === "square"
+									? "You'll enter the card on the next step."
+									: "Recorded against this consult either way."}
+							</span>
+						</div>
+					)}
+				</>
 			)}
 			{error && <div className="bookingRequestError">{error}</div>}
 			<div className="bookSessionDatesFormButtons">
-				<Button type="submit" variant="contained" disabled={submitting}>
-					{submitting ? "Booking..." : "Confirm"}
+				<Button
+					type="submit"
+					variant="contained"
+					// Blocked on the method rather than defaulting to one. A deposit recorded with
+					// the wrong method is worse than one that made the artist answer a question.
+					disabled={submitting || (needsMethod && !depositMethod)}
+				>
+					{submitting
+						? "Booking..."
+						: needsMethod && depositMethod === "square"
+						? "Book and take payment"
+						: "Confirm"}
 				</Button>
 				{onCancel && (
 					<Button type="button" onClick={onCancel} disabled={submitting}>

@@ -23,11 +23,23 @@ const Appointment = require('../../models/Appointment');
 const Shop = require('../../models/Shop');
 
 const RECORD_DEPOSIT = `
-	mutation RecordDeposit($appointmentId: ID!, $depositCents: Int!) {
-		recordDeposit(appointmentId: $appointmentId, depositCents: $depositCents) {
+	mutation RecordDeposit(
+		$appointmentId: ID!
+		$depositCents: Int!
+		$paymentMethod: String!
+		$squarePaymentId: String
+	) {
+		recordDeposit(
+			appointmentId: $appointmentId
+			depositCents: $depositCents
+			paymentMethod: $paymentMethod
+			squarePaymentId: $squarePaymentId
+		) {
 			id
 			depositCents
 			depositStatus
+			depositPaymentMethod
+			depositSquarePaymentId
 			subtotalCents
 			totalCents
 			shopCutCents
@@ -90,9 +102,20 @@ async function setup({ shopCutPercent = 20 } = {}) {
 	return { shop, artist, client, project, consult, session };
 }
 
-const record = (server, artist, appointmentId, depositCents) =>
+// paymentMethod defaults to cash here so the existing cases stay about what they were about -
+// the deposit ledger rules - rather than each restating a payment method. The method's own rules
+// get their own describe block at the end of this file.
+const record = (server, artist, appointmentId, depositCents, opts = {}) =>
 	server.executeOperation(
-		{ query: RECORD_DEPOSIT, variables: { appointmentId: String(appointmentId), depositCents } },
+		{
+			query: RECORD_DEPOSIT,
+			variables: {
+				appointmentId: String(appointmentId),
+				depositCents,
+				paymentMethod: opts.paymentMethod || 'cash',
+				squarePaymentId: opts.squarePaymentId,
+			},
+		},
 		{ contextValue: contextWithToken(signTestToken(artist)) },
 	);
 
@@ -305,5 +328,98 @@ describe('applyDeposit', () => {
 
 		expect(res.body.singleResult.data.applyDeposit).toBeNull();
 		expect(res.body.singleResult.errors[0].message).toMatch(/Action not allowed/);
+	});
+});
+
+// How a deposit was taken, and why it's required rather than defaulted.
+//
+// The field this replaces was a bare amount box. A $200 deposit recorded that way is an assertion
+// that money changed hands, with nothing saying whether it was cash in the drawer or a card
+// charge - so at close of day the shop can't reconcile either one, and a deposit that never
+// actually happened looks identical to one that did.
+describe('recordDeposit: payment method', () => {
+	it('records a cash deposit', async () => {
+		const { artist, consult } = await setup();
+		const server = createTestServer();
+
+		const res = await record(server, artist, consult.id, 20000, { paymentMethod: 'cash' });
+
+		expect(res.body.singleResult.errors).toBeUndefined();
+		expect(res.body.singleResult.data.recordDeposit.depositPaymentMethod).toBe('cash');
+		expect(res.body.singleResult.data.recordDeposit.depositSquarePaymentId).toBeNull();
+	});
+
+	it('records a Square deposit with the payment that collected it', async () => {
+		const { artist, consult } = await setup();
+		const server = createTestServer();
+
+		const res = await record(server, artist, consult.id, 20000, {
+			paymentMethod: 'square',
+			squarePaymentId: 'sqpmt_abc123',
+		});
+
+		expect(res.body.singleResult.errors).toBeUndefined();
+		const deposit = res.body.singleResult.data.recordDeposit;
+		expect(deposit.depositPaymentMethod).toBe('square');
+		// The thing that makes it auditable against Square rather than merely claimed.
+		expect(deposit.depositSquarePaymentId).toBe('sqpmt_abc123');
+	});
+
+	it('refuses a Square deposit with no payment behind it', async () => {
+		// The rule the whole feature turns on. Cash is allowed to be an assertion because cash IS
+		// one; a card charge has a system of record and the two should agree. Without this, a
+		// "Square" deposit is the old free-text box wearing a payment method's name.
+		const { artist, consult } = await setup();
+		const server = createTestServer();
+
+		const res = await record(server, artist, consult.id, 20000, { paymentMethod: 'square' });
+
+		expect(res.body.singleResult.errors).toBeDefined();
+		expect(res.body.singleResult.errors[0].extensions.errors.squarePaymentId).toBeTruthy();
+	});
+
+	it('refuses a method it does not recognise', async () => {
+		const { artist, consult } = await setup();
+		const server = createTestServer();
+
+		const res = await record(server, artist, consult.id, 20000, { paymentMethod: 'venmo' });
+
+		expect(res.body.singleResult.errors).toBeDefined();
+		expect(res.body.singleResult.errors[0].extensions.errors.paymentMethod).toBeTruthy();
+	});
+
+	it('clears a stale Square id when a deposit is re-recorded as cash', async () => {
+		// Correcting a mis-entered deposit must not leave the old payment id attached. A cash
+		// deposit still pointing at a Square payment sends reconciliation at a transaction that
+		// has nothing to do with it - and it would reconcile, which is the dangerous part.
+		const { artist, consult } = await setup();
+		const server = createTestServer();
+
+		await record(server, artist, consult.id, 20000, {
+			paymentMethod: 'square',
+			squarePaymentId: 'sqpmt_wrong',
+		});
+		const res = await record(server, artist, consult.id, 15000, { paymentMethod: 'cash' });
+
+		expect(res.body.singleResult.errors).toBeUndefined();
+		expect(res.body.singleResult.data.recordDeposit.depositPaymentMethod).toBe('cash');
+		expect(res.body.singleResult.data.recordDeposit.depositSquarePaymentId).toBeNull();
+	});
+
+	it('still computes the shop cut the same way whichever method was used', async () => {
+		// The method is a bookkeeping fact about how the money arrived. It must not change how
+		// much of it the shop is owed.
+		const { artist, consult } = await setup();
+		const server = createTestServer();
+		const cash = await record(server, artist, consult.id, 20000, { paymentMethod: 'cash' });
+		const cashCut = cash.body.singleResult.data.recordDeposit.shopCutCents;
+
+		const { artist: artist2, consult: consult2 } = await setup();
+		const card = await record(server, artist2, consult2.id, 20000, {
+			paymentMethod: 'square',
+			squarePaymentId: 'sqpmt_xyz',
+		});
+
+		expect(card.body.singleResult.data.recordDeposit.shopCutCents).toBe(cashCut);
 	});
 });

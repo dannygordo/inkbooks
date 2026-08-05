@@ -23,6 +23,19 @@ import { ALERT_CONSTANTS } from "../../constants";
 import { formatCents } from "../../utils/money";
 import ProjectSessionsList from "../../components/projectSessions/ProjectSessionsList";
 
+// A project usually has exactly one deposit, but the schema allows several (a consult that took
+// two payments), so this says "Cash", "Card", or "Cash + Card" rather than silently reporting
+// whichever happened to be first.
+const depositMethodLabel = (deposits) => {
+	const methods = new Set(
+		(deposits || []).filter((d) => d.depositCents > 0).map((d) => d.depositPaymentMethod)
+	);
+	const labels = [];
+	if (methods.has("cash")) labels.push("Cash");
+	if (methods.has("square")) labels.push("Card");
+	return labels.join(" + ");
+};
+
 const Project = (props) => {
 	const navigate = useNavigate();
 	const { user, setModal, modal, setAlert } = useAuth();
@@ -392,6 +405,14 @@ const Project = (props) => {
 							{data.getProject.depositCollectedCents > 0 ? (
 								<span className="projectDepositValue">
 									{formatCents(data.getProject.depositCollectedCents)} taken at consult
+									{/* Cash or card. Without it a deposit is just an amount someone
+									    typed, and neither the drawer nor the Square dashboard can
+									    be reconciled against it. */}
+									{depositMethodLabel(data.getProject.deposits) && (
+										<span className="projectDepositMethod">
+											{" "}({depositMethodLabel(data.getProject.deposits)})
+										</span>
+									)}
 									<span className="projectDepositNote">
 										{data.getProject.depositAvailableCents > 0
 											? ` - ${formatCents(

@@ -38,12 +38,24 @@ export const DepositService = (() => {
 	};
 
 	const _RECORD_DEPOSIT = gql`
-		mutation RecordDeposit($appointmentId: ID!, $depositCents: Int!) {
-			recordDeposit(appointmentId: $appointmentId, depositCents: $depositCents) {
+		mutation RecordDeposit(
+			$appointmentId: ID!
+			$depositCents: Int!
+			$paymentMethod: String!
+			$squarePaymentId: String
+		) {
+			recordDeposit(
+				appointmentId: $appointmentId
+				depositCents: $depositCents
+				paymentMethod: $paymentMethod
+				squarePaymentId: $squarePaymentId
+			) {
 				id
 				depositCents
 				depositStatus
 				depositCollectedAt
+				depositPaymentMethod
+				depositSquarePaymentId
 				subtotalCents
 				totalCents
 				shopCutCents
