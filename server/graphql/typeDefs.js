@@ -348,6 +348,37 @@ module.exports = gql`
     available: Boolean!
     reason: String
   }
+  # One shape for both halves of the notification system.
+  #
+  # A stored event and a derived condition render identically here on purpose - the person reading
+  # an inbox does not care which is which, and the difference is an implementation detail of how the
+  # row was produced (see NOTIFICATIONS_DESIGN.md section 2). isCondition is exposed only so the UI
+  # can hide read/done controls on rows that have no such state.
+  type InboxItem {
+    # Stable across refetches. A stored event's own id; for a condition, a key derived from its
+    # subject - conditions have no identity, because they are the answer to a question asked just
+    # now rather than a thing that exists.
+    key: ID!
+    type: String!
+    category: String!
+    subjectType: String
+    subjectId: ID
+    title: String!
+    body: String
+    amountCents: Int
+    createdAt: DateTime!
+    # Null on a condition. A condition disappears when it stops being true, which is a better
+    # mechanism than read state and needs no bookkeeping.
+    readAt: DateTime
+    doneAt: DateTime
+    isCondition: Boolean!
+  }
+  type InboxSummary {
+    items: [InboxItem!]!
+    # Unread stored events plus every live condition. Conditions always count: a condition that
+    # could be dismissed without being fixed would be a worse version of a stored notification.
+    unreadCount: Int!
+  }
   type PublicArtistProfile {
     id: ID!
     firstName: String!
@@ -874,6 +905,8 @@ module.exports = gql`
     # Total unread across every conversation the caller is in - what the sidebar badge shows.
     # Separate from Conversation.unreadCount so the badge, which is mounted on every page, is one
     # cheap aggregation rather than a fetch of every thread the person has.
+    # Everything wanting the caller's attention - stored events and live conditions, merged.
+    getInbox(includeRead: Boolean): InboxSummary!
     getUnreadMessageCount: Int!
     getConversation(conversationId: ID!): Conversation
     getConversationsByShopId(shopId: ID!): [Conversation!]
@@ -1168,6 +1201,11 @@ module.exports = gql`
     # Marks everything in a conversation read for the caller, as of now. Idempotent - opening a
     # thread twice, or a component re-rendering, costs one write and changes nothing the second
     # time.
+    # Marks stored notifications read. Omit ids to mark everything. Also cancels any email still
+    # inside its grace window - reading it is the whole reason the grace exists.
+    markNotificationsRead(notificationIds: [ID!]): Int!
+    # Handled, not merely seen. See models/Notification.js on why these are different.
+    markNotificationsDone(notificationIds: [ID!]!): Int!
     markConversationRead(conversationId: ID!): Conversation!
     createMessage(
       conversationId: ID!

@@ -11,6 +11,7 @@ const clientResolvers = require('./clients');
 const projectMutations = require('../mutations/projects');
 const conversationMutations = require('../mutations/conversations');
 const conversationResolvers = require('./conversations');
+const notificationResolvers = require('./notifications');
 const messageMutations = require('../mutations/messages');
 const messageResolvers = require('./messages');
 const projectResolvers = require('./projects');
@@ -73,7 +74,8 @@ module.exports = {
     ...artistShopConnectionResolvers.Query,
     ...analyticsResolvers.Query,
     ...depositResolvers.Query,
-    ...passwordResolvers.Query
+    ...passwordResolvers.Query,
+    ...notificationResolvers.Query
   },
   Mutation: {
     ...usersResolvers.Mutation,
@@ -90,7 +92,8 @@ module.exports = {
     ...shopCutPaymentMutations,
     ...depositMutations,
     ...passwordMutations,
-    ...accountMutations
+    ...accountMutations,
+    ...notificationResolvers.Mutation
   },
   Project: {
     artist: async(project, args, context, info) => {
