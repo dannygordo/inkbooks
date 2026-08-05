@@ -1,10 +1,10 @@
-const mongoose = require('mongoose');
 const Appointment = require('../models/Appointment');
 const Project = require('../models/Project');
 const Client = require('../models/Client');
 const User = require('../models/User');
 const Artist = require('../models/Artist');
 const { getArtistIdsForShops } = require('./shop-membership');
+const { toObjectId } = require('./object-id');
 
 /**
  * The one place any dashboard figure is defined.
@@ -60,7 +60,7 @@ const CUT_AWAITING = ['pending_confirmation'];
 // status silently vanishing from a total is a worse failure than it being counted.
 const PROJECT_CLOSED_STATUSES = ['completed', 'cancelled'];
 
-const toObjectId = (id) => new mongoose.Types.ObjectId(String(id));
+// Shared - see utils/object-id.js on why an aggregation needs this and a find() does not.
 
 /**
  * @param {object} scope

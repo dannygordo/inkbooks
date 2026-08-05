@@ -1,5 +1,6 @@
 const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
+const { toObjectId } = require('./object-id');
 
 /**
  * What "unread" means, in one place.
@@ -24,6 +25,9 @@ function readRowFor(conversation, userId) {
   );
 }
 
+// Ids must be real ObjectIds here, not strings: unreadSummaryForUser AGGREGATES, and an
+// aggregation pipeline does not cast. See utils/object-id.js - this is the exact bug it documents,
+// and the reason the sidebar badge once counted your own messages against you.
 /**
  * The Mongo filter for "messages in this conversation that are unread by this user".
  *
@@ -32,9 +36,9 @@ function readRowFor(conversation, userId) {
  */
 function unreadFilter(conversationId, userId, lastReadAt) {
   const filter = {
-    conversationId,
+    conversationId: toObjectId(conversationId),
     // Never your own. See the header - this is the clause that keeps a badge honest.
-    senderId: { $ne: userId },
+    senderId: { $ne: toObjectId(userId) },
   };
   if (lastReadAt) {
     filter.createdAt = { $gt: lastReadAt };

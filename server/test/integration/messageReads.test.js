@@ -107,14 +107,23 @@ describe('unread counting', () => {
 	});
 
 	it('treats a thread that has never been opened as entirely unread', async () => {
-		// No read row at all, rather than a row with an epoch date. Both count the same; only one
-		// of them claims a read event that never happened.
+		// What "never opened" means is an ABSENT lastReadAt, not an absent row.
+		//
+		// A read row can exist without a read having happened: notifying somebody writes one, to
+		// record lastNotifiedAt for the throttle. That is deliberate - see markConversationNotified,
+		// which pointedly does NOT fill in lastReadAt, because telling somebody they have mail is
+		// not the same as them reading it. Setting an epoch date there to satisfy the schema would
+		// have been the easy thing and would have claimed a read that never happened.
+		//
+		// This test originally asserted the row itself was absent, which was true only until the
+		// message-notification path started running.
 		const { artist, client, conversation } = await twoPersonConversation();
 		const server = createTestServer();
 		await say(server, client, conversation.id, 'First contact');
 
 		const stored = await Conversation.findById(conversation.id);
-		expect(readRowFor(stored, artist.id)).toBeNull();
+		const row = readRowFor(stored, artist.id);
+		expect(row === null || !row.lastReadAt).toBe(true);
 		expect(await unreadCountForConversation(stored, artist.id)).toBe(1);
 	});
 
@@ -148,6 +157,11 @@ describe('unread counting', () => {
 		await say(server, client, conversation.id, 'a');
 		await say(server, client, second.id, 'b');
 		await say(server, client, second.id, 'c');
+		// One from the artist too. Without this, every message in the fixture comes from one side
+		// and the "not your own" clause is never exercised - which is exactly how a real bug
+		// survived here: the aggregation path failed to exclude your own messages, and no fixture
+		// ever had any of your own to exclude.
+		await say(server, artist, second.id, 'artist reply');
 
 		const list = await server.executeOperation(
 			{ query: MY_CONVERSATIONS, variables: { memberId: String(artist.id) } },
