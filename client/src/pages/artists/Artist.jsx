@@ -4,6 +4,8 @@ import { ArtistService } from "../../services/ArtistService";
 import IBPageLoader from "../../components/ibPageLoader/IBPageLoader";
 import IBAvatar from "../../components/inputs/IBAvatar";
 import ArtistPerformancePanel from "../../components/artistDashboard/ArtistPerformancePanel";
+import ArchiveControl from "../../components/archive/ArchiveControl";
+import { ARTIST_STATUS } from "../../constants";
 
 // Was a name and an "Edit Artist" button with nothing else - this is the shop's management view
 // into one specific artist (as opposed to Home.jsx, which is an artist's view of their own
@@ -14,7 +16,7 @@ const Artist = (props) => {
 	/**
 	 * Gets artist by id
 	 */
-	const { loading, data } = ArtistService.fetchArtist(params.artistId);
+	const { loading, data, refetch } = ArtistService.fetchArtist(params.artistId);
 
 	// The corner "Edit" button is gone from every detail page. It was a fixed action in the top
 	// right of a record that didn't say what it edited or where it went, and it was the only way
@@ -47,6 +49,17 @@ const Artist = (props) => {
 							{artist.phone && <span>{artist.phone}</span>}
 						</div>
 					</div>
+					{/* Archiving is how someone leaves the roster - there is no delete. See
+					    components/archive/ArchiveControl.jsx. */}
+					<ArchiveControl
+						kind="artist"
+						name={`${artist.firstName} ${artist.lastName}`}
+						isArchived={artist.status === ARTIST_STATUS.ARCHIVED}
+						archiveMutation={ArtistService.ARCHIVE_ARTIST_MUTATION}
+						unarchiveMutation={ArtistService.UNARCHIVE_ARTIST_MUTATION}
+						variables={{ artistId: artist.id }}
+						onChanged={refetch}
+					/>
 				</div>
 				<ArtistPerformancePanel artistUserId={artist.userId} isSelf={false} />
 			</div>

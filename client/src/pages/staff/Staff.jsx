@@ -1,10 +1,10 @@
-import React from 'react'
+import React, { useState } from 'react'
 import './staff.css';
 import { gql, useQuery } from '@apollo/client';
 import EntityList from '../../components/entityList/EntityList';
 import IBPageActionBar from '../../components/ibPageActionBar/IBPageActionBar';
 import IBPageLoader from '../../components/ibPageLoader/IBPageLoader';
-import { ROUTE_CONSTANTS } from '../../constants';
+import { ROUTE_CONSTANTS, STAFF_STATUS } from '../../constants';
 import UtilsService from '../../services/UtilsService';
 
 // Was a grid of IBCard tiles. Fields preserved from IBCardHeader + IBCardStaffDetails: avatar,
@@ -15,8 +15,8 @@ import UtilsService from '../../services/UtilsService';
 // GraphQL rejects the whole document (fixed separately; see StaffService.js). This one selects
 // `user { avatar }` properly and works, so it's the one kept.
 const FETCH_STAFF_QUERY = gql`
-  {
-    getStaff {
+  query GetStaff($includeArchived: Boolean) {
+    getStaff(includeArchived: $includeArchived) {
       id
       firstName
       lastName
@@ -51,8 +51,11 @@ const STAFF_COLUMNS = [
 ];
 
 const Staff = () => {
+  const [showArchived, setShowArchived] = useState(false);
   // refetch is handed to the action bar so a newly created staff member appears immediately.
-  const { loading, data, refetch } = useQuery(FETCH_STAFF_QUERY);
+  const { loading, data, refetch } = useQuery(FETCH_STAFF_QUERY, {
+    variables: { includeArchived: showArchived },
+  });
   if (loading) return <IBPageLoader />;
 
   const items = (data?.getStaff || []).map((staff) => ({
@@ -65,6 +68,7 @@ const Staff = () => {
     avatar: staff.user?.avatar || staff.avatar,
     primary: `${staff.firstName} ${staff.lastName}`,
     secondary: staff.title,
+    archived: staff.status === STAFF_STATUS.ARCHIVED,
     values: {
       email: staff.email,
       phone: UtilsService.formatPhone(staff.phone),
@@ -76,6 +80,16 @@ const Staff = () => {
   return (
     <div className="staff">
       <IBPageActionBar pageType='staff' onCreated={refetch} />
+      {/* Archived people are hidden by default but have to stay reachable - restoring someone
+          you can't find isn't a feature. See components/archive/ArchiveControl.jsx. */}
+      <label className="entityListToggle">
+        <input
+          type="checkbox"
+          checked={showArchived}
+          onChange={(e) => setShowArchived(e.target.checked)}
+        />
+        Show archived
+      </label>
       <EntityList columns={STAFF_COLUMNS} items={items} emptyMessage="No staff yet." />
     </div>
   )

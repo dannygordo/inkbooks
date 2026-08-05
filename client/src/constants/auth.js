@@ -45,3 +45,31 @@ export const AUTH_SETTINGS_CONSTANTS = {
 		RECORD_UPDATE_SUCCESS: "Changes have been successfully saved!!",
 	},
 };
+
+// Mirrors server/utils/constants.js's ARTIST_STATUS / STAFF_STATUS / CLIENT_STATUS. Same reason
+// ROLES lives here: a status number written from memory in the wrong file is a silent bug, not a
+// compile error.
+//
+// ARCHIVED is 4 in all three, deliberately - "archived" is one fact, not three. Archiving is how
+// someone is removed from the app; there is no delete (see server/graphql/typeDefs.js). It never
+// touches history: an archived artist's completed sessions still count toward shop revenue.
+//
+// Absent/undefined means active everywhere. Client.status and Staff.status were added with
+// archiving, so records predating it have no value, and treating unset as anything else would
+// hide them all.
+export const ARTIST_STATUS = {
+	ACTIVE: 1,
+	INACTIVE: 2,
+	BOOKS_CLOSED: 3,
+	ARCHIVED: 4,
+};
+
+export const STAFF_STATUS = {
+	ACTIVE: 1,
+	ARCHIVED: 4,
+};
+
+export const CLIENT_STATUS = {
+	ACTIVE: 1,
+	ARCHIVED: 4,
+};

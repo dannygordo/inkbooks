@@ -1,0 +1,77 @@
+.archiveControl {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+/* Says the record is archived wherever it's shown on its own - a detail page otherwise looks
+   completely normal, and someone could sit editing a record that no longer appears in any list
+   without understanding why. */
+.archiveBadge {
+	display: inline-block;
+	padding: 3px 10px;
+	border-radius: 12px;
+	background: #4a3a1a;
+	color: #e0c072;
+	font-size: 12px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+.archiveConfirmBackdrop {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.6);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 1300;
+}
+
+.archiveConfirmDialog {
+	background: #1e1e1e;
+	color: #ddd;
+	border-radius: 10px;
+	padding: 28px;
+	max-width: 520px;
+	margin: 20px;
+	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.archiveConfirmDialog h2 {
+	margin: 0 0 16px;
+	font-size: 22px;
+}
+
+.archiveConfirmDialog p {
+	margin: 0 0 12px;
+	line-height: 1.5;
+}
+
+/* The "nothing is lost" paragraph, given its own weight. It's the half people don't believe, and
+   if it reads as fine print they'll avoid archiving and leave departed artists on the roster
+   forever - which is the thing this feature exists to stop. */
+.archiveConfirmKept {
+	border-left: 3px solid #4a7a4a;
+	padding-left: 12px;
+	color: #cfe0cf;
+}
+
+.archiveConfirmNote {
+	color: #999;
+	font-size: 14px;
+}
+
+.archiveConfirmActions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 10px;
+	margin-top: 20px;
+}
+
+/* Row treatment for an archived record in a list - muted, but still legible. Greying it out
+   entirely would make the restore path harder to use than the archive path. */
+.entityRowArchived {
+	opacity: 0.55;
+}

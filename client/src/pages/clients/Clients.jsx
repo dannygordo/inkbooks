@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import './clients.css';
 import EntityList from '../../components/entityList/EntityList';
 import IBPageActionBar from '../../components/ibPageActionBar/IBPageActionBar';
@@ -6,6 +6,7 @@ import IBPageLoader from '../../components/ibPageLoader/IBPageLoader';
 import ClientService from '../../services/ClientService';
 import { ROUTE_CONSTANTS } from '../../constants';
 import UtilsService from '../../services/UtilsService';
+import { CLIENT_STATUS } from '../../constants';
 
 // Was a grid of IBCard tiles built off an inline gql document duplicating ClientService's own
 // fetchClients query - the service query is used instead, so there's one definition of what a
@@ -26,7 +27,8 @@ const CLIENT_COLUMNS = [
 
 const Clients = () => {
   // refetch is handed to the action bar so a newly created client appears immediately.
-  const { loading, data, refetch } = ClientService.fetchClients();
+  const [showArchived, setShowArchived] = useState(false);
+  const { loading, data, refetch } = ClientService.fetchClients(showArchived);
   if (loading) return <IBPageLoader />;
 
   const items = (data?.getClients || []).map((client) => ({
@@ -39,6 +41,7 @@ const Clients = () => {
     avatar: client.avatar,
     primary: `${client.firstName} ${client.lastName}`,
     secondary: client.email,
+    archived: client.status === CLIENT_STATUS.ARCHIVED,
     values: {
       phone: UtilsService.formatPhone(client.phone),
       location: [client.city, client.state].filter(Boolean).join(', '),
@@ -50,6 +53,16 @@ const Clients = () => {
   return (
     <div className="clients">
       <IBPageActionBar pageType='clients' onCreated={refetch} />
+      {/* Archived people are hidden by default but have to stay reachable - restoring someone
+          you can't find isn't a feature. See components/archive/ArchiveControl.jsx. */}
+      <label className="entityListToggle">
+        <input
+          type="checkbox"
+          checked={showArchived}
+          onChange={(e) => setShowArchived(e.target.checked)}
+        />
+        Show archived
+      </label>
       <EntityList columns={CLIENT_COLUMNS} items={items} emptyMessage="No clients yet." />
     </div>
   );

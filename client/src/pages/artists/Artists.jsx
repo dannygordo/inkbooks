@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import "./artists.css";
 import EntityList from "../../components/entityList/EntityList";
 import IBPageActionBar from "../../components/ibPageActionBar/IBPageActionBar";
@@ -6,6 +6,7 @@ import IBPageLoader from "../../components/ibPageLoader/IBPageLoader";
 import { ArtistService } from "../../services/ArtistService";
 import { APP_SETTINGS_CONSTANTS, ROUTE_CONSTANTS } from "../../constants";
 import UtilsService from "../../services/UtilsService";
+import { ARTIST_STATUS } from "../../constants";
 
 // Was a grid of IBCard tiles. Now the same list the dashboard uses - see
 // components/entityList/EntityList.jsx for why a directory wants rows rather than cards.
@@ -25,7 +26,8 @@ const ARTIST_COLUMNS = [
 const Artists = () => {
 	// refetch is handed to the action bar so a newly created artist appears immediately - the
 	// create mutation has no way to know this list query exists, let alone update its cache.
-	const { loading, data, refetch } = ArtistService.fetchArtists();
+	const [showArchived, setShowArchived] = useState(false);
+	const { loading, data, refetch } = ArtistService.fetchArtists(showArchived);
 	if (loading) {
 		return <IBPageLoader />;
 	}
@@ -40,6 +42,7 @@ const Artists = () => {
 		avatar: artist.user?.avatar || artist.avatar,
 		primary: `${artist.firstName} ${artist.lastName}`,
 		secondary: artist.title,
+		archived: artist.status === ARTIST_STATUS.ARCHIVED,
 		values: {
 			email: artist.email,
 			phone: UtilsService.formatPhone(artist.phone),
@@ -54,6 +57,16 @@ const Artists = () => {
 				pageType={APP_SETTINGS_CONSTANTS.PAGE_TYPES.ARTISTS}
 				onCreated={refetch}
 			/>
+			{/* Archived artists are hidden by default but have to stay reachable - restoring
+			    someone you can't find isn't a feature. See components/archive/ArchiveControl.jsx. */}
+			<label className="entityListToggle">
+				<input
+					type="checkbox"
+					checked={showArchived}
+					onChange={(e) => setShowArchived(e.target.checked)}
+				/>
+				Show archived
+			</label>
 			<EntityList
 				columns={ARTIST_COLUMNS}
 				items={items}

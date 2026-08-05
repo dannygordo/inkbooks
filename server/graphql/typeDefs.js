@@ -719,7 +719,10 @@ module.exports = gql`
 
     ######### Artists ###########
 
-    getArtists: [Artist]
+    # includeArchived: archived people have to stay reachable or unarchiving them is impossible -
+    # there'd be no way to find who you wanted back. Hidden by default, askable for. See
+    # utils/archiving.js.
+    getArtists(includeArchived: Boolean): [Artist]
     getArtist(artistId: ID!): Artist
     getArtistsByShop(shopId: ID!): [Artist]
 
@@ -730,12 +733,12 @@ module.exports = gql`
 
     ######### Staff ###########
     
-    getStaff: [Staff]
+    getStaff(includeArchived: Boolean): [Staff]
     getOneStaff(staffId: ID!): Staff
     
     ######### Clients ###########
     
-    getClients: [Client]
+    getClients(includeArchived: Boolean): [Client]
     getClient(clientId: ID!): Client
     
     ######### Users ###########

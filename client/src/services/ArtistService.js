@@ -63,10 +63,12 @@ export const ArtistService = (() => {
 		});
 	}
 
-	const _fetchArtists = () => {
+	// includeArchived: archived artists are hidden by default but have to stay reachable, or
+	// there'd be no way to find someone to restore them. See server/utils/archiving.js.
+	const _fetchArtists = (includeArchived = false) => {
 		const FETCH_ARTISTS_QUERY = gql`
-			{
-				getArtists {
+			query GetArtists($includeArchived: Boolean) {
+				getArtists(includeArchived: $includeArchived) {
 					id
 					firstName
 					lastName
@@ -91,7 +93,7 @@ export const ArtistService = (() => {
 				}
 			}
 		`;
-		return useQuery(FETCH_ARTISTS_QUERY);
+		return useQuery(FETCH_ARTISTS_QUERY, { variables: { includeArchived } });
 	};
 
 	const _updateArtist = (artist) => {
@@ -136,6 +138,19 @@ export const ArtistService = (() => {
 		}
 	`;
 
+	// Archiving replaced deleteArtist, which used to destroy the row and leave their projects,
+	// appointments and User account pointing at nothing - see server/graphql/typeDefs.js.
+	const _ARCHIVE_ARTIST_MUTATION = gql`
+		mutation ArchiveArtist($artistId: ID!) {
+			archiveArtist(artistId: $artistId) { id status }
+		}
+	`;
+	const _UNARCHIVE_ARTIST_MUTATION = gql`
+		mutation UnarchiveArtist($artistId: ID!) {
+			unarchiveArtist(artistId: $artistId) { id status }
+		}
+	`;
+
 	return {
 		fetchArtist: _fetchArtist,
 		fetchArtists: _fetchArtists,
@@ -143,5 +158,7 @@ export const ArtistService = (() => {
 		FETCH_ARTISTS_BY_SHOP: _FETCH_ARTISTS_BY_SHOP,
 		fetchArtistsByShop: _fetchArtistsByShop,
 		UPDATE_ARTIST_RATE_SETTINGS_MUTATION: _UPDATE_ARTIST_RATE_SETTINGS_MUTATION,
+		ARCHIVE_ARTIST_MUTATION: _ARCHIVE_ARTIST_MUTATION,
+		UNARCHIVE_ARTIST_MUTATION: _UNARCHIVE_ARTIST_MUTATION,
 	};
 })();

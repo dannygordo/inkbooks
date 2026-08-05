@@ -2,7 +2,7 @@ const Staff = require('../../models/Staff');
 const withAuth = require('../../utils/with-auth');
 const { AuthenticationError } = require('../../utils/errors');
 const { getShopIdsForUser } = require('../../utils/shop-membership');
-const { excludeArchived } = require('../../utils/archiving');
+const { archiveFilter } = require('../../utils/archiving');
 
 module.exports = {
   Query: {
@@ -10,16 +10,16 @@ module.exports = {
     // could list every staff member (name, email, phone, address) at every shop on the platform.
     // SHOP_ADMIN-or-better still sees everyone - see the matching comment in resolvers/shops.js.
     // Staff/Artist callers only see staff at the shop(s) they're actually affiliated with.
-    getStaff: withAuth(async (_, __, context, info, user) => {
+    getStaff: withAuth(async (_, { includeArchived }, context, info, user) => {
       try {
         // No unscoped branch, for anyone - see utils/shop-membership.js's role rule.
         const shopIds = await getShopIdsForUser(user.id);
         if (shopIds.length === 0) {
           return [];
         }
-        return await Staff.find(excludeArchived({ shopId: { $in: shopIds } })).sort({
-          lastName: 1,
-        });
+        return await Staff.find(
+          archiveFilter(includeArchived, { shopId: { $in: shopIds } }),
+        ).sort({ lastName: 1 });
       } catch (err) {
         throw new Error(err);
       }

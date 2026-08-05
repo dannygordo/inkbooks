@@ -18,6 +18,9 @@ const ClientService = (() => {
 					facebook
 					avatar
 					userId
+					# status drives the archived badge and which action ArchiveControl offers -
+					# without it the control always reads "not archived".
+					status
 					user{
 						avatar
 					}
@@ -31,10 +34,11 @@ const ClientService = (() => {
 		});
 	};
 
-	const _fetchClients = () => {
+	// See ArtistService's matching comment on includeArchived.
+	const _fetchClients = (includeArchived = false) => {
 		const FETCH_CLIENTS_QUERY = gql`
-			{
-				getClients {
+			query GetClients($includeArchived: Boolean) {
+				getClients(includeArchived: $includeArchived) {
 					id
 					firstName
 					lastName
@@ -48,10 +52,12 @@ const ClientService = (() => {
 					facebook
 					avatar
 					userId
+					# Needed to mute and label an archived row when the list is showing them.
+					status
 				}
 			}
 		`;
-		return useQuery(FETCH_CLIENTS_QUERY);
+		return useQuery(FETCH_CLIENTS_QUERY, { variables: { includeArchived } });
 	};
 
 	const _updateClient = (client) => {
@@ -159,13 +165,26 @@ const ClientService = (() => {
 		}
 	`;
 
+	const _ARCHIVE_CLIENT_MUTATION = gql`
+		mutation ArchiveClient($clientId: ID!) {
+			archiveClient(clientId: $clientId) { id status }
+		}
+	`;
+	const _UNARCHIVE_CLIENT_MUTATION = gql`
+		mutation UnarchiveClient($clientId: ID!) {
+			unarchiveClient(clientId: $clientId) { id status }
+		}
+	`;
+
 	return {
 		fetchClient: _fetchClient,
 		fetchClients: _fetchClients,
         updateClient: _updateClient,
 		fetchClientDashboard: _fetchClientDashboard,
 		FETCH_CLIENT_DASHBOARD: _FETCH_CLIENT_DASHBOARD,
-		UPDATE_CLIENT_NOTES: _UPDATE_CLIENT_NOTES
+		UPDATE_CLIENT_NOTES: _UPDATE_CLIENT_NOTES,
+		ARCHIVE_CLIENT_MUTATION: _ARCHIVE_CLIENT_MUTATION,
+		UNARCHIVE_CLIENT_MUTATION: _UNARCHIVE_CLIENT_MUTATION,
 	};
 })();
 

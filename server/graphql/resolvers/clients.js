@@ -7,7 +7,7 @@ const {
   getArtistIdsForShops,
   assertCanAccessClient,
 } = require('../../utils/shop-membership');
-const { excludeArchived } = require('../../utils/archiving');
+const { archiveFilter } = require('../../utils/archiving');
 
 module.exports = {
   Query: {
@@ -22,7 +22,7 @@ module.exports = {
     // Both are needed. Project.clientId is the Client sub-document's own _id, not the client's
     // User._id (see resolvers/index.js's Project.client resolver), which is what the distinct
     // below relies on.
-    getClients: withAuth(async (_, __, context, info, user) => {
+    getClients: withAuth(async (_, { includeArchived }, context, info, user) => {
       try {
         const shopIds = await getShopIdsForUser(user.id);
         const artistIds =
@@ -42,7 +42,9 @@ module.exports = {
         if (or.length === 0) {
           return [];
         }
-        return await Client.find(excludeArchived({ $or: or })).sort({ lastName: 1 });
+        return await Client.find(archiveFilter(includeArchived, { $or: or })).sort({
+          lastName: 1,
+        });
       } catch (err) {
         throw new Error(err);
       }

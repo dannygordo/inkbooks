@@ -133,6 +133,18 @@ projects silently pointing at nothing; the `User` row outlived its profile, prod
 a role and no profile (the exact bug that made the old `platformadmin` unable to log in); and
 appointments kept totals, shop cuts and Square invoice ids with nobody attached.
 
+Wired into the UI: an Archive/Restore control on the artist, staff and client detail pages
+(`components/archive/ArchiveControl.jsx`, shop-admin only, matching the mutations' minRole), and a
+"Show archived" toggle on each list backed by `includeArchived` on `getArtists`/`getStaff`/
+`getClients`. That flag isn't a nicety - without it the archive is a one-way door, since there'd be
+no way to find someone to restore them. `getArtistsByShop` deliberately does NOT take it: it feeds
+the booking picker, and archived artists must not be bookable whatever a list elsewhere shows.
+
+The confirmation says what archiving does AND what it doesn't. The second half is the part people
+don't believe: "remove this person" reads as "lose their history", and someone who thinks they're
+about to lose a year of revenue records will leave departed artists on the roster forever instead -
+which is the outcome archiving exists to prevent.
+
 Still open: a redaction action for GDPR/CCPA erasure requests, which must null the PII in place and
 keep the financial row - tax retention runs the other way, so deletion is the wrong tool even
 there.

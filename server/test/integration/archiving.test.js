@@ -42,6 +42,18 @@ const UNARCHIVE_CLIENT = `mutation A($clientId: ID!) { unarchiveClient(clientId:
 const GET_ARTISTS = `{ getArtists { id } }`;
 const GET_STAFF = `{ getStaff { id } }`;
 const GET_CLIENTS = `{ getClients { id } }`;
+const GET_ARTISTS_INCLUDING_ARCHIVED = `
+	query A($includeArchived: Boolean) { getArtists(includeArchived: $includeArchived) { id } }
+`;
+const GET_STAFF_INCLUDING_ARCHIVED = `
+	query A($includeArchived: Boolean) { getStaff(includeArchived: $includeArchived) { id } }
+`;
+const GET_CLIENTS_INCLUDING_ARCHIVED = `
+	query A($includeArchived: Boolean) { getClients(includeArchived: $includeArchived) { id } }
+`;
+const GET_ARTISTS_BY_SHOP = `
+	query A($shopId: ID!) { getArtistsByShop(shopId: $shopId) { id } }
+`;
 const SHOP_ANALYTICS = `
 	query A($shopId: ID!, $start: DateTime!, $end: DateTime!) {
 		getShopAnalytics(shopId: $shopId, start: $start, end: $end) { revenueCents tipsCents }
@@ -139,6 +151,74 @@ describe('archiving removes someone from the directories', () => {
 		const after = await server.executeOperation({ query: GET_CLIENTS }, asUser(shopAdmin));
 		expect(after.body.singleResult.data.getClients.map((c) => c.id)).not.toContain(client.id);
 		expect(await Client.findById(client.id)).not.toBeNull();
+	});
+
+	it('shows archived people when asked, which is the only way to restore one', async () => {
+		// Without this the archive is a one-way door: unarchiveArtist exists, but nothing would be
+		// able to find the artist to call it on. The default stays "hidden" - see
+		// utils/archiving.js's archiveFilter.
+		const { shopAdmin, artist } = await shopWithEarningArtist();
+		const server = createTestServer();
+
+		await server.executeOperation(
+			{ query: ARCHIVE_ARTIST, variables: { artistId: artist.id } },
+			asUser(shopAdmin),
+		);
+
+		const hidden = await server.executeOperation({ query: GET_ARTISTS }, asUser(shopAdmin));
+		expect(hidden.body.singleResult.data.getArtists.map((a) => a.id)).not.toContain(artist.id);
+
+		const shown = await server.executeOperation(
+			{ query: GET_ARTISTS_INCLUDING_ARCHIVED, variables: { includeArchived: true } },
+			asUser(shopAdmin),
+		);
+		expect(shown.body.singleResult.data.getArtists.map((a) => a.id)).toContain(artist.id);
+	});
+
+	it('shows archived staff and clients when asked', async () => {
+		const { shopAdmin, shop, client } = await shopWithEarningArtist();
+		const { staff } = await createStaffUser(shop.id);
+		const server = createTestServer();
+
+		await server.executeOperation(
+			{ query: ARCHIVE_STAFF, variables: { staffId: staff.id } },
+			asUser(shopAdmin),
+		);
+		await server.executeOperation(
+			{ query: ARCHIVE_CLIENT, variables: { clientId: client.id } },
+			asUser(shopAdmin),
+		);
+
+		const staffShown = await server.executeOperation(
+			{ query: GET_STAFF_INCLUDING_ARCHIVED, variables: { includeArchived: true } },
+			asUser(shopAdmin),
+		);
+		expect(staffShown.body.singleResult.data.getStaff.map((s) => s.id)).toContain(staff.id);
+
+		const clientsShown = await server.executeOperation(
+			{ query: GET_CLIENTS_INCLUDING_ARCHIVED, variables: { includeArchived: true } },
+			asUser(shopAdmin),
+		);
+		expect(clientsShown.body.singleResult.data.getClients.map((c) => c.id)).toContain(client.id);
+	});
+
+	it('keeps an archived artist out of the booking picker even so', async () => {
+		// getArtistsByShop feeds "who can this be booked with", and deliberately takes no
+		// includeArchived - you should never be able to book new work with someone who's been
+		// taken off the roster, whatever a list elsewhere is showing.
+		const { shopAdmin, shop, artist } = await shopWithEarningArtist();
+		const server = createTestServer();
+
+		await server.executeOperation(
+			{ query: ARCHIVE_ARTIST, variables: { artistId: artist.id } },
+			asUser(shopAdmin),
+		);
+
+		const res = await server.executeOperation(
+			{ query: GET_ARTISTS_BY_SHOP, variables: { shopId: shop.id } },
+			asUser(shopAdmin),
+		);
+		expect(res.body.singleResult.data.getArtistsByShop.map((a) => a.id)).not.toContain(artist.id);
 	});
 
 	it('brings someone back', async () => {

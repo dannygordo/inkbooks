@@ -3,6 +3,8 @@ import "./staffProfile.css";
 import StaffService  from "../../services/StaffService";
 import IBPageLoader from "../../components/ibPageLoader/IBPageLoader";
 import IBCardShowError from "../../components/card/ibCardShowError/IBCardShowError";
+import ArchiveControl from "../../components/archive/ArchiveControl";
+import { STAFF_STATUS } from "../../constants";
 
 const StaffProfile = (props) => {
 	let params = useParams();
@@ -10,7 +12,7 @@ const StaffProfile = (props) => {
 	/**
 	 * Gets staffProfile by id
 	 */
-	const { loading, data } = StaffService.fetchOneStaff(params.staffId);
+	const { loading, data, refetch } = StaffService.fetchOneStaff(params.staffId);
 
 	// The corner "Edit" button is gone from every detail page. It was a fixed action in the top
 	// right of a record that didn't say what it edited or where it went, and it was the only way
@@ -26,9 +28,20 @@ const StaffProfile = (props) => {
 	if (data) {
 		return (
 			<div className="staffProfile">
-				<h1 className="staffProfileTitle">
-					{`${data.getOneStaff.firstName} ${data.getOneStaff.lastName}`}
-				</h1>
+				<div className="staffProfileHeader">
+					<h1 className="staffProfileTitle">
+						{`${data.getOneStaff.firstName} ${data.getOneStaff.lastName}`}
+					</h1>
+					<ArchiveControl
+						kind="staff member"
+						name={`${data.getOneStaff.firstName} ${data.getOneStaff.lastName}`}
+						isArchived={data.getOneStaff.status === STAFF_STATUS.ARCHIVED}
+						archiveMutation={StaffService.ARCHIVE_STAFF_MUTATION}
+						unarchiveMutation={StaffService.UNARCHIVE_STAFF_MUTATION}
+						variables={{ staffId: data.getOneStaff.id }}
+						onChanged={refetch}
+					/>
+				</div>
 			</div>
 		);
 	} else {

@@ -26,7 +26,9 @@ import "./entityList.css";
  * would put the header and body on different grids the moment one row had a longer email.
  *
  * @param {Array} columns - [{ key, label, width }] - width is any CSS length
- * @param {Array} items - [{ key, linkTo, avatar, primary, secondary, values: {colKey: value}, tagColor }]
+ * @param {Array} items - [{ key, linkTo, avatar, primary, secondary, values: {colKey: value},
+ *   tagColor, archived }] - `archived` mutes the row and labels it, so a list showing archived
+ *   records doesn't look like a list of active ones.
  * @param {string} emptyMessage
  */
 const EntityList = ({ columns = [], items, emptyMessage = "Nothing here yet." }) => {
@@ -62,7 +64,13 @@ const EntityList = ({ columns = [], items, emptyMessage = "Nothing here yet." })
 			{items.map((item) => (
 				<div
 					key={item.key}
-					className={item.linkTo ? "entityRow entityRowClickable" : "entityRow"}
+					className={[
+						"entityRow",
+						item.linkTo ? "entityRowClickable" : "",
+						item.archived ? "entityRowArchived" : "",
+					]
+						.filter(Boolean)
+						.join(" ")}
 					style={{
 						gridTemplateColumns: gridTemplate,
 						// Tinted by tag colour where the row belongs to someone who has one - same
@@ -81,7 +89,10 @@ const EntityList = ({ columns = [], items, emptyMessage = "Nothing here yet." })
 					    names; dropping it for density would make this harder to scan, not easier. */}
 					<IBAvatar size={40} imgUrl={item.avatar} label={item.primary} />
 					<div className="entityRowText">
-						<span className="entityRowPrimary">{item.primary}</span>
+						<span className="entityRowPrimary">
+							{item.primary}
+							{item.archived && <span className="entityRowArchivedTag">Archived</span>}
+						</span>
 						{item.secondary && (
 							<span className="entityRowSecondary">{item.secondary}</span>
 						)}

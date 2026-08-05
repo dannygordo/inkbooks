@@ -53,4 +53,15 @@ function isArchived(doc) {
   return Boolean(doc) && doc.status === ARCHIVED;
 }
 
-module.exports = { ARCHIVED, notArchived, excludeArchived, isArchived };
+/**
+ * The filter for a list query that takes an `includeArchived` flag.
+ *
+ * Archived records have to stay REACHABLE or unarchiving is unusable - there'd be no way to find
+ * the person you wanted to bring back. So the directories hide them by default and every one of
+ * them can be asked to show them.
+ */
+function archiveFilter(includeArchived, filter = {}) {
+  return includeArchived ? filter : excludeArchived(filter);
+}
+
+module.exports = { ARCHIVED, notArchived, excludeArchived, archiveFilter, isArchived };

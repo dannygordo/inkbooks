@@ -6,7 +6,7 @@ const {
   getShopIdsForUser,
   assertCanAccessShop,
 } = require('../../utils/shop-membership');
-const { excludeArchived } = require('../../utils/archiving');
+const { excludeArchived, archiveFilter } = require('../../utils/archiving');
 const { findArtistsForShops, getActiveShopIdForArtist } = require('../../utils/artist-shop');
 
 module.exports = {
@@ -25,7 +25,7 @@ module.exports = {
     // history. Artists have no reason to see each other's books; they reach their own numbers
     // through Home.jsx's dashboard, which mounts the same panel scoped to themselves.
     // Shop-scoping for Staff is unchanged below.
-    getArtists: withAuth(async (_, __, context, info, user) => {
+    getArtists: withAuth(async (_, { includeArchived }, context, info, user) => {
       try {
         // No unscoped branch, for anyone - see utils/shop-membership.js's role rule.
         const shopIds = await getShopIdsForUser(user.id);
@@ -39,7 +39,7 @@ module.exports = {
         //
         // Archived artists drop out of the directory but keep every appointment, project and
         // dollar they earned - see utils/archiving.js.
-        const artists = await findArtistsForShops(shopIds, excludeArchived());
+        const artists = await findArtistsForShops(shopIds, archiveFilter(includeArchived));
         return artists.sort((a, b) => new Date(a.startDate || 0) - new Date(b.startDate || 0));
       } catch (err) {
         throw new Error(err);
@@ -85,6 +85,9 @@ module.exports = {
     getArtistsByShop: withAuth(async (_, { shopId }, context, info, user) => {
       await assertCanAccessShop(user, shopId);
       try {
+        // Deliberately no includeArchived here: this feeds the booking flow's artist picker
+        // (ibCalendar/Sidebar's old filter, BookSessionDatesForm), and you should never be able to
+        // book new work with someone who's been taken off the roster.
         const artists = await findArtistsForShops([shopId], excludeArchived());
         return artists.sort((a, b) =>
           String(a.firstName || '').localeCompare(String(b.firstName || '')),

@@ -31,10 +31,11 @@ const StaffService = (() => {
 		});
 	};
 
-	const _fetchStaff = () => {
+	// See ArtistService's matching comment on includeArchived.
+	const _fetchStaff = (includeArchived = false) => {
 		const FETCH_STAFF_QUERY = gql`
-			{
-				getStaff {
+			query GetStaff($includeArchived: Boolean) {
+				getStaff(includeArchived: $includeArchived) {
 					id
 					firstName
 					lastName
@@ -66,7 +67,7 @@ const StaffService = (() => {
 				}
 			}
 		`;
-		return useQuery(FETCH_STAFF_QUERY);
+		return useQuery(FETCH_STAFF_QUERY, { variables: { includeArchived } });
 	};
 
 	const _updateStaff = (staff) => {
@@ -95,10 +96,23 @@ const StaffService = (() => {
         return UPDATE_STAFF_MUTATION;
 	};
 
+	const _ARCHIVE_STAFF_MUTATION = gql`
+		mutation ArchiveStaff($staffId: ID!) {
+			archiveStaff(staffId: $staffId) { id status }
+		}
+	`;
+	const _UNARCHIVE_STAFF_MUTATION = gql`
+		mutation UnarchiveStaff($staffId: ID!) {
+			unarchiveStaff(staffId: $staffId) { id status }
+		}
+	`;
+
 	return {
 		fetchOneStaff: _fetchOneStaff,
 		fetchStaff: _fetchStaff,
-        updateStaff: _updateStaff
+        updateStaff: _updateStaff,
+		ARCHIVE_STAFF_MUTATION: _ARCHIVE_STAFF_MUTATION,
+		UNARCHIVE_STAFF_MUTATION: _UNARCHIVE_STAFF_MUTATION,
 	};
 })();
 

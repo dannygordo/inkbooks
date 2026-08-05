@@ -127,3 +127,39 @@
 		flex-shrink: 0;
 	}
 }
+
+/* Archived rows: muted but still legible and still clickable, since the detail page is where you
+   go to restore someone. Hiding them outright is what the default list already does. */
+.entityRowArchived {
+	opacity: 0.55;
+}
+.entityRowArchivedTag {
+	margin-left: 8px;
+	padding: 2px 8px;
+	border-radius: 10px;
+	background: #4a3a1a;
+	color: #e0c072;
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	vertical-align: middle;
+}
+
+/* The "Show archived" toggle above a list. */
+.entityListToggle {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 0 0 12px 4px;
+	color: #bbb;
+	font-size: 14px;
+	cursor: pointer;
+	user-select: none;
+}
+.entityListToggle input {
+	height: auto;
+	padding: 0;
+	margin: 0;
+	cursor: pointer;
+}
