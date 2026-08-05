@@ -11,17 +11,20 @@ import { resolveTagColor } from "../../utils/tagColor";
 
 const Day = ({ day, rowIdx }) => {
 	const [dayEvents, setDayEvents] = useState([]);
-	const { setDaySelected, filteredEvents } = useCalendar();
+	const { setDaySelected, savedEvents } = useCalendar();
 	const { setModal, user } = useAuth();
 
 	useEffect(() => {
-		const events = filteredEvents.filter(
+		// Reads savedEvents directly. This used to read `filteredEvents`, which the artist
+		// checkbox filter in Sidebar.jsx maintained - and maintained incorrectly, so a broken
+		// intermediate list decided what the calendar drew. See Sidebar.jsx for the full note.
+		const events = savedEvents.filter(
 			(evt) =>
 				moment(evt.appointmentDate).format("DD-MM-YY") ===
 				day.format("DD-MM-YY")
 		);
 		setDayEvents(events);
-	}, [filteredEvents, day]);
+	}, [savedEvents, day]);
 
 	const getCurrentDayClass = () => {
 		return day.format("DD-MM-YY") === moment().format("DD-MM-YY")

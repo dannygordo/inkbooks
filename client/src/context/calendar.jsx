@@ -36,8 +36,10 @@ export function CalendarProvider(props) {
 	const [monthIndex, setMonthIndex] = useState(moment().month());
 	const [smallCalendarMonth, setSmallCalendarMonth] = useState(null);
 	const [daySelected, setDaySelected] = useState(moment());
+	// savedEvents is the whole set the calendar draws from. There was a parallel `filteredEvents`
+	// here, written by the Sidebar artist filter and read by Day.jsx - so the thing that rendered
+	// was never the thing that was fetched. Both are gone; see Sidebar.jsx.
 	const [savedEvents, setSavedEvents] = useState([]);
-    const [filteredEvents, setFilteredEvents] = useState([]);
 
 	useEffect(() => {
 		if (smallCalendarMonth !== null) {
@@ -55,9 +57,7 @@ export function CalendarProvider(props) {
 				daySelected,
 				setDaySelected,
                 savedEvents,
-                setSavedEvents,
-                filteredEvents,
-                setFilteredEvents
+                setSavedEvents
 			}}
 			{...props}
 		/>

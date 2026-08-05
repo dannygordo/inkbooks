@@ -11,7 +11,7 @@ import Sidebar from './Sidebar';
 const IBCalendar = () => {
     const { user } = useAuth();
     const [currentMonth, setCurrentMonth] = useState(UtilsService.getMonth());
-    const { monthIndex, setMonthIndex, savedEvents, setSavedEvents, setFilteredEvents } = useCalendar();
+    const { monthIndex, setMonthIndex, setSavedEvents } = useCalendar();
     // user.userInfo.shop is legitimately absent for an independent artist (no shop connection -
     // see PRODUCTION_ROADMAP.md's artist-centric tenancy section). Both queries are always called
     // (required - hooks can't be called conditionally) but each `skip`s itself when its own id is
@@ -31,14 +31,12 @@ const IBCalendar = () => {
         // crashed with "Cannot read properties of undefined (reading 'appointmentDate')" the
         // instant a shop had zero appointments (an entirely normal, common state - a brand new
         // shop, or any shop between appointments), not just an independent-artist edge case.
-        // Found via manual testing. Removed - they added no functional value; setSavedEvents/
-        // setFilteredEvents below already use the full array correctly and don't depend on them.
+        // Found via manual testing. Removed - they added no functional value; setSavedEvents
+        // below already uses the full array correctly and doesn't depend on them.
         if (shopId && shopData) {
             setSavedEvents(shopData.getAppointmentsByShop);
-            setFilteredEvents(shopData.getAppointmentsByShop);
         } else if (!shopId && artistData) {
             setSavedEvents(artistData.getAppointmentsByArtist);
-            setFilteredEvents(artistData.getAppointmentsByArtist);
         }
     }, [shopId, shopData, artistData])
     useEffect(() => {
