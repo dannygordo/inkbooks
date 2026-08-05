@@ -79,6 +79,54 @@ The reason Phase 1's bugs exist is that every resolver repeats the same `checkAu
   - **Node ≥20 is now required** (`@as-integrations/express5` enforces this via `engines`). Run `node -v` before you `npm install` — if you're on an older Node, the install or runtime will fail.
   - You'll need to run `npm install` in `server/` yourself (sandbox can't reach the npm registry) — `apollo-server` is removed and `@apollo/server`, `@as-integrations/express5`, `express`, `cors`, `graphql-tag`, and `zod` are added to `package.json`.
 
+### Lists are bounded — DONE
+
+Before this, no list query had any bound at all.
+
+`getAppointmentsByShop` returned every appointment a shop had ever had so the browser could filter
+down to the thirty days on screen. `ArtistPerformancePanel` fetched an artist's entire career and
+ran four separate client-side passes over it — upcoming, recently completed, payout candidates,
+plus the calendar's own filter — to render two lists of five. Both grow by one row per session,
+forever.
+
+**Offset, not cursors.** These are directories: people want a total, want to jump to a page, and
+the sort is stable enough that offset drift is a non-event. Cursors suit feeds — forward-only,
+shifting underneath you, nobody asking "how many". `utils/pagination.js`: default 50, max 200,
+clamps an over-large limit but REFUSES a negative or fractional one, because that means the caller
+computed something wrong and swallowing it hides the bug where it's cheapest to find.
+
+`getClients`/`getStaff`/`getProjects` page in the database; `getArtists` pages in memory, because
+the roster resolves through `ArtistShopConnection` first and can't be one Mongo filter — and a
+roster is bounded by how many people work at the shop.
+
+**Appointments got a filter, not just a limit.** The calendar wants a month, the dashboard wants
+"the next few" and "the recent few", the payout list wants "completed and unpaid". Four questions,
+and paging one fat query answers none of them — page 1 of an artist's history is not their next
+five appointments. `AppointmentFilter` takes `from`/`to`, `appointmentStatus`, `shopCutStatus` and
+`upcomingOnly`, and `upcomingOnly` resolves against the moment the query runs rather than a `now`
+the client computed when it rendered.
+
+The calendar derives its range from the rendered grid rather than the month number — `getMonth()`
+returns five weeks starting on the week containing the 1st, so it spills into the neighbouring
+months, and asking for the calendar month would leave those cells mysteriously empty.
+
+**`getShopCutPayoutCandidates` is deliberately unpaginated.** The task is settling a debt, not
+browsing history: the admin selects rows or invoices the lot, and a batch action over a paged list
+is ambiguous about what it covers in a way that costs money. The set is self-limiting, since
+settling a row removes it.
+
+**Two bugs this surfaced**, both invisible until the shape changed:
+
+- `getAppointmentsByArtist` sorted by `updatedAt`, so "the first N" meant "the N most recently
+  edited". Hidden because the client re-sorted the whole array itself after fetching all of it.
+- `AppointmentWizard` matched a typed email against the fetched client list to spot an existing
+  client. Once that list paged it could only match page one — and a miss is not cosmetic: the
+  wizard asks for a name, `createClientAccount` finds the person by email anyway, and the typed
+  name overwrites the real one. Now `findClientByEmail`, scoped so another shop's client returns
+  null rather than becoming an email-to-name oracle.
+
+**Breaking API change with no version gate** — client and server deploy together.
+
 ### Deliberate errors survive the resolver that threw them — DONE
 
 Nearly every resolver here is shaped `try { ... } catch (err) { throw new Error(err) }`. That catch
@@ -131,10 +179,7 @@ the shop being helped — time-boxed, revocable, visible to the shop owner — n
 `shop-membership.js`. A backend management tool would create and revoke that row; it does not need,
 and should not get, its own privileged read path.
 
-**Open, deliberately not bundled into this:** none of the list queries paginate. `getClients`,
-`getProjects` and friends have no `.limit()`, which is unbounded for a large single shop regardless
-of tenancy. That's a separate job with its own tests — removing the global role did not address it
-and was never going to.
+**Pagination is done** — see "Lists are bounded" below.
 
 **Deleted rather than scoped:** `getUsers`, `getMessages`, `getConversations`. All three returned
 every record of their kind on the platform, none had a caller in the client, and their only
