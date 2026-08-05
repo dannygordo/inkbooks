@@ -42,6 +42,56 @@ if (!mongoUri) {
   throw new Error('MONGODB environment variable is not set - check your .env file.');
 }
 
+/**
+ * Square's two identifiers have to name the SAME application, and nothing used to say so.
+ *
+ * A card nonce is only chargeable by the application that minted it. The browser tokenizes with
+ * the application id; the server charges with the access token. If those belong to different
+ * apps, every charge fails with "Card nonce not found in this application environment" - a
+ * message that is precisely accurate and reads like nonsense, because the two halves it's talking
+ * about are configured in different places and each looks correct on its own. That is exactly what
+ * happened: a hardcoded id in the client named one sandbox app, the token named another.
+ *
+ * The client no longer holds a copy (see routes/squarePayments.js's GET /square/config), so the
+ * remaining way to get this wrong is to paste the token and the id from two different app pages
+ * in the Square dashboard. This catches that at boot, where it costs ten seconds, rather than at
+ * the moment somebody is standing in front of a client with a card in their hand.
+ *
+ * Warns rather than refusing to start. Square is one optional feature; a dev with no Square setup
+ * at all should still get a running server, and SQUARE_APPLICATION_ID legitimately holds a
+ * PRODUCTION id for the OAuth/shop-cut flow in a deployment where the sandbox charge path isn't
+ * used. Both of those are "unset or deliberately different", not "silently mismatched", so the
+ * check only fires when both values exist and disagree.
+ */
+function checkSquareApplicationIds() {
+  const sandboxAppId = process.env.SQUARE_SANDBOX_APPLICATION_ID;
+  const oauthAppId = process.env.SQUARE_APPLICATION_ID;
+  const token = process.env.SQUARE_SANDBOX_ACCESS_TOKEN;
+
+  if (token && !sandboxAppId && !oauthAppId) {
+    console.warn(
+      '[square] SQUARE_SANDBOX_ACCESS_TOKEN is set but neither SQUARE_SANDBOX_APPLICATION_ID nor ' +
+        'SQUARE_APPLICATION_ID is - the card form has no application id to tokenize against and ' +
+        'GET /square/config will return a 500.',
+    );
+    return;
+  }
+  if (sandboxAppId && oauthAppId && sandboxAppId !== oauthAppId) {
+    console.warn(
+      '\n[square] WARNING: two different Square applications are configured.\n' +
+        `  SQUARE_SANDBOX_APPLICATION_ID  ${sandboxAppId}\n` +
+        `  SQUARE_APPLICATION_ID          ${oauthAppId}\n` +
+        '  A card nonce is only chargeable by the app that minted it. If SQUARE_SANDBOX_ACCESS_TOKEN\n' +
+        '  belongs to the second one, every card charge will fail with "Card nonce not found in this\n' +
+        '  application environment". Copy the Application ID and the Sandbox Access Token from the\n' +
+        '  SAME app in your Square Developer Dashboard.\n' +
+        '  (Ignore this if SQUARE_APPLICATION_ID is deliberately a production id for the OAuth\n' +
+        '  shop-cut flow and you are not using the sandbox charge path.)\n',
+    );
+  }
+}
+checkSquareApplicationIds();
+
 const app = express();
 // Render (like most PaaS providers) terminates TLS and proxies requests to this app - without
 // this, req.ip returns Render's internal proxy address for every request instead of the real
