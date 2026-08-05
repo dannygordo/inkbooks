@@ -79,6 +79,33 @@ The reason Phase 1's bugs exist is that every resolver repeats the same `checkAu
   - **Node ≥20 is now required** (`@as-integrations/express5` enforces this via `engines`). Run `node -v` before you `npm install` — if you're on an older Node, the install or runtime will fail.
   - You'll need to run `npm install` in `server/` yourself (sandbox can't reach the npm registry) — `apollo-server` is removed and `@apollo/server`, `@as-integrations/express5`, `express`, `cors`, `graphql-tag`, and `zod` are added to `package.json`.
 
+### Deliberate errors survive the resolver that threw them — DONE
+
+Nearly every resolver here is shaped `try { ... } catch (err) { throw new Error(err) }`. That catch
+destroyed every error raised inside its own try: an `AuthenticationError` carrying "Action not
+allowed", or a `UserInputError` carrying `extensions.errors.email`, was caught by the resolver that
+threw it and re-thrown as a bare `Error` — message stringified into
+`Error: AuthenticationError: Action not allowed`, extensions gone.
+
+Two costs. A client couldn't distinguish "you're not allowed to do that" from "the server fell
+over". And any form reading `extensions.errors[field]` to highlight the offending input got
+nothing, so every one of them silently degraded to a generic failure.
+
+Found three separate times before it was recognised as one thing — `getShop`, then `getClient`,
+then all three update mutations — because each instance looks local and harmless. Five files had
+independently grown their own `if (err instanceof GraphQLError) throw err` guard, which is the fix
+written out longhand.
+
+`rethrow` (`utils/errors.js`) replaces all 43 sites across 20 files: a `GraphQLError` passes
+through as the same object; anything else keeps the old behaviour exactly, so genuine unexpected
+failures surface as they always did. `test/integration/errorPassthrough.test.js` pins the shape — a
+code, an un-prefixed message, structured extensions — rather than any one resolver.
+
+Related and still open: `throw new Error('Artist not found')` inside one of these try blocks used
+to reach the client as `Error: Error: Artist not found`. `rethrow` doesn't fix that (a plain Error
+isn't a GraphQLError, by design), and the real answer is that those should be `UserInputError`s
+with a field, not bare Errors. Worth a pass when the not-found messages are next touched.
+
 ### The tenancy rule: nobody reaches a shop they aren't assigned to
 
 **Decided and implemented.** There is no global role. `Constants.ROLES.ADMIN` (1) survives as a

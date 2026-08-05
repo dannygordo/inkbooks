@@ -40,4 +40,30 @@ class RateLimitError extends GraphQLError {
   }
 }
 
-module.exports = { AuthenticationError, UserInputError, ForbiddenError, RateLimitError };
+/**
+ * Use this in a catch instead of `throw new Error(err)`.
+ *
+ * Almost every resolver in this codebase wraps its body in
+ * `try { ... } catch (err) { throw new Error(err) }`. That pattern silently destroys every
+ * deliberate error thrown inside the try: an AuthenticationError carrying "Action not allowed",
+ * or a UserInputError carrying `extensions.errors.email`, gets caught by its own resolver and
+ * re-thrown as a bare Error whose message is the stringified original and whose extensions are
+ * gone. The client sees an opaque server error where the server was trying to say something
+ * specific, and every form that reads `extensions.errors` to highlight a field gets nothing.
+ *
+ * It was found three separate times before it was understood as one thing - getShop, getClient,
+ * then all three update mutations - because each instance looks local and harmless. Five files
+ * had already grown their own `if (err instanceof GraphQLError) throw err` guard, which is this
+ * function written out longhand.
+ *
+ * Anything that isn't a GraphQLError keeps the old behaviour exactly, so a genuine unexpected
+ * failure (a Mongoose cast error, a network blip) is reported the way it always was.
+ */
+function rethrow(err) {
+  if (err instanceof GraphQLError) {
+    throw err;
+  }
+  throw new Error(err);
+}
+
+module.exports = { AuthenticationError, UserInputError, ForbiddenError, RateLimitError, rethrow };

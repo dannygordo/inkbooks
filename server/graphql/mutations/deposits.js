@@ -1,9 +1,8 @@
-const { GraphQLError } = require('graphql');
 const Appointment = require('../../models/Appointment');
 const Project = require('../../models/Project');
 const BookingRequest = require('../../models/BookingRequest');
 const withAuth = require('../../utils/with-auth');
-const { AuthenticationError, UserInputError } = require('../../utils/errors');
+const { AuthenticationError, UserInputError, rethrow } = require('../../utils/errors');
 const { applyShopCut } = require('../../utils/shop-cut');
 const { assertCanManageArtist } = require('../../utils/shop-membership');
 
@@ -93,10 +92,7 @@ module.exports = {
       await appointment.save();
       return appointment;
     } catch (err) {
-      if (err instanceof GraphQLError) {
-        throw err;
-      }
-      throw new Error(err);
+      rethrow(err);
     }
   }),
 
@@ -201,10 +197,7 @@ module.exports = {
         await target.save();
         return target;
       } catch (err) {
-        if (err instanceof GraphQLError) {
-          throw err;
-        }
-        throw new Error(err);
+        rethrow(err);
       }
     },
   ),

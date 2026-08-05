@@ -1,8 +1,7 @@
-const { GraphQLError } = require('graphql');
 const Appointment = require('../../models/Appointment');
 const ArtistShopConnection = require('../../models/ArtistShopConnection');
 const withAuth = require('../../utils/with-auth');
-const { AuthenticationError, UserInputError } = require('../../utils/errors');
+const { AuthenticationError, UserInputError, rethrow } = require('../../utils/errors');
 const { updateAppointmentInputSchema, createAppointmentInputSchema, appointmentIdInputSchema, validate } = require('../../utils/validation');
 const { applyShopCut } = require('../../utils/shop-cut');
 const { canManageArtist, assertCanManageArtist } = require('../../utils/shop-membership');
@@ -220,15 +219,12 @@ module.exports = {
         }
         throw new AuthenticationError('Action not allowed');
       } catch (err) {
-          // Was unconditionally `throw new Error(err)` - that rewraps AuthenticationError/
+          // Was unconditionally `rethrow(err)` - that rewraps AuthenticationError/
           // UserInputError into a plain Error, stripping the extensions.code the client relies
           // on (see utils/errors.js's own comment on this). Pre-existing bug, surfaced now
           // because the new shopId checks above would otherwise lose their error type the same
           // way the pre-existing 'Action not allowed' throw already was.
-          if (err instanceof GraphQLError) {
-            throw err;
-          }
-          throw new Error(err);
+          rethrow(err);
       }
     }),
     startSessionTimer: withAuth(async (_, args, context, info, user) => {

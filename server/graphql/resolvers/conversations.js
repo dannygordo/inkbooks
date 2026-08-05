@@ -1,7 +1,7 @@
 const Conversation = require('../../models/Conversation');
 const Client = require('../../models/Client');
 const withAuth = require('../../utils/with-auth');
-const { AuthenticationError } = require('../../utils/errors');
+const { AuthenticationError, rethrow } = require('../../utils/errors');
 const {
   getShopIdsForUser,
   getArtistIdsForShops,
@@ -37,7 +37,7 @@ module.exports = {
         return conversation;
       } catch (err) {
         console.log(err);
-        throw new Error(err);
+        rethrow(err);
       }
     }),
     // Was matching `members: {$in: [shopId]}` - Conversation.members only ever holds real User
@@ -65,7 +65,7 @@ module.exports = {
           return conversation;
         } catch (err) {
           console.log(err);
-          throw new Error(err);
+          rethrow(err);
         }
       }),
     // Was withAuth with no restriction at all - any authenticated user could pass an arbitrary
@@ -88,7 +88,7 @@ module.exports = {
         }
         return conversation;
       } catch (err) {
-        throw new Error(err);
+        rethrow(err);
       }
     }),
     // Was Conversation.findOne({artistId, clientId}) - same broken filter as the old
@@ -119,7 +119,7 @@ module.exports = {
         }
         return await findOrCreateConversationForMembers([artistId, client.userId]);
       } catch(err) {
-        throw new Error(err);
+        rethrow(err);
       }
     })
   },

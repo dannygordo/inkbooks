@@ -3,7 +3,7 @@ const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 const { assertCanAccessShop } = require('../../utils/shop-membership');
 const { assertNoArchiveTransition } = require('../../utils/archiving');
-const { UserInputError } = require('../../utils/errors');
+const { UserInputError, rethrow } = require('../../utils/errors');
 
 module.exports = {
   createStaff: withAuth(async (
@@ -86,7 +86,7 @@ module.exports = {
       const res = await Staff.findByIdAndUpdate({_id: staff.id}, staff, {new: true});
       return res;
     } catch (err) {
-        throw new Error(err);
+        rethrow(err);
     }
   }, Constants.ROLES.SHOP_ADMIN)
 };

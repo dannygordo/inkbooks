@@ -5,7 +5,7 @@ const Client = require('../../models/Client');
 const User = require('../../models/User');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
-const { UserInputError, AuthenticationError } = require('../../utils/errors');
+const { UserInputError, AuthenticationError, rethrow } = require('../../utils/errors');
 const { updateMessageInputSchema, createMessageInputSchema, validate } = require('../../utils/validation');
 const { sendNewMessageNotificationToGuest } = require('../../utils/email');
 const { canAccessConversation } = require('../../utils/shop-membership');
@@ -99,7 +99,7 @@ module.exports = {
         const res = await Message.findByIdAndUpdate({_id: message.id}, message, {new: true});
         return res;
       } catch (err) {
-          throw new Error(err);
+          rethrow(err);
       }
     }, Constants.ROLES.SHOP_ADMIN)
   };

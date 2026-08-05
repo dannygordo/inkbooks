@@ -1,7 +1,7 @@
 const Conversation = require('../../models/Conversation');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
-const { UserInputError, AuthenticationError } = require('../../utils/errors');
+const { UserInputError, AuthenticationError, rethrow } = require('../../utils/errors');
 const { updateConversationInputSchema, createConversationInputSchema, validate } = require('../../utils/validation');
 const { canAccessConversation } = require('../../utils/shop-membership');
 
@@ -54,7 +54,7 @@ module.exports = {
         const res = await Conversation.findByIdAndUpdate({_id: conversation.id}, conversation, {new: true});
         return res;
       } catch (err) {
-          throw new Error(err);
+          rethrow(err);
       }
     }, Constants.ROLES.SHOP_ADMIN)
   };

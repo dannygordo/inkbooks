@@ -1,7 +1,7 @@
 const Artist = require('../../models/Artist');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
-const { AuthenticationError } = require('../../utils/errors');
+const { AuthenticationError, rethrow } = require('../../utils/errors');
 const {
   getShopIdsForUser,
   assertCanAccessShop,
@@ -42,7 +42,7 @@ module.exports = {
         const artists = await findArtistsForShops(shopIds, archiveFilter(includeArchived));
         return artists.sort((a, b) => new Date(a.startDate || 0) - new Date(b.startDate || 0));
       } catch (err) {
-        throw new Error(err);
+        rethrow(err);
       }
     }, Constants.ROLES.SHOP_STAFF),
     // Allowed: the artist themselves, or Staff-and-above affiliated with the same shop.
@@ -74,7 +74,7 @@ module.exports = {
         }
         return artist;
       } catch (err) {
-        throw new Error(err);
+        rethrow(err);
       }
     }),
     // Was withAuth with no restriction at all - any authenticated user, including a Client,
@@ -93,7 +93,7 @@ module.exports = {
           String(a.firstName || '').localeCompare(String(b.firstName || '')),
         );
       } catch (err) {
-        throw new Error(err);
+        rethrow(err);
       }
     }),
   },

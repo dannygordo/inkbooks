@@ -2,7 +2,7 @@ const Project = require('../../models/Project');
 const Client = require('../../models/Client');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
-const { AuthenticationError } = require('../../utils/errors');
+const { AuthenticationError, rethrow } = require('../../utils/errors');
 const {
   getShopIdsForUser,
   getArtistIdsForShops,
@@ -44,7 +44,7 @@ const resolvers = {
         const projects = await Project.find(filter).sort({ createdAt: -1 });
         return projects;
       } catch (err) {
-        throw new Error(err);
+        rethrow(err);
       }
     }),
     // Was withAuth with no restriction at all - any authenticated user could pass an arbitrary
@@ -73,7 +73,7 @@ const resolvers = {
         }
         return project;
       } catch (err) {
-        throw new Error(err);
+        rethrow(err);
       }
     }),
     // Was withAuth with no ownership check at all - any authenticated user could pass an
@@ -91,7 +91,7 @@ const resolvers = {
         });
         return results;
       }catch(err) {
-        throw new Error(err);
+        rethrow(err);
       }
     })
   }

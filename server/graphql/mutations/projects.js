@@ -1,6 +1,6 @@
 const Project = require('../../models/Project');
 const withAuth = require('../../utils/with-auth');
-const { AuthenticationError, UserInputError } = require('../../utils/errors');
+const { AuthenticationError, UserInputError, rethrow } = require('../../utils/errors');
 const { Constants } = require('../../utils/constants');
 const { updateProjectInputSchema, createProjectInputSchema, validate } = require('../../utils/validation');
 const { canManageArtist, linkClientToUsersShops } = require('../../utils/shop-membership');
@@ -107,7 +107,7 @@ module.exports = {
       }
       throw new AuthenticationError('Action not allowed');
     } catch (err) {
-        throw new Error(err);
+        rethrow(err);
     }
   }),
   updateProjectNotes: withAuth(async (_, { notes, projectId }, context, info, user) => {
@@ -122,7 +122,7 @@ module.exports = {
       }
       throw new AuthenticationError('Action not allowed');
     } catch( err ) {
-      throw new Error(err);
+      rethrow(err);
     }
   }),
   updateProjectTags: withAuth(async (_, { tags, projectId }, context, info, user) => {
@@ -137,7 +137,7 @@ module.exports = {
       }
       throw new AuthenticationError('Action not allowed');
     } catch (err) {
-      throw new Error(err);
+      rethrow(err);
     }
   })
 };

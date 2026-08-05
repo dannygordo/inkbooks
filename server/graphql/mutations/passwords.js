@@ -1,6 +1,5 @@
-const { GraphQLError } = require('graphql');
 const User = require('../../models/User');
-const { UserInputError } = require('../../utils/errors');
+const { UserInputError, rethrow } = require('../../utils/errors');
 const { issuePasswordToken, consumePasswordToken } = require('../../utils/password-tokens');
 const { sendPasswordResetEmail } = require('../../utils/email');
 const { checkRateLimit, getClientIp } = require('../../utils/rate-limit');
@@ -106,10 +105,7 @@ module.exports = {
       }
       return true;
     } catch (err) {
-      if (err instanceof GraphQLError) {
-        throw err;
-      }
-      throw new Error(err);
+      rethrow(err);
     }
   },
 };

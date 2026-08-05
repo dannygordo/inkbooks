@@ -1,6 +1,6 @@
 const Staff = require('../../models/Staff');
 const withAuth = require('../../utils/with-auth');
-const { AuthenticationError } = require('../../utils/errors');
+const { AuthenticationError, rethrow } = require('../../utils/errors');
 const { getShopIdsForUser } = require('../../utils/shop-membership');
 const { archiveFilter } = require('../../utils/archiving');
 
@@ -21,7 +21,7 @@ module.exports = {
           archiveFilter(includeArchived, { shopId: { $in: shopIds } }),
         ).sort({ lastName: 1 });
       } catch (err) {
-        throw new Error(err);
+        rethrow(err);
       }
     }),
     // Was withAuth with no restriction at all - any authenticated user could pass an arbitrary
@@ -41,7 +41,7 @@ module.exports = {
         }
         return staff;
       } catch (err) {
-        throw new Error(err);
+        rethrow(err);
       }
     }),
   },

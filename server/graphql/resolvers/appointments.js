@@ -5,7 +5,7 @@ const Project = require('../../models/Project');
 const ArtistShopConnection = require('../../models/ArtistShopConnection');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
-const { AuthenticationError } = require('../../utils/errors');
+const { AuthenticationError, rethrow } = require('../../utils/errors');
 const {
   getShopIdsForUser,
   getArtistIdsForShops,
@@ -56,7 +56,7 @@ module.exports = {
         const appointments = await Appointment.find({shopId: shopId}).sort({ appointmentDate: 1 });
         return appointments;
       } catch (err) {
-        throw new Error(err);
+        rethrow(err);
       }
     }),
     // Was withAuth with no ownership check at all - any authenticated user could pass an
@@ -85,7 +85,7 @@ module.exports = {
             const appointments = await Appointment.find({userId: userId}).sort({ updatedAt: 1 });
             return appointments;
         } catch (err) {
-          throw new Error(err);
+          rethrow(err);
         }
       }),
     // Was withAuth with no restriction at all - any authenticated user could pass an arbitrary
@@ -108,7 +108,7 @@ module.exports = {
         }
         return appointment;
       } catch (err) {
-        throw new Error(err);
+        rethrow(err);
       }
     }),
     // Powers the in-project session list (see client/src/pages/projects/Project.jsx) - every
@@ -139,7 +139,7 @@ module.exports = {
         const appointments = await Appointment.find({ projectId }).sort({ appointmentDate: 1 });
         return appointments;
       } catch (err) {
-        throw new Error(err);
+        rethrow(err);
       }
     }),
   },

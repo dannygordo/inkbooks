@@ -1,6 +1,6 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { UserInputError, AuthenticationError } = require('../../utils/errors');
+const { UserInputError, AuthenticationError, rethrow } = require('../../utils/errors');
 // See utils/check-auth.js - server/config.js is gitignored and never committed, so requiring it
 // crashes anywhere the file isn't manually present (e.g. Render). Read from process.env instead,
 // same mechanism MONGODB already uses.
@@ -241,7 +241,7 @@ module.exports = {
         }
         throw new AuthenticationError('Action not allowed');
       } catch (err) {
-          throw new Error(err);
+          rethrow(err);
       }
     }),
     // Renamed from forgotPassword. The original version reset any user's password given only
@@ -305,7 +305,7 @@ module.exports = {
           return foundUser;
         } throw new Error('User not found');
       } catch (err) {
-        throw new Error(err);
+        rethrow(err);
       }
     }),
     // Was withAuth with no restriction at all - any authenticated user could pass an arbitrary
@@ -334,7 +334,7 @@ module.exports = {
         }
         return usrs;
       }catch(err) {
-        throw new Error(err);
+        rethrow(err);
       }
     })
   }

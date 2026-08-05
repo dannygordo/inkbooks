@@ -1,8 +1,7 @@
-const { GraphQLError } = require('graphql');
 const Client = require('../../models/Client');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
-const { AuthenticationError } = require('../../utils/errors');
+const { AuthenticationError, rethrow } = require('../../utils/errors');
 const {
   assertCanAccessClient,
   linkClientToUsersShops,
@@ -86,7 +85,7 @@ module.exports = {
       const res = await Client.findByIdAndUpdate({_id: client.id}, client, {new: true});
       return res;
     } catch (err) {
-        throw new Error(err);
+        rethrow(err);
     }
   }, Constants.ROLES.SHOP_ADMIN),
   // Shop-side notes about a client. Mirrors updateProjectNotes (mutations/projects.js) - the whole
@@ -117,10 +116,7 @@ module.exports = {
       await assertCanAccessClient(user, client);
       return await Client.findByIdAndUpdate({ _id: clientId }, { notes }, { new: true });
     } catch (err) {
-      if (err instanceof GraphQLError) {
-        throw err;
-      }
-      throw new Error(err);
+      rethrow(err);
     }
   })
 };

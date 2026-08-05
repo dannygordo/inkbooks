@@ -1,7 +1,7 @@
 const Message = require('../../models/Message');
 const Conversation = require('../../models/Conversation');
 const withAuth = require('../../utils/with-auth');
-const { AuthenticationError } = require('../../utils/errors');
+const { AuthenticationError, rethrow } = require('../../utils/errors');
 const { canAccessConversation } = require('../../utils/shop-membership');
 
 module.exports = {
@@ -27,7 +27,7 @@ module.exports = {
           }).sort({ updatedAt: 1 });
           return message;
         } catch (err) {
-          throw new Error(err);
+          rethrow(err);
         }
       }),
     // Was withAuth with no restriction at all - any authenticated user could pass an arbitrary
@@ -45,7 +45,7 @@ module.exports = {
         }
         return message;
       } catch (err) {
-        throw new Error(err);
+        rethrow(err);
       }
     }),
   },

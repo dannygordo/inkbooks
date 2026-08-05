@@ -2,6 +2,7 @@ const Shop = require('../../models/Shop');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 const { assertCanAccessShop } = require('../../utils/shop-membership');
+const { rethrow } = require('../../utils/errors');
 
 module.exports = {
     createShop: withAuth(async (
@@ -53,7 +54,7 @@ module.exports = {
         const res = await Shop.findByIdAndUpdate({_id: shop.id}, shop, {new: true});
         return res;
       } catch (err) {
-          throw new Error(err);
+          rethrow(err);
       }
     }, Constants.ROLES.SHOP_ADMIN),
     // Clears the stored Square connection - doesn't touch any Appointment already invoiced under

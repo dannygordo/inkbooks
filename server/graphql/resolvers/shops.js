@@ -4,6 +4,7 @@ const { Constants } = require('../../utils/constants');
 const square = require('../../utils/square');
 const { signState } = require('../../routes/squareOAuth');
 const { getShopIdsForUser, assertCanAccessShop } = require('../../utils/shop-membership');
+const { rethrow } = require('../../utils/errors');
 
 module.exports = {
     Query: {
@@ -24,7 +25,7 @@ module.exports = {
                 }
                 return await Shop.find({ _id: { $in: shopIds } }).sort({ name: 1 });
             } catch (err) {
-                throw new Error(err);
+                rethrow(err);
             }
         }),
         // Was withAuth with no restriction at all - any authenticated user could pass an
@@ -40,7 +41,7 @@ module.exports = {
                   return shop;
                 } throw new Error('Shop not found');
               } catch (err) {
-                throw new Error(err);
+                rethrow(err);
             }
         }),
         // Shop-admin-or-better only, same convention as everywhere else in this file - see

@@ -8,6 +8,7 @@ const {
   assertCanAccessClient,
 } = require('../../utils/shop-membership');
 const { archiveFilter } = require('../../utils/archiving');
+const { rethrow } = require('../../utils/errors');
 
 module.exports = {
   Query: {
@@ -46,7 +47,7 @@ module.exports = {
           lastName: 1,
         });
       } catch (err) {
-        throw new Error(err);
+        rethrow(err);
       }
     }),
     // Was withAuth with no restriction at all - any authenticated user could pass an arbitrary
@@ -57,7 +58,7 @@ module.exports = {
         throw new Error('Client not found');
       }
       // Outside any try/catch: an authorization failure shouldn't be rewrapped as if the lookup
-      // broke, which is what the old `throw new Error(err)` around this did.
+      // broke, which is what the old `rethrow(err)` around this did.
       await assertCanAccessClient(user, client);
       return client;
     }),

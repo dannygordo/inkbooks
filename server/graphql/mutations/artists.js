@@ -2,7 +2,7 @@ const Artist = require('../../models/Artist');
 const ArtistShopConnection = require('../../models/ArtistShopConnection');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
-const { AuthenticationError, UserInputError } = require('../../utils/errors');
+const { AuthenticationError, UserInputError, rethrow } = require('../../utils/errors');
 const { updateArtistRateSettingsInputSchema, validate } = require('../../utils/validation');
 const { assertCanAccessShop, assertCanManageArtist } = require('../../utils/shop-membership');
 const { assertNoArchiveTransition } = require('../../utils/archiving');
@@ -124,7 +124,7 @@ module.exports = {
       const res = await Artist.findByIdAndUpdate({_id: artist.id}, artist, {new: true});
       return res;
     } catch (err) {
-        throw new Error(err);
+        rethrow(err);
     }
   }, Constants.ROLES.SHOP_ADMIN),
   // Self-service rate settings, deliberately separate from updateArtist above - updateArtist is

@@ -1,5 +1,4 @@
 const crypto = require('crypto');
-const { GraphQLError } = require('graphql');
 const User = require('../../models/User');
 const Artist = require('../../models/Artist');
 const Staff = require('../../models/Staff');
@@ -8,7 +7,7 @@ const ArtistShopConnection = require('../../models/ArtistShopConnection');
 const withAuth = require('../../utils/with-auth');
 const { assertCanAccessShop, linkClientToUsersShops } = require('../../utils/shop-membership');
 const { Constants } = require('../../utils/constants');
-const { UserInputError } = require('../../utils/errors');
+const { UserInputError, rethrow } = require('../../utils/errors');
 const { issuePasswordToken, generateUnusablePassword } = require('../../utils/password-tokens');
 const { sendAccountInviteEmail, buildSetPasswordLink } = require('../../utils/email');
 const { pickDefaultTagColor } = require('../../utils/tag-color');
@@ -169,10 +168,7 @@ module.exports = {
 
         return { artist, inviteLink };
       } catch (err) {
-        if (err instanceof GraphQLError) {
-          throw err;
-        }
-        throw new Error(err);
+        rethrow(err);
       }
     },
     Constants.ROLES.SHOP_ADMIN,
@@ -230,10 +226,7 @@ module.exports = {
 
         return { staff, inviteLink };
       } catch (err) {
-        if (err instanceof GraphQLError) {
-          throw err;
-        }
-        throw new Error(err);
+        rethrow(err);
       }
     },
     Constants.ROLES.SHOP_ADMIN,
@@ -287,10 +280,7 @@ module.exports = {
         // duplicate should find out.
         return { client: updated, isNewAccount: isNewUser };
       } catch (err) {
-        if (err instanceof GraphQLError) {
-          throw err;
-        }
-        throw new Error(err);
+        rethrow(err);
       }
     },
     Constants.ROLES.SHOP_STAFF,
