@@ -25,6 +25,40 @@ const router = express.Router();
 // this to a production access token until Phase 4's full checklist (real production access, real
 // credentials, a real decision about who the money actually settles to) is done - see
 // PRODUCTION_ROADMAP.md.
+/**
+ * The credentials the browser needs to tokenize a card, served from the SAME env vars the charge
+ * below uses.
+ *
+ * This exists because those two things drifted. The application id was a hardcoded literal in
+ * client/src/config.js and the access token came from .env - two different Square applications, as
+ * it turned out. The browser minted a nonce with app A, the server charged it with app B's token,
+ * and Square refused with "Card nonce not found in this application environment", which is a
+ * precise description of the problem and reads like nonsense until you know to compare two values
+ * that live in different repos-worth of file.
+ *
+ * A nonce is only chargeable by the application that minted it, so these are not two settings that
+ * happen to be related - they are one setting, and the only safe number of places to write it down
+ * is one. Serving it means the browser cannot be configured wrongly; there is nothing to configure.
+ *
+ * Public and unauthenticated: Square documents the application and location ids as public
+ * identifiers that necessarily ship to the browser. The access token, which is the actual secret,
+ * never leaves this process.
+ */
+router.get('/square/config', (req, res) => {
+  const applicationId =
+    process.env.SQUARE_SANDBOX_APPLICATION_ID || process.env.SQUARE_APPLICATION_ID;
+  const locationId = process.env.SQUARE_SANDBOX_LOCATION_ID;
+  if (!applicationId || !locationId) {
+    return res.status(500).json({
+      error:
+        'Square is not configured on the server. Set SQUARE_SANDBOX_APPLICATION_ID and ' +
+        'SQUARE_SANDBOX_LOCATION_ID in .env.development - both from the SAME app in your Square ' +
+        'Developer Dashboard as SQUARE_SANDBOX_ACCESS_TOKEN.',
+    });
+  }
+  return res.status(200).json({ applicationId, locationId });
+});
+
 router.post('/square/process-payment', express.json(), async (req, res) => {
   let user;
   try {

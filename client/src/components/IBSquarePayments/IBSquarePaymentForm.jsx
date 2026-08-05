@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Alert, Box, Button, CircularProgress } from "@mui/material";
 import { useAuth } from "../../context/auth";
 import { loadSquareSdk } from "./loadSquareSdk";
-import squareConfig from "./squareConfig";
+import { loadSquareConfig } from "./squareConfig";
 import { APP_SETTINGS_CONSTANTS } from "../../constants";
 
 // Real, working replacement for the previous version of this component, which was built against
@@ -51,14 +51,15 @@ const IBSquarePaymentForm = ({
 
 		async function setup() {
 			try {
-				const Square = await loadSquareSdk();
+				// Both in parallel - the SDK script and the config are independent, and the card
+				// field can't attach without either.
+				const [Square, config] = await Promise.all([loadSquareSdk(), loadSquareConfig()]);
 				if (cancelled) {
 					return;
 				}
-				const payments = Square.payments(
-					squareConfig.applicationId,
-					squareConfig.locationId
-				);
+				// From the server, so the application this tokenizes against is by construction the
+				// one whose access token will charge the resulting nonce. See squareConfig.js.
+				const payments = Square.payments(config.applicationId, config.locationId);
 				const card = await payments.card();
 				if (cancelled) {
 					return;
