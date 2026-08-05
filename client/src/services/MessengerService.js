@@ -14,7 +14,6 @@ const MessengerService = (() => {
 					createdAt
 					updatedAt
 					user {
-						username
 						firstName
 						lastName
 						avatar
@@ -55,7 +54,6 @@ const MessengerService = (() => {
 					conversationId
 					senderId
 					user {
-						username
 						firstName
 						lastName
 						avatar
@@ -65,7 +63,6 @@ const MessengerService = (() => {
 					updatedAt
 				}
 				membersInfo {
-					username
 					firstName
 					lastName
 					avatar

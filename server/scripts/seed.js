@@ -101,6 +101,26 @@ async function seed() {
     PasswordToken.deleteMany({}),
   ]);
 
+  // deleteMany empties collections but leaves their INDEXES behind, and a stale unique index is a
+  // re-seed that fails for a reason nothing in this file explains.
+  //
+  // Concretely, the one that made this necessary: User used to carry a unique `username`. Drop the
+  // field from the schema and every new user writes no username at all - which Mongo stores as the
+  // single value `null` for indexing purposes, so the FIRST user seeds fine and the SECOND dies on
+  // a duplicate key error naming an index for a field that no longer exists anywhere in the code.
+  //
+  // syncIndexes() drops any index the schema doesn't declare and builds any it does, so removing a
+  // field is a schema edit and nothing more - no manual dropIndex, no "delete the database and
+  // start over". Runs after the wipe, on empty collections, where a unique index build can't fail
+  // on data that's already there.
+  console.log('Syncing indexes (drops any left over from removed fields) ...');
+  await Promise.all(
+    [
+      User, Shop, Staff, Artist, Client, ArtistShopConnection, Project,
+      Appointment, Conversation, Message, BookingRequest, PasswordToken,
+    ].map((model) => model.syncIndexes()),
+  );
+
   const hashedPassword = await bcrypt.hash(DEV_PASSWORD, 12);
 
   // --- Shop ---------------------------------------------------------------
@@ -139,7 +159,6 @@ async function seed() {
 
   // --- Shop Admin (User + Staff) -------------------------------------------
   const shopAdminUser = await new User({
-    username: 'shopadmin',
     email: 'shopadmin@copperwolf.dev',
     password: hashedPassword,
     role: Constants.ROLES.SHOP_ADMIN,
@@ -163,7 +182,6 @@ async function seed() {
 
   // --- Shop Staff (front desk) ----------------------------------------------
   const staffUser = await new User({
-    username: 'frontdesk',
     email: 'frontdesk@copperwolf.dev',
     password: hashedPassword,
     role: Constants.ROLES.SHOP_STAFF,
@@ -186,7 +204,6 @@ async function seed() {
 
   // --- Artists (shop-affiliated) --------------------------------------------
   const artist1User = await new User({
-    username: 'artist.maya',
     email: 'maya@copperwolf.dev',
     password: hashedPassword,
     role: Constants.ROLES.ARTIST,
@@ -210,7 +227,6 @@ async function seed() {
   await new ArtistShopConnection({ artistId: artist1User._id, shopId: shop._id, status: 'active' }).save();
 
   const artist2User = await new User({
-    username: 'artist.jonas',
     email: 'jonas@copperwolf.dev',
     password: hashedPassword,
     role: Constants.ROLES.ARTIST,
@@ -235,7 +251,6 @@ async function seed() {
 
   // --- Independent artist (no shop) - exercises the artist-centric tenancy path ---
   const independentArtistUser = await new User({
-    username: 'artist.indie',
     email: 'indie@copperwolf.dev',
     password: hashedPassword,
     role: Constants.ROLES.ARTIST,
@@ -274,7 +289,6 @@ async function seed() {
   const clients = [];
   for (const def of clientDefs) {
     const clientUser = await new User({
-      username: `client.${def.firstName.toLowerCase()}`,
       email: def.email,
       password: hashedPassword,
       role: Constants.ROLES.CLIENT,
@@ -530,18 +544,20 @@ async function seed() {
 
   console.log('\nSeed complete. All accounts share the same password:\n');
   console.log(`  Password: ${DEV_PASSWORD}\n`);
-  // The login mutation takes USERNAME, not email (see resolvers/users.js's login) - listing
-  // username first here since that's the field that actually matters at the login screen.
-  console.log('Accounts (log in with username + password, not email):');
-  console.log(`  Shop Admin      username: shopadmin       (shopadmin@copperwolf.dev)`);
-  console.log(`  Shop Staff      username: frontdesk       (frontdesk@copperwolf.dev)`);
-  console.log(`  Artist          username: artist.maya     (maya@copperwolf.dev)  - shop-affiliated`);
-  console.log(`  Artist          username: artist.jonas    (jonas@copperwolf.dev) - shop-affiliated`);
-  console.log(`  Artist          username: artist.indie    (indie@copperwolf.dev) - independent, no shop`);
-  console.log(`  Client          username: client.alex     (alex.kim@example.dev)`);
-  console.log(`  Client          username: client.jordan   (jordan.lee@example.dev)`);
-  console.log(`  Client          username: client.taylor   (taylor.brooks@example.dev)`);
-  console.log(`  Client          username: client.morgan   (morgan.diaz@example.dev)`);
+  // Email IS the credential now - it's what login() takes and the only identifier any of these
+  // accounts has. There used to be a separate username printed alongside, which was the field the
+  // login screen actually wanted; the two lists drifting apart is precisely the confusion that
+  // made this worth deleting.
+  console.log('Accounts (log in with email + password):');
+  console.log(`  Shop Admin      shopadmin@copperwolf.dev`);
+  console.log(`  Shop Staff      frontdesk@copperwolf.dev`);
+  console.log(`  Artist          maya@copperwolf.dev    - shop-affiliated`);
+  console.log(`  Artist          jonas@copperwolf.dev   - shop-affiliated`);
+  console.log(`  Artist          indie@copperwolf.dev   - independent, no shop`);
+  console.log(`  Client          alex.kim@example.dev`);
+  console.log(`  Client          jordan.lee@example.dev`);
+  console.log(`  Client          taylor.brooks@example.dev`);
+  console.log(`  Client          morgan.diaz@example.dev`);
   console.log(`\nShop: Copper Wolf Tattoo Co. (${shop._id})`);
 }
 

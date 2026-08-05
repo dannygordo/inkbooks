@@ -354,3 +354,141 @@ describe('createClientAccount', () => {
 		expect(res.body.singleResult.errors[0].message).toMatch(/Action not allowed/);
 	});
 });
+
+// The whole loop, in one test, because every piece of it passed on its own while the loop itself
+// was broken.
+//
+// createArtistAccount worked. setPasswordWithToken worked. login worked. And an invited artist
+// still could not get in - because User carried a separate required `username`, auto-derived from
+// the email's local part plus random hex, never shown in any UI, and login() keyed on it. The
+// person held a valid password for an identifier nobody could tell them. Three green tests, one
+// account nobody could reach.
+//
+// This asserts the seam, not the pieces: invite -> set password -> log in with the address the
+// admin typed. If email ever stops being the login credential, this is what fails.
+describe('invite to first login, end to end', () => {
+	const SET_PASSWORD = `
+		mutation SetPasswordWithToken($token: String!, $newPassword: String!) {
+			setPasswordWithToken(token: $token, newPassword: $newPassword)
+		}
+	`;
+
+	const LOGIN = `
+		mutation Login($email: String!, $password: String!) {
+			login(email: $email, password: $password) {
+				id
+				email
+				role
+				accessToken
+			}
+		}
+	`;
+
+	// setPasswordWithToken and login are public - no token to sign. A unique ip per call because
+	// requestPasswordReset's limiter state is module-level and shared across the whole test
+	// process; see the same note in passwordTokens.test.js.
+	let ipCounter = 0;
+	const publicContext = () => ({
+		contextValue: { req: { headers: {}, ip: `10.1.0.${(ipCounter += 1)}` } },
+	});
+
+	it('lets an invited artist log in with the address their admin typed', async () => {
+		const { user: admin, shop } = await createShopAdminUser();
+		const server = createTestServer();
+		const email = 'invited.artist@example.com';
+		const newPassword = 'a-real-password-they-chose';
+
+		const created = await server.executeOperation(
+			{
+				query: CREATE_ARTIST,
+				variables: {
+					input: { firstName: 'Maya', lastName: 'Chen', email, shopId: String(shop.id) },
+				},
+			},
+			asUser(admin),
+		);
+		expect(created.body.singleResult.errors).toBeUndefined();
+		const { inviteLink } = created.body.singleResult.data.createArtistAccount;
+
+		// Exactly what the person does: opens the link, reads the token out of the URL.
+		const rawToken = inviteLink.split('/set-password/')[1];
+
+		const set = await server.executeOperation(
+			{ query: SET_PASSWORD, variables: { token: rawToken, newPassword } },
+			publicContext(),
+		);
+		expect(set.body.singleResult.errors).toBeUndefined();
+		expect(set.body.singleResult.data.setPasswordWithToken).toBe(true);
+
+		const loggedIn = await server.executeOperation(
+			{ query: LOGIN, variables: { email, password: newPassword } },
+			publicContext(),
+		);
+
+		expect(loggedIn.body.singleResult.errors).toBeUndefined();
+		expect(loggedIn.body.singleResult.data.login.email).toBe(email);
+		expect(loggedIn.body.singleResult.data.login.accessToken).toEqual(expect.any(String));
+	});
+
+	it('lets an invited staff member log in the same way', async () => {
+		const { user: admin, shop } = await createShopAdminUser();
+		const server = createTestServer();
+		const email = 'invited.frontdesk@example.com';
+		const newPassword = 'another-real-password';
+
+		const created = await server.executeOperation(
+			{
+				query: CREATE_STAFF,
+				variables: {
+					input: { firstName: 'Sam', lastName: 'Reyes', email, shopId: String(shop.id) },
+				},
+			},
+			asUser(admin),
+		);
+		const { inviteLink } = created.body.singleResult.data.createStaffAccount;
+
+		await server.executeOperation(
+			{
+				query: SET_PASSWORD,
+				variables: { token: inviteLink.split('/set-password/')[1], newPassword },
+			},
+			publicContext(),
+		);
+
+		const loggedIn = await server.executeOperation(
+			{ query: LOGIN, variables: { email, password: newPassword } },
+			publicContext(),
+		);
+
+		expect(loggedIn.body.singleResult.errors).toBeUndefined();
+		expect(loggedIn.body.singleResult.data.login.email).toBe(email);
+	});
+
+	it('still refuses the account before the invite is redeemed', async () => {
+		// The other half of the seam: the account exists and has SOME password from the moment it
+		// is created (a random one nobody knows), so "can log in" must remain false until the
+		// token is actually used. Guessing the address is not enough.
+		const { user: admin, shop } = await createShopAdminUser();
+		const server = createTestServer();
+		const email = 'not.yet.redeemed@example.com';
+
+		await server.executeOperation(
+			{
+				query: CREATE_ARTIST,
+				variables: {
+					input: { firstName: 'Jonas', lastName: 'Ek', email, shopId: String(shop.id) },
+				},
+			},
+			asUser(admin),
+		);
+
+		for (const guess of ['inkbooks123', 'password', 'changeme', email]) {
+			const attempt = await server.executeOperation(
+				{ query: LOGIN, variables: { email, password: guess } },
+				publicContext(),
+			);
+			expect(attempt.body.singleResult.errors).toBeDefined();
+			expect(attempt.body.singleResult.data).toBeNull();
+		}
+	});
+});

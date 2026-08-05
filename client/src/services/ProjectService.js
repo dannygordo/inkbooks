@@ -45,7 +45,6 @@ const ProjectService = (() => {
 						firstName
 						lastName
 						avatar
-						username
 					}
 					messages {
 						id

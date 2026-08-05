@@ -14,7 +14,6 @@ import { AuthContext } from "../../context/auth";
 
 const Register = () => {
   const context = useContext(AuthContext);
-	const username = useRef();
 	const email = useRef();
 	const password = useRef();
 	const confirmPassword = useRef();
@@ -26,7 +25,6 @@ const Register = () => {
 
   const REGISTER_USER = gql`
     mutation register(
-      $username: String!
       $email: String!
       $firstName: String!
       $lastName: String!
@@ -42,7 +40,6 @@ const Register = () => {
           firstName: $firstName
           lastName: $lastName
           avatar: $avatar
-          username: $username
           password: $password
           confirmPassword: $confirmPassword
           role: $role
@@ -54,7 +51,6 @@ const Register = () => {
         firstName
         lastName
         avatar
-        username
         role
         accessToken
         firebaseToken
@@ -95,7 +91,6 @@ const handleClick =  (e) => {
     // self-registered account has no shop - see utils/tag-color.js) regardless of what's sent, so
     // there's nothing useful for the client to contribute here either.
     registerUser({variables: {
-      username: username.current.value,
       email: email.current.value,
       firstName: firstName.current.value,
       lastName: lastName.current.value,
@@ -120,11 +115,6 @@ const handleClick =  (e) => {
 				</div>
 				<div className="registerRight">
 					<form className="registerBox" onSubmit={handleClick}>
-						<input
-							placeholder="Username"
-							ref={username}
-							className="registerInput"
-						/>
             <input
 							placeholder="First Name"
 							ref={firstName}

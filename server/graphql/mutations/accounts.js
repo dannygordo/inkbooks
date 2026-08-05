@@ -32,16 +32,11 @@ const Shop = require('../../models/Shop');
  * anyone who has seen it.
  */
 
-// Usernames are `required` and `unique` on User but nothing in the app displays one, and no
-// wizard should ask a shop admin to invent one. Derived from the email's local part with a random
-// suffix, which keeps it human-readable in the database without risking a collision.
-function deriveUsername(email) {
-  const localPart = String(email).split('@')[0].replace(/[^a-zA-Z0-9._-]/g, '').slice(0, 20);
-  return `${localPart || 'user'}_${crypto.randomBytes(4).toString('hex')}`;
-}
-
 async function assertEmailAvailable(email) {
-  const existing = await User.findOne({ email });
+  // Callers normalise before calling, but this looks it up normalised anyway: the address is the
+  // login credential now, so a case difference slipping past this check would surface as a
+  // duplicate-key crash on save rather than a usable message.
+  const existing = await User.findOne({ email: String(email).trim().toLowerCase() });
   if (existing) {
     // Named plainly rather than obscured. This is an authenticated shop admin adding someone to
     // their own shop, not a public signup form - "that address is already in use" is the useful
@@ -67,7 +62,6 @@ async function createUserWithInvite({ firstName, lastName, email, role, userType
   const tagColor = await pickDefaultTagColor(shopId, null);
 
   const user = await new User({
-    username: deriveUsername(email),
     email,
     password,
     role,

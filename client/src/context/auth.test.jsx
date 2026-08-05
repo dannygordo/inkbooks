@@ -27,15 +27,15 @@ function TestConsumer() {
 	const { user, firebaseUser, login, logout, updateCurrentUser } = useAuth();
 	return (
 		<div>
-			<div data-testid="user">{user ? user.username : "no-user"}</div>
+			<div data-testid="user">{user ? user.email : "no-user"}</div>
 			<div data-testid="firebase-user">{firebaseUser ? firebaseUser.uid : "no-fb-user"}</div>
-			<button onClick={() => login({ id: "1", username: "gordo", accessToken: "tok123", firebaseToken: "fb-tok" })}>
+			<button onClick={() => login({ id: "1", email: "gordo@example.com", accessToken: "tok123", firebaseToken: "fb-tok" })}>
 				login
 			</button>
-			<button onClick={() => login({ id: "1", username: "gordo", accessToken: "tok123" })}>
+			<button onClick={() => login({ id: "1", email: "gordo@example.com", accessToken: "tok123" })}>
 				loginNoFirebase
 			</button>
-			<button onClick={() => updateCurrentUser({ id: "1", username: "gordo-renamed", accessToken: "tok123" })}>
+			<button onClick={() => updateCurrentUser({ id: "1", email: "renamed@example.com", accessToken: "tok123" })}>
 				update
 			</button>
 			<button onClick={logout}>logout</button>
@@ -70,7 +70,7 @@ describe("AuthProvider", () => {
 			await user.click(screen.getByText("login"));
 		});
 
-		expect(screen.getByTestId("user")).toHaveTextContent("gordo");
+		expect(screen.getByTestId("user")).toHaveTextContent("gordo@example.com");
 		expect(localStorage.getItem(AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE)).not.toBeNull();
 	});
 
@@ -96,7 +96,7 @@ describe("AuthProvider", () => {
 
 		expect(signInWithCustomToken).not.toHaveBeenCalled();
 		// App-level login still succeeds even though Firebase Storage features are unavailable.
-		expect(screen.getByTestId("user")).toHaveTextContent("gordo");
+		expect(screen.getByTestId("user")).toHaveTextContent("gordo@example.com");
 	});
 
 	it("updateCurrentUser() replaces both the reducer state and the cached value", async () => {
@@ -110,7 +110,7 @@ describe("AuthProvider", () => {
 			await user.click(screen.getByText("update"));
 		});
 
-		expect(screen.getByTestId("user")).toHaveTextContent("gordo-renamed");
+		expect(screen.getByTestId("user")).toHaveTextContent("renamed@example.com");
 	});
 
 	it("logout() clears state, the cache, and signs out of Firebase", async () => {

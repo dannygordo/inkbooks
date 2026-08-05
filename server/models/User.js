@@ -1,8 +1,21 @@
 const mongoose = require('mongoose');
 
 const UserSchema = new mongoose.Schema({
-    username: {type: String, required: true, unique: true},
-    email: {type: String, required: true, unique: true},
+    // Email IS the identity. There was a separate required `username` alongside it, auto-derived
+    // from the email's local part plus random hex - invisible to the person it belonged to, never
+    // shown anywhere in the UI, and the only key login() would accept. Every invited artist and
+    // staff member could set a password and then had no way to sign in, because nothing told them
+    // what their username was. A credential nobody can know is not a credential.
+    //
+    // A human-readable public handle is a real thing to want later - /book/maya-chen reads better
+    // than an ObjectId - but that's a profile SLUG on Artist: optional, chosen, changeable. It is
+    // not an auth field, and conflating the two is what produced the lockout.
+    //
+    // lowercase + trim are enforced HERE rather than at each call site. Some paths normalised and
+    // some didn't, which was harmless while email was only a contact field and becomes "why can't
+    // I log in" the moment it's the credential: Maya@shop.com and maya@shop.com have to be one
+    // account, and the unique index only agrees if the stored value is canonical.
+    email: {type: String, required: true, unique: true, lowercase: true, trim: true, index: true},
     password: {type: String, required: true},
     role: {type: Number, required: true},
     userType: {type: String, required: true},

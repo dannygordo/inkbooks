@@ -10,7 +10,7 @@ const { AuthenticationError } = require('./errors');
 // Shared helpers for scoping the shop-wide "browse everything" list queries (getShops/getStaff/
 // getArtists/getClients) to a non-admin caller's own shop(s), instead of returning every shop's
 // data on the platform to any authenticated user. checkAuth's JWT payload only carries
-// {id, email, username, role} - no userType - so, same as callerBelongsToShop in
+// {id, email, role} - no userType - so, same as callerBelongsToShop in
 // resolvers/appointments.js, this checks real DB relationships (Staff/ArtistShopConnection) rather
 // than branching on a userType this code doesn't have.
 

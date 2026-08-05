@@ -8,7 +8,6 @@ const UserService = (() => {
         updateUser(user: $user) {
             id
             email
-            username
             firstName
             lastName
             avatar
@@ -33,7 +32,6 @@ const UserService = (() => {
         changePassword(currentPassword: $currentPassword, newPassword: $newPassword) {
             id
             email
-            username
             firstName
             lastName
             avatar

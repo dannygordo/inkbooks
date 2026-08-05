@@ -6,8 +6,13 @@ const { z } = require('zod');
 // completely unvalidated. A schema-based approach like this doesn't have that failure mode: an
 // unexpected/extra field either has an explicit place in the schema or it doesn't exist at all.
 
+// Email is the identity - there is no username. See models/User.js.
+//
+// Deliberately NOT .email() here. A login form should say "invalid email or password", not
+// "that's not a well-formed address" - the second tells someone which half they got wrong, and
+// on the way there it confirms whether a malformed string could ever have been an account.
 const loginInputSchema = z.object({
-  username: z.string().trim().min(1, 'Username must not be empty'),
+  email: z.string().trim().min(1, 'Email must not be empty'),
   password: z.string().min(1, 'Password must not be empty'),
 });
 
@@ -16,7 +21,6 @@ const loginInputSchema = z.object({
 // PRODUCTION_ROADMAP.md Phase 1, item 3 for why that's a security fix, not an oversight.
 const registerInputSchema = z
   .object({
-    username: z.string().trim().min(1, 'Username must not be empty'),
     email: z
       .string()
       .trim()

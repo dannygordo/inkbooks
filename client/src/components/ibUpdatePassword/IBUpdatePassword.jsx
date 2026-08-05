@@ -9,7 +9,7 @@ import IBPasswordField from "../inputs/IBPasswordField";
 import "./ibUpdatePassword.css";
 
 // NOTE: this used to support an `isPublic` mode for a logged-out "forgot password" flow that
-// only asked for a username - no proof of account ownership. That was a full account-takeover
+// only asked for an account identifier - no proof of account ownership. That was a full account-takeover
 // vulnerability (see server/graphql/resolvers/users.js changePassword for details) and has been
 // removed. Changing a password now always requires an authenticated session and the current
 // password. A real logged-out reset flow needs an email-based token and isn't built yet.

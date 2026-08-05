@@ -74,7 +74,6 @@ const Profile = () => {
 				user: {
 					id: user.id,
 					email: user.email,
-					username: user.username,
 					firstName: user.firstName,
 					lastName: user.lastName,
 					avatar: avatar,
@@ -170,7 +169,6 @@ const Profile = () => {
 					tagColor: tag.value,
 					id: user.id,
 					email: user.email,
-					username: user.username,
 					role: user.role,
 				},
 			},

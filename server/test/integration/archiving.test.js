@@ -587,14 +587,13 @@ describe('redaction: erase who, keep what', () => {
 
 		const after = await User.findById(client.userId);
 		expect(after.email).not.toBe(before.email);
-		expect(after.username).not.toBe(before.username);
 		expect(after.firstName).toBe('Redacted');
 		// Randomised and discarded - nobody, including this server, knows it.
 		expect(after.password).not.toBe(before.password);
 	});
 
 	it('can erase two people without colliding', async () => {
-		// Client.email and User.email/username are all UNIQUE. A constant placeholder would work
+		// Client.email and User.email are both UNIQUE, and User.email is the login credential. A constant placeholder would work
 		// exactly once and then throw a duplicate-key error - surfacing as a failed legal request,
 		// at the worst possible moment.
 		const { shopAdmin, shop, client: first } = await shopWithEarningArtist();

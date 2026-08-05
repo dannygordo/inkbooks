@@ -20,7 +20,7 @@ export const AUTH_ERROR_MESSAGES = {
 	AUTH_FAILED: "You are not authenticated",
 	UNAUTHORIZED_ACTION: "You are not authorized to perform this action",
 	INCORRECT_CREDENTIALS:
-		"The username and/or password submitted are not correct.  Please try again.",
+		"The email and/or password submitted are not correct.  Please try again.",
 	INVALID_REQUEST:
 		"The request you made is not valid, please check the URL and try again",
 };

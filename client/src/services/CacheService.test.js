@@ -14,7 +14,7 @@ beforeEach(() => {
 
 describe("CacheService", () => {
 	it("round-trips a pre-stringified value (the real usage pattern)", () => {
-		const user = { id: "1", username: "gordo", accessToken: "abc123" };
+		const user = { id: "1", email: "gordo@example.com", accessToken: "abc123" };
 		CacheService.setItem("token", JSON.stringify(user));
 		expect(CacheService.getItem("token")).toEqual(user);
 	});

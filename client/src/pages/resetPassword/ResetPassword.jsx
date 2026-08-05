@@ -10,7 +10,7 @@ import { ROUTE_CONSTANTS } from "../../constants";
 import PasswordService from "../../services/PasswordService";
 
 /**
- * This page used to offer a logged-out "forgot password" form that asked only for a username -
+ * This page used to offer a logged-out "forgot password" form that asked only for an identifier -
  * no email, no token, no proof of ownership. That was a full account-takeover vulnerability and
  * was removed, leaving a note telling locked-out users to phone their shop admin.
  *

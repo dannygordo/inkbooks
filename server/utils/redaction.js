@@ -43,17 +43,14 @@ const REDACTED_NAME = 'Redacted';
 /**
  * A unique, non-routable placeholder.
  *
- * Both Client.email and User.email/username are UNIQUE. Writing a constant would work exactly once
- * and then throw a duplicate-key error on the second erasure - which would surface as a failed
- * legal request, at the worst possible moment. `.invalid` is the RFC 2606 reserved TLD, so this
- * can never accidentally reach a real mailbox.
+ * Both Client.email and User.email are UNIQUE - and User.email is now the login credential, so a
+ * redacted account must get an address that is both unique and unusable. Writing a constant would
+ * work exactly once and then throw a duplicate-key error on the second erasure, surfacing as a
+ * failed legal request at the worst possible moment. `.invalid` is the RFC 2606 reserved TLD, so
+ * this can never accidentally reach a real mailbox - or be logged into.
  */
 function redactedEmail() {
   return `redacted-${crypto.randomBytes(12).toString('hex')}@redacted.invalid`;
-}
-
-function redactedUsername() {
-  return `redacted-${crypto.randomBytes(12).toString('hex')}`;
 }
 
 /**
@@ -98,7 +95,6 @@ async function redactClient(client) {
       { _id: user._id },
       {
         $set: {
-          username: redactedUsername(),
           email: redactedEmail(),
           firstName: REDACTED_NAME,
           lastName: '',
@@ -131,4 +127,4 @@ async function redactClient(client) {
   };
 }
 
-module.exports = { redactClient, redactedEmail, redactedUsername, REDACTED_NAME };
+module.exports = { redactClient, redactedEmail, REDACTED_NAME };

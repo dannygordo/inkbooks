@@ -23,7 +23,6 @@ function unique(prefix) {
 
 async function createUser(overrides = {}) {
 	const user = new User({
-		username: unique('user'),
 		email: `${unique('user')}@example.com`,
 		// Never actually checked in most tests (they auth via a signed JWT, not a real login) -
 		// a fixed bcrypt-shaped placeholder is fine; auth.test.js sets a real hashed password

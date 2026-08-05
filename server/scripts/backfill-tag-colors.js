@@ -62,7 +62,7 @@ async function main() {
     const shopIds = await getShopIdsForUser(user.id);
     const color = await pickDefaultTagColor(shopIds[0], user.id);
     console.log(
-      `  ${user.username} (${user.userType}) ${user.tagColor ?? '<unset>'} -> ${color}`,
+      `  ${user.email} (${user.userType}) ${user.tagColor ?? '<unset>'} -> ${color}`,
     );
     if (!DRY_RUN) {
       user.tagColor = color;

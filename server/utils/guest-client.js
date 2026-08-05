@@ -42,10 +42,8 @@ async function findOrCreateGuestClient({ firstName, lastName, email, phone }) {
   // password no one (including this app) knows, since it's random and immediately discarded.
   const randomPassword = crypto.randomBytes(32).toString('hex');
   const hashedPassword = await bcrypt.hash(randomPassword, 12);
-  const username = `guest_${crypto.randomBytes(8).toString('hex')}`;
 
   user = await new User({
-    username,
     email: normalizedEmail,
     password: hashedPassword,
     role: Constants.ROLES.CLIENT,

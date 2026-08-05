@@ -13,31 +13,38 @@ const validObjectId = '507f1f77bcf86cd799439011';
 
 describe('validate() helper', () => {
 	it('returns { valid: true, data } for a schema that passes', () => {
-		const result = validate(loginInputSchema, { username: 'gordo', password: 'hunter2' });
+		const result = validate(loginInputSchema, { email: 'gordo@example.com', password: 'hunter2' });
 		expect(result.valid).toBe(true);
 		expect(result.errors).toEqual({});
-		expect(result.data).toEqual({ username: 'gordo', password: 'hunter2' });
+		expect(result.data).toEqual({ email: 'gordo@example.com', password: 'hunter2' });
 	});
 
 	it('returns { valid: false, errors } keyed by field for a schema that fails', () => {
-		const result = validate(loginInputSchema, { username: '', password: '' });
+		const result = validate(loginInputSchema, { email: '', password: '' });
 		expect(result.valid).toBe(false);
-		expect(result.errors).toHaveProperty('username');
+		expect(result.errors).toHaveProperty('email');
 		expect(result.errors).toHaveProperty('password');
 		expect(result.data).toBeNull();
 	});
 });
 
 describe('loginInputSchema', () => {
-	it('rejects an empty username or password', () => {
-		expect(validate(loginInputSchema, { username: '', password: 'x' }).valid).toBe(false);
-		expect(validate(loginInputSchema, { username: 'x', password: '' }).valid).toBe(false);
+	it('rejects an empty email or password', () => {
+		expect(validate(loginInputSchema, { email: '', password: 'x' }).valid).toBe(false);
+		expect(validate(loginInputSchema, { email: 'x@y.com', password: '' }).valid).toBe(false);
+	});
+
+	// Deliberately NOT .email()-validated. A login form telling you "that is not a well-formed
+	// address" before it has checked anything is both useless to the person typing and a free
+	// oracle for anyone probing. Wrong shape and wrong password fail identically. See
+	// utils/validation.js.
+	it('accepts a malformed address rather than pre-judging the credential', () => {
+		expect(validate(loginInputSchema, { email: 'not-an-address', password: 'hunter2' }).valid).toBe(true);
 	});
 });
 
 describe('registerInputSchema', () => {
 	const base = {
-		username: 'newartist',
 		email: 'artist@example.com',
 		firstName: 'Jon',
 		lastName: 'Snow',

@@ -1,6 +1,6 @@
-// Mirrors resolvers/users.js's generateToken() exactly - same payload shape (id/email/username/
-// role), same secret env var, same algorithm - so a test-signed token is indistinguishable from
-// one the real login/register mutations would issue.
+// Mirrors resolvers/users.js's generateToken() exactly - same payload shape (id/email/role), same
+// secret env var, same algorithm - so a test-signed token is indistinguishable from one the real
+// login/register mutations would issue.
 const jwt = require('jsonwebtoken');
 
 function signTestToken(user) {
@@ -8,7 +8,6 @@ function signTestToken(user) {
 		{
 			id: user.id || user._id.toString(),
 			email: user.email,
-			username: user.username,
 			role: user.role,
 		},
 		process.env.SECRET_KEY,

@@ -19,11 +19,10 @@ const Login = () => {
 	const navigate = useNavigate();
 
 	const LOGIN_USER = gql`
-		mutation login($username: String!, $password: String!) {
-			login(username: $username, password: $password) {
+		mutation login($email: String!, $password: String!) {
+			login(email: $email, password: $password) {
 				id
 				email
-				username
 				firstName
 				lastName
 				avatar
@@ -90,7 +89,10 @@ const Login = () => {
 		e.preventDefault();
 		loginUser({
 			variables: {
-				username: email.current.value,
+				// The ref was already called `email` and the field already collected one - it was
+				// just being sent as `username`, which is what the server keyed on. See
+				// server/models/User.js.
+				email: email.current.value,
 				password: password.current.value,
 			},
 		});

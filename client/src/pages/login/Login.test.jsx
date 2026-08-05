@@ -19,11 +19,10 @@ import { AuthContext } from "../../context/auth";
 // matching (Apollo matches on query + variables, not the exact gql template identity) - only the
 // fields this test actually asserts on need to be present in the mock's result.
 const LOGIN_USER = gql`
-	mutation login($username: String!, $password: String!) {
-		login(username: $username, password: $password) {
+	mutation login($email: String!, $password: String!) {
+		login(email: $email, password: $password) {
 			id
 			email
-			username
 			firstName
 			lastName
 			avatar
@@ -104,7 +103,6 @@ describe("Login", () => {
 			__typename: "User",
 			id: "u1",
 			email: "gordo@example.com",
-			username: "gordo",
 			firstName: "Gordo",
 			lastName: "Test",
 			avatar: "",
@@ -117,13 +115,13 @@ describe("Login", () => {
 		};
 		const mocks = [
 			{
-				request: { query: LOGIN_USER, variables: { username: "gordo", password: "hunter2" } },
+				request: { query: LOGIN_USER, variables: { email: "gordo@example.com", password: "hunter2" } },
 				result: { data: { login: returnedUser } },
 			},
 		];
 		const contextValue = renderLogin({ mocks });
 
-		await user.type(screen.getByPlaceholderText("email"), "gordo");
+		await user.type(screen.getByPlaceholderText("email"), "gordo@example.com");
 		await user.type(screen.getByPlaceholderText("password"), "hunter2");
 		await user.click(screen.getByText("Login In"));
 
@@ -134,13 +132,13 @@ describe("Login", () => {
 		const user = userEvent.setup();
 		const mocks = [
 			{
-				request: { query: LOGIN_USER, variables: { username: "wronguser", password: "wrongpass" } },
-				error: new Error("Invalid username/password"),
+				request: { query: LOGIN_USER, variables: { email: "wrong@example.com", password: "wrongpass" } },
+				error: new Error("Invalid email or password"),
 			},
 		];
 		const contextValue = renderLogin({ mocks });
 
-		await user.type(screen.getByPlaceholderText("email"), "wronguser");
+		await user.type(screen.getByPlaceholderText("email"), "wrong@example.com");
 		await user.type(screen.getByPlaceholderText("password"), "wrongpass");
 		await user.click(screen.getByText("Login In"));
 

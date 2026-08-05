@@ -156,7 +156,6 @@ module.exports = gql`
   input UserUpdateInput {
     id: ID!
     email: String!
-    username: String!
     firstName: String
     lastName: String
     password: String
@@ -168,8 +167,10 @@ module.exports = gql`
   }
   type User {
     id: ID!
+    # Email is the identity. There was a separate required username field here, auto-derived and never
+    # shown to anyone, which was the only key login accepted - so every invited artist could set a
+    # password and then had no way in. See models/User.js.
     email: String!
-    username: String!
     firstName: String
     lastName: String
     avatar: String
@@ -444,7 +445,6 @@ module.exports = gql`
     depositAmount: Int
   }
   input RegisterInput {
-    username: String!
     email: String!
     firstName: String!
     lastName: String!
@@ -949,7 +949,7 @@ module.exports = gql`
     ######### Users ###########
 
     register(registerInput: RegisterInput): User!
-    login(username: String!, password: String!): User!
+    login(email: String!, password: String!): User!
     updateUser(user: UserUpdateInput): User!
     # Renamed from forgotPassword: this now requires an authenticated session and the caller's
     # current password. A true logged-out "forgot password" flow needs an email-based reset

@@ -566,7 +566,6 @@ describe('there is no role that reaches across shops', () => {
 			signTestToken({
 				id: String(user._id),
 				email: user.email,
-				username: user.username,
 				role: Constants.ROLES.ADMIN,
 			}),
 		),

@@ -23,7 +23,6 @@ const REGISTER_MUTATION = `
 		register(registerInput: $registerInput) {
 			id
 			email
-			username
 			role
 			userType
 			accessToken
@@ -33,11 +32,10 @@ const REGISTER_MUTATION = `
 `;
 
 const LOGIN_MUTATION = `
-	mutation Login($username: String!, $password: String!) {
-		login(username: $username, password: $password) {
+	mutation Login($email: String!, $password: String!) {
+		login(email: $email, password: $password) {
 			id
 			email
-			username
 			role
 			accessToken
 			tagColor
@@ -70,10 +68,15 @@ const UPDATE_SHOP_MUTATION = `
 	}
 `;
 
+let registerCounter = 0;
+
 function baseRegisterInput(overrides = {}) {
 	return {
-		username: `newclient${Date.now()}`,
-		email: `newclient${Date.now()}@example.com`,
+		// Date.now() alone repeats within a single fast-running test file - two registrations in the
+		// same millisecond would collide on the unique email index and fail as a "duplicate" that
+		// the test never intended. Email is now the ONLY unique identifier on User, so there is no
+		// second field left to accidentally carry the uniqueness.
+		email: `newclient${Date.now()}-${(registerCounter += 1)}@example.com`,
 		firstName: 'Jon',
 		lastName: 'Snow',
 		password: 'longenoughpassword',
@@ -123,7 +126,7 @@ describe('register mutation', () => {
 		expect(data.register.userType).toBe(Constants.USER_TYPE.CLIENT);
 
 		// Also confirm it stuck in the actual DB record, not just the mutation's return value.
-		const stored = await User.findOne({ username: registerInput.username });
+		const stored = await User.findOne({ email: registerInput.email });
 		expect(stored.role).toBe(Constants.ROLES.CLIENT);
 		expect(stored.userType).toBe(Constants.USER_TYPE.CLIENT);
 	});
@@ -147,7 +150,7 @@ describe('register mutation', () => {
 		expect(data.register.tagColor).toBe(DEFAULT_NO_SHOP_TAG_COLOR);
 
 		// Also confirm it stuck in the actual DB record, not just the mutation's return value.
-		const stored = await User.findOne({ username: registerInput.username });
+		const stored = await User.findOne({ email: registerInput.email });
 		expect(stored.tagColor).toBe(DEFAULT_NO_SHOP_TAG_COLOR);
 	});
 
@@ -208,7 +211,10 @@ describe('register mutation', () => {
 		expect(data).toBeNull();
 	});
 
-	it('rejects a duplicate username', async () => {
+	it('treats a differently-cased address as the same account', async () => {
+		// Email is the login credential now, so "Jon@Example.com" and "jon@example.com" have to be one
+		// account, not two. Normalisation lives on the schema field (lowercase: true in models/User.js)
+		// rather than at each call site, precisely so a caller that forgets can't create the second one.
 		const server = createTestServer();
 		const first = baseRegisterInput();
 		await server.executeOperation(
@@ -216,16 +222,12 @@ describe('register mutation', () => {
 			{ contextValue: contextWithToken() },
 		);
 
-		const dupe = baseRegisterInput({ username: first.username });
+		const dupe = baseRegisterInput({ email: first.email.toUpperCase() });
 		const response = await server.executeOperation(
 			{ query: REGISTER_MUTATION, variables: { registerInput: dupe } },
 			{ contextValue: contextWithToken() },
 		);
 
-		// register(...): User! is non-null in the schema - when its resolver throws, GraphQL's
-		// null-propagation rule bubbles the null past the field and up to `data` itself (the
-		// nearest nullable ancestor), not just `data.register`. See the same pattern below on
-		// login (also User!) and on several mutations in crud.test.js/projects.test.js.
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeDefined();
 		expect(data).toBeNull();
@@ -246,25 +248,58 @@ describe('login mutation', () => {
 
 	it('logs in with correct credentials and returns a valid, decodable JWT', async () => {
 		const server = createTestServer();
-		const { username, password } = await registerRealUser(server);
+		const { email, password } = await registerRealUser(server);
 
 		const response = await server.executeOperation(
-			{ query: LOGIN_MUTATION, variables: { username, password } },
+			{ query: LOGIN_MUTATION, variables: { email, password } },
 			{ contextValue: contextWithToken() },
 		);
 
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeUndefined();
-		expect(data.login.username).toBe(username);
+		expect(data.login.email).toBe(email);
 		const decoded = jwt.verify(data.login.accessToken, process.env.SECRET_KEY, { algorithms: ['HS256'] });
-		expect(decoded.username).toBe(username);
+		expect(decoded.email).toBe(email);
 		expect(decoded.role).toBe(Constants.ROLES.CLIENT);
 	});
 
-	it('rejects an unknown username', async () => {
+	it('logs in with a differently-cased address', async () => {
+		// Somebody typing their address with a capital first letter, or a phone keyboard doing it for
+		// them, is the single most likely way a real login fails. login() lowercases before looking up.
+		const server = createTestServer();
+		const { email, password } = await registerRealUser(server);
+
+		const response = await server.executeOperation(
+			{ query: LOGIN_MUTATION, variables: { email: email.toUpperCase(), password } },
+			{ contextValue: contextWithToken() },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.login.email).toBe(email);
+	});
+
+	it('logs in with surrounding whitespace', async () => {
+		const server = createTestServer();
+		const { email, password } = await registerRealUser(server);
+
+		const response = await server.executeOperation(
+			{ query: LOGIN_MUTATION, variables: { email: `  ${email} `, password } },
+			{ contextValue: contextWithToken() },
+		);
+
+		expect(response.body.singleResult.errors).toBeUndefined();
+	});
+
+	// Both of the next two assert the SAME message, and that is the assertion. An unknown address
+	// and a wrong password have to be indistinguishable from outside, or the login form becomes a
+	// free oracle for "does this person have an account at this shop" - which, for a tattoo studio's
+	// client list, is information worth protecting on its own. The old code answered "User not
+	// found" for one and "Invalid username/password" for the other.
+	it('rejects an unknown address without revealing that it is unknown', async () => {
 		const server = createTestServer();
 		const response = await server.executeOperation(
-			{ query: LOGIN_MUTATION, variables: { username: 'nobody-registered-this', password: 'whatever123' } },
+			{ query: LOGIN_MUTATION, variables: { email: 'nobody-registered-this@example.com', password: 'whatever123' } },
 			{ contextValue: contextWithToken() },
 		);
 
@@ -273,23 +308,50 @@ describe('login mutation', () => {
 		// the null propagates all the way to `data`, not just `data.login`.
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeDefined();
-		expect(errors[0].message).toMatch(/User not found/);
+		expect(errors[0].message).toBe('Invalid email or password');
 		expect(data).toBeNull();
 	});
 
-	it('rejects the wrong password for a real username', async () => {
+	it('rejects the wrong password with the identical message', async () => {
 		const server = createTestServer();
-		const { username } = await registerRealUser(server);
+		const { email } = await registerRealUser(server);
 
 		const response = await server.executeOperation(
-			{ query: LOGIN_MUTATION, variables: { username, password: 'definitely-not-it' } },
+			{ query: LOGIN_MUTATION, variables: { email, password: 'definitely-not-it' } },
 			{ contextValue: contextWithToken() },
 		);
 
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeDefined();
-		expect(errors[0].message).toMatch(/Invalid username\/password/);
+		expect(errors[0].message).toBe('Invalid email or password');
 		expect(data).toBeNull();
+	});
+
+	it('still runs a bcrypt comparison for an address that does not exist', async () => {
+		// Timing. Returning early on "no such user" skips bcrypt entirely, and a ~100ms difference
+		// between "unknown address" and "known address, wrong password" is measurable over the network
+		// - it hands back exactly the enumeration signal the identical error messages above are there
+		// to withhold. login() compares against DUMMY_PASSWORD_HASH instead. This asserts the two paths
+		// are within an order of magnitude of each other rather than a fixed threshold, since CI timing
+		// is noisy and a tight bound here would be a flake generator.
+		const server = createTestServer();
+		const { email } = await registerRealUser(server);
+
+		const t0 = Date.now();
+		await server.executeOperation(
+			{ query: LOGIN_MUTATION, variables: { email, password: 'definitely-not-it' } },
+			{ contextValue: contextWithToken() },
+		);
+		const knownMs = Date.now() - t0;
+
+		const t1 = Date.now();
+		await server.executeOperation(
+			{ query: LOGIN_MUTATION, variables: { email: 'no-such-person@example.com', password: 'definitely-not-it' } },
+			{ contextValue: contextWithToken() },
+		);
+		const unknownMs = Date.now() - t1;
+
+		expect(unknownMs).toBeGreaterThan(knownMs / 10);
 	});
 });
 
@@ -302,10 +364,10 @@ describe('login mutation', () => {
 describe('login mutation: tagColor self-heal', () => {
 	const REAL_PASSWORD = 'reallongpassword123';
 
-	async function login(username) {
+	async function login(email) {
 		const server = createTestServer();
 		const response = await server.executeOperation(
-			{ query: LOGIN_MUTATION, variables: { username, password: REAL_PASSWORD } },
+			{ query: LOGIN_MUTATION, variables: { email, password: REAL_PASSWORD } },
 			{ contextValue: contextWithToken() },
 		);
 		return response.body.singleResult;
@@ -317,7 +379,7 @@ describe('login mutation: tagColor self-heal', () => {
 			tagColor: undefined,
 		});
 
-		const { errors, data } = await login(user.username);
+		const { errors, data } = await login(user.email);
 		expect(errors).toBeUndefined();
 		expect(data.login.tagColor).toBe(DEFAULT_NO_SHOP_TAG_COLOR);
 
@@ -332,7 +394,7 @@ describe('login mutation: tagColor self-heal', () => {
 			tagColor: '#fff',
 		});
 
-		const { data } = await login(user.username);
+		const { data } = await login(user.email);
 		expect(data.login.tagColor).toBe(DEFAULT_NO_SHOP_TAG_COLOR);
 	});
 
@@ -348,7 +410,7 @@ describe('login mutation: tagColor self-heal', () => {
 			artist: { shopId: shop.id },
 		});
 
-		const { errors, data } = await login(healingArtist.username);
+		const { errors, data } = await login(healingArtist.email);
 		expect(errors).toBeUndefined();
 		expect(data.login.tagColor).toBeTruthy();
 		expect(data.login.tagColor).not.toBe('#c69818');
@@ -360,7 +422,7 @@ describe('login mutation: tagColor self-heal', () => {
 			tagColor: '#2ea2dc',
 		});
 
-		const { data } = await login(user.username);
+		const { data } = await login(user.email);
 		expect(data.login.tagColor).toBe('#2ea2dc');
 	});
 });
@@ -393,7 +455,7 @@ describe('withAuth: unauthenticated / malformed / expired tokens', () => {
 	it('rejects an expired token', async () => {
 		const { user } = await createArtistUser();
 		const expiredToken = jwt.sign(
-			{ id: user.id, email: user.email, username: user.username, role: user.role },
+			{ id: user.id, email: user.email, role: user.role },
 			process.env.SECRET_KEY,
 			{ expiresIn: '-1s', algorithm: 'HS256' },
 		);
@@ -412,7 +474,7 @@ describe('withAuth: unauthenticated / malformed / expired tokens', () => {
 	it('rejects a token signed with the wrong secret', async () => {
 		const { user } = await createArtistUser();
 		const wrongSecretToken = jwt.sign(
-			{ id: user.id, email: user.email, username: user.username, role: user.role },
+			{ id: user.id, email: user.email, role: user.role },
 			'not-the-real-secret-key',
 			{ expiresIn: '5d', algorithm: 'HS256' },
 		);

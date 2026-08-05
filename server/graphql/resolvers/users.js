@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { UserInputError, AuthenticationError, rethrow } = require('../../utils/errors');
@@ -27,12 +28,17 @@ const {
 const { DEFAULT_NO_SHOP_TAG_COLOR, isUnsetTagColor, pickDefaultTagColor } = require('../../utils/tag-color');
 const { findArtistsForShops } = require('../../utils/artist-shop');
 
+// A real bcrypt hash of a value nobody knows, compared against when no account matches, so a
+// missing account and a wrong password take the same time to answer. Generated once at module
+// load rather than per request - bcrypt is deliberately slow, and the point is that both paths
+// pay the same cost, not that they pay it twice.
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), 12);
+
 function generateToken(user) {
   return jwt.sign(
     {
       id: user.id,
       email: user.email,
-      username: user.username,
       role: user.role,
     },
     SECRET_KEY,
@@ -46,26 +52,30 @@ module.exports = {
     // login and register are the only two Mutations in this whole codebase that are
     // intentionally NOT wrapped in withAuth - they're how a session gets created in the first
     // place, so there's nothing to authenticate against yet.
-    async login(_, { username, password }) {
-      const { errors, valid } = validate(loginInputSchema, { username, password });
+    async login(_, { email, password }) {
+      const { errors, valid } = validate(loginInputSchema, { email, password });
       if (!valid) {
         throw new UserInputError('Errors', { errors });
       }
-      // get user and if not found throw error
-      const user = await User.findOne({ username });
-      if (!user) {
-        throw new UserInputError('User not found', {
+      // Lowercased to match how it's stored (models/User.js normalises on write). Typing an
+      // address with the capitalisation your phone chose must not be a failed login.
+      const normalizedEmail = String(email).trim().toLowerCase();
+      const user = await User.findOne({ email: normalizedEmail });
+
+      // One message and one field for both "no such account" and "wrong password", deliberately.
+      // Distinguishing them turns this into an oracle for which addresses have accounts here -
+      // and for a tattoo shop, the account list IS the client list. requestPasswordReset already
+      // takes the same care (see mutations/passwords.js); this is the other half of it.
+      //
+      // bcrypt.compare still runs against a dummy hash when there's no user, so a missing account
+      // and a wrong password take the same time to answer. Returning early would make the
+      // difference measurable regardless of what the message says.
+      const passwordHash = user ? user.password : DUMMY_PASSWORD_HASH;
+      const match = await bcrypt.compare(password, passwordHash);
+      if (!user || !match) {
+        throw new UserInputError('Invalid email or password', {
           errors: {
-            username: 'Username not found',
-          }
-        });
-      }
-      // if user is found make sure password entered is the same as the saved hash
-      const match = await bcrypt.compare(password, user.password);
-      if (!match) {
-        throw new UserInputError('Invalid username/password', {
-          errors: {
-            password: 'Invalid username/password',
+            password: 'Invalid email or password',
           }
         });
       }
@@ -135,7 +145,7 @@ module.exports = {
       _,
       {
         registerInput: {
-          username, password, email, firstName, lastName, avatar, confirmPassword
+          password, email, firstName, lastName, avatar, confirmPassword
           // NOTE: role and userType are intentionally NOT destructured from client input here.
           // Public self-registration must never let the caller choose their own role - see
           // PRODUCTION_ROADMAP.md Phase 1, item 3. Every self-registered account is a Client.
@@ -148,26 +158,22 @@ module.exports = {
       const userType = Constants.USER_TYPE.CLIENT;
 
       const { valid, errors } = validate(registerInputSchema, {
-        username, email, firstName, lastName, avatar, password, confirmPassword,
+        email, firstName, lastName, avatar, password, confirmPassword,
       });
       if (!valid) {
         throw new UserInputError('Errors', { errors });
       }
-      // Check to see if the email address is already in use
-      const userEmail = await User.findOne({ email });
-      if (userEmail) {
+      // Normalised before the uniqueness check, not just on write. Checking the raw value would
+      // let Maya@shop.com past a lookup for maya@shop.com and then collide on the unique index at
+      // save time, surfacing as a duplicate-key crash instead of "that address is taken".
+      const normalizedEmail = String(email).trim().toLowerCase();
+      const existing = await User.findOne({ email: normalizedEmail });
+      if (existing) {
+        // The error is on `email` now. It used to be reported under `username` - so the register
+        // form highlighted the wrong field for a taken address.
         throw new UserInputError('Email is already taken', {
           errors: {
-            username: 'This email is taken',
-          },
-        });
-      }
-      // Check to see if the username is already in use
-      const userUsername = await User.findOne({ username });
-      if (userUsername) {
-        throw new UserInputError('Username is already taken', {
-          errors: {
-            username: 'This username is taken',
+            email: 'An account already exists for that email address.',
           },
         });
       }
@@ -175,11 +181,10 @@ module.exports = {
       const hashedPassword = await bcrypt.hash(password, 12);
 
       const newUser = new User({
-        email,
+        email: normalizedEmail,
         firstName,
         lastName,
         avatar,
-        username,
         password: hashedPassword,
         role,
         userType,

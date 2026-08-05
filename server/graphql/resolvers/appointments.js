@@ -18,7 +18,7 @@ const { paginate } = require('../../utils/pagination');
 // getAppointmentsByShop is called for real by Artist- and Staff-role users viewing their own
 // shop's calendar (see client/src/components/ibCalendar/IBCalendar.jsx), not just Shop Admins -
 // so this can't be a flat role gate the way getPendingShopCutConfirmations is. checkAuth's JWT
-// payload only carries {id, email, username, role} (see utils/check-auth.js/generateToken), no
+// payload only carries {id, email, role} (see utils/check-auth.js/generateToken), no
 // userType, so this checks both possible ownership relationships directly rather than branching
 // on a userType this function doesn't have.
 async function callerBelongsToShop(user, shopId) {

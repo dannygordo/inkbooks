@@ -21,7 +21,6 @@ import { AuthContext } from "../../context/auth";
 
 const REGISTER_USER = gql`
 	mutation register(
-		$username: String!
 		$email: String!
 		$firstName: String!
 		$lastName: String!
@@ -37,7 +36,6 @@ const REGISTER_USER = gql`
 				firstName: $firstName
 				lastName: $lastName
 				avatar: $avatar
-				username: $username
 				password: $password
 				confirmPassword: $confirmPassword
 				role: $role
@@ -49,7 +47,6 @@ const REGISTER_USER = gql`
 			firstName
 			lastName
 			avatar
-			username
 			role
 			accessToken
 			firebaseToken
@@ -75,7 +72,6 @@ function renderRegister({ mocks = [] } = {}) {
 
 async function fillForm(user, overrides = {}) {
 	const values = {
-		username: "newartist",
 		firstName: "Jon",
 		lastName: "Snow",
 		avatar: "",
@@ -84,7 +80,6 @@ async function fillForm(user, overrides = {}) {
 		confirmPassword: "longenoughpassword",
 		...overrides,
 	};
-	if (values.username) await user.type(screen.getByPlaceholderText("Username"), values.username);
 	if (values.firstName) await user.type(screen.getByPlaceholderText("First Name"), values.firstName);
 	if (values.lastName) await user.type(screen.getByPlaceholderText("Last Name"), values.lastName);
 	if (values.avatar) await user.type(screen.getByPlaceholderText("Avatar"), values.avatar);
@@ -138,7 +133,6 @@ describe("Register", () => {
 			firstName: "Jon",
 			lastName: "Snow",
 			avatar: "",
-			username: "newartist",
 			role: 30,
 			accessToken: "real-jwt",
 			firebaseToken: null,
@@ -154,7 +148,6 @@ describe("Register", () => {
 				request: {
 					query: REGISTER_USER,
 					variables: {
-						username: "newartist",
 						email: "jon@example.com",
 						firstName: "Jon",
 						lastName: "Snow",
@@ -185,7 +178,6 @@ describe("Register", () => {
 				request: {
 					query: REGISTER_USER,
 					variables: {
-						username: "newartist",
 						email: "jon@example.com",
 						firstName: "Jon",
 						lastName: "Snow",
