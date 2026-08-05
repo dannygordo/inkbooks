@@ -1,0 +1,125 @@
+/* The inbox panel behind the bell. Bounded height, because an inbox that grows to the height of
+   the viewport pushes its own scroll behaviour onto the page instead of into the list. */
+.notificationMenu {
+	width: 380px;
+	max-height: 520px;
+}
+
+.notificationMenuHeader {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 8px 16px;
+	border-bottom: 1px solid #eee;
+}
+
+.notificationMenuTitle {
+	font-weight: 600;
+	font-size: 14px;
+}
+
+.notificationEmpty {
+	padding: 28px 16px;
+	text-align: center;
+	color: #6b6b6b;
+	font-size: 13px;
+}
+
+.notificationList {
+	max-height: 440px;
+	overflow-y: auto;
+}
+
+.notificationItem {
+	padding: 12px 16px;
+	border-bottom: 1px solid #f2f2f2;
+}
+
+/* Unread is a left bar rather than a background wash - it survives being printed, screenshotted
+   in greyscale, and read by somebody who doesn't distinguish the colours. */
+.notificationItemUnread {
+	border-left: 3px solid #c62828;
+	padding-left: 13px;
+}
+
+.notificationItemDone {
+	opacity: 0.55;
+}
+
+.notificationItemTop {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 4px;
+}
+
+.notificationCategory {
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	font-weight: 700;
+	color: #6b6b6b;
+}
+
+.notificationCategory--money { color: #2e7d32; }
+.notificationCategory--schedule { color: #1565c0; }
+.notificationCategory--roster { color: #6a1b9a; }
+.notificationCategory--message { color: #6b6b6b; }
+
+.notificationWhen {
+	font-size: 11px;
+	color: #9b9b9b;
+}
+
+.notificationTitle {
+	font-size: 14px;
+	line-height: 1.35;
+	color: #222;
+}
+
+.notificationBody {
+	font-size: 12px;
+	color: #6b6b6b;
+	margin-top: 2px;
+}
+
+.notificationAmount {
+	font-size: 13px;
+	font-weight: 600;
+	margin-top: 4px;
+}
+
+.notificationActions {
+	margin-top: 4px;
+	margin-left: -6px;
+}
+
+/* Says why there is no button, rather than leaving the row looking like one that lost its
+   controls. */
+.notificationConditionNote {
+	font-size: 11px;
+	color: #9b9b9b;
+	margin-top: 4px;
+	font-style: italic;
+}
+
+/* Settings rows. The hint carries the resolved mode, so it needs to read as explanation rather
+   than as decoration under the switch. */
+.notificationPrefRow {
+	margin-bottom: 10px;
+}
+
+.notificationPrefHint {
+	font-size: 12px;
+	color: #6b6b6b;
+	margin-left: 48px;
+	margin-top: -4px;
+}
+
+.notificationDigestRow {
+	display: flex;
+	align-items: flex-start;
+	flex-wrap: wrap;
+	gap: 12px;
+	margin-top: 18px;
+}

@@ -25,6 +25,7 @@ import InputBase from "@mui/material/InputBase";
 import { useNavigate } from "react-router-dom";
 import IBAvatar from "../inputs/IBAvatar";
 import MessengerService from "../../services/MessengerService";
+import NotificationBell from "../notifications/NotificationBell";
 import {
 	AccountBox,
 	AccountCircle,
@@ -378,23 +379,11 @@ export default function Sidebar() {
 									<MailIcon />
 								</Badge>
 							</Fab>
-							<Fab
-								sx={{
-									marginLeft: "5px",
-									backgroundColor: "#ddd",
-									color: "#333",
-									"&:hover": {
-										color: "#ddd",
-										backgroundColor: "#333",
-									},
-								}}
-								size="medium"
-								aria-label="show 17 new notifications"
-							>
-								<Badge badgeContent={17} color="error">
-									<NotificationsIcon />
-								</Badge>
-							</Fab>
+							{/* Was a Fab hardcoded to badgeContent={17} - a placeholder that looked
+							    exactly like a working feature, which is its own small version of the
+							    problem this whole system is about: a number on screen that nobody
+							    can act on and nobody can trust. This is the real one. */}
+							<NotificationBell />
 						</Box>
 						<Tooltip title="Account settings">
 							<IconButton
@@ -876,6 +865,39 @@ export default function Sidebar() {
 							/>
 						</ListItemButton>
 					)}
+				</List>
+				</>
+				)}
+				{/* Clients get their own Settings entry, outside the !isClient group above. Until
+				    now they had no settings surface at all, so "can I turn these emails off" had no
+				    answer - which is a complaint vector and, depending on jurisdiction, more than
+				    that. It points at /my-settings rather than /settings: that page is dense with
+				    shop connection, rates and booking links, none of which is a client's business. */}
+				{isClient && (
+				<>
+				<Divider />
+				<List>
+					<ListItemButton
+						selected={selectedIndex === 12}
+						onClick={(event) => handleListItemClick(event, 12, "my-settings")}
+						key="ClientSettings"
+						sx={{
+							minHeight: 48,
+							justifyContent: open ? "initial" : "center",
+							px: 2.5,
+						}}
+					>
+						<ListItemIcon
+							sx={{
+								minWidth: 0,
+								mr: open ? 3 : "auto",
+								justifyContent: "center",
+							}}
+						>
+							<SettingsIcon />
+						</ListItemIcon>
+						<ListItemText primary="Settings" sx={{ opacity: open ? 1 : 0 }} />
+					</ListItemButton>
 				</List>
 				</>
 				)}

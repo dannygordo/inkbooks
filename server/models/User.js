@@ -30,7 +30,52 @@ const UserSchema = new mongoose.Schema({
     // signal: false means the account was never really "claimed" with a real password, which
     // is also the security gate on whether a guest magic-link token is allowed to work for
     // this user - see utils/guest-auth.js.
-    hasSetPassword: {type: Boolean, required: true, default: true}
+    hasSetPassword: {type: Boolean, required: true, default: true},
+
+    /**
+     * Notification preferences: per CATEGORY x per CHANNEL. Six toggles, not forty.
+     *
+     * Per-event-type settings are the obvious "more control" answer and they produce a settings
+     * page nobody reads, which means the defaults do all the work anyway - with far more code
+     * behind them. Six is few enough that somebody annoyed by one thing goes and fixes that one
+     * thing instead of muting everything.
+     *
+     * ONLY the email channel can be turned off. In-app is always on, because the inbox is also
+     * the record - "did we tell the shop about that payment" has to stay answerable, and silently
+     * dropping rows would make it not. Muting is about what reaches your inbox at work, not about
+     * erasing what happened.
+     *
+     * Absent means "use the role-appropriate default" (see utils/notification-preferences.js), not
+     * "off". A missing preference and a deliberate false are different answers, and storing
+     * defaults into every user at creation would freeze today's defaults into accounts forever -
+     * changing a default later would then only affect people who signed up after the change.
+     */
+    notificationPrefs: {
+      moneyEmail: { type: Boolean },
+      scheduleEmail: { type: Boolean },
+      rosterEmail: { type: Boolean },
+      messageEmail: { type: Boolean },
+    },
+
+    /**
+     * IANA zone name, never an offset - an offset is wrong twice a year, and a digest arriving an
+     * hour late every March is the kind of bug nobody reports and everybody notices.
+     *
+     * This is the ONLY thing read when deciding when to send. Shop.timezone exists as the source
+     * of a default when somebody joins a shop, but is never consulted at send time: a person is in
+     * a timezone, a shop is only where they usually are. Reading the shop when there is one and
+     * the user otherwise would be one fact in two places with a precedence rule between them,
+     * which is how Artist.shopId and ArtistShopConnection disagreed for months.
+     */
+    timezone: {type: String},
+
+    /**
+     * The local hour a daily digest arrives, 0-23. Stored as an hour plus a zone rather than as a
+     * precomputed UTC send time: a stored UTC moment is a derived value that goes quietly wrong at
+     * every DST boundary and every time somebody changes timezone. The hour is what the person
+     * chose; the instant is computed from both at send time.
+     */
+    digestHour: {type: Number, min: 0, max: 23}
 
 }, {
     timestamps: true

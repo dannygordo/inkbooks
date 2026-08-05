@@ -11,6 +11,7 @@ import ArtistShopConnectionService from "../../services/ArtistShopConnectionServ
 import ShopService from "../../services/ShopService";
 import { ALERT_CONSTANTS, APP_SETTINGS_CONSTANTS } from "../../constants";
 import BookingSlugField from "../../components/artist/BookingSlugField";
+import NotificationSettingsPanel from "../../components/notifications/NotificationSettingsPanel";
 import { bookingUrl } from "../../utils/bookingSlug";
 
 // New top-level settings section - see PRODUCTION_ROADMAP.md's "Rates & settings" entry for why
@@ -457,6 +458,8 @@ const Settings = () => {
 				    /book/<their Mongo ObjectId> - a real URL, and not one anybody can hand to a
 				    client. Nothing in the app displayed it either, so an artist had no way to find
 				    their own booking link at all. */}
+				<NotificationSettingsPanel />
+
 				<IBCardWrapper>
 					<div>
 						<h1>Booking link</h1>

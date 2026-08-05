@@ -98,7 +98,8 @@ const NotificationSchema = new mongoose.Schema({
    * before the grace expires cancels the email entirely (§11). So the send is a scheduled thing
    * with its own state, not a side effect of creation.
    *
-   * 'pending'   - queued, grace not yet expired
+   * 'pending'   - queued for immediate send, grace not yet expired
+   * 'digest'    - waiting for this recipient's daily digest rather than its own email
    * 'sent'      - delivered to the mail provider
    * 'cancelled' - read before the grace expired, so never sent. The good outcome.
    * 'skipped'   - preferences said no, or the recipient has no email
@@ -110,7 +111,7 @@ const NotificationSchema = new mongoose.Schema({
    */
   emailStatus: {
     type: String,
-    enum: ['pending', 'sent', 'cancelled', 'skipped', 'failed'],
+    enum: ['pending', 'digest', 'sent', 'cancelled', 'skipped', 'failed'],
     default: 'pending',
   },
   // When the email becomes eligible to send. Null for anything that should never be emailed.

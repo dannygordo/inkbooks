@@ -2,6 +2,29 @@ const Notification = require('../../models/Notification');
 const withAuth = require('../../utils/with-auth');
 const { markRead, markDone } = require('../../utils/notifications');
 const { attentionForUser } = require('../../utils/attention');
+const User = require('../../models/User');
+const { UserInputError } = require('../../utils/errors');
+const { emailModeFor, digestTimingFor } = require('../../utils/notification-preferences');
+
+/**
+ * The settings screen's whole answer, including the RESOLVED modes.
+ *
+ * Returning the raw preferences alone would leave the UI showing a blank toggle with no way to say
+ * what a blank actually does - and "money email: (unset)" is not a thing anybody can act on. The
+ * resolved mode says "digest" or "immediate" or "off", which is the sentence a person needs.
+ */
+function settingsFor(user) {
+  const { timezone, hour } = digestTimingFor(user);
+  return {
+    prefs: (user && user.notificationPrefs) || {},
+    moneyMode: emailModeFor(user, 'money'),
+    scheduleMode: emailModeFor(user, 'schedule'),
+    rosterMode: emailModeFor(user, 'roster'),
+    messageMode: emailModeFor(user, 'message'),
+    timezone,
+    digestHour: hour,
+  };
+}
 
 /**
  * The inbox: stored events and derived conditions, merged into one list.
@@ -66,11 +89,44 @@ module.exports = {
 
       return { items, unreadCount: unreadStored + conditions.length };
     }),
+
+    getNotificationSettings: withAuth(async (_, args, context, info, user) =>
+      settingsFor(await User.findById(user.id)),
+    ),
   },
 
   Mutation: {
     // Scoped by userId inside the update filter rather than by a check beforehand, so there is no
     // path where a wrong id lets one person mark another's notifications read.
+    updateNotificationSettings: withAuth(
+      async (_, { prefs, timezone, digestHour }, context, info, user) => {
+        const update = {};
+        // Each preference set only when present. A client sending `{ moneyEmail: false }` must not
+        // wipe the other three back to null - and null is meaningful here (it means "use my role's
+        // default"), so an absent key and an explicit null are genuinely different instructions.
+        if (prefs) {
+          for (const key of ['moneyEmail', 'scheduleEmail', 'rosterEmail', 'messageEmail']) {
+            if (prefs[key] !== undefined) {
+              update[`notificationPrefs.${key}`] = prefs[key];
+            }
+          }
+        }
+        if (timezone !== undefined && timezone !== null) {
+          update.timezone = timezone;
+        }
+        if (digestHour !== undefined && digestHour !== null) {
+          if (!Number.isInteger(digestHour) || digestHour < 0 || digestHour > 23) {
+            throw new UserInputError('Errors', {
+              errors: { digestHour: 'Pick an hour between 0 and 23.' },
+            });
+          }
+          update.digestHour = digestHour;
+        }
+
+        const updated = await User.findByIdAndUpdate(user.id, { $set: update }, { new: true });
+        return settingsFor(updated);
+      },
+    ),
     markNotificationsRead: withAuth(async (_, { notificationIds }, context, info, user) =>
       markRead(user.id, notificationIds || null),
     ),

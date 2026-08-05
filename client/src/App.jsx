@@ -41,6 +41,7 @@ import GuestConversation from "./pages/booking/GuestConversation";
 import ArtistBookingRequests from "./pages/booking/ArtistBookingRequests";
 import ShopCutConfirmations from "./pages/shopCutConfirmations/ShopCutConfirmations";
 import Settings from "./pages/settings/Settings";
+import ClientSettings from "./pages/settings/ClientSettings";
 import ConsultDetail from "./pages/consults/ConsultDetail";
 
 // An artist keeps access to their own /artist/:artistId page (and its edit form) even though the
@@ -286,11 +287,24 @@ function App() {
 								</AuthRoute>
 							}
 						/>
+						{/* Two settings routes, not one page with six sections hidden behind role
+						    checks. /settings is dense with things a client has no business seeing -
+						    shop connection, rates, booking link - and conditionally hiding most of
+						    a page to show one card is how a page becomes impossible to reason
+						    about. The client route reuses the same notification panel. */}
 						<Route
 							path="/settings"
 							element={
 								<AuthRoute>
 									<Settings />
+								</AuthRoute>
+							}
+						/>
+						<Route
+							path="/my-settings"
+							element={
+								<AuthRoute>
+									<ClientSettings />
 								</AuthRoute>
 							}
 						/>

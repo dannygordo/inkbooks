@@ -8,6 +8,9 @@ const ShopSchema = new mongoose.Schema({
 	city: {type: String, default: ""},
 	state: {type: String, default: ""},
 	zip: {type: String, default: ""},
+	// Seeds User.timezone when somebody joins this shop, and is never read at send time - see
+	// models/User.js. IANA name ('America/Los_Angeles'), never an offset.
+	timezone: {type: String},
 	instagram: {type: String, default: ""},
 	facebook: {type: String, default: ""},
 	website: {type: String},

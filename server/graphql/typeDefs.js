@@ -343,6 +343,37 @@ module.exports = gql`
   # Both fields matter to the form: available drives the tick or cross, and reason is what gets
   # shown when it is false. A bare boolean would leave the UI guessing between "taken", "too
   # short" and "that word is reserved" - three different things for the person typing to do next.
+  # Six toggles: three categories x the one channel that can be switched off. In-app is never
+  # optional - the inbox is also the record, and a preference that silently dropped rows would make
+  # "did we tell the shop about that payment" unanswerable.
+  #
+  # Null means "use the default for my role", NOT off. A missing preference and a deliberate false
+  # are different answers, and storing defaults into every account would freeze today's defaults
+  # into it forever.
+  type NotificationPrefs {
+    moneyEmail: Boolean
+    scheduleEmail: Boolean
+    rosterEmail: Boolean
+    messageEmail: Boolean
+  }
+  input NotificationPrefsInput {
+    moneyEmail: Boolean
+    scheduleEmail: Boolean
+    rosterEmail: Boolean
+    messageEmail: Boolean
+  }
+  # What the settings screen needs: the raw preferences, plus the resolved defaults so the UI can
+  # show what an untouched toggle is actually doing rather than an ambiguous blank.
+  type NotificationSettings {
+    prefs: NotificationPrefs!
+    # 'immediate' | 'digest' | 'off' per category, after defaults are applied.
+    moneyMode: String!
+    scheduleMode: String!
+    rosterMode: String!
+    messageMode: String!
+    timezone: String!
+    digestHour: Int!
+  }
   type BookingSlugAvailability {
     slug: String!
     available: Boolean!
@@ -907,6 +938,7 @@ module.exports = gql`
     # cheap aggregation rather than a fetch of every thread the person has.
     # Everything wanting the caller's attention - stored events and live conditions, merged.
     getInbox(includeRead: Boolean): InboxSummary!
+    getNotificationSettings: NotificationSettings!
     getUnreadMessageCount: Int!
     getConversation(conversationId: ID!): Conversation
     getConversationsByShopId(shopId: ID!): [Conversation!]
@@ -1203,6 +1235,13 @@ module.exports = gql`
     # time.
     # Marks stored notifications read. Omit ids to mark everything. Also cancels any email still
     # inside its grace window - reading it is the whole reason the grace exists.
+    # Timezone and digestHour are separate from prefs because they are not on/off switches; a
+    # null on either means "leave it alone", so a client sending only one doesn't wipe the other.
+    updateNotificationSettings(
+      prefs: NotificationPrefsInput
+      timezone: String
+      digestHour: Int
+    ): NotificationSettings!
     markNotificationsRead(notificationIds: [ID!]): Int!
     # Handled, not merely seen. See models/Notification.js on why these are different.
     markNotificationsDone(notificationIds: [ID!]!): Int!

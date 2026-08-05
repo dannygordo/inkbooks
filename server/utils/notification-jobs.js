@@ -1,6 +1,7 @@
 const Notification = require('../models/Notification');
 const User = require('../models/User');
 const { sendEmail } = require('./email');
+const { sendDailyDigests } = require('./digest');
 
 /**
  * The scheduled half of the notification system.
@@ -141,6 +142,17 @@ function notificationJobs({ onReport = console.warn } = {}) {
       run: async () => {
         const result = await sendDueEmails();
         return `sent=${result.sent} skipped=${result.skipped} failed=${result.failed}`;
+      },
+    },
+    {
+      // Hourly, because "somebody's chosen hour" only comes round once a day but the job has to be
+      // awake at every hour to notice whose it is. The scheduler's lock makes the 23 no-op runs
+      // free.
+      name: 'notification-digests',
+      everyMs: 60 * 60 * 1000,
+      run: async () => {
+        const result = await sendDailyDigests();
+        return `digests=${result.sent} considered=${result.considered}`;
       },
     },
     {

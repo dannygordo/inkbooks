@@ -134,6 +134,9 @@ async function seed() {
     zip: '97201',
     instagram: '@copperwolftattoo',
     website: 'https://copperwolf.dev',
+    // Portland. Seeds User.timezone for anyone who joins, and is never read at send time - see
+    // models/User.js on why a person's zone is theirs and not their shop's.
+    timezone: 'America/Los_Angeles',
     shopMinimum: 80,
     hourlyRate: 150,
     // The shop takes 20% of session work. Applied to subtotalCents only - never tips, tax or
@@ -563,6 +566,9 @@ async function seed() {
   console.log(`  Client          jordan.lee@example.dev`);
   console.log(`  Client          taylor.brooks@example.dev`);
   console.log(`  Client          morgan.diaz@example.dev`);
+  console.log('\nNotifications: shop admin digests at 8am; artists get theirs immediately.');
+  console.log('  Take a deposit as an artist, then check the bell as shopadmin@copperwolf.dev.');
+  console.log('  An independent artist gets nothing - there is nobody else to tell.');
   console.log('\nPublic booking pages (no login needed - this is what a client sees):');
   console.log('  http://localhost:3000/book/maya-chen');
   console.log('  http://localhost:3000/book/jonas-petrov');

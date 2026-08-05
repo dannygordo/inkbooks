@@ -1,4 +1,6 @@
 const Notification = require('../models/Notification');
+const User = require('../models/User');
+const { emailModeFor, IMMEDIATE, DIGEST, OFF } = require('./notification-preferences');
 
 /**
  * Creating notifications, in one place.
@@ -73,13 +75,37 @@ async function notify({
   }
 
   const now = new Date();
-  // Queued, not sent. The sweep picks it up once the grace has expired, and reading the
-  // notification before then cancels it outright (§11). Email is a scheduled consequence of a
-  // notification, never a side effect of creating one.
-  const emailAfter = email ? new Date(now.getTime() + EMAIL_GRACE_MS) : null;
 
-  return Notification.insertMany(
-    recipients.map((userId) => ({
+  // Preferences are resolved PER RECIPIENT, which is why this loads them rather than taking a
+  // single flag. The same event is immediate for an artist, digest for their shop admin, and
+  // silent for the front desk - that is the whole shop-versus-solo, money-versus-schedule story,
+  // and it lives in the recipient's role rather than in the emit site.
+  const users = await User.find({ _id: { $in: recipients } }).select(
+    'role notificationPrefs',
+  );
+  const byId = new Map(users.map((u) => [String(u._id), u]));
+
+  const rows = recipients.map((userId) => {
+    const recipient = byId.get(String(userId));
+    // A recipient we can't load gets the in-app row and no email. The notification still exists -
+    // dropping it would lose the record - but we won't guess at somebody's preferences.
+    const mode = recipient && email ? emailModeFor(recipient, category) : OFF;
+
+    let emailStatus = 'skipped';
+    let emailAfter = null;
+    if (mode === IMMEDIATE) {
+      // Queued, not sent. The sweep picks it up once the grace has expired, and reading the
+      // notification before then cancels it outright (§11). Email is a scheduled consequence of a
+      // notification, never a side effect of creating one.
+      emailStatus = 'pending';
+      emailAfter = new Date(now.getTime() + EMAIL_GRACE_MS);
+    } else if (mode === DIGEST) {
+      // Left as 'digest' so the digest job can find it and the immediate sweep can't. Two
+      // different queries over one field, rather than a second field that could disagree with it.
+      emailStatus = 'digest';
+    }
+
+    return {
       userId,
       actorId,
       type,
@@ -89,11 +115,13 @@ async function notify({
       title,
       body,
       amountCents,
-      emailStatus: email ? 'pending' : 'skipped',
+      emailStatus,
       emailAfter,
       createdAt: now,
-    })),
-  );
+    };
+  });
+
+  return Notification.insertMany(rows);
 }
 
 /**
