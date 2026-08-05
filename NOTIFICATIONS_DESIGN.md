@@ -371,25 +371,38 @@ Shipped ahead of this document, and consistent with it:
 
 The four questions parked in the first draft, answered August 5.
 
-### Digest day boundary — the shop's local time
+### Digest day boundary — shop-local, via `User.timezone`
 
 **Decided.** A digest arriving at 4pm because the boundary was UTC is worse than no digest.
 
-*Mechanism.* There is currently no timezone field anywhere in the codebase — `Shop` carries
-city/state/zip and nothing else, so "the shop's local time" is not derivable today. It needs
-`Shop.timezone`, an IANA name (`America/Los_Angeles`), not an offset — offsets are wrong twice a
-year.
+**Delivery time is computed from `User.timezone`, and only from `User.timezone`.**
+`Shop.timezone` exists as the *source of a default* — an artist or staff member joining a shop gets
+the shop's timezone written onto their own record — but nothing reads the shop at send time. So a
+shop's people all get shop-local digests, because that is what their default resolves to, and an
+independent artist, who has no shop, needs no special case.
 
-*The gap this leaves.* An independent artist has no shop, so "shop local time" has no answer for
-them, and they are a first-class supported case here.
+The alternative — read the shop when there is one, fall back to the user otherwise — would put the
+same fact in two places with a precedence rule between them, and precedence rules are how
+`Artist.shopId` and `ArtistShopConnection` disagreed for months (§2). A person is in a timezone; a
+shop is only where they usually are.
 
-*Proposed resolution:* the field that decides delivery time is **`User.timezone`**, defaulted from
-the shop's timezone when someone joins a shop, and capturable from the browser at login when unset.
-This honours the decision — a shop's artists and staff all get shop-local digests, because that's
-what their default resolves to — while giving the independent artist the same field rather than a
-special case. It also avoids `Shop.timezone` and `User.timezone` becoming two records of one fact,
-which is the failure catalogued in §2: a person is in a timezone; a shop is only where they usually
-are. `Shop.timezone` remains, as the *source of the default*, never read directly at send time.
+Both fields are IANA names (`America/Los_Angeles`), never offsets. An offset is wrong twice a year,
+and a digest arriving an hour late every March is the kind of bug nobody reports and everybody
+notices.
+
+Neither field exists today — `Shop` carries city/state/zip and nothing else — so both are new.
+
+*Precedence for populating `User.timezone`, highest first:*
+
+1. What the user set explicitly, in settings.
+2. The browser's `Intl.DateTimeFormat().resolvedOptions().timeZone`, captured at login.
+3. The shop's timezone, written at the moment they join a shop.
+4. `America/Los_Angeles` as a last resort, so an invited account that has never logged in still has
+   a valid boundary rather than a null one.
+
+Populating is *not* the same as reading. Once set, the value is the user's; a later shop change does
+not overwrite it, because that would silently move somebody's digest for a reason they never asked
+for.
 
 ### Staff money notifications — off
 
@@ -432,9 +445,6 @@ migration; adding it at creation is a line of schema.
 
 Genuinely undecided, and none of it blocks starting:
 
-- **Where `User.timezone` comes from on day one.** Browser detection at login is the obvious
-  source, but it needs a fallback for accounts created by an admin that have never logged in — an
-  invited artist who hasn't redeemed yet has no browser to detect from.
 - **Digest send hour.** "Morning" is the obvious answer; whether that's 7am or 9am, and whether it
   differs for a shop admin versus an artist, is a product call best made once someone has lived
   with it.
