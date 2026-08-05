@@ -278,6 +278,7 @@ Two new fields elsewhere, both for digest timing (§11):
 ```
 Shop.timezone   — IANA name ('America/Los_Angeles'), the SOURCE of a default
 User.timezone   — IANA name, what delivery time is actually computed from
+User.digestHour — 0-23, read in User.timezone, default 8
 ```
 
 Never an offset. Offsets are wrong twice a year, and a digest that arrives an hour late every
@@ -404,6 +405,17 @@ Populating is *not* the same as reading. Once set, the value is the user's; a la
 not overwrite it, because that would silently move somebody's digest for a reason they never asked
 for.
 
+### Digest send hour — configurable in settings
+
+**Decided.** `User.digestHour` (0–23), interpreted in `User.timezone`, defaulted to 8. Exposed on
+the same settings surface as the notification preferences (§7), so the whole of "when and what do I
+hear about" is one screen rather than a preference here and a time-of-day setting somewhere else.
+
+Two fields rather than a single stored UTC send time, deliberately. A stored UTC time would be a
+derived value that silently goes wrong at every DST boundary and every time someone changes their
+timezone — the hour is what the person chose, the timezone is where they are, and the UTC moment is
+computed from both at send time.
+
 ### Staff money notifications — off
 
 **Decided.** Off by default, as in the §7 table. Revisit if a real front desk turns out to take
@@ -445,9 +457,28 @@ migration; adding it at creation is a line of schema.
 
 Genuinely undecided, and none of it blocks starting:
 
-- **Digest send hour.** "Morning" is the obvious answer; whether that's 7am or 9am, and whether it
-  differs for a shop admin versus an artist, is a product call best made once someone has lived
-  with it.
-- **Whether an unread in-app notification should still email later.** A notification read in the
-  app arguably shouldn't also arrive by email an hour later. That's the same reset-on-read logic
-  already built for message throttling, generalised — worth doing, not yet specified.
+- **Whether to delay the email so reading it in-app can cancel it.** Recommended, not decided.
+
+  There is no window today — the in-app row and the email both fire within seconds, so nobody sees
+  one before the other. The window only exists if the email is deliberately delayed, and the
+  question is whether that is worth building.
+
+  The case for: an artist working in the app sees the badge at 2:00, opens and handles it by 2:01,
+  and gets an email at 2:02 about something already finished. That is precisely the notification
+  this document exists to prevent.
+
+  The shape, if built: fire in-app instantly, queue the email with a ~3 minute grace, drop it if the
+  notification is read before the grace expires. Same reset-on-read logic as the message throttle,
+  applied before the first send rather than the second.
+
+  Three constraints it carries:
+
+  - **Only for recipients who have an in-app surface.** A guest on a magic link has no badge to
+    see; email *is* their notification and delaying it is pure loss. `message-notifications.js`
+    already makes this distinction via `hasSetPassword` — reuse it, don't re-derive it.
+  - **The queue must be a database row, not memory.** A crash between queueing and sending would
+    otherwise drop the email with nothing recording that it was owed — the silent-failure class
+    §5 ranks highest.
+  - **Digests are exempt.** They are delayed by definition; a grace period on top means nothing.
+
+  Cost is a queue and a sweep. The system is correct without it; it is a polish item.
