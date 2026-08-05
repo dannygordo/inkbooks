@@ -117,9 +117,10 @@ describe('a connected artist is visible to their shop', () => {
 		expect(data.shop.id).toBe(String(shop.id));
 		expect(String(data.shopId)).toBe(String(shop.id));
 
-		// And genuinely derived - the stored field was never set.
+		// And genuinely derived: Artist has no shopId path at all any more, so there is nothing it
+		// could have been read from except the connection.
 		const stored = await Artist.findById(artist.id);
-		expect(stored.shopId).toBeFalsy();
+		expect(stored.shopId).toBeUndefined();
 	});
 
 	it('lets shop staff open a connected artist, and refuses staff at another shop', async () => {

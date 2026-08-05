@@ -55,12 +55,14 @@ async function createArtistUser(overrides = {}) {
 	}).save();
 	// `{ artist: { shopId } }` reads as "this artist works at this shop", and a dozen tests already
 	// say it that way. That used to be literally true - Artist.shopId was the membership record.
-	// It isn't any more: ArtistShopConnection is (see utils/artist-shop.js), and Artist.shopId is
-	// deprecated. So the option keeps its meaning by creating the connection too, rather than every
-	// call site having to remember a second line. The stored field is still written, which is what
-	// lets the backfill script be tested against realistic legacy rows.
-	if (artist.shopId) {
-		await connectArtistToShop(user._id, artist.shopId);
+	// It isn't any more, and the field is gone from the model entirely: ArtistShopConnection is the
+	// only record (see utils/artist-shop.js). The option keeps its meaning by creating the
+	// connection, so those call sites still say something true rather than each needing a second
+	// line. Read from overrides rather than the saved doc, since Mongoose now drops the unknown
+	// path on save.
+	const requestedShopId = overrides.artist && overrides.artist.shopId;
+	if (requestedShopId) {
+		await connectArtistToShop(user._id, requestedShopId);
 	}
 	return { user, artist };
 }

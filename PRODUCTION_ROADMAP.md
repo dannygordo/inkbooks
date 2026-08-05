@@ -174,8 +174,9 @@ The realistic way an artist ends up connected twice isn't a guest spot, it's mun
 shops and nobody remembers to disconnect them from the old one. Connecting somewhere new is now
 exactly that record.
 
-**Before deploying:** run `node scripts/backfill-artist-connections.js` (report), then `--apply`.
-Any artist whose membership exists only as a stored `shopId` becomes independent without it.
+`Artist.shopId` is gone from the model entirely - not deprecated-in-place. There's no production
+data and no users, so the seed is the migration: `npm run seed` produces artists whose only
+membership record is a connection, which is what every read now expects.
 
 **Deliberately not built** (and not wanted per the shop-context-switcher decision): concurrent
 multi-shop artists, invite-link shop bootstrapping, the searchable shop directory, and

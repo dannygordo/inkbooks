@@ -15,6 +15,7 @@ const { resolveGuestToken } = require('../../utils/guest-auth');
 const { checkRateLimit, getClientIp } = require('../../utils/rate-limit');
 const { tryCheckAuth } = require('../../utils/check-auth');
 const { assertCanManageArtist, linkClientToUsersShops } = require('../../utils/shop-membership');
+const { getActiveShopIdForArtist } = require('../../utils/artist-shop');
 const {
   createBookingRequestInputSchema,
   guestMessageInputSchema,
@@ -308,11 +309,16 @@ module.exports = {
     // getAppointmentsByShop once an artist has a shop (see that file's own comment), which filters
     // on Appointment.shopId, so a converted booking request was invisible on a shop-affiliated
     // artist's calendar for the same "never actually appears anywhere" reason, independent of the
-    // userId bug above. Derived from the artist's own Shop record here (same single-shop
-    // convention every other appointment-creation path already uses via user.userInfo.shop.id -
-    // see Artist.shop's resolver) rather than requiring every caller (the wizard, the booking-
-    // requests dashboard) to remember to pass it - one fix here covers both existing callers.
-    const artistRecord = await Artist.findOne({ userId: bookingRequest.artistId });
+    // userId bug above. Derived from the artist's active shop connection here (the same single
+    // source every other path now uses - see utils/artist-shop.js) rather than requiring every
+    // caller (the wizard, the booking-requests dashboard) to remember to pass it - one fix here
+    // covers both existing callers.
+    // From the artist's active ArtistShopConnection, not the old Artist.shopId field. This read
+    // was the last one left on the stored field, and it's on the money path: shopId is what
+    // decides whether a shop cut gets computed and whether this session shows up in the shop's
+    // revenue. With Artist.shopId no longer written, this would have silently produced
+    // shop-less appointments for every booking request converted - the same bug, one layer down.
+    const artistShopId = await getActiveShopIdForArtist(bookingRequest.artistId);
 
     // A session gets its title from the Project just created above (data.projectTitle) - the
     // same label already shown everywhere a Project is (dashboard, Project page). A consult has
@@ -350,7 +356,7 @@ module.exports = {
       // createAppointmentInputSchema's userId/shopId fields are zod string regex checks (see
       // utils/validation.js's objectIdSchema).
       userId: bookingRequest.artistId.toString(),
-      shopId: artistRecord?.shopId ? artistRecord.shopId.toString() : args.appointmentInput?.shopId,
+      shopId: artistShopId ? artistShopId.toString() : args.appointmentInput?.shopId,
       createdAt: args.appointmentInput?.createdAt || now,
       updatedAt: args.appointmentInput?.updatedAt || now,
     };

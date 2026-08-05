@@ -24,11 +24,13 @@ const ArtistSchema = new mongoose.Schema(
     flatRate: { type: Number },
     billingType: { type: String, enum: ['hourly', 'flat_rate'], default: 'hourly' },
     avatar: { type: String, default: "" },
-    // DEPRECATED - no longer read or written anywhere. Which shop an artist works at is
-    // ArtistShopConnection, full stop (see utils/artist-shop.js). This field is left in place so
-    // scripts/backfill-artist-connections.js has something to read and so no data is destroyed
-    // before that has run everywhere; drop it once there's confidence nothing regressed.
-    shopId: { type: mongoose.Schema.Types.ObjectId },
+    // No shopId here, deliberately. Which shop an artist works at is ArtistShopConnection and
+    // nothing else (see utils/artist-shop.js). This model used to carry the field as well, and the
+    // two disagreed: connectArtistToShop only ever wrote the connection, so an artist connected
+    // through the real flow had a null Artist.shopId, which the whole client reads as "independent
+    // artist" - and the client puts that value on every appointment it creates. Their sessions
+    // were written with no shop at all: no shop cut, no revenue for the shop, nothing erroring.
+    // Don't add it back as a convenience cache; that is exactly what it was.
     userId: { type: mongoose.Schema.Types.ObjectId },
     status: { type: Number },
   },
