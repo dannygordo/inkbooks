@@ -56,9 +56,11 @@ const APPOINTMENTS_BY_SHOP = `
 	query A($shopId: ID!) { getAppointmentsByShop(shopId: $shopId) { id totalCents } }
 `;
 
+// Widest range assertValidRange allows (ten years, see resolvers/analytics.js) that still contains
+// the fixtures, whose appointmentDate is `new Date()`.
 const RANGE = {
-	start: new Date('2000-01-01T00:00:00.000Z').toISOString(),
-	end: new Date('2100-01-01T00:00:00.000Z').toISOString(),
+	start: new Date(Date.now() - 5 * 365 * 24 * 60 * 60 * 1000).toISOString(),
+	end: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
 };
 
 const asUser = (user) => ({ contextValue: contextWithToken(signTestToken(user)) });

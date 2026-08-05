@@ -173,25 +173,27 @@ describe('Artist CRUD', () => {
 	// policy - not just that one artist - breaking the whole Artists page. Fixed by making
 	// Artist.shopId nullable in the schema (userId stays non-null - every artist has a real user
 	// account regardless of shop affiliation, that part of the model is a real invariant).
-	it('getArtists: does not error on an independent artist with no shopId', async () => {
-		// The caller is the global ADMIN, not a shop admin: this is a test about schema
-		// nullability, and a shop admin's result set is now scoped to their own shop, which a
-		// shopId-less artist by definition isn't in.
-		const admin = await createUser({ role: Constants.ROLES.ADMIN, userType: Constants.USER_TYPE.STAFF });
-		await createArtistUser(); // shopId-less by default - see factories.js's createArtistUser
+	// Goes through getArtist rather than getArtists, and the artist reads their own row. There is
+	// no longer any caller who can list a shopId-less artist: getArtists is scoped to the caller's
+	// own shops and matches on Artist.shopId, so an artist belonging to no shop appears in nobody's
+	// directory - correct, but it means the list query can't reach this case at all any more. The
+	// nullability it guards is unchanged, so the test moves rather than going away.
+	it('getArtist: does not error on an independent artist with no shopId', async () => {
+		const { user: artistUser, artist } = await createArtistUser(); // shopId-less by default
 		const server = createTestServer();
 
 		const response = await server.executeOperation(
-			{ query: '{ getArtists { id shopId userId } }' },
-			{ contextValue: contextWithToken(signTestToken(admin)) },
+			{
+				query: 'query GetArtist($artistId: ID!) { getArtist(artistId: $artistId) { id shopId userId } }',
+				variables: { artistId: artist.id },
+			},
+			{ contextValue: contextWithToken(signTestToken(artistUser)) },
 		);
 
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeUndefined();
-		expect(Array.isArray(data.getArtists)).toBe(true);
-		const independentArtist = data.getArtists.find((a) => a.shopId === null);
-		expect(independentArtist).toBeDefined();
-		expect(independentArtist.userId).not.toBeNull();
+		expect(data.getArtist.shopId).toBeNull();
+		expect(data.getArtist.userId).not.toBeNull();
 	});
 });
 

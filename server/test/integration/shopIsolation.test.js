@@ -35,11 +35,15 @@ const Project = require('../../models/Project');
 const Shop = require('../../models/Shop');
 const { Constants } = require('../../utils/constants');
 
-// getShopAnalytics/getArtistAnalytics take a required window (see typeDefs.js) - these tests care
-// about who is asking, not about what falls inside it, so one wide range is shared by all of them.
+// getShopAnalytics/getArtistAnalytics take a required window (see typeDefs.js) and reject anything
+// over ten years (assertValidRange in resolvers/analytics.js). These tests care about who is
+// asking, not about what falls inside the window, so this is simply the widest legal range that
+// still contains the fixtures - whose appointmentDate is `new Date()`. A 2000-2100 span was the
+// obvious thing to reach for and fails the range check, which surfaces as a BAD_USER_INPUT
+// "Errors" rather than anything to do with authorization.
 const RANGE = {
-	start: new Date('2000-01-01T00:00:00.000Z').toISOString(),
-	end: new Date('2100-01-01T00:00:00.000Z').toISOString(),
+	start: new Date(Date.now() - 5 * 365 * 24 * 60 * 60 * 1000).toISOString(),
+	end: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
 };
 
 /**
@@ -51,7 +55,10 @@ const RANGE = {
  * failing to find anything rather than by refusing.
  */
 async function twoShops() {
-	const { user: adminA, shop: shopA } = await createShopAdminUser();
+	// shopCutPercent is set explicitly: Shop's schema default is 0, and the cross-shop updateShop
+	// test below tries to write 0, so a defaulted fixture would make "the value didn't change"
+	// pass whether or not the write was refused.
+	const { user: adminA, shop: shopA } = await createShopAdminUser({ shop: { shopCutPercent: 20 } });
 	const { user: adminB, shop: shopB } = await createShopAdminUser();
 
 	const { user: artistA, artist: artistProfileA } = await createArtistUser({
@@ -314,7 +321,19 @@ describe('work and schedule are not visible across shops', () => {
 		const response = await server.executeOperation(
 			{
 				query: `mutation A($project: ProjectInput) { updateProject(project: $project) { id title } }`,
-				variables: { project: { id: projectA.id, title: 'Renamed by an outsider' } },
+				// ProjectInput's non-null fields all have to be present or the request fails
+				// variable coercion before any resolver runs - which would pass expectRefused for
+				// entirely the wrong reason.
+				variables: {
+					project: {
+						id: projectA.id,
+						title: 'Renamed by an outsider',
+						description: projectA.description,
+						artistId: String(projectA.artistId),
+						clientId: String(projectA.clientId),
+						status: projectA.status,
+					},
+				},
 			},
 			asOutsideAdmin(adminB),
 		);

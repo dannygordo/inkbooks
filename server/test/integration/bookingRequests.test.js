@@ -9,7 +9,12 @@
 // test/integration/appointments.test.js for why there's no `require('vitest')` here.
 const { createTestServer, contextWithToken } = require('../helpers/testServer');
 const { signTestToken } = require('../helpers/auth');
-const { createArtistUser, createUser, createShopAdminUser } = require('../helpers/factories');
+const {
+	createArtistUser,
+	createUser,
+	createShopAdminUser,
+	connectArtistToShop,
+} = require('../helpers/factories');
 const { Constants } = require('../../utils/constants');
 const User = require('../../models/User');
 const Client = require('../../models/Client');
