@@ -86,7 +86,15 @@ module.exports = {
     getShopAnalytics: withAuth(
       async (_, { shopId, start, end }, context, info, user) => {
         assertValidRange(start, end);
-        if (user.role > Constants.ROLES.SHOP_ADMIN) {
+        // Affiliation applies to SHOP_ADMIN too, which is the whole point - a shop admin is a
+        // shop admin *somewhere*, and the role says nothing about which shop. This was written as
+        // `role > SHOP_ADMIN`, so role 10 skipped the check entirely and any shop admin could
+        // read any other shop's books by passing a different shopId. Exactly the one-argument
+        // data leak the comment above warns about, implemented backwards. Caught by
+        // analytics.test.js's cross-shop case the first time the suite was actually run.
+        //
+        // Only the platform ADMIN (role 1) is exempt, because that role is deliberately global.
+        if (user.role > Constants.ROLES.ADMIN) {
           const shopIds = await getShopIdsForUser(user.id);
           if (!shopIds.map(String).includes(String(shopId))) {
             throw new AuthenticationError('Action not allowed');
@@ -108,7 +116,10 @@ module.exports = {
     getArtistAnalytics: withAuth(async (_, { userId, start, end }, context, info, user) => {
       assertValidRange(start, end);
       const isSelf = String(user.id) === String(userId);
-      if (!isSelf && user.role > Constants.ROLES.SHOP_ADMIN) {
+      // Same correction as getShopAnalytics above: this said `role > SHOP_ADMIN`, so a shop admin
+      // skipped the shop check and could read ANY artist's earnings anywhere on the platform. A
+      // shop admin is an admin of a particular shop; the role number doesn't say which.
+      if (!isSelf && user.role > Constants.ROLES.ADMIN) {
         const isSameShopStaff =
           user.role <= Constants.ROLES.SHOP_STAFF && (await sharesShopWith(user.id, userId));
         if (!isSameShopStaff) {
@@ -117,7 +128,8 @@ module.exports = {
       }
       const analytics = await computeAnalytics({ artistUserId: userId, start, end });
       // Staff looking at someone else's numbers get the same money blackout they get shop-wide.
-      // An artist looking at their own always sees everything.
+      // An artist looking at their own always sees everything, and a shop admin at that artist's
+      // own shop sees the money - they're the one owed the shop cut.
       if (!isSelf && user.role > Constants.ROLES.SHOP_ADMIN) {
         return stripMoney(analytics);
       }

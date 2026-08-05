@@ -321,6 +321,45 @@ describe('getArtistAnalytics', () => {
 		expect(a.artists).toEqual([]);
 	});
 
+	it("lets a shop admin read an artist at their own shop, with the money intact", async () => {
+		// Guards the other side of the cross-shop fix. Tightening the affiliation check to apply
+		// to SHOP_ADMIN could have locked admins out of their own artists' numbers - they're the
+		// party owed the shop cut, so they must still see them.
+		const { user: admin, shop } = await createShopAdminUser();
+		const { user: artist } = await createArtistUser();
+		await connectArtistToShop(artist.id, shop.id);
+		await completedSession(artist.id, shop.id, { totalCents: 50000 });
+
+		const res = await createTestServer().executeOperation(
+			{
+				query: GET_ARTIST_ANALYTICS,
+				variables: { userId: String(artist.id), start: START, end: END },
+			},
+			{ contextValue: contextWithToken(signTestToken(admin)) },
+		);
+
+		expect(res.body.singleResult.errors).toBeUndefined();
+		expect(res.body.singleResult.data.getArtistAnalytics.revenueCents).toBe(50000);
+	});
+
+	it("refuses a shop admin reading an artist at a different shop", async () => {
+		const { user: adminB } = await createShopAdminUser();
+		const { shop: shopA } = await createShopAdminUser();
+		const { user: artist } = await createArtistUser();
+		await connectArtistToShop(artist.id, shopA.id);
+
+		const res = await createTestServer().executeOperation(
+			{
+				query: GET_ARTIST_ANALYTICS,
+				variables: { userId: String(artist.id), start: START, end: END },
+			},
+			{ contextValue: contextWithToken(signTestToken(adminB)) },
+		);
+
+		expect(res.body.singleResult.data.getArtistAnalytics).toBeNull();
+		expect(res.body.singleResult.errors[0].message).toMatch(/Action not allowed/);
+	});
+
 	it("refuses one artist reading another artist's figures", async () => {
 		const { shop } = await createShopAdminUser();
 		const { user: artistA } = await createArtistUser();

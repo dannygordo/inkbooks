@@ -128,6 +128,11 @@ describe('POST /square/process-payment: charging via Square', () => {
 			success: true,
 			paymentId: 'sandbox-payment-1',
 			status: 'COMPLETED',
+			// Null because this request names no appointment. The field is always present so a
+			// caller can tell "the charge was recorded against session X" from "the charge went
+			// through but nothing in InkBooks references it" - which is what every charge used to
+			// be before the endpoint started persisting the breakdown.
+			appointmentId: null,
 		});
 	});
 

@@ -200,7 +200,13 @@ describe('createArtistAccount', () => {
 			asUser(admin),
 		);
 
-		expect(res.body.singleResult.data.createArtistAccount).toBeNull();
+		// `data` itself is null here, not just the field. createArtistAccount returns
+		// ArtistAccountResult! - a NON-NULL type - and GraphQL propagates a null from a non-null
+		// field up to its parent, which for a root field means the whole `data`. Asserting
+		// `data.createArtistAccount` is null only works for nullable fields (getShopAnalytics,
+		// getArtist and friends), which is where that habit came from.
+		expect(res.body.singleResult.data).toBeNull();
+		expect(res.body.singleResult.errors).toBeDefined();
 		expect(await Artist.countDocuments({})).toBe(0);
 	});
 
@@ -224,7 +230,7 @@ describe('createArtistAccount', () => {
 			asUser(staff),
 		);
 
-		expect(res.body.singleResult.data.createArtistAccount).toBeNull();
+		expect(res.body.singleResult.data).toBeNull();
 		expect(res.body.singleResult.errors[0].message).toMatch(/Action not allowed/);
 		expect(await User.countDocuments({ email: 'maya@example.com' })).toBe(0);
 	});
@@ -344,7 +350,7 @@ describe('createClientAccount', () => {
 			asUser(artist),
 		);
 
-		expect(res.body.singleResult.data.createClientAccount).toBeNull();
+		expect(res.body.singleResult.data).toBeNull();
 		expect(res.body.singleResult.errors[0].message).toMatch(/Action not allowed/);
 	});
 });

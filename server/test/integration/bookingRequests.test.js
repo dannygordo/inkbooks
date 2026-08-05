@@ -593,7 +593,15 @@ describe('convertBookingRequest', () => {
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeUndefined();
 		expect(data.convertBookingRequest.status).toBe('not_booked');
-		expect(data.convertBookingRequest.resultingAppointmentId).toBeNull();
+		// Asserts what the test name actually claims - that no SECOND appointment was created.
+		//
+		// This previously asserted resultingAppointmentId was null, which fails and should: the
+		// consult booked in the first call is a real appointment that really happened, and
+		// not_booked means "had a consult, went cold" (as distinct from declined, which is
+		// "turned down before any consult" - see models/BookingRequest.js). Erasing the link
+		// would orphan the record of a consult that took place, and would lose exactly the
+		// information that distinguishes those two outcomes.
+		expect(await Appointment.countDocuments({ bookingRequestId: bookingRequest._id })).toBe(1);
 	});
 
 	it('rejects converting an already-terminal booking request (e.g. re-converting a declined one)', async () => {

@@ -85,45 +85,45 @@ module.exports = {
         role: user.role,
         userType: user.userType,
       });
-      let userInfo = {};
-      switch(user.userType) {
-        case Constants.USER_TYPE.ARTIST :
-          userInfo = await Artist.findOne({userId: user.id}).select('-user');
+      // Resolves the profile record that matches this user's type. Three near-identical branches
+      // collapsed into one lookup - the only thing that differed between them was which model to
+      // query.
+      //
+      // The profile can legitimately be MISSING, and the previous version crashed when it was:
+      // each branch did `userInfo.id = userInfo._id` on the result of a findOne with no null
+      // check, so a User whose profile row doesn't exist got
+      // "Cannot read properties of null" and could not log in at all. That isn't hypothetical -
+      // the seeded `platformadmin` account is a User with userType STAFF and deliberately no
+      // Staff record ("no Staff/Shop tie", see scripts/seed.js), so logging in as the platform
+      // admin failed outright. Found by auth.test.js the first time the suite was run.
+      //
+      // Returning null userInfo is the honest answer: the account exists and its credentials are
+      // valid, it just has no shop-side profile attached. Callers already optional-chain this
+      // (user.userInfo?.shop?.id appears throughout the client).
+      const profileModelByType = {
+        [Constants.USER_TYPE.ARTIST]: Artist,
+        [Constants.USER_TYPE.CLIENT]: Client,
+        [Constants.USER_TYPE.STAFF]: Staff,
+      };
+      const ProfileModel = profileModelByType[user.userType];
+      let userInfo = null;
+      if (ProfileModel) {
+        userInfo = await ProfileModel.findOne({ userId: user.id }).select('-user');
+        if (userInfo) {
+          // `id` is a Mongoose virtual, so it survives neither .lean() nor the spread the client
+          // does on this object - set explicitly, as the original branches did.
           userInfo.id = userInfo._id;
-          return {
-            ...user._doc,
-            userInfo: userInfo,
-            id: user._id,
-            role: user.role,
-            accessToken: token,
-            firebaseToken: firebaseToken,
-            userType: user.userType
-          };
-        case Constants.USER_TYPE.CLIENT :
-            userInfo = await Client.findOne({userId: user.id}).select('-user');
-            userInfo.id = userInfo._id;
-            return {
-              ...user._doc,
-              userInfo: userInfo,
-              id: user._id,
-              role: user.role,
-              accessToken: token,
-              firebaseToken: firebaseToken,
-              userType: user.userType
-            };
-        case Constants.USER_TYPE.STAFF :
-            userInfo = await Staff.findOne({userId: user.id}).select('-user');
-            userInfo.id = userInfo._id;
-            return {
-              ...user._doc,
-              userInfo: userInfo,
-              id: user._id,
-              role: user.role,
-              accessToken: token,
-              firebaseToken: firebaseToken,
-              userType: user.userType
-            };
+        }
       }
+      return {
+        ...user._doc,
+        userInfo,
+        id: user._id,
+        role: user.role,
+        accessToken: token,
+        firebaseToken: firebaseToken,
+        userType: user.userType,
+      };
     },
     async register(
       _,

@@ -238,7 +238,10 @@ describe('setPasswordWithToken / inspectPasswordToken', () => {
 			publicContext(),
 		);
 
-		expect(res.body.singleResult.data.setPasswordWithToken).toBeNull();
+		// setPasswordWithToken returns Boolean! - non-null - so a thrown error nulls the whole
+		// `data`, not just the field. See the note in accounts.test.js.
+		expect(res.body.singleResult.data).toBeNull();
+		expect(res.body.singleResult.errors).toBeDefined();
 		// And the token is still unspent, so the person can try again with a longer one rather
 		// than having burned their only link on a typo.
 		const stored = await PasswordToken.findOne({ userId: user._id });
