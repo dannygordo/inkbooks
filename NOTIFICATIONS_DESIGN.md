@@ -1,7 +1,7 @@
 # InkBooks — Notification System Design
 
-Agreed August 5, 2026. Status: design settled, not yet implemented (except message
-notifications, which shipped ahead of this and are described in "What already exists").
+Agreed August 5, 2026. Status: **design settled, every open question decided** (§11), not yet
+implemented — except message notifications, which shipped ahead of this and are described in §10.
 
 This document exists because notification systems fail in a specific, predictable way: they get
 built one `sendEmail` call at a time, each one obviously correct on its own, until the product
@@ -346,9 +346,12 @@ demonstrated the cost of work that isn't verifiable until it's finished.
 3. **The scheduler.** Interval + lock + the condition sweep. Time-based catchers light up.
 4. **Stored events.** Emit from the money and schedule mutations. Inbox now shows both.
 5. **Preferences + digests + the client settings page.** Six toggles and the defaults per §7,
-   the `User.timezone` field and its shop-sourced default, the daily digest job, and the first
-   client-facing settings route — built together rather than retrofitted (§11).
+   `User.timezone` with its shop-sourced default and `User.digestHour`, the daily digest job, and
+   the first client-facing settings route — built together rather than retrofitted (§11).
 6. **Inbox UI.** Bell, grouping by subject, read/done, and the 90-day inbox filter (§11).
+7. **Email grace.** The queue row, the 3-minute delay, and cancel-on-read (§11). Last because
+   everything before it is correct without it, and because a queue built before the thing it queues
+   is a queue with nothing to test against.
 
 ---
 
@@ -453,32 +456,57 @@ migration; adding it at creation is a line of schema.
 
 ---
 
-## 12. Still open
+### Immediate email is delayed, and cancelled by reading it in-app
 
-Genuinely undecided, and none of it blocks starting:
+**Decided.** An immediate (non-digest) notification fires in-app instantly and queues its email
+with a **3-minute grace**. If the notification is read before the grace expires, **the email is not
+sent at all.**
 
-- **Whether to delay the email so reading it in-app can cancel it.** Recommended, not decided.
+This is the same reset-on-read logic already in the message throttle, moved earlier: applied before
+the first send rather than to suppress the second. It exists for the case that makes a notification
+system feel careless — an artist sees the badge at 2:00, handles it by 2:01, and receives an email
+at 2:02 about something already finished.
 
-  There is no window today — the in-app row and the email both fire within seconds, so nobody sees
-  one before the other. The window only exists if the email is deliberately delayed, and the
-  question is whether that is worth building.
+Three constraints, all load-bearing:
 
-  The case for: an artist working in the app sees the badge at 2:00, opens and handles it by 2:01,
-  and gets an email at 2:02 about something already finished. That is precisely the notification
-  this document exists to prevent.
+- **Only for recipients who have an in-app surface.** A guest on a magic link has no badge to read;
+  email *is* their notification and delaying it is pure loss. `message-notifications.js` already
+  draws exactly this line via `hasSetPassword` — reuse that check rather than inventing a second
+  one that can disagree with it.
+- **The queue is a database row, never memory.** A crash between queueing and sending must not lose
+  an email with nothing recording that it was owed. That is the silent-failure class §5 ranks
+  highest, and building it into a brand-new feature would be indefensible.
+- **Digests are exempt.** They are delayed by definition; a grace period on top of a delay means
+  nothing.
 
-  The shape, if built: fire in-app instantly, queue the email with a ~3 minute grace, drop it if the
-  notification is read before the grace expires. Same reset-on-read logic as the message throttle,
-  applied before the first send rather than the second.
+Three minutes is one named constant, not a number buried in a condition — the same treatment as
+`NOTIFY_THROTTLE_MS`, and for the same reason: it is a guess, and it should cost one edit when it
+turns out to be wrong.
 
-  Three constraints it carries:
+---
 
-  - **Only for recipients who have an in-app surface.** A guest on a magic link has no badge to
-    see; email *is* their notification and delaying it is pure loss. `message-notifications.js`
-    already makes this distinction via `hasSetPassword` — reuse it, don't re-derive it.
-  - **The queue must be a database row, not memory.** A crash between queueing and sending would
-    otherwise drop the email with nothing recording that it was owed — the silent-failure class
-    §5 ranks highest.
-  - **Digests are exempt.** They are delayed by definition; a grace period on top means nothing.
+## 12. Risks to watch during implementation
 
-  Cost is a queue and a sweep. The system is correct without it; it is a polish item.
+Every question is decided. These are the places this design can still go wrong in the building.
+
+- **Orphaned queue rows.** A queued email whose send never ran is invisible unless something looks
+  for it. The condition sweep (§8) should include *"queued more than an hour ago and still
+  unsent"* — a silent-failure catcher for the notification system itself, which is exactly the kind
+  of thing that gets forgotten because the feature it guards is new and assumed healthy.
+
+- **The scheduler lock.** Double-sending every digest is invisible in dev, where there is only ever
+  one instance. The unique key on `{ job, periodStart }` is the guarantee; a check-then-run is not.
+  Worth a test that runs the job twice concurrently and asserts one send.
+
+- **Volume estimates are estimates.** "60–80 events a week for a six-artist shop" (§6) is reasoning,
+  not measurement. If the real number is triple that, digest-by-default stops being sufficient and
+  the categories need splitting further. Measure before adding notification types.
+
+- **Copy is frozen at write time.** §8 stores rendered `title`/`body` deliberately, so history says
+  what it said. The trade is that a copy bug is permanent in rows already written. Worth proofreading
+  notification strings harder than UI strings, which can be fixed by editing them.
+
+- **The actor check depends on knowing the actor.** §1 turns on `actorId != userId`. Any event
+  emitted from a background job or a webhook has no obvious actor, and defaulting that to null makes
+  everyone a recipient. Square's payment webhook is the live example. Decide the actor explicitly at
+  every emit site.
