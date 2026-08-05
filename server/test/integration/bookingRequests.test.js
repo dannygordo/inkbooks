@@ -652,9 +652,12 @@ describe('convertBookingRequest', () => {
 		expect(errors).toBeDefined();
 	});
 
-	it('a SHOP_ADMIN-or-better user can convert a request that isn\'t theirs', async () => {
+	it('a shop admin at the artist\'s own shop can convert a request that isn\'t theirs', async () => {
 		const { user: artistUser } = await createArtistUser();
-		const { user: shopAdmin } = await createShopAdminUser();
+		const { user: shopAdmin, shop } = await createShopAdminUser();
+		// The connection is what makes this artist theirs. Without it the same call is now
+		// refused - a shop admin is an admin of one shop, not of the platform.
+		await connectArtistToShop(artistUser.id, shop.id);
 		const bookingRequest = await submitBookingRequest(artistUser.id);
 		const server = createTestServer();
 

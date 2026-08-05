@@ -8,7 +8,12 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { createTestServer, contextWithToken } = require('../helpers/testServer');
 const { signTestToken } = require('../helpers/auth');
-const { createUser, createArtistUser, createShopAdminUser } = require('../helpers/factories');
+const {
+	createUser,
+	createArtistUser,
+	createShopAdminUser,
+	createStaffUser,
+} = require('../helpers/factories');
 const { Constants } = require('../../utils/constants');
 const { DEFAULT_NO_SHOP_TAG_COLOR } = require('../../utils/tag-color');
 const User = require('../../models/User');
@@ -40,9 +45,17 @@ const LOGIN_MUTATION = `
 	}
 `;
 
-const GET_USERS_QUERY = `
-	query GetUsers {
-		getUsers {
+// This suite's stand-in for "any withAuth-wrapped resolver": it needs a query that is gated by
+// authentication and nothing else, so a rejection can only mean the token was rejected. getShops
+// fits exactly - withAuth with no minRole, returning the caller's own shops (an empty list for a
+// caller with none, which is fine here since these tests assert on errors, not contents).
+//
+// This was getUsers until getUsers was deleted. That query returned every user account on the
+// platform and existed only for a global admin role that no longer exists - see
+// utils/shop-membership.js.
+const AUTHED_QUERY = `
+	query GetShops {
+		getShops {
 			id
 		}
 	}
@@ -356,24 +369,24 @@ describe('withAuth: unauthenticated / malformed / expired tokens', () => {
 	it('rejects a call with no authorization header at all', async () => {
 		const server = createTestServer();
 		const response = await server.executeOperation(
-			{ query: GET_USERS_QUERY },
+			{ query: AUTHED_QUERY },
 			{ contextValue: contextWithToken() },
 		);
 
 		const { errors, data } = response.body.singleResult;
-		expect(data.getUsers).toBeNull();
+		expect(data.getShops).toBeNull();
 		expect(errors[0].message).toMatch(/Authentication header must be provided/);
 	});
 
 	it('rejects a garbage/malformed token', async () => {
 		const server = createTestServer();
 		const response = await server.executeOperation(
-			{ query: GET_USERS_QUERY },
+			{ query: AUTHED_QUERY },
 			{ contextValue: contextWithToken('not-a-real-jwt') },
 		);
 
 		const { errors, data } = response.body.singleResult;
-		expect(data.getUsers).toBeNull();
+		expect(data.getShops).toBeNull();
 		expect(errors[0].message).toMatch(/Invalid\/expired token/);
 	});
 
@@ -387,12 +400,12 @@ describe('withAuth: unauthenticated / malformed / expired tokens', () => {
 
 		const server = createTestServer();
 		const response = await server.executeOperation(
-			{ query: GET_USERS_QUERY },
+			{ query: AUTHED_QUERY },
 			{ contextValue: contextWithToken(expiredToken) },
 		);
 
 		const { errors, data } = response.body.singleResult;
-		expect(data.getUsers).toBeNull();
+		expect(data.getShops).toBeNull();
 		expect(errors[0].message).toMatch(/Invalid\/expired token/);
 	});
 
@@ -406,35 +419,31 @@ describe('withAuth: unauthenticated / malformed / expired tokens', () => {
 
 		const server = createTestServer();
 		const response = await server.executeOperation(
-			{ query: GET_USERS_QUERY },
+			{ query: AUTHED_QUERY },
 			{ contextValue: contextWithToken(wrongSecretToken) },
 		);
 
 		const { errors, data } = response.body.singleResult;
-		expect(data.getUsers).toBeNull();
+		expect(data.getShops).toBeNull();
 		expect(errors[0].message).toMatch(/Invalid\/expired token/);
 	});
 
 	it('accepts a valid token for an authenticated resolver whose role check it satisfies', async () => {
-		// GET_USERS_QUERY (getUsers) is also this suite's stand-in for "any withAuth-wrapped
-		// resolver" in the token-rejection tests above - that's still valid there, since a missing/
-		// malformed/expired/wrong-secret token is rejected by withAuth before any role check runs.
-		// But getUsers itself is ADMIN-only (see resolvers/users.js - tightened after this test was
-		// first written, since it returned every user account on the platform to any authenticated
-		// caller), so proving "a valid token is accepted" specifically through getUsers now needs
-		// an Admin-role token, not just any authenticated user.
-		const admin = await createUser({ role: Constants.ROLES.ADMIN, userType: Constants.USER_TYPE.STAFF });
-		const token = signTestToken(admin);
+		// A plain shop staff member: AUTHED_QUERY has no minRole, so any authenticated caller
+		// should get through. The point is that the token is accepted, not what comes back.
+		const { shop } = await createShopAdminUser();
+		const { user: staff } = await createStaffUser(shop.id);
+		const token = signTestToken(staff);
 
 		const server = createTestServer();
 		const response = await server.executeOperation(
-			{ query: GET_USERS_QUERY },
+			{ query: AUTHED_QUERY },
 			{ contextValue: contextWithToken(token) },
 		);
 
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeUndefined();
-		expect(Array.isArray(data.getUsers)).toBe(true);
+		expect(Array.isArray(data.getShops)).toBe(true);
 	});
 });
 
@@ -486,9 +495,17 @@ describe('withAuth: minRole gate (updateShop requires Constants.ROLES.SHOP_ADMIN
 		expect(data.updateShop.name).toBe('Renamed Shop');
 	});
 
+	// The point here is purely the numeric comparison in withAuth: role 1 <= the required 10, so
+	// the gate lets it through. The Staff row is what gets it past updateShop's separate shop
+	// check - ADMIN grants no shop access of its own any more (see utils/shop-membership.js), so
+	// without a real assignment this caller would be refused after passing the role gate, and the
+	// test would pass or fail for the wrong reason.
 	it('accepts an ADMIN-role caller (numerically more privileged than the required minRole)', async () => {
-		const user = await createUser({ role: Constants.ROLES.ADMIN, userType: Constants.USER_TYPE.STAFF });
 		const { shop } = await createShopAdminUser();
+		const { user } = await createStaffUser(shop.id, {
+			role: Constants.ROLES.ADMIN,
+			userType: Constants.USER_TYPE.STAFF,
+		});
 		const token = signTestToken(user);
 
 		const server = createTestServer();

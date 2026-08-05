@@ -8,6 +8,7 @@ const { Constants } = require('../../utils/constants');
 const { UserInputError, AuthenticationError } = require('../../utils/errors');
 const { updateMessageInputSchema, createMessageInputSchema, validate } = require('../../utils/validation');
 const { sendNewMessageNotificationToGuest } = require('../../utils/email');
+const { canAccessConversation } = require('../../utils/shop-membership');
 
 module.exports = {
     // Had no ownership check at all - any authenticated user could pass an arbitrary
@@ -79,9 +80,17 @@ module.exports = {
 
       return msg;
     }),
-    deleteMessage: withAuth(async (_, { messageId }) => {
+    // Was ADMIN-gated, i.e. reachable only by the global role that no longer exists. Now a member
+    // of the thread this message belongs to, or a shop admin at a member's own shop.
+    deleteMessage: withAuth(async (_, { messageId }, context, info, user) => {
       try {
         const message = await Message.findById(messageId);
+        if (message) {
+          const conversation = await Conversation.findById(message.conversationId).select('members');
+          if (!(await canAccessConversation(user, conversation))) {
+            throw new AuthenticationError('Action not allowed');
+          }
+        }
         //TODO: revisit rule that allows a user to delete an message.  Might want to inactive message instead of delete in order to prevent historical documents from breaking
         if (message) {
           await Message.deleteOne({ _id: messageId });
@@ -91,12 +100,21 @@ module.exports = {
       } catch (err) {
         throw new Error(err);
       }
-    }, Constants.ROLES.ADMIN),
-    updateMessage: withAuth(async (_, args) => {
+    }),
+    updateMessage: withAuth(async (_, args, context, info, user) => {
       const message = args.message;
       const { valid, errors } = validate(updateMessageInputSchema, message);
       if (!valid) {
         throw new UserInputError('Errors', { errors });
+      }
+      // The minRole was the whole check - any shop admin could edit anyone's message text.
+      const existing = await Message.findById(message.id).select('conversationId');
+      if (!existing) {
+        throw new Error('Message not found');
+      }
+      const conversation = await Conversation.findById(existing.conversationId).select('members');
+      if (!(await canAccessConversation(user, conversation))) {
+        throw new AuthenticationError('Action not allowed');
       }
       try{
         const res = await Message.findByIdAndUpdate({_id: message.id}, message, {new: true});

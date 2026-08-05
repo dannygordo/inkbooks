@@ -6,6 +6,7 @@ const Staff = require('../../models/Staff');
 const Client = require('../../models/Client');
 const ArtistShopConnection = require('../../models/ArtistShopConnection');
 const withAuth = require('../../utils/with-auth');
+const { assertCanAccessShop } = require('../../utils/shop-membership');
 const { Constants } = require('../../utils/constants');
 const { UserInputError } = require('../../utils/errors');
 const { issuePasswordToken, generateUnusablePassword } = require('../../utils/password-tokens');
@@ -127,6 +128,10 @@ module.exports = {
         await assertEmailAvailable(email);
 
         const shopId = input.shopId || null;
+        // Creating an artist attaches them to shopId and gives them a tag colour there. Without
+        // this a shop admin could plant a working account, with an invite link they hold, on
+        // someone else's shop calendar.
+        await assertCanAccessShop(user, shopId);
         const { user: newUser, inviteLink } = await createUserWithInvite({
           firstName: input.firstName,
           lastName: input.lastName,
@@ -189,6 +194,9 @@ module.exports = {
             errors: { shopId: 'A staff member must belong to a shop.' },
           });
         }
+        // Same reasoning as createArtistAccount - and staff are more sensitive, since the account
+        // created here can read that shop's client list.
+        await assertCanAccessShop(user, input.shopId);
         await assertEmailAvailable(email);
 
         const { user: newUser, inviteLink } = await createUserWithInvite({

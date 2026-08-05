@@ -1,6 +1,7 @@
 const Shop = require('../../models/Shop');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
+const { assertCanAccessShop } = require('../../utils/shop-membership');
 
 module.exports = {
     createShop: withAuth(async (
@@ -43,7 +44,10 @@ module.exports = {
       const shop = await newShop.save();
       return shop;
     }, Constants.ROLES.SHOP_ADMIN),
-    deleteShop: withAuth(async (_, { shopId }) => {
+    // Was ADMIN-gated, i.e. reachable only by the global role that no longer exists. Now the
+    // shop's own admin, and only their own shop.
+    deleteShop: withAuth(async (_, { shopId }, context, info, user) => {
+      await assertCanAccessShop(user, shopId);
       try {
         const shop = await Shop.findById(shopId);
         //TODO: revisit rule that allows a user to delete an shop.  Might want to inactive shop instead of delete in order to prevent historical documents from breaking
@@ -55,10 +59,13 @@ module.exports = {
       } catch (err) {
         throw new Error(err);
       }
-    }, Constants.ROLES.ADMIN),
-    updateShop: withAuth(async (_, args) => {
+    }, Constants.ROLES.SHOP_ADMIN),
+    updateShop: withAuth(async (_, args, context, info, user) => {
       try{
         const shop = args.shop;
+        // A shop admin editing a shop's name, rates, billing type and shop-cut percentage - which
+        // must be their own shop. The minRole was the entire check before this.
+        await assertCanAccessShop(user, shop.id);
         const res = await Shop.findByIdAndUpdate({_id: shop.id}, shop, {new: true});
         return res;
       } catch (err) {
@@ -70,7 +77,9 @@ module.exports = {
     // calls are blocked until the shop reconnects). Doesn't call Square's RevokeToken endpoint -
     // simplest correct behavior for this minimal slice is "InkBooks forgets this token"; the
     // seller can also revoke it directly from their own Square dashboard if they want it fully dead.
-    disconnectShopSquare: withAuth(async (_, { shopId }) => {
+    disconnectShopSquare: withAuth(async (_, { shopId }, context, info, user) => {
+      // Otherwise any shop admin could cut any other shop off from taking payment.
+      await assertCanAccessShop(user, shopId);
       const shop = await Shop.findById(shopId);
       if (!shop) {
         throw new Error('Shop not found');

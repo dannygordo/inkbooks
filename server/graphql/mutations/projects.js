@@ -3,6 +3,7 @@ const withAuth = require('../../utils/with-auth');
 const { AuthenticationError, UserInputError } = require('../../utils/errors');
 const { Constants } = require('../../utils/constants');
 const { updateProjectInputSchema, createProjectInputSchema, validate } = require('../../utils/validation');
+const { canManageArtist } = require('../../utils/shop-membership');
 
 // IBImageInput/IBNoteInput's `id` field is GraphQL's name for the field, but Mongoose subdocuments
 // use `_id` as their real identity (`id` is only a computed virtual, never a settable schema path -
@@ -73,9 +74,14 @@ module.exports = {
     const project = await newProject.save();
     return project;
   }, Constants.ROLES.CLIENT),
-  deleteProject: withAuth(async (_, { projectId }) => {
+  // Was ADMIN-gated, i.e. reachable only by the global role that no longer exists. Now the
+  // project's own artist, or a shop admin at that artist's shop.
+  deleteProject: withAuth(async (_, { projectId }, context, info, user) => {
     try {
       const project = await Project.findById(projectId);
+      if (project && !(await canManageArtist(user, project.artistId))) {
+        throw new AuthenticationError('Action not allowed');
+      }
       //TODO: revisit rule that allows a user to delete an project.  Might want to inactive project instead of delete in order to prevent historical documents from breaking
       if (project) {
         await Project.deleteOne({ _id: projectId });
@@ -85,7 +91,7 @@ module.exports = {
     } catch (err) {
       throw new Error(err);
     }
-  }, Constants.ROLES.ADMIN),
+  }),
   // NOTE on project.artistId: per the Project resolver in resolvers/index.js
   // (Artist.findOne({ userId: project.artistId })), artistId stores the artist's *User* _id,
   // not the Artist collection's own _id - so comparing it directly against the JWT's user.id
@@ -101,7 +107,7 @@ module.exports = {
       const existingProject = await Project.findById(project.id);
       if (
         existingProject &&
-        (user.role <= Constants.ROLES.SHOP_ADMIN || String(user.id) === String(existingProject.artistId))
+        (await canManageArtist(user, existingProject.artistId))
       ) {
         const projectUpdate = {
           ...project,
@@ -122,7 +128,7 @@ module.exports = {
       const existingProject = await Project.findById(projectId);
       if (
         existingProject &&
-        (user.role <= Constants.ROLES.SHOP_ADMIN || String(user.id) === String(existingProject.artistId))
+        (await canManageArtist(user, existingProject.artistId))
       ) {
         const res = await Project.findByIdAndUpdate({_id: projectId}, {notes: notes}, {new: true});
         return res;
@@ -137,7 +143,7 @@ module.exports = {
       const existingProject = await Project.findById(projectId);
       if (
         existingProject &&
-        (user.role <= Constants.ROLES.SHOP_ADMIN || String(user.id) === String(existingProject.artistId))
+        (await canManageArtist(user, existingProject.artistId))
       ) {
         const res = await Project.findByIdAndUpdate({_id: projectId}, {tags: tags}, {new: true});
         return res;

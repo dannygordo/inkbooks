@@ -1,6 +1,5 @@
 const Staff = require('../../models/Staff');
 const withAuth = require('../../utils/with-auth');
-const { Constants } = require('../../utils/constants');
 const { AuthenticationError } = require('../../utils/errors');
 const { getShopIdsForUser } = require('../../utils/shop-membership');
 
@@ -12,9 +11,7 @@ module.exports = {
     // Staff/Artist callers only see staff at the shop(s) they're actually affiliated with.
     getStaff: withAuth(async (_, __, context, info, user) => {
       try {
-        if (user.role <= Constants.ROLES.SHOP_ADMIN) {
-          return await Staff.find().sort({ lastName: 1 });
-        }
+        // No unscoped branch, for anyone - see utils/shop-membership.js's role rule.
         const shopIds = await getShopIdsForUser(user.id);
         if (shopIds.length === 0) {
           return [];
@@ -33,7 +30,7 @@ module.exports = {
         if (!staff) {
           throw new Error('Staff not found');
         }
-        if (user.role > Constants.ROLES.SHOP_ADMIN && String(user.id) !== String(staff.userId)) {
+        if (String(user.id) !== String(staff.userId)) {
           const shopIds = await getShopIdsForUser(user.id);
           if (!shopIds.map(String).includes(String(staff.shopId))) {
             throw new AuthenticationError('Action not allowed');

@@ -79,6 +79,53 @@ The reason Phase 1's bugs exist is that every resolver repeats the same `checkAu
   - **Node ≥20 is now required** (`@as-integrations/express5` enforces this via `engines`). Run `node -v` before you `npm install` — if you're on an older Node, the install or runtime will fail.
   - You'll need to run `npm install` in `server/` yourself (sandbox can't reach the npm registry) — `apollo-server` is removed and `@apollo/server`, `@as-integrations/express5`, `express`, `cors`, `graphql-tag`, and `zod` are added to `package.json`.
 
+### The tenancy rule: nobody reaches a shop they aren't assigned to
+
+**Decided and implemented.** There is no global role. `Constants.ROLES.ADMIN` (1) survives as a
+reserved number so existing role-1 rows don't silently become some other role, but it grants no
+access to any shop's data — an account with role 1 and no `Staff` row sees nothing at all.
+
+The rule lives in one file, `server/utils/shop-membership.js`, and every shop-scoped resolver
+routes through it (`assertCanAccessShop`, `canManageArtist`, `canAccessConversation`). Roles still
+exist and still answer a real question — *how much of their own shop* someone sees: `SHOP_ADMIN`
+(10) sees the money, `SHOP_STAFF` (15) sees the schedule but not the books, `ARTIST` (20) sees
+their own work. "Which shop" is never a role question, and a role comparison can never answer it.
+
+**Why this was worth doing.** `user.role <= Constants.ROLES.SHOP_ADMIN` appeared ~50 times, and in
+every case where it guarded shop-scoped data it meant "skip the shop check" — which for a shop
+admin is exactly backwards. Any shop admin could read any other shop's revenue, client list,
+booking inbox and private message threads by passing a different id. The first version of the fix
+got `getShopAnalytics` backwards *in the very line under a comment warning about this*; the test
+suite caught it.
+
+**What this deliberately gives up.** Cross-shop platform analytics, and "log in as support and look
+at the customer's data". If support access is ever needed, the mechanism is a real `Staff` row at
+the shop being helped — time-boxed, revocable, visible to the shop owner — not a role that bypasses
+`shop-membership.js`. A backend management tool would create and revoke that row; it does not need,
+and should not get, its own privileged read path.
+
+**Open, deliberately not bundled into this:** none of the list queries paginate. `getClients`,
+`getProjects` and friends have no `.limit()`, which is unbounded for a large single shop regardless
+of tenancy. That's a separate job with its own tests — removing the global role did not address it
+and was never going to.
+
+**Deleted rather than scoped:** `getUsers`, `getMessages`, `getConversations`. All three returned
+every record of their kind on the platform, none had a caller in the client, and their only
+possible caller was the global role that no longer exists. Scoping them would have meant inventing
+a feature to justify keeping a query that returns every email address in the system.
+
+**The delete mutations moved down, not away.** `deleteShop`/`deleteStaff`/`deleteArtist`/
+`deleteClient`/`deleteProject`/`deleteAppointment`/`deleteConversation`/`deleteMessage` were all
+`ADMIN`-gated, which after this change would have meant nobody could ever call them. They're now
+`SHOP_ADMIN` scoped to the caller's own shop. The `//TODO: revisit rule that allows a user to
+delete` comments on each of them still stand — soft-status instead of hard delete remains the
+better long-term answer, and is still open.
+
+**Coverage:** `server/test/integration/shopIsolation.test.js` is the boundary test — two complete
+shops, and shop B's admin (a real, legitimate user) attempting every read and write against shop A
+one surface at a time, plus the counterweight cases proving a shop admin still has full reach
+inside their own shop.
+
 ### Artist-centric tenancy model — finalized design (pre-launch, no real user data to migrate)
 
 The original plan assumed the current shop-centric schema (`Artist.shopId` as a hard foreign key — an artist *belongs to* a shop) was staying as-is. It isn't. Below is the finalized design from a dedicated design conversation, ready to implement.
@@ -589,8 +636,9 @@ that prompted looking at this at all.
   with `mongodb://localhost` or `mongodb://127.0.0.1` — a deliberate guard against ever pointing
   this destructive script at Atlas by accident.
 
-  Seeded data covers every real role: a platform Admin (`Constants.ROLES.ADMIN` - no dedicated
-  client-side UI, but a real login for exercising Admin-only backend behavior like `getUsers`), one
+  Seeded data covers every real role. The `platformadmin` account was removed when the global
+  role lost its cross-shop access - it has no `Staff` row, so it would log in to an empty app, and
+  seeding a login that looks broken is worse than not seeding it. What remains: one
   shop (Copper Wolf Tattoo Co.), a Shop Admin, a Shop Staff member, two shop-affiliated Artists
   (each with a real `ArtistShopConnection`), one independent Artist with no shop connection at all
   (exercises the artist-centric tenancy path — see that section above), four Clients, four Projects

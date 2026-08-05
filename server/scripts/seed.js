@@ -124,24 +124,16 @@ async function seed() {
     status: 1,
   }).save();
 
-  // --- Platform Admin (User only - no Staff/Shop tie, matches the convention already used in
-  // test/integration/users.test.js: Constants.ROLES.ADMIN is a distinct, more-privileged role from
-  // SHOP_ADMIN, with no client-side UI of its own today (no ROLES.ADMIN references anywhere in
-  // client/src) - it exists purely as the backend's top role for things like getUsers. Seeded
-  // anyway so every real role in the system has a real login, not just the ones with dedicated
-  // pages. ---
-  await new User({
-    username: 'platformadmin',
-    email: 'platformadmin@copperwolf.dev',
-    password: hashedPassword,
-    role: Constants.ROLES.ADMIN,
-    userType: Constants.USER_TYPE.STAFF,
-    firstName: 'Alex',
-    lastName: 'Admin',
-    hasSetPassword: true,
-    // No shop to be unique within - same fallback pickDefaultTagColor uses for anyone unaffiliated.
-    tagColor: await pickDefaultTagColor(null),
-  }).save();
+  // --- Platform Admin: deliberately NOT seeded any more. ---
+  //
+  // There used to be a `platformadmin` account here at Constants.ROLES.ADMIN, back when that role
+  // could read every shop on the platform. That bypass is gone (see utils/shop-membership.js) and
+  // nothing grants cross-shop access, so the account would log in and see an empty app - it has
+  // no Staff row, therefore no shop, therefore no data. Seeding a login that appears broken is
+  // worse than not seeding it.
+  //
+  // If cross-shop support access is ever needed, the mechanism is a real Staff row at the shop
+  // being helped: time-boxed, revocable, and visible to the shop owner. Not a role.
 
   // --- Shop Admin (User + Staff) -------------------------------------------
   const shopAdminUser = await new User({
@@ -534,7 +526,6 @@ async function seed() {
   // The login mutation takes USERNAME, not email (see resolvers/users.js's login) - listing
   // username first here since that's the field that actually matters at the login screen.
   console.log('Accounts (log in with username + password, not email):');
-  console.log(`  Platform Admin  username: platformadmin  (${'platformadmin@copperwolf.dev'}) - no dedicated UI, backend-only role`);
   console.log(`  Shop Admin      username: shopadmin       (shopadmin@copperwolf.dev)`);
   console.log(`  Shop Staff      username: frontdesk       (frontdesk@copperwolf.dev)`);
   console.log(`  Artist          username: artist.maya     (maya@copperwolf.dev)  - shop-affiliated`);

@@ -6,7 +6,12 @@ const ArtistShopConnection = require('../../models/ArtistShopConnection');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 const { AuthenticationError } = require('../../utils/errors');
-const { getShopIdsForUser, getArtistIdsForShops, sharesShopWith } = require('../../utils/shop-membership');
+const {
+  getShopIdsForUser,
+  getArtistIdsForShops,
+  sharesShopWith,
+  assertCanAccessShop,
+} = require('../../utils/shop-membership');
 
 // getAppointmentsByShop is called for real by Artist- and Staff-role users viewing their own
 // shop's calendar (see client/src/components/ibCalendar/IBCalendar.jsx), not just Shop Admins -
@@ -15,9 +20,9 @@ const { getShopIdsForUser, getArtistIdsForShops, sharesShopWith } = require('../
 // userType, so this checks both possible ownership relationships directly rather than branching
 // on a userType this function doesn't have.
 async function callerBelongsToShop(user, shopId) {
-  if (user.role <= Constants.ROLES.SHOP_ADMIN) {
-    return true;
-  }
+  // No role skips this. It said `role <= SHOP_ADMIN`, which treated a shop admin as belonging to
+  // EVERY shop - passing someone else's shopId returned their whole appointment history, money
+  // included. Belonging to a shop is a database relationship, never a role number.
   const [isStaffHere, isConnectedArtist] = await Promise.all([
     Staff.exists({ userId: user.id, shopId }),
     ArtistShopConnection.exists({ artistId: user.id, shopId }),
@@ -27,10 +32,11 @@ async function callerBelongsToShop(user, shopId) {
 
 module.exports = {
   Query: {
-    // Shop-admin-or-better, same loose convention as getShopArtistConnections (Shop has no
-    // owning-User field yet to check a caller belongs to *this specific* shop - see
-    // resolvers/artistShopConnections.js's comment on the same gap).
-    getPendingShopCutConfirmations: withAuth(async (_, { shopId }) => {
+    // Shop-admin-or-better AND at this shop. The minRole alone was the whole check before, so any
+    // shop admin could read any other shop's pending confirmations - each of which carries an
+    // artist's name and the amount they claim to have paid - by passing a different shopId.
+    getPendingShopCutConfirmations: withAuth(async (_, { shopId }, context, info, user) => {
+      await assertCanAccessShop(user, shopId);
       return Appointment.find({ shopId, shopCutStatus: 'pending_confirmation' }).sort({
         shopCutMarkedPaidAt: 1,
       });
@@ -65,7 +71,10 @@ module.exports = {
     // at a DIFFERENT shop stay denied - role alone can't express that, hence sharesShopWith.
     // ARTIST-role callers are unaffected and still only ever see their own history.
     getAppointmentsByArtist: withAuth(async (_, { userId }, context, info, user) => {
-        if (user.role > Constants.ROLES.SHOP_ADMIN && String(user.id) !== String(userId)) {
+        // The artist themselves, or Staff-and-above who share a shop with them. A shop admin is
+        // in that second group and takes the same shared-shop check as anyone else - previously
+        // `role > SHOP_ADMIN` let them skip it and read any artist's financial history.
+        if (String(user.id) !== String(userId)) {
           const isSameShopStaff =
             user.role <= Constants.ROLES.SHOP_STAFF && (await sharesShopWith(user.id, userId));
           if (!isSameShopStaff) {
@@ -92,7 +101,6 @@ module.exports = {
           throw new Error('Appointment not found');
         }
         if (
-          user.role > Constants.ROLES.SHOP_ADMIN &&
           String(user.id) !== String(appointment.userId) &&
           !(await callerBelongsToShop(user, appointment.shopId))
         ) {
@@ -114,7 +122,7 @@ module.exports = {
       if (!project) {
         throw new Error('Project not found');
       }
-      if (user.role > Constants.ROLES.SHOP_ADMIN && String(user.id) !== String(project.artistId)) {
+      if (String(user.id) !== String(project.artistId)) {
         const myClient = await Client.findOne({ userId: user.id }).select('_id');
         const isOwnClient = myClient && String(myClient.id) === String(project.clientId);
         let isShopStaff = false;

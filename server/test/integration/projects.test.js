@@ -7,7 +7,14 @@
 // test/integration/appointments.test.js for why there's no `require('vitest')` here.
 const { createTestServer, contextWithToken } = require('../helpers/testServer');
 const { signTestToken } = require('../helpers/auth');
-const { createUser, createArtistUser, createClientUser, createProject } = require('../helpers/factories');
+const {
+	createUser,
+	createArtistUser,
+	createClientUser,
+	createShopAdminUser,
+	connectArtistToShop,
+	createProject,
+} = require('../helpers/factories');
 const { Constants } = require('../../utils/constants');
 
 const CREATE_PROJECT = `
@@ -190,12 +197,15 @@ describe('updateProject / updateProjectNotes ownership', () => {
 		expect(errors[0].message).toMatch(/Action not allowed/);
 	});
 
-	it('allows a SHOP_ADMIN-or-better user to update any project regardless of assigned artist', async () => {
+	// Was "any project regardless of assigned artist", called as the global ADMIN. Now a shop
+	// admin may update a project belonging to an artist at their own shop, and no further.
+	it('allows a shop admin to update a project belonging to an artist at their shop', async () => {
 		const { user: ownerArtist } = await createArtistUser();
 		const { client } = await createClientUser();
-		const admin = await createUser({ role: Constants.ROLES.ADMIN, userType: Constants.USER_TYPE.STAFF });
+		const { user: shopAdmin, shop } = await createShopAdminUser();
+		await connectArtistToShop(ownerArtist.id, shop.id);
 		const project = await createProject(ownerArtist.id, client.id);
-		const token = signTestToken(admin);
+		const token = signTestToken(shopAdmin);
 		const server = createTestServer();
 
 		const response = await server.executeOperation(
@@ -427,12 +437,13 @@ describe('deleteProject: Admin-only', () => {
 		expect(errors[0].message).toMatch(/Action not allowed/);
 	});
 
-	it('allows an Admin to delete a project', async () => {
+	it('allows a shop admin at the artist\'s shop to delete a project', async () => {
 		const { user: artistUser } = await createArtistUser();
 		const { client } = await createClientUser();
-		const admin = await createUser({ role: Constants.ROLES.ADMIN, userType: Constants.USER_TYPE.STAFF });
+		const { user: shopAdmin, shop } = await createShopAdminUser();
+		await connectArtistToShop(artistUser.id, shop.id);
 		const project = await createProject(artistUser.id, client.id);
-		const token = signTestToken(admin);
+		const token = signTestToken(shopAdmin);
 		const server = createTestServer();
 
 		const response = await server.executeOperation(
@@ -499,12 +510,13 @@ describe('getProjectsByArtist: ownership', () => {
 		expect(errors[0].message).toMatch(/Action not allowed/);
 	});
 
-	it('allows a SHOP_ADMIN-or-better user to read any artist\'s project list', async () => {
+	it('allows a shop admin to read the project list of an artist at their shop', async () => {
 		const { user: ownerArtist } = await createArtistUser();
 		const { client } = await createClientUser();
 		await createProject(ownerArtist.id, client.id);
-		const admin = await createUser({ role: Constants.ROLES.ADMIN, userType: Constants.USER_TYPE.STAFF });
-		const token = signTestToken(admin);
+		const { user: shopAdmin, shop } = await createShopAdminUser();
+		await connectArtistToShop(ownerArtist.id, shop.id);
+		const token = signTestToken(shopAdmin);
 		const server = createTestServer();
 
 		const response = await server.executeOperation(

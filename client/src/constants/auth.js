@@ -5,6 +5,9 @@
 //
 // Lower is more privileged throughout, so "at least this privileged" is `role <= X`.
 export const ROLES = {
+	// Reserved, and deliberately powerless - see server/utils/constants.js. Nothing grants
+	// cross-shop access any more; don't write UI that assumes this role sees more than a
+	// SHOP_ADMIN does.
 	ADMIN: 1,
 	SHOP_ADMIN: 10,
 	SHOP_STAFF: 15,

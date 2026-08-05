@@ -1,9 +1,9 @@
 const BookingRequest = require('../../models/BookingRequest');
 const User = require('../../models/User');
 const withAuth = require('../../utils/with-auth');
-const { AuthenticationError } = require('../../utils/errors');
 const { Constants } = require('../../utils/constants');
 const { resolveGuestToken } = require('../../utils/guest-auth');
+const { assertCanManageArtist } = require('../../utils/shop-membership');
 
 module.exports = {
   Query: {
@@ -30,9 +30,10 @@ module.exports = {
     // from the artist's own point of view and shouldn't be echoed back at them in this inbox. See
     // BookingRequest.js's own comment on the source field.
     getBookingRequests: withAuth(async (_, { artistId }, context, info, user) => {
-      if (user.role > Constants.ROLES.SHOP_ADMIN && String(user.id) !== String(artistId)) {
-        throw new AuthenticationError('Action not allowed');
-      }
+      // The artist themselves, or a shop admin at their shop. Previously any shop admin, at any
+      // shop, could read an artist's whole inbox - each request carries a client's name, email
+      // and the description of the work they want.
+      await assertCanManageArtist(user, artistId);
       return BookingRequest.find({ artistId, source: 'public_form' }).sort({ createdAt: -1 });
     }),
     getBookingRequest: withAuth(async (_, { bookingRequestId }, context, info, user) => {
@@ -40,12 +41,7 @@ module.exports = {
       if (!bookingRequest) {
         throw new Error('Booking request not found');
       }
-      if (
-        user.role > Constants.ROLES.SHOP_ADMIN &&
-        String(user.id) !== String(bookingRequest.artistId)
-      ) {
-        throw new AuthenticationError('Action not allowed');
-      }
+      await assertCanManageArtist(user, bookingRequest.artistId);
       return bookingRequest;
     }),
     // Public, token-gated (not withAuth) - resolves a guest's magic link to their own request.

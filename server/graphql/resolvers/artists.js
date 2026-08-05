@@ -2,7 +2,10 @@ const Artist = require('../../models/Artist');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 const { AuthenticationError } = require('../../utils/errors');
-const { getShopIdsForUser } = require('../../utils/shop-membership');
+const {
+  getShopIdsForUser,
+  assertCanAccessShop,
+} = require('../../utils/shop-membership');
 
 module.exports = {
   Query: {
@@ -22,9 +25,7 @@ module.exports = {
     // Shop-scoping for Staff is unchanged below.
     getArtists: withAuth(async (_, __, context, info, user) => {
       try {
-        if (user.role <= Constants.ROLES.SHOP_ADMIN) {
-          return await Artist.find().sort({ startDate: 1 });
-        }
+        // No unscoped branch, for anyone - see utils/shop-membership.js's role rule.
         const shopIds = await getShopIdsForUser(user.id);
         if (shopIds.length === 0) {
           return [];
@@ -48,7 +49,7 @@ module.exports = {
           throw new Error('Artist not found');
         }
         const isSelf = String(user.id) === String(artist.userId);
-        if (!isSelf && user.role > Constants.ROLES.SHOP_ADMIN) {
+        if (!isSelf) {
           // Staff, but not Artists or Clients - and only Staff at this artist's own shop. Role
           // alone can't express "same shop", which is why both halves are checked.
           const shopIds = await getShopIdsForUser(user.id);
@@ -69,13 +70,8 @@ module.exports = {
     // viewing their own shop - same "not a flat role gate" reasoning as
     // resolvers/appointments.js's callerBelongsToShop.
     getArtistsByShop: withAuth(async (_, { shopId }, context, info, user) => {
+      await assertCanAccessShop(user, shopId);
       try {
-        if (user.role > Constants.ROLES.SHOP_ADMIN) {
-          const shopIds = await getShopIdsForUser(user.id);
-          if (!shopIds.map(String).includes(String(shopId))) {
-            throw new AuthenticationError('Action not allowed');
-          }
-        }
         const artists = await Artist.find({ shopId: shopId }).sort({ firstName: 1 });
         if (artists) {
           return artists;

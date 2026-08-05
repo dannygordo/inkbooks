@@ -17,6 +17,7 @@ const {
 	createArtistUser,
 	createClientUser,
 	createShopAdminUser,
+	connectArtistToShop,
 	createProject,
 	createAppointment,
 } = require('../helpers/factories');
@@ -161,9 +162,15 @@ describe('updateClientNotes', () => {
 		expect(errors[0].message).toMatch(/Action not allowed/);
 	});
 
-	it('allows a shop admin regardless of shared projects', async () => {
-		const { user: shopAdmin } = await createShopAdminUser();
+	// This asserted "regardless of shared projects" until the global-admin role was removed. A
+	// shop admin has no platform-wide reach any more: a Client carries no shopId, so the only
+	// thing that makes them this shop's client is a Project with one of its artists.
+	it('allows a shop admin whose own shop has a project with this client', async () => {
+		const { user: shopAdmin, shop } = await createShopAdminUser();
+		const { user: artistUser } = await createArtistUser();
+		await connectArtistToShop(artistUser.id, shop.id);
 		const { client } = await createClientUser();
+		await createProject(artistUser.id, client.id);
 
 		const server = createTestServer();
 		const res = await server.executeOperation(
@@ -173,5 +180,20 @@ describe('updateClientNotes', () => {
 
 		expect(res.body.singleResult.errors).toBeUndefined();
 		expect(res.body.singleResult.data.updateClientNotes.notes).toHaveLength(1);
+	});
+
+	it('refuses a shop admin with no project connecting their shop to this client', async () => {
+		const { user: shopAdmin } = await createShopAdminUser();
+		const { client } = await createClientUser();
+
+		const server = createTestServer();
+		const res = await server.executeOperation(
+			{ query: UPDATE_CLIENT_NOTES, variables: { clientId: client.id, notes: [noteInput()] } },
+			{ contextValue: contextWithToken(signTestToken(shopAdmin)) },
+		);
+
+		const { errors, data } = res.body.singleResult;
+		expect(data.updateClientNotes).toBeNull();
+		expect(errors[0].message).toMatch(/Action not allowed/);
 	});
 });

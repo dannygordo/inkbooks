@@ -14,7 +14,6 @@ const {
 } = require('../helpers/factories');
 const { Constants } = require('../../utils/constants');
 
-const GET_USERS = `{ getUsers { id } }`;
 const GET_USER = `query GetUser($userId: ID!) { getUser(userId: $userId) { id } }`;
 const GET_USER_TAG_COLORS = `
 	query GetUserTagColors($shopId: ID!) {
@@ -22,37 +21,10 @@ const GET_USER_TAG_COLORS = `
 	}
 `;
 
-describe('getUsers: ADMIN-only', () => {
-	it('rejects a non-Admin caller, including a Shop Admin', async () => {
-		const { user: shopAdmin } = await createShopAdminUser();
-		const server = createTestServer();
-
-		const response = await server.executeOperation(
-			{ query: GET_USERS },
-			{ contextValue: contextWithToken(signTestToken(shopAdmin)) },
-		);
-
-		const { errors, data } = response.body.singleResult;
-		expect(data.getUsers).toBeNull();
-		expect(errors[0].message).toMatch(/Action not allowed/);
-	});
-
-	it('allows an Admin', async () => {
-		const admin = await createUser({ role: Constants.ROLES.ADMIN, userType: Constants.USER_TYPE.STAFF });
-		const server = createTestServer();
-
-		const response = await server.executeOperation(
-			{ query: GET_USERS },
-			{ contextValue: contextWithToken(signTestToken(admin)) },
-		);
-
-		const { errors, data } = response.body.singleResult;
-		expect(errors).toBeUndefined();
-		expect(Array.isArray(data.getUsers)).toBe(true);
-	});
-});
-
-describe('getUser: self-or-shop-admin-or-better', () => {
+// getUsers was deleted outright rather than scoped - it returned every user account on the
+// platform and had no caller in the client. The test that proved "only ADMIN can call it" went
+// with it; what replaces it is the schema itself, which no longer offers the field.
+describe('getUser: self, or a shop admin at that person\'s own shop', () => {
 	it('allows a user to read their own record', async () => {
 		const { user: clientUser } = await createClientUser();
 		const server = createTestServer();
@@ -82,19 +54,35 @@ describe('getUser: self-or-shop-admin-or-better', () => {
 		expect(errors[0].message).toMatch(/Action not allowed/);
 	});
 
-	it('allows a Shop Admin to read any user\'s record', async () => {
-		const { user: shopAdmin } = await createShopAdminUser();
-		const { user: clientUser } = await createClientUser();
+	it('allows a Shop Admin to read the record of someone at their own shop', async () => {
+		const { user: shopAdmin, shop } = await createShopAdminUser();
+		const { user: coworker } = await createStaffUser(shop.id);
 		const server = createTestServer();
 
 		const response = await server.executeOperation(
-			{ query: GET_USER, variables: { userId: clientUser.id } },
+			{ query: GET_USER, variables: { userId: coworker.id } },
 			{ contextValue: contextWithToken(signTestToken(shopAdmin)) },
 		);
 
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeUndefined();
-		expect(data.getUser.id).toBe(clientUser.id);
+		expect(data.getUser.id).toBe(coworker.id);
+	});
+
+	it('refuses a Shop Admin the record of someone at a different shop', async () => {
+		const { shop: shopA } = await createShopAdminUser();
+		const { user: adminB } = await createShopAdminUser();
+		const { user: staffAtA } = await createStaffUser(shopA.id);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_USER, variables: { userId: staffAtA.id } },
+			{ contextValue: contextWithToken(signTestToken(adminB)) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(data.getUser).toBeNull();
+		expect(errors[0].message).toMatch(/Action not allowed/);
 	});
 });
 

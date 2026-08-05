@@ -1,26 +1,22 @@
 const Conversation = require('../../models/Conversation');
 const Client = require('../../models/Client');
 const withAuth = require('../../utils/with-auth');
-const { Constants } = require('../../utils/constants');
 const { AuthenticationError } = require('../../utils/errors');
-const { getShopIdsForUser, getArtistIdsForShops, getMemberUserIdsForShop } = require('../../utils/shop-membership');
+const {
+  getShopIdsForUser,
+  getArtistIdsForShops,
+  getMemberUserIdsForShop,
+  assertCanAccessShop,
+  canAccessConversation,
+} = require('../../utils/shop-membership');
 const { findOrCreateConversationForMembers } = require('../../utils/conversations');
 
 module.exports = {
   Query: {
-    // Was withAuth with no restriction at all - any authenticated user could read every private
-    // conversation on the platform. Not called anywhere in the client (grepped - no caller), so
-    // there's no real feature relying on "every conversation" access; flat-gating to ADMIN closes
-    // the hole without resurrecting a feature nobody uses. Worth a follow-up decision on whether
-    // to just delete this resolver instead.
-    getConversations: withAuth(async () => {
-      try {
-        const conversation = await Conversation.find().sort({ updatedAt: 1 });
-        return conversation;
-      } catch (err) {
-        throw new Error(err);
-      }
-    }, Constants.ROLES.ADMIN),
+    // getConversations (every private thread on the platform) was deleted - see the note on
+    // getUsers in resolvers/users.js for why these three went rather than getting scoped. Reading
+    // messages goes through getConversationsByMemberId or the Conversation.messages field
+    // resolver, both of which check who's asking.
     // Was withAuth with no ownership check at all - any authenticated user could pass an
     // arbitrary memberId and read that user's entire private message history. The one real
     // caller (Messenger.jsx) always passes the caller's own user.id, so this is strictly
@@ -56,12 +52,7 @@ module.exports = {
     // reasoning as getArtistsByShop (resolvers/artists.js).
     getConversationsByShopId: withAuth(async (_, { shopId }, context, info, user) => {
         try {
-          if (user.role > Constants.ROLES.SHOP_ADMIN) {
-            const shopIds = await getShopIdsForUser(user.id);
-            if (!shopIds.map(String).includes(String(shopId))) {
-              throw new AuthenticationError('Action not allowed');
-            }
-          }
+          await assertCanAccessShop(user, shopId);
           const memberIds = await getMemberUserIdsForShop(shopId);
           if (memberIds.length === 0) {
             return [];
@@ -88,10 +79,11 @@ module.exports = {
         if (!conversation) {
           throw new Error('Conversation not found');
         }
-        if (
-          user.role > Constants.ROLES.SHOP_ADMIN &&
-          !(conversation.members || []).some((memberId) => String(memberId) === String(user.id))
-        ) {
+        // A member, or a shop admin at the shop one of the members works at. The old check let
+        // any shop admin anywhere read any thread in the system; these are private messages
+        // between an artist and their client. See canAccessConversation for how a Conversation -
+        // which has no shopId - gets attached to a shop at all.
+        if (!(await canAccessConversation(user, conversation))) {
           throw new AuthenticationError('Action not allowed');
         }
         return conversation;
@@ -116,7 +108,6 @@ module.exports = {
           throw new Error('Client not found');
         }
         if (
-          user.role > Constants.ROLES.SHOP_ADMIN &&
           String(user.id) !== String(artistId) &&
           String(user.id) !== String(client.userId)
         ) {

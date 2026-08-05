@@ -4,6 +4,7 @@ const User = require('../../models/User');
 const withAuth = require('../../utils/with-auth');
 const { AuthenticationError, UserInputError } = require('../../utils/errors');
 const { Constants } = require('../../utils/constants');
+const { assertCanAccessShop } = require('../../utils/shop-membership');
 const square = require('../../utils/square');
 const {
   sendShopCutMarkedPaidNotificationToShop,
@@ -221,10 +222,10 @@ module.exports = {
     return appointment;
   }),
 
-  // The shop's independent confirmation - the other half of the dual-control design. Same
-  // shop-admin-or-better convention as getPendingShopCutConfirmations/getShopArtistConnections
-  // (documented gap: no per-shop ownership check yet, only "is this caller a shop-admin-or-better
-  // at all").
+  // The shop's independent confirmation - the other half of the dual-control design. Shop admin
+  // AND at this appointment's shop: the role says they're senior enough to confirm a payment,
+  // assertCanAccessShop below says it's their shop's money. The "no per-shop ownership check
+  // yet" gap this comment used to describe is closed - see utils/shop-membership.js.
   confirmShopCutPaid: withAuth(async (_, args, context, info, user) => {
     const { valid, errors, data } = validate(appointmentIdInputSchema, args);
     if (!valid) {
@@ -234,6 +235,7 @@ module.exports = {
     if (!appointment) {
       throw new UserInputError('Errors', { errors: { appointmentId: 'Appointment not found' } });
     }
+    await assertCanAccessShop(user, appointment.shopId);
     if (appointment.shopCutStatus !== 'pending_confirmation') {
       throw new UserInputError('Errors', {
         errors: { appointmentId: 'This shop cut is not awaiting confirmation.' },

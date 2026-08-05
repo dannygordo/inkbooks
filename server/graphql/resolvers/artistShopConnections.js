@@ -1,25 +1,22 @@
 const ArtistShopConnection = require('../../models/ArtistShopConnection');
 const withAuth = require('../../utils/with-auth');
-const { AuthenticationError } = require('../../utils/errors');
-const { Constants } = require('../../utils/constants');
+const { assertCanAccessShop, assertCanManageArtist } = require('../../utils/shop-membership');
 
 module.exports = {
   Query: {
     getArtistShopConnections: withAuth(async (_, { artistId }, context, info, user) => {
-      if (user.role > Constants.ROLES.SHOP_ADMIN && String(user.id) !== String(artistId)) {
-        throw new AuthenticationError('Action not allowed');
-      }
+      // The artist themselves, or a shop admin who actually shares a shop with them. The old
+      // `role <= SHOP_ADMIN` half of this let any shop admin enumerate any artist's shop history.
+      await assertCanManageArtist(user, artistId);
       return ArtistShopConnection.find({ artistId }).sort({ createdAt: -1 });
     }),
-    // Shop has no owning-User field yet (see models/Shop.js) - there's no way to check "is this
-    // caller the admin of *this specific* shop", only "is this caller a shop-admin-or-better at
-    // all". Matches the same loose convention already used elsewhere in this codebase (e.g.
-    // updateAppointment's role check) rather than inventing shop-scoped ownership as a side
-    // effect of this task.
+    // The "Shop has no owning-User field, so we can only check the role" note that used to sit
+    // here is no longer true - Staff.shopId and ArtistShopConnection.shopId are exactly that
+    // relationship, read through utils/shop-membership.js. Two separate questions now: the role
+    // says a caller is senior enough to see a shop's roster, assertCanAccessShop says it's their
+    // shop.
     getShopArtistConnections: withAuth(async (_, { shopId }, context, info, user) => {
-      if (user.role > Constants.ROLES.SHOP_ADMIN) {
-        throw new AuthenticationError('Action not allowed');
-      }
+      await assertCanAccessShop(user, shopId);
       return ArtistShopConnection.find({ shopId }).sort({ createdAt: -1 });
     }),
   },

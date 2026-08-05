@@ -1,6 +1,12 @@
 module.exports.Constants = {
     ROLES: {
+        // Reserved, and deliberately powerless. ADMIN was a global role that could read every
+        // shop on the platform; that bypass is gone (see utils/shop-membership.js) and nothing
+        // grants cross-shop access any more. The number is kept rather than deleted so an
+        // existing role-1 row doesn't silently become some other role - it degrades to an
+        // account with no shop, which sees nothing. Don't build new features on it.
         ADMIN: 1,
+        // The real ceiling. Full access to everything at THEIR OWN shop, money included.
         SHOP_ADMIN: 10,
         SHOP_STAFF: 15,
         ARTIST: 20,

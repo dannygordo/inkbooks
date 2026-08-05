@@ -1,7 +1,7 @@
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 const { AuthenticationError, UserInputError } = require('../../utils/errors');
-const { getShopIdsForUser, sharesShopWith } = require('../../utils/shop-membership');
+const { sharesShopWith, assertCanAccessShop } = require('../../utils/shop-membership');
 const { computeAnalytics } = require('../../utils/analytics');
 
 // Every money-denominated field on the Analytics type. Listed once, here, rather than deleted
@@ -93,13 +93,8 @@ module.exports = {
         // data leak the comment above warns about, implemented backwards. Caught by
         // analytics.test.js's cross-shop case the first time the suite was actually run.
         //
-        // Only the platform ADMIN (role 1) is exempt, because that role is deliberately global.
-        if (user.role > Constants.ROLES.ADMIN) {
-          const shopIds = await getShopIdsForUser(user.id);
-          if (!shopIds.map(String).includes(String(shopId))) {
-            throw new AuthenticationError('Action not allowed');
-          }
-        }
+        // Nobody is exempt - there is no global role. See utils/shop-membership.js.
+        await assertCanAccessShop(user, shopId);
         const analytics = await computeAnalytics({ shopId, start, end });
         return user.role <= Constants.ROLES.SHOP_ADMIN ? analytics : stripMoney(analytics);
       },
@@ -119,7 +114,7 @@ module.exports = {
       // Same correction as getShopAnalytics above: this said `role > SHOP_ADMIN`, so a shop admin
       // skipped the shop check and could read ANY artist's earnings anywhere on the platform. A
       // shop admin is an admin of a particular shop; the role number doesn't say which.
-      if (!isSelf && user.role > Constants.ROLES.ADMIN) {
+      if (!isSelf) {
         const isSameShopStaff =
           user.role <= Constants.ROLES.SHOP_STAFF && (await sharesShopWith(user.id, userId));
         if (!isSameShopStaff) {

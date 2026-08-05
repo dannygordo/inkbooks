@@ -3,7 +3,11 @@ const Client = require('../../models/Client');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 const { AuthenticationError } = require('../../utils/errors');
-const { getShopIdsForUser, getArtistIdsForShops } = require('../../utils/shop-membership');
+const {
+  getShopIdsForUser,
+  getArtistIdsForShops,
+  assertCanManageArtist,
+} = require('../../utils/shop-membership');
 
 const resolvers = {
   Query: {
@@ -18,11 +22,12 @@ const resolvers = {
     getProjects: withAuth(async (_, __, context, info, user) => {
       try {
         let filter = {};
-        if (user.role <= Constants.ROLES.SHOP_ADMIN) {
-          filter = {};
-        } else if (user.role === Constants.ROLES.ARTIST) {
+        // No unscoped branch, for anyone. The staff test is `<= SHOP_STAFF` rather than
+        // `=== SHOP_STAFF` so a shop admin lands here rather than falling through to the client
+        // branch and seeing nothing.
+        if (user.role === Constants.ROLES.ARTIST) {
           filter = { artistId: user.id };
-        } else if (user.role === Constants.ROLES.SHOP_STAFF) {
+        } else if (user.role <= Constants.ROLES.SHOP_STAFF) {
           const shopIds = await getShopIdsForUser(user.id);
           const artistIds = await getArtistIdsForShops(shopIds);
           if (artistIds.length === 0) {
@@ -53,7 +58,7 @@ const resolvers = {
         if (!project) {
           throw new Error('Project not found');
         }
-        if (user.role > Constants.ROLES.SHOP_ADMIN && String(user.id) !== String(project.artistId)) {
+        if (String(user.id) !== String(project.artistId)) {
           const myClient = await Client.findOne({ userId: user.id }).select('_id');
           const isOwnClient = myClient && String(myClient.id) === String(project.clientId);
           let isShopStaff = false;
@@ -76,9 +81,9 @@ const resolvers = {
     // themselves, or shop-admin-or-better" convention as getAppointmentsByArtist
     // (see resolvers/appointments.js) and getArtistShopConnections/getBookingRequests.
     getProjectsByArtist: withAuth(async (_, { artistId }, context, info, user) => {
-      if (user.role > Constants.ROLES.SHOP_ADMIN && String(user.id) !== String(artistId)) {
-        throw new AuthenticationError('Action not allowed');
-      }
+      // Was "shop-admin-or-better, or the artist themselves", which let any shop admin list any
+      // artist's projects. Now a shop admin has to actually share a shop with them.
+      await assertCanManageArtist(user, artistId);
       try {
         const projects = await Project.find({artistId: artistId}).sort({createdAt: -1});
         const results = projects.filter((proj) => {

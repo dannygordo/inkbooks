@@ -14,6 +14,7 @@ const { findOrCreateGuestClient } = require('../../utils/guest-client');
 const { resolveGuestToken } = require('../../utils/guest-auth');
 const { checkRateLimit, getClientIp } = require('../../utils/rate-limit');
 const { tryCheckAuth } = require('../../utils/check-auth');
+const { assertCanManageArtist } = require('../../utils/shop-membership');
 const {
   createBookingRequestInputSchema,
   guestMessageInputSchema,
@@ -204,12 +205,9 @@ module.exports = {
     if (!bookingRequest) {
       throw new UserInputError('Errors', { errors: { bookingRequestId: 'Booking request not found' } });
     }
-    if (
-      user.role > Constants.ROLES.SHOP_ADMIN &&
-      String(user.id) !== String(bookingRequest.artistId)
-    ) {
-      throw new AuthenticationError('Action not allowed');
-    }
+    // The request's own artist, or a shop admin at that artist's shop. Was `role <= SHOP_ADMIN`,
+    // which let a shop admin convert or reassign another shop's booking requests.
+    await assertCanManageArtist(user, bookingRequest.artistId);
 
     // Which outcome is reachable depends on the request's *current* status, not just its shape -
     // the real-world funnel is pending -> (consult_booked -> (session_booked | not_booked)) |
@@ -389,12 +387,9 @@ module.exports = {
         errors: { bookingRequestId: 'Booking request not found' },
       });
     }
-    if (
-      user.role > Constants.ROLES.SHOP_ADMIN &&
-      String(user.id) !== String(bookingRequest.artistId)
-    ) {
-      throw new AuthenticationError('Action not allowed');
-    }
+    // The request's own artist, or a shop admin at that artist's shop. Was `role <= SHOP_ADMIN`,
+    // which let a shop admin convert or reassign another shop's booking requests.
+    await assertCanManageArtist(user, bookingRequest.artistId);
     // Reassigning after conversion doesn't mean anything - the resulting Appointment/Project
     // already exist under the original artistId, and this mutation only ever touches
     // BookingRequest.artistId, not those. Only a still-open request can be forwarded.

@@ -370,11 +370,14 @@ describe('deleteAppointment: ownership', () => {
 		expect(errors[0].message).toMatch(/Action not allowed/);
 	});
 
-	it('allows an Admin to delete any appointment regardless of ownership', async () => {
+	// Was "an Admin, regardless of ownership". The global role is gone; a shop admin can delete an
+	// appointment belonging to an artist at their own shop, and nobody can reach another shop's.
+	it('allows a shop admin to delete an appointment belonging to an artist at their shop', async () => {
 		const { user: owner } = await createArtistUser();
-		const admin = await createUser({ role: Constants.ROLES.ADMIN, userType: Constants.USER_TYPE.STAFF });
+		const { user: shopAdmin, shop } = await createShopAdminUser();
+		await connectArtistToShop(owner.id, shop.id);
 		const appointment = await createAppointment(owner.id);
-		const token = signTestToken(admin);
+		const token = signTestToken(shopAdmin);
 		const server = createTestServer();
 
 		const response = await server.executeOperation(
@@ -385,6 +388,25 @@ describe('deleteAppointment: ownership', () => {
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeUndefined();
 		expect(data.deleteAppointment).toMatch(/deleted successfully/);
+	});
+
+	it('refuses a shop admin deleting an appointment at a different shop', async () => {
+		const { user: owner } = await createArtistUser();
+		const { shop: shopA } = await createShopAdminUser();
+		const { user: adminB } = await createShopAdminUser();
+		await connectArtistToShop(owner.id, shopA.id);
+		const appointment = await createAppointment(owner.id);
+		const token = signTestToken(adminB);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: DELETE_APPOINTMENT, variables: { appointmentId: appointment.id } },
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(data).toBeNull();
+		expect(errors[0].message).toMatch(/Action not allowed/);
 	});
 });
 
@@ -443,9 +465,13 @@ describe('getAppointmentsByArtist: ownership', () => {
 		expect(errors[0].message).toMatch(/Action not allowed/);
 	});
 
-	it('allows a Shop Admin to read any artist\'s appointments', async () => {
+	// Was "any artist's appointments" - a shop admin passed on role alone. A shop admin is the
+	// admin of one shop, so this now takes the connection that makes the artist theirs; the
+	// unconnected case is the next test.
+	it('allows a Shop Admin to read the appointments of an artist at their own shop', async () => {
 		const { user: owner } = await createArtistUser();
-		const { user: shopAdmin } = await createShopAdminUser();
+		const { user: shopAdmin, shop } = await createShopAdminUser();
+		await connectArtistToShop(owner.id, shop.id);
 		await createAppointment(owner.id);
 		const token = signTestToken(shopAdmin);
 		const server = createTestServer();
@@ -458,6 +484,25 @@ describe('getAppointmentsByArtist: ownership', () => {
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeUndefined();
 		expect(data.getAppointmentsByArtist).toHaveLength(1);
+	});
+
+	it("refuses a Shop Admin the appointments of an artist at a different shop", async () => {
+		const { user: owner } = await createArtistUser();
+		const { shop: shopA } = await createShopAdminUser();
+		const { user: adminB } = await createShopAdminUser();
+		await connectArtistToShop(owner.id, shopA.id);
+		await createAppointment(owner.id);
+		const token = signTestToken(adminB);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_APPOINTMENTS_BY_ARTIST, variables: { userId: owner.id } },
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(data.getAppointmentsByArtist).toBeNull();
+		expect(errors[0].message).toMatch(/Action not allowed/);
 	});
 });
 
@@ -623,11 +668,14 @@ describe('getAppointment: ownership', () => {
 		expect(errors[0].message).toMatch(/Action not allowed/);
 	});
 
-	it('allows a Shop Admin regardless of connection', async () => {
+	// Was "a Shop Admin regardless of connection", called with the global ADMIN role. Both halves
+	// of that are gone: the connection is now exactly what grants access.
+	it('allows a shop admin connected to the appointment\'s shop', async () => {
 		const { user: artistUser } = await createArtistUser();
-		const appointment = await createAppointment(artistUser.id);
-		const admin = await createUser({ role: Constants.ROLES.ADMIN, userType: Constants.USER_TYPE.STAFF });
-		const token = signTestToken(admin);
+		const { user: shopAdmin, shop } = await createShopAdminUser();
+		await connectArtistToShop(artistUser.id, shop.id);
+		const appointment = await createAppointment(artistUser.id, { shopId: shop.id });
+		const token = signTestToken(shopAdmin);
 		const server = createTestServer();
 
 		const response = await server.executeOperation(

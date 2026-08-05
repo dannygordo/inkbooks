@@ -3,9 +3,9 @@ const Appointment = require('../../models/Appointment');
 const Project = require('../../models/Project');
 const BookingRequest = require('../../models/BookingRequest');
 const withAuth = require('../../utils/with-auth');
-const { Constants } = require('../../utils/constants');
 const { AuthenticationError, UserInputError } = require('../../utils/errors');
 const { applyShopCut } = require('../../utils/shop-cut');
+const { assertCanManageArtist } = require('../../utils/shop-membership');
 
 /**
  * Deposits.
@@ -45,12 +45,7 @@ async function loadOwnedAppointment(appointmentId, user, label) {
   if (!appointment) {
     throw new UserInputError('Errors', { errors: { [label]: 'Appointment not found' } });
   }
-  if (
-    user.role > Constants.ROLES.SHOP_ADMIN &&
-    String(user.id) !== String(appointment.userId)
-  ) {
-    throw new AuthenticationError('Action not allowed');
-  }
+  await assertCanManageArtist(user, appointment.userId);
   return appointment;
 }
 

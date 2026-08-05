@@ -3,7 +3,10 @@ const Project = require('../../models/Project');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 const { AuthenticationError } = require('../../utils/errors');
-const { getShopIdsForUser, getArtistIdsForShops } = require('../../utils/shop-membership');
+const {
+  getShopIdsForUser,
+  getArtistIdsForShops,
+} = require('../../utils/shop-membership');
 
 module.exports = {
   Query: {
@@ -17,9 +20,8 @@ module.exports = {
     // relies on.
     getClients: withAuth(async (_, __, context, info, user) => {
       try {
-        if (user.role <= Constants.ROLES.SHOP_ADMIN) {
-          return await Client.find().sort({ lastName: 1 });
-        }
+        // No unscoped branch, for anyone. Everyone reaches clients the same way: through the
+        // projects their own shop's artists have with them.
         let artistIds;
         if (user.role === Constants.ROLES.ARTIST) {
           artistIds = [user.id];
@@ -49,7 +51,7 @@ module.exports = {
         if (!client) {
           throw new Error('Client not found');
         }
-        if (user.role > Constants.ROLES.SHOP_ADMIN && String(user.id) !== String(client.userId)) {
+        if (String(user.id) !== String(client.userId)) {
           let artistIds;
           if (user.role === Constants.ROLES.ARTIST) {
             artistIds = [user.id];

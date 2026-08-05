@@ -43,9 +43,12 @@ const CREATE_CONVERSATION = `
 `;
 
 describe('getShops: shop-affiliation scoping', () => {
-	it('allows a SHOP_ADMIN to see every shop (matches the existing, documented no-per-shop-scoping-for-admins convention)', async () => {
-		const { user: shopAdminA } = await createShopAdminUser();
-		await createShopAdminUser();
+	// This asserted the opposite until the global-admin role was removed: a SHOP_ADMIN used to see
+	// every shop on the platform, on the reasoning that Shop had no owning-User field to scope
+	// them by. It does have one, through Staff.shopId - see utils/shop-membership.js.
+	it('shows a SHOP_ADMIN only their own shop, not every shop on the platform', async () => {
+		const { user: shopAdminA, shop: shopA } = await createShopAdminUser();
+		const { shop: shopB } = await createShopAdminUser();
 		const server = createTestServer();
 
 		const response = await server.executeOperation(
@@ -55,7 +58,9 @@ describe('getShops: shop-affiliation scoping', () => {
 
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeUndefined();
-		expect(data.getShops.length).toBeGreaterThanOrEqual(2);
+		const ids = data.getShops.map((s) => s.id);
+		expect(ids).toEqual([shopA.id]);
+		expect(ids).not.toContain(shopB.id);
 	});
 
 	it('only shows a Staff member their own shop, not other shops', async () => {
@@ -224,23 +229,31 @@ describe('getProjects: role-scoped visibility', () => {
 		expect(data.getProjects[0].artistId).toBe(artistA.id);
 	});
 
-	it('allows a SHOP_ADMIN-or-better user to see every project', async () => {
+	// Was "a SHOP_ADMIN-or-better user sees every project", called as the global ADMIN. There is
+	// no caller who sees every project any more - a shop admin sees their own shop's artists'
+	// work and nothing else.
+	it('shows a shop admin their own shop\'s projects and not another shop\'s', async () => {
+		const { user: shopAdmin, shop: shopA } = await createShopAdminUser();
+		const { shop: shopB } = await createShopAdminUser();
 		const { user: artistA } = await createArtistUser();
 		const { user: artistB } = await createArtistUser();
+		await connectArtistToShop(artistA.id, shopA.id);
+		await connectArtistToShop(artistB.id, shopB.id);
 		const { client: clientA } = await createClientUser();
-		await createProject(artistA.id, clientA.id);
-		await createProject(artistB.id, clientA.id);
-		const admin = await createUser({ role: Constants.ROLES.ADMIN, userType: Constants.USER_TYPE.STAFF });
+		const mine = await createProject(artistA.id, clientA.id);
+		const theirs = await createProject(artistB.id, clientA.id);
 		const server = createTestServer();
 
 		const response = await server.executeOperation(
 			{ query: GET_PROJECTS },
-			{ contextValue: contextWithToken(signTestToken(admin)) },
+			{ contextValue: contextWithToken(signTestToken(shopAdmin)) },
 		);
 
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeUndefined();
-		expect(data.getProjects.length).toBeGreaterThanOrEqual(2);
+		const ids = data.getProjects.map((p) => p.id);
+		expect(ids).toContain(mine.id);
+		expect(ids).not.toContain(theirs.id);
 	});
 });
 

@@ -1,6 +1,8 @@
 const Staff = require('../models/Staff');
 const Artist = require('../models/Artist');
 const ArtistShopConnection = require('../models/ArtistShopConnection');
+const { Constants } = require('./constants');
+const { AuthenticationError } = require('./errors');
 
 // Shared helpers for scoping the shop-wide "browse everything" list queries (getShops/getStaff/
 // getArtists/getClients) to a non-admin caller's own shop(s), instead of returning every shop's
@@ -67,6 +69,95 @@ async function getMemberUserIdsForShop(shopId) {
   return Array.from(memberIds);
 }
 
+/**
+ * THE ROLE RULE, in one place.
+ *
+ * NOBODY reaches a shop they aren't assigned to. There is no global role and no exemption - not
+ * for ADMIN, not for support, not for the person who wrote this. Every question about shop-scoped
+ * data is answered by a real relationship in the database (Staff.shopId, Artist.shopId,
+ * ArtistShopConnection.shopId), never by a role number.
+ *
+ * Roles still exist, and still answer a different question: how much of their OWN shop somebody
+ * sees. SHOP_ADMIN (10) sees the money; SHOP_STAFF (15) sees the schedule but not the books;
+ * ARTIST (20) sees their own work. That is a "how privileged" question. "Which shop" is never a
+ * role question, and a role comparison can never answer it - which is exactly how this codebase
+ * spent months leaking every shop's revenue to every shop admin: `role <= SHOP_ADMIN` appeared
+ * ~50 times, and in every case guarding shop-scoped data it meant "skip the shop check".
+ *
+ * ROLES.ADMIN (1) is kept as a reserved number so existing role-1 rows don't silently become
+ * something else, but it grants no access to any shop's data. An account with role 1 and no Staff
+ * row sees nothing at all, which is the intended, safe degradation.
+ *
+ * Cross-shop support access, if it's ever needed, is a Staff row at that shop - time-boxed,
+ * revocable, and visible to the shop owner - not a role that bypasses this file.
+ */
+
+/**
+ * Throws unless the caller is actually assigned to this shop.
+ */
+async function assertCanAccessShop(user, shopId) {
+  if (!shopId) {
+    throw new AuthenticationError('Action not allowed');
+  }
+  const shopIds = await getShopIdsForUser(user.id);
+  if (!shopIds.map(String).includes(String(shopId))) {
+    throw new AuthenticationError('Action not allowed');
+  }
+}
+
+/**
+ * "May this caller act on this artist's records?" - the artist-shaped counterpart to
+ * assertCanAccessShop, for the many resolvers keyed by an artist's User._id rather than a shopId
+ * (their appointments, projects, booking requests, deposits, shop connections).
+ *
+ * Allowed: the artist themselves, or someone at minRole-or-better who shares a shop with them.
+ * No exemption above that - see the role rule above.
+ *
+ * minRole is per-call rather than fixed because the two sensible floors are already both in use:
+ * SHOP_ADMIN for management surfaces (booking inbox, project lists, deposits) and SHOP_STAFF for
+ * the front-desk surfaces a receptionist genuinely needs (the calendar, the artist page).
+ */
+async function canManageArtist(user, artistUserId, minRole = Constants.ROLES.SHOP_ADMIN) {
+  if (artistUserId && String(user.id) === String(artistUserId)) {
+    return true;
+  }
+  if (user.role > minRole || !artistUserId) {
+    return false;
+  }
+  return sharesShopWith(user.id, artistUserId);
+}
+
+async function assertCanManageArtist(user, artistUserId, minRole = Constants.ROLES.SHOP_ADMIN) {
+  if (!(await canManageArtist(user, artistUserId, minRole))) {
+    throw new AuthenticationError('Action not allowed');
+  }
+}
+
+/**
+ * "May this caller read this conversation?" A Conversation has no shopId of its own (see
+ * models/Conversation.js) - members is the only field that says who's in it - so "at my shop"
+ * means "at least one member works where I work".
+ *
+ * Allowed: a member, or a shop-admin-or-better who shares a shop with a member. These are private
+ * message threads between an artist and a client, so the floor stays at SHOP_ADMIN rather than
+ * following the calendar's looser SHOP_STAFF rule.
+ */
+async function canAccessConversation(user, conversation) {
+  const members = (conversation && conversation.members) || [];
+  if (members.some((memberId) => String(memberId) === String(user.id))) {
+    return true;
+  }
+  if (user.role > Constants.ROLES.SHOP_ADMIN || members.length === 0) {
+    return false;
+  }
+  const myShopIds = new Set((await getShopIdsForUser(user.id)).map(String));
+  if (myShopIds.size === 0) {
+    return false;
+  }
+  const memberShopIds = await Promise.all(members.map((memberId) => getShopIdsForUser(memberId)));
+  return memberShopIds.some((ids) => ids.some((id) => myShopIds.has(String(id))));
+}
+
 // True when two users are affiliated with at least one shop in common. Used to answer "may this
 // staff member look at this artist?" without a flat role gate: Staff at one shop have no business
 // reading an artist's books at a different shop, and role alone can't express that.
@@ -80,6 +171,10 @@ async function sharesShopWith(userId, otherUserId) {
 }
 
 module.exports = {
+  assertCanAccessShop,
+  canManageArtist,
+  assertCanManageArtist,
+  canAccessConversation,
   getShopIdsForUser,
   getArtistIdsForShops,
   getMemberUserIdsForShop,

@@ -2,8 +2,7 @@ const Appointment = require('../../models/Appointment');
 const Project = require('../../models/Project');
 const BookingRequest = require('../../models/BookingRequest');
 const withAuth = require('../../utils/with-auth');
-const { Constants } = require('../../utils/constants');
-const { AuthenticationError } = require('../../utils/errors');
+const { assertCanManageArtist } = require('../../utils/shop-membership');
 
 /**
  * Which deposits can be applied to a given session.
@@ -39,12 +38,9 @@ module.exports = {
         if (!target) {
           return [];
         }
-        if (
-          user.role > Constants.ROLES.SHOP_ADMIN &&
-          String(user.id) !== String(target.userId)
-        ) {
-          throw new AuthenticationError('Action not allowed');
-        }
+        // The appointment's own artist, or a shop admin at their shop. `role <= SHOP_ADMIN`
+        // alone let a shop admin see which unspent deposits an artist at another shop is holding.
+        await assertCanManageArtist(user, target.userId);
 
         const clientId = await clientIdForAppointment(target);
         if (!clientId) {

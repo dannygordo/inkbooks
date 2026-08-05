@@ -732,7 +732,6 @@ module.exports = gql`
     
     ######### Users ###########
     
-    getUsers: [User]
     getUser(userId: ID!): User
     getUserTagColors(shopId: ID!): [User]
     
@@ -747,12 +746,10 @@ module.exports = gql`
     getConversation(conversationId: ID!): Conversation
     getConversationsByShopId(shopId: ID!): [Conversation!]
     getProjectConversation(artistId: ID!, clientId: ID!): Conversation
-    getConversations: [Conversation]
     getConversationsByMemberId(memberId: ID!): [Conversation]
 
     ######### Messages ###########
 
-    getMessages: [Message]
     getMessage(messageId: ID!): Message
     getMessagesByConversationId(conversationId: ID!): [Message!]
 

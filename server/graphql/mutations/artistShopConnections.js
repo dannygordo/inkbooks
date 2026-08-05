@@ -10,14 +10,23 @@ const {
   validate,
 } = require('../../utils/validation');
 const { isUnsetTagColor, pickDefaultTagColor } = require('../../utils/tag-color');
+const { assertCanAccessShop } = require('../../utils/shop-membership');
 
-// Same authorization shape as the Query side (see resolvers/artistShopConnections.js) - the
-// artist themselves, or a shop-admin-or-better role (Shop has no owning-User field to check
-// against a *specific* shop yet).
-function assertCanManageConnection(user, artistId) {
-  if (user.role > Constants.ROLES.SHOP_ADMIN && String(user.id) !== String(artistId)) {
+// The artist themselves, or a shop admin OF THIS SHOP. The old version was role-only ("a shop
+// admin, of anywhere"), which meant any shop admin could attach an artist to - or detach them
+// from - a shop neither of them has anything to do with, and set that artist's rate there.
+//
+// The artist's own case can't go through assertCanAccessShop: connecting is precisely how they
+// become a member, so they aren't one yet at this point. There's no invite/approve flow (see
+// PRODUCTION_ROADMAP.md), so a direct self-connect stays allowed.
+async function assertCanManageConnection(user, artistId, shopId) {
+  if (String(user.id) === String(artistId)) {
+    return;
+  }
+  if (user.role > Constants.ROLES.SHOP_ADMIN) {
     throw new AuthenticationError('Action not allowed');
   }
+  await assertCanAccessShop(user, shopId);
 }
 
 module.exports = {
@@ -30,7 +39,7 @@ module.exports = {
     if (!valid) {
       throw new UserInputError('Errors', { errors });
     }
-    assertCanManageConnection(user, data.artistId);
+    await assertCanManageConnection(user, data.artistId, data.shopId);
 
     const artist = await User.findById(data.artistId);
     if (!artist || artist.userType !== Constants.USER_TYPE.ARTIST) {
@@ -68,7 +77,7 @@ module.exports = {
     if (!valid) {
       throw new UserInputError('Errors', { errors });
     }
-    assertCanManageConnection(user, data.artistId);
+    await assertCanManageConnection(user, data.artistId, data.shopId);
 
     const connection = await ArtistShopConnection.findOne({
       artistId: data.artistId,
@@ -93,7 +102,7 @@ module.exports = {
     if (!valid) {
       throw new UserInputError('Errors', { errors });
     }
-    assertCanManageConnection(user, data.artistId);
+    await assertCanManageConnection(user, data.artistId, data.shopId);
 
     const connection = await ArtistShopConnection.findOne({
       artistId: data.artistId,

@@ -18,7 +18,12 @@ const {
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 const { mintFirebaseToken } = require('../../utils/firebase-admin');
-const { getShopIdsForUser } = require('../../utils/shop-membership');
+const {
+  getShopIdsForUser,
+  canManageArtist,
+  assertCanManageArtist,
+  assertCanAccessShop,
+} = require('../../utils/shop-membership');
 const { DEFAULT_NO_SHOP_TAG_COLOR, isUnsetTagColor, pickDefaultTagColor } = require('../../utils/tag-color');
 
 function generateToken(user) {
@@ -223,7 +228,12 @@ module.exports = {
     updateUser: withAuth(async (_, args, context, info, user) => {
       try {
         const usr = args.user;
-        if (user.role <= Constants.ROLES.SHOP_ADMIN || user.id === usr.id) {
+        // Was `role <= SHOP_ADMIN || self` - a shop admin could edit ANY user account on the
+        // platform, including another shop's admin (role is a writable field on this input).
+        // Now: the person themselves, or a shop admin at that person's own shop. Clients aren't
+        // shop-affiliated and so aren't reachable here at all - they're edited through
+        // updateClient (mutations/clients.js), which has its own shared-project check.
+        if (user.id === usr.id || (await canManageArtist(user, usr.id))) {
           let res = await User.findByIdAndUpdate({_id: usr.id}, usr, {new: true});
           res.accessToken = 'temp_' + Date.now();
           return res;
@@ -273,18 +283,11 @@ module.exports = {
     })
   },
   Query: {
-    // Was withAuth with no restriction at all - any authenticated user, including a Client,
-    // could list every user account on the platform (email, username, role, tagColor). Not
-    // called anywhere in the client (grepped - no caller). Flat-gating to ADMIN closes the hole
-    // without resurrecting a feature nobody uses.
-    getUsers: withAuth(async () => {
-      try {
-        const users = await User.find().sort({ email: 1 });
-        return users;
-      } catch (err) {
-        throw new Error(err);
-      }
-    }, Constants.ROLES.ADMIN),
+    // getUsers (every user account on the platform) was deleted, not scoped. It had no caller in
+    // the client, and its only possible caller was the global admin role that no longer exists -
+    // so scoping it would have meant inventing a feature to justify keeping a query that returns
+    // every email address in the system. "Ungated but nobody calls it" is exactly the shape of
+    // hole that survives review by looking unused.
     // Was withAuth with no restriction at all - any authenticated user could pass an arbitrary
     // userId and read that account's full record. Not called anywhere in the client (grepped -
     // every place that needs "the user behind this Staff/Artist/Client/Message" already resolves
@@ -293,8 +296,8 @@ module.exports = {
     // themselves.
     getUser: withAuth(async (_, { userId }, context, info, user) => {
       try {
-        if (user.role > Constants.ROLES.SHOP_ADMIN && String(user.id) !== String(userId)) {
-          throw new AuthenticationError('Action not allowed');
+        if (String(user.id) !== String(userId)) {
+          await assertCanManageArtist(user, userId);
         }
         const foundUser = await User.findById(userId);
         if (foundUser) {
@@ -310,13 +313,8 @@ module.exports = {
     // caller actually be affiliated with that shop (or shop-admin-or-better) - same pattern as
     // getArtistsByShop/getConversationsByShopId.
     getUserTagColors: withAuth(async (_, { shopId }, context, info, user) => {
+      await assertCanAccessShop(user, shopId);
       try {
-        if (user.role > Constants.ROLES.SHOP_ADMIN) {
-          const shopIds = await getShopIdsForUser(user.id);
-          if (!shopIds.map(String).includes(String(shopId))) {
-            throw new AuthenticationError('Action not allowed');
-          }
-        }
         let usrIds = [];
         let usrs = [];
         const artists = await Artist.find({shopId: shopId});

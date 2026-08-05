@@ -3,9 +3,9 @@ const Appointment = require('../../models/Appointment');
 const ArtistShopConnection = require('../../models/ArtistShopConnection');
 const withAuth = require('../../utils/with-auth');
 const { AuthenticationError, UserInputError } = require('../../utils/errors');
-const { Constants } = require('../../utils/constants');
 const { updateAppointmentInputSchema, createAppointmentInputSchema, appointmentIdInputSchema, validate } = require('../../utils/validation');
 const { applyShopCut } = require('../../utils/shop-cut');
+const { canManageArtist, assertCanManageArtist } = require('../../utils/shop-membership');
 
 // Same ownership shape as updateAppointment/deleteAppointment below - Admin/SHOP_ADMIN-or-better,
 // or the appointment's own artist. Shared by all three session-timer mutations so that check is
@@ -15,9 +15,9 @@ async function loadOwnedAppointment(appointmentId, user) {
   if (!appointment) {
     throw new UserInputError('Errors', { errors: { appointmentId: 'Appointment not found' } });
   }
-  if (user.role > Constants.ROLES.SHOP_ADMIN && String(user.id) !== String(appointment.userId)) {
-    throw new AuthenticationError('Action not allowed');
-  }
+  // The appointment's own artist, or a shop admin at that artist's shop. Was `role <= SHOP_ADMIN`,
+  // which let a shop admin start, stop and price another shop's sessions.
+  await assertCanManageArtist(user, appointment.userId);
   return appointment;
 }
 
@@ -110,7 +110,10 @@ module.exports = {
       try {
         const appointment = await Appointment.findById(appointmentId);
         //TODO: revisit rule that allows a user to delete an appointment.  Might want to inactive appointment instead of delete in order to prevent historical documents from breaking
-        if (appointment && (user.role === Constants.ROLES.ADMIN || String(user.id) === String(appointment.userId))) {
+        // Was "the global ADMIN, or the appointment's own artist". The global role is gone, so
+        // this is now the artist themselves or a shop admin at their shop - the same rule the
+        // rest of this file uses.
+        if (appointment && (await canManageArtist(user, appointment.userId))) {
           await Appointment.deleteOne({ _id: appointmentId });
           return 'Appointment deleted successfully';
         }
@@ -129,7 +132,7 @@ module.exports = {
         const existingAppointment = await Appointment.findById(appointment.id);
         if (
           existingAppointment &&
-          (user.role <= Constants.ROLES.SHOP_ADMIN || String(user.id) === String(existingAppointment.userId))
+          (await canManageArtist(user, existingAppointment.userId))
         ) {
           // shopId, once written, is a permanent attribution - see PRODUCTION_ROADMAP.md's
           // "Known gap" note under the tenancy model. An appointment already tied to a shop can

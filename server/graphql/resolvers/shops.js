@@ -1,10 +1,9 @@
 const Shop = require('../../models/Shop');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
-const { AuthenticationError } = require('../../utils/errors');
 const square = require('../../utils/square');
 const { signState } = require('../../routes/squareOAuth');
-const { getShopIdsForUser } = require('../../utils/shop-membership');
+const { getShopIdsForUser, assertCanAccessShop } = require('../../utils/shop-membership');
 
 module.exports = {
     Query: {
@@ -17,9 +16,8 @@ module.exports = {
         // affiliated with, via Staff/Artist/ArtistShopConnection - see utils/shop-membership.js.
         getShops: withAuth(async (_, __, context, info, user) => {
             try {
-                if (user.role <= Constants.ROLES.SHOP_ADMIN) {
-                    return await Shop.find().sort({ name: 1 });
-                }
+                // No unscoped branch, for anyone. Every caller sees exactly the shops they are
+                // assigned to; a caller assigned to none sees none.
                 const shopIds = await getShopIdsForUser(user.id);
                 if (shopIds.length === 0) {
                     return [];
@@ -33,13 +31,10 @@ module.exports = {
         // arbitrary shopId and read that shop's full contact/Square-connection details. Same
         // "own the resource, or shop-admin-or-better" convention as getShops above.
         getShop: withAuth(async (_, { shopId }, context, info, user) => {
+            // Outside the try: the catch below rewraps everything as a generic Error, and an
+            // authorization failure shouldn't be reported as if the lookup broke.
+            await assertCanAccessShop(user, shopId);
             try {
-                if (user.role > Constants.ROLES.SHOP_ADMIN) {
-                    const shopIds = await getShopIdsForUser(user.id);
-                    if (!shopIds.map(String).includes(String(shopId))) {
-                        throw new AuthenticationError('Action not allowed');
-                    }
-                }
                 const shop = await Shop.findById(shopId);
                 if (shop) {
                   return shop;
@@ -53,7 +48,11 @@ module.exports = {
         // pointing at Square's hosted consent page; `state` is a signed, 15-minute token binding
         // this attempt to shopId (see routes/squareOAuth.js) so the eventual callback can't be
         // pointed at a different shop.
-        getSquareAuthorizationUrl: withAuth(async (_, { shopId }) => {
+        getSquareAuthorizationUrl: withAuth(async (_, { shopId }, context, info, user) => {
+          // The role gate alone let a shop admin start an OAuth handshake against a shop they
+          // have nothing to do with. The signed `state` binds the callback to this shopId, so
+          // without this check that binding is to someone else's shop.
+          await assertCanAccessShop(user, shopId);
           const shop = await Shop.findById(shopId);
           if (!shop) {
             throw new Error('Shop not found');

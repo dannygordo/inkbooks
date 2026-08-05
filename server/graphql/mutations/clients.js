@@ -4,7 +4,34 @@ const Project = require('../../models/Project');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 const { AuthenticationError } = require('../../utils/errors');
-const { getShopIdsForUser, getArtistIdsForShops } = require('../../utils/shop-membership');
+const {
+  getShopIdsForUser,
+  getArtistIdsForShops,
+} = require('../../utils/shop-membership');
+
+/**
+ * Throws unless the caller's own shop has a Project with this client.
+ *
+ * A Client has no shopId of its own (unlike Staff and Artist), so there is no direct "is this
+ * your client" field to check - the Projects connecting a shop's artists to them are the only
+ * path. Same join getClient/getClients already use on the read side (see resolvers/clients.js);
+ * pulled out here because three mutations now need it.
+ */
+async function assertSharesProjectWithClient(user, client) {
+  let artistIds;
+  if (user.role === Constants.ROLES.ARTIST) {
+    artistIds = [user.id];
+  } else {
+    const shopIds = await getShopIdsForUser(user.id);
+    artistIds = await getArtistIdsForShops(shopIds);
+  }
+  const hasSharedProject =
+    artistIds.length > 0 &&
+    (await Project.exists({ artistId: { $in: artistIds }, clientId: client._id }));
+  if (!hasSharedProject) {
+    throw new AuthenticationError('Action not allowed');
+  }
+}
 
 module.exports = {
   createClient: withAuth(async (
@@ -41,9 +68,14 @@ module.exports = {
     const client = await newClient.save();
     return client;
   }, Constants.ROLES.CLIENT),
-  deleteClient: withAuth(async (_, { clientId }) => {
+  // Was ADMIN-gated, i.e. reachable only by the global role that no longer exists. Now a shop
+  // admin whose own shop actually works with this client.
+  deleteClient: withAuth(async (_, { clientId }, context, info, user) => {
     try {
       const client = await Client.findById(clientId);
+      if (client) {
+        await assertSharesProjectWithClient(user, client);
+      }
       //TODO: revisit rule that allows a user to delete an client.  Might want to inactive client instead of delete in order to prevent historical documents from breaking
       if (client) {
         await Client.deleteOne({ _id: clientId });
@@ -53,10 +85,17 @@ module.exports = {
     } catch (err) {
       throw new Error(err);
     }
-  }, Constants.ROLES.ADMIN),
-  updateClient: withAuth(async (_, args) => {
+  }, Constants.ROLES.SHOP_ADMIN),
+  // The minRole was the whole check here too - any shop admin could rewrite any client's name,
+  // email, phone and address anywhere on the platform.
+  updateClient: withAuth(async (_, args, context, info, user) => {
     try{
       const client = args.client;
+      const existing = await Client.findById(client.id);
+      if (!existing) {
+        throw new Error('Client not found');
+      }
+      await assertSharesProjectWithClient(user, existing);
       const res = await Client.findByIdAndUpdate({_id: client.id}, client, {new: true});
       return res;
     } catch (err) {
@@ -84,24 +123,10 @@ module.exports = {
       if (String(user.id) === String(client.userId)) {
         throw new AuthenticationError('Action not allowed');
       }
-      if (user.role > Constants.ROLES.SHOP_ADMIN) {
-        let artistIds;
-        if (user.role === Constants.ROLES.ARTIST) {
-          artistIds = [user.id];
-        } else {
-          const shopIds = await getShopIdsForUser(user.id);
-          artistIds = await getArtistIdsForShops(shopIds);
-        }
-        // Same "shares a Project with this client" join getClient/getClients already use - Client
-        // has no shopId of its own, so a Project is the only path from a shop or artist to a
-        // client. See resolvers/clients.js.
-        const hasSharedProject =
-          artistIds.length > 0 &&
-          (await Project.exists({ artistId: { $in: artistIds }, clientId: client._id }));
-        if (!hasSharedProject) {
-          throw new AuthenticationError('Action not allowed');
-        }
-      }
+      // Was `role <= SHOP_ADMIN` skipping this entirely - any shop admin could write internal
+      // notes on any shop's client. Nobody skips it now; a shop admin reaches the client the same
+      // way an artist does, through a shared Project.
+      await assertSharesProjectWithClient(user, client);
       return await Client.findByIdAndUpdate({ _id: clientId }, { notes }, { new: true });
     } catch (err) {
       if (err instanceof GraphQLError) {
