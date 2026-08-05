@@ -80,27 +80,6 @@ module.exports = {
 
       return msg;
     }),
-    // Was ADMIN-gated, i.e. reachable only by the global role that no longer exists. Now a member
-    // of the thread this message belongs to, or a shop admin at a member's own shop.
-    deleteMessage: withAuth(async (_, { messageId }, context, info, user) => {
-      try {
-        const message = await Message.findById(messageId);
-        if (message) {
-          const conversation = await Conversation.findById(message.conversationId).select('members');
-          if (!(await canAccessConversation(user, conversation))) {
-            throw new AuthenticationError('Action not allowed');
-          }
-        }
-        //TODO: revisit rule that allows a user to delete an message.  Might want to inactive message instead of delete in order to prevent historical documents from breaking
-        if (message) {
-          await Message.deleteOne({ _id: messageId });
-          return 'Message deleted successfully';
-        }
-        throw new Error('Message not found');
-      } catch (err) {
-        throw new Error(err);
-      }
-    }),
     updateMessage: withAuth(async (_, args, context, info, user) => {
       const message = args.message;
       const { valid, errors } = validate(updateMessageInputSchema, message);

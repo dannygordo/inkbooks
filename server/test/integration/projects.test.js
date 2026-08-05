@@ -1,6 +1,6 @@
 // Integration tests for Project mutations - createProject (open to any authenticated user, since
 // Constants.ROLES.CLIENT is the least-privileged role and withAuth's minRole check is "at least
-// this privileged"), deleteProject (Admin-only), and the ownership-or-SHOP_ADMIN check shared by
+// this privileged") and the ownership-or-SHOP_ADMIN check shared by
 // updateProject/updateProjectNotes/updateProjectTags (see mutations/projects.js's own comment on
 // why that OR can't be expressed as a single withAuth minRole).
 // describe/it/expect come from Vitest's `globals: true` config - see the comment in
@@ -41,12 +41,6 @@ const UPDATE_PROJECT_NOTES = `
 		updateProjectNotes(projectId: $projectId, notes: $notes) {
 			id
 		}
-	}
-`;
-
-const DELETE_PROJECT = `
-	mutation DeleteProject($projectId: ID!) {
-		deleteProject(projectId: $projectId)
 	}
 `;
 
@@ -414,46 +408,6 @@ describe('updateProject: image/note identity preservation across saves', () => {
 		const secondResult = secondSave.body.singleResult;
 		expect(secondResult.errors).toBeUndefined();
 		expect(secondResult.data.updateProject.notes[0].id).toBe(savedNoteId);
-	});
-});
-
-describe('deleteProject: Admin-only', () => {
-	it('rejects a non-Admin caller, even the assigned artist', async () => {
-		const { user: artistUser } = await createArtistUser();
-		const { client } = await createClientUser();
-		const project = await createProject(artistUser.id, client.id);
-		const token = signTestToken(artistUser);
-		const server = createTestServer();
-
-		const response = await server.executeOperation(
-			{ query: DELETE_PROJECT, variables: { projectId: project.id } },
-			{ contextValue: contextWithToken(token) },
-		);
-
-		// deleteProject(...): String! is non-null in the schema, so a thrown resolver error nulls
-		// out `data` itself, not just `data.deleteProject`.
-		const { errors, data } = response.body.singleResult;
-		expect(data).toBeNull();
-		expect(errors[0].message).toMatch(/Action not allowed/);
-	});
-
-	it('allows a shop admin at the artist\'s shop to delete a project', async () => {
-		const { user: artistUser } = await createArtistUser();
-		const { client } = await createClientUser();
-		const { user: shopAdmin, shop } = await createShopAdminUser();
-		await connectArtistToShop(artistUser.id, shop.id);
-		const project = await createProject(artistUser.id, client.id);
-		const token = signTestToken(shopAdmin);
-		const server = createTestServer();
-
-		const response = await server.executeOperation(
-			{ query: DELETE_PROJECT, variables: { projectId: project.id } },
-			{ contextValue: contextWithToken(token) },
-		);
-
-		const { errors, data } = response.body.singleResult;
-		expect(errors).toBeUndefined();
-		expect(data.deleteProject).toMatch(/deleted successfully/);
 	});
 });
 

@@ -49,24 +49,6 @@ module.exports = {
     const staff = await newStaff.save();
     return staff;
   }, Constants.ROLES.SHOP_ADMIN),
-  // Was ADMIN-gated, i.e. reachable only by the global role that no longer exists. Now the shop
-  // admin of the shop this staff member actually belongs to.
-  deleteStaff: withAuth(async (_, { staffId }, context, info, user) => {
-    try {
-      const staff = await Staff.findById(staffId);
-      if (staff) {
-        await assertCanAccessShop(user, staff.shopId);
-      }
-      //TODO: revisit rule that allows a user to delete an staff.  Might want to inactive staff instead of delete in order to prevent historical documents from breaking
-      if (staff) {
-        await Staff.deleteOne({ _id: staffId });
-        return 'Staff deleted successfully';
-      }
-      throw new Error('Staff not found');
-    } catch (err) {
-      throw new Error(err);
-    }
-  }, Constants.ROLES.SHOP_ADMIN),
   updateStaff: withAuth(async (_, args, context, info, user) => {
     try{
       const staff = args.staff;

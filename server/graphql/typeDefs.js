@@ -790,10 +790,26 @@ module.exports = gql`
     getArtistAnalytics(userId: ID!, start: DateTime!, end: DateTime!): Analytics
   }
   type Mutation {
+    # deleteAppointment is the only surviving delete* mutation, and it now refuses anything
+    # carrying money or a completed record - see mutations/appointments.js. It stays because two
+    # real buttons call it (UpdateEventDialog.jsx, SessionDetail.jsx); removing an empty
+    # scheduled slot is a legitimate thing to want.
+    deleteAppointment(appointmentId: ID): String
+    #
+    # The other seven were removed, not re-gated. Nothing in the client called any of them
+    # (grepped), and each one silently corrupted the records around it: Project.client is
+    # nullable, so a deleted Client left every project pointing at nothing without erroring;
+    # deleting an Artist/Staff/Client row left the User row behind, producing a login with a role
+    # and no profile - the exact bug that made the old platformadmin account unable to log in;
+    # and appointments carry money, shop-cut ledger state and Square invoice ids that stop
+    # reconciling once the person behind them is gone. Records need to survive for audit anyway.
+    #
+    # Removing someone is archiving - see archiveArtist/archiveStaff/archiveClient below.
+    # Erasure requests (GDPR/CCPA) are a separate future action that redacts PII in place and
+    # keeps the financial row, since tax retention obligations run the other way.
     ######### Appointments ############
     createAppointment(appointmentInput: AppointmentInput): Appointment
     updateAppointment(appointmentInput: AppointmentInput): Appointment
-    deleteAppointment(appointmentId: ID): String
     # Session timer controls - see models/Appointment.js's comment on why these are separate,
     # dedicated mutations rather than fields on the generic updateAppointment/AppointmentInput.
     # All three: Admin/SHOP_ADMIN-or-better, or the appointment's own artist - same ownership
@@ -855,7 +871,6 @@ module.exports = gql`
       userId: ID!
       status: Int
     ): Artist!
-    deleteArtist(artistId: ID!): String!
     updateArtist(artist: ArtistInput): Artist
     # Self-service - see mutations/artists.js's comment on why this is separate from updateArtist
     # (which is SHOP_ADMIN-or-better only, so a plain artist could never call it on themselves).
@@ -880,7 +895,6 @@ module.exports = gql`
       billingType: Int
       status: Int
     ): Shop!
-    deleteShop(shopId: ID!): String!
     updateShop(shop: ShopInput): Shop
     disconnectShopSquare(shopId: ID!): Shop!
 
@@ -918,7 +932,6 @@ module.exports = gql`
       title: String
       shopId: ID!
     ): Staff!
-    deleteStaff(staffId: ID!): String!
     updateStaff(staff: StaffInput): Staff
 
     ######### Clients ###########
@@ -937,7 +950,6 @@ module.exports = gql`
       avatar: String!
       userId: ID!
     ): Client!
-    deleteClient(clientId: ID!): String!
     updateClient(client: ClientInput): Client
 
     ######### Projects ###########
@@ -959,7 +971,6 @@ module.exports = gql`
       status: String!
       depositAmount: Int
     ): Project!
-    deleteProject(projectId: ID!): String!
     updateProject(project: ProjectInput): Project
     updateProjectNotes(notes: [IBNoteInput], projectId: ID!): Project
     # Shop-side client notes - see the comment on Client.notes. Deliberately NOT available to the
@@ -983,7 +994,6 @@ module.exports = gql`
       createdAt: DateTime
       updatedAt: DateTime
     ): Conversation!
-    deleteConversation(conversationId: ID!): String!
     updateConversation(conversation: ConversationInput): Conversation
 
     ######### Messages ###########
@@ -995,7 +1005,6 @@ module.exports = gql`
       createdAt: DateTime
       updatedAt: DateTime
     ): Message!
-    deleteMessage(messageId: ID!): String!
     updateMessage(message: MessageInput): Message
 
     ######### Booking Requests ###########

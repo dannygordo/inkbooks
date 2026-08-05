@@ -1,22 +1,16 @@
-// Integration tests for the remaining simple-CRUD resources - Client, Staff, Artist, Shop. Unlike
-// Appointment/Project, none of these have inline ownership logic; every mutation is a flat
-// withAuth(resolverFn, minRole) gate, so each resource gets one success path plus one
-// below-the-gate rejection rather than the exhaustive coverage appointments.test.js/projects.test.js
-// have.
+// Integration tests for the remaining simple-CRUD resources - Client, Staff, Artist, Shop. Each
+// gets one success path plus one below-the-gate rejection rather than the exhaustive coverage
+// appointments.test.js/projects.test.js have.
+//
+// The delete cases that used to live here are gone with the mutations themselves - see the note on
+// the Mutation type in typeDefs.js. Cross-shop coverage for the create/update paths lives in
+// shopIsolation.test.js rather than being duplicated here.
 // describe/it/expect come from Vitest's `globals: true` config - see the comment in
 // test/integration/appointments.test.js for why there's no `require('vitest')` here.
 const { createTestServer, contextWithToken } = require('../helpers/testServer');
 const { signTestToken } = require('../helpers/auth');
-const {
-	createUser,
-	createShopAdminUser,
-	createArtistUser,
-	connectArtistToShop,
-	createProject,
-} = require('../helpers/factories');
+const { createUser, createShopAdminUser, createArtistUser } = require('../helpers/factories');
 const { Constants } = require('../../utils/constants');
-const Shop = require('../../models/Shop');
-const Staff = require('../../models/Staff');
 
 function unique(prefix) {
 	return `${prefix}${Date.now()}${Math.floor(Math.random() * 100000)}`;
@@ -31,8 +25,6 @@ describe('Client CRUD', () => {
 			}
 		}
 	`;
-	const DELETE_CLIENT = `mutation DeleteClient($clientId: ID!) { deleteClient(clientId: $clientId) }`;
-
 	function clientVars(userId, overrides = {}) {
 		return {
 			firstName: 'Jon', lastName: 'Snow', email: `${unique('client')}@example.com`,
@@ -57,53 +49,6 @@ describe('Client CRUD', () => {
 		expect(data.createClient.firstName).toBe('Jon');
 	});
 
-	it('deleteClient: rejects everyone below ADMIN, including SHOP_ADMIN', async () => {
-		const { user: shopAdmin } = await createShopAdminUser();
-		const targetUser = await createUser();
-		const server = createTestServer();
-		const createRes = await server.executeOperation(
-			{ query: CREATE_CLIENT, variables: clientVars(targetUser.id) },
-			{ contextValue: contextWithToken(signTestToken(shopAdmin)) },
-		);
-		const clientId = createRes.body.singleResult.data.createClient.id;
-
-		const response = await server.executeOperation(
-			{ query: DELETE_CLIENT, variables: { clientId } },
-			{ contextValue: contextWithToken(signTestToken(shopAdmin)) },
-		);
-
-		// deleteClient(...): String! is non-null in the schema, so a thrown resolver error nulls
-		// out `data` itself, not just `data.deleteClient` - same rule noted in auth.test.js.
-		const { errors, data } = response.body.singleResult;
-		expect(data).toBeNull();
-		expect(errors[0].message).toMatch(/Action not allowed/);
-	});
-
-	// Was "allows ADMIN". The global role is gone, so deletion is now the shop admin's - and only
-	// for a client their own shop actually works with, which is what the Project below establishes
-	// (a Client has no shopId of its own; a shared Project is the only path to one).
-	it('deleteClient: allows a shop admin whose shop has a project with this client', async () => {
-		const targetUser = await createUser();
-		const { user: shopAdmin, shop } = await createShopAdminUser();
-		const { user: artistUser } = await createArtistUser();
-		await connectArtistToShop(artistUser.id, shop.id);
-		const server = createTestServer();
-		const createRes = await server.executeOperation(
-			{ query: CREATE_CLIENT, variables: clientVars(targetUser.id) },
-			{ contextValue: contextWithToken(signTestToken(shopAdmin)) },
-		);
-		const clientId = createRes.body.singleResult.data.createClient.id;
-		await createProject(artistUser.id, clientId);
-
-		const response = await server.executeOperation(
-			{ query: DELETE_CLIENT, variables: { clientId } },
-			{ contextValue: contextWithToken(signTestToken(shopAdmin)) },
-		);
-
-		const { errors, data } = response.body.singleResult;
-		expect(errors).toBeUndefined();
-		expect(data.deleteClient).toMatch(/deleted successfully/);
-	});
 });
 
 describe('Staff CRUD', () => {
@@ -121,8 +66,6 @@ describe('Staff CRUD', () => {
 			}
 		}
 	`;
-	const DELETE_STAFF = `mutation DeleteStaff($staffId: ID!) { deleteStaff(staffId: $staffId) }`;
-
 	function staffVars(userId, shopId, overrides = {}) {
 		return {
 			firstName: 'Sam', lastName: 'Tarly', email: `${unique('staff')}@example.com`,
@@ -165,51 +108,6 @@ describe('Staff CRUD', () => {
 		expect(errors[0].message).toMatch(/Action not allowed/);
 	});
 
-	// Was "rejects SHOP_ADMIN (requires full ADMIN)" - which, with the global role removed, meant
-	// nobody could ever delete a staff member. It's the shop admin's now, for their own shop.
-	it('deleteStaff: allows the shop admin of that staff member\'s own shop', async () => {
-		const { user: shopAdmin, shop } = await createShopAdminUser();
-		const targetUser = await createUser();
-		const server = createTestServer();
-		const createRes = await server.executeOperation(
-			{ query: CREATE_STAFF, variables: staffVars(targetUser.id, shop.id) },
-			{ contextValue: contextWithToken(signTestToken(shopAdmin)) },
-		);
-		const staffId = createRes.body.singleResult.data.createStaff.id;
-
-		const response = await server.executeOperation(
-			{ query: DELETE_STAFF, variables: { staffId } },
-			{ contextValue: contextWithToken(signTestToken(shopAdmin)) },
-		);
-
-		const { errors, data } = response.body.singleResult;
-		expect(errors).toBeUndefined();
-		expect(data.deleteStaff).toMatch(/deleted successfully/);
-	});
-
-	it('deleteStaff: refuses a shop admin deleting another shop\'s staff', async () => {
-		const { user: adminA, shop: shopA } = await createShopAdminUser();
-		const { user: adminB } = await createShopAdminUser();
-		const targetUser = await createUser();
-		const server = createTestServer();
-		const createRes = await server.executeOperation(
-			{ query: CREATE_STAFF, variables: staffVars(targetUser.id, shopA.id) },
-			{ contextValue: contextWithToken(signTestToken(adminA)) },
-		);
-		const staffId = createRes.body.singleResult.data.createStaff.id;
-
-		const response = await server.executeOperation(
-			{ query: DELETE_STAFF, variables: { staffId } },
-			{ contextValue: contextWithToken(signTestToken(adminB)) },
-		);
-
-		// deleteStaff(...): String! is non-null in the schema, so a thrown resolver error nulls out
-		// `data` itself, not just `data.deleteStaff`.
-		const { errors, data } = response.body.singleResult;
-		expect(data).toBeNull();
-		expect(errors[0].message).toMatch(/Action not allowed/);
-		expect(await Staff.findById(staffId)).not.toBeNull();
-	});
 });
 
 describe('Artist CRUD', () => {
@@ -221,8 +119,6 @@ describe('Artist CRUD', () => {
 			}
 		}
 	`;
-	const DELETE_ARTIST = `mutation DeleteArtist($artistId: ID!) { deleteArtist(artistId: $artistId) }`;
-
 	function artistVars(userId, shopId, overrides = {}) {
 		return {
 			firstName: 'Gendry', lastName: 'Baratheon', email: `${unique('artist')}@example.com`,
@@ -264,29 +160,6 @@ describe('Artist CRUD', () => {
 		const { errors, data } = response.body.singleResult;
 		expect(data).toBeNull();
 		expect(errors[0].message).toMatch(/Action not allowed/);
-	});
-
-	// Was "allows ADMIN". Now a shop admin who actually shares a shop with the artist - which is
-	// what connectArtistToShop establishes here.
-	it('deleteArtist: allows a shop admin at the artist\'s own shop', async () => {
-		const { user: shopAdmin, shop } = await createShopAdminUser();
-		const targetUser = await createUser();
-		await connectArtistToShop(targetUser.id, shop.id);
-		const server = createTestServer();
-		const createRes = await server.executeOperation(
-			{ query: CREATE_ARTIST, variables: artistVars(targetUser.id, shop.id) },
-			{ contextValue: contextWithToken(signTestToken(shopAdmin)) },
-		);
-		const artistId = createRes.body.singleResult.data.createArtist.id;
-
-		const response = await server.executeOperation(
-			{ query: DELETE_ARTIST, variables: { artistId } },
-			{ contextValue: contextWithToken(signTestToken(shopAdmin)) },
-		);
-
-		const { errors, data } = response.body.singleResult;
-		expect(errors).toBeUndefined();
-		expect(data.deleteArtist).toMatch(/deleted successfully/);
 	});
 
 	// Regression test for a real bug found via manual testing against seeded local data: Artist.
@@ -331,8 +204,6 @@ describe('Shop CRUD', () => {
 			}
 		}
 	`;
-	const DELETE_SHOP = `mutation DeleteShop($shopId: ID!) { deleteShop(shopId: $shopId) }`;
-
 	it('createShop: allows SHOP_ADMIN', async () => {
 		const { user: shopAdmin } = await createShopAdminUser();
 		const server = createTestServer();
@@ -363,39 +234,4 @@ describe('Shop CRUD', () => {
 		expect(errors[0].message).toMatch(/Action not allowed/);
 	});
 
-	// "deleteShop: rejects SHOP_ADMIN (requires full ADMIN)" used to live here. With the global
-	// role removed that rule would mean nobody can ever delete a shop, so the pair below replaces
-	// it: the shop's own admin may, another shop's admin may not.
-	//
-	// deleteShop(...): String! is non-null in the schema, so a thrown resolver error nulls out
-	// `data` itself, not just `data.deleteShop`.
-	it('deleteShop: allows the shop\'s own admin', async () => {
-		const { user: shopAdmin, shop } = await createShopAdminUser();
-		const server = createTestServer();
-
-		const response = await server.executeOperation(
-			{ query: DELETE_SHOP, variables: { shopId: shop.id } },
-			{ contextValue: contextWithToken(signTestToken(shopAdmin)) },
-		);
-
-		const { errors, data } = response.body.singleResult;
-		expect(errors).toBeUndefined();
-		expect(data.deleteShop).toMatch(/deleted successfully/);
-	});
-
-	it('deleteShop: refuses a shop admin deleting somebody else\'s shop', async () => {
-		const { shop: shopA } = await createShopAdminUser();
-		const { user: adminB } = await createShopAdminUser();
-		const server = createTestServer();
-
-		const response = await server.executeOperation(
-			{ query: DELETE_SHOP, variables: { shopId: shopA.id } },
-			{ contextValue: contextWithToken(signTestToken(adminB)) },
-		);
-
-		const { errors, data } = response.body.singleResult;
-		expect(data).toBeNull();
-		expect(errors[0].message).toMatch(/Action not allowed/);
-		expect(await Shop.findById(shopA.id)).not.toBeNull();
-	});
 });

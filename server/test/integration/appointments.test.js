@@ -20,6 +20,7 @@ const {
 	createAppointment,
 } = require('../helpers/factories');
 const { Constants } = require('../../utils/constants');
+const Appointment = require('../../models/Appointment');
 
 const GET_APPOINTMENTS_BY_ARTIST = `
 	query GetAppointmentsByArtist($userId: ID!) {
@@ -62,12 +63,6 @@ const UPDATE_APPOINTMENT = `
 			shopId
 			title
 		}
-	}
-`;
-
-const DELETE_APPOINTMENT = `
-	mutation DeleteAppointment($appointmentId: ID) {
-		deleteAppointment(appointmentId: $appointmentId)
 	}
 `;
 
@@ -336,84 +331,114 @@ describe('updateAppointment: shopId immutability + first-time attribution', () =
 	});
 });
 
-describe('deleteAppointment: ownership', () => {
-	it('allows the appointment owner to delete it', async () => {
-		const { user } = await createArtistUser();
-		const appointment = await createAppointment(user.id);
-		const token = signTestToken(user);
-		const server = createTestServer();
-
-		const response = await server.executeOperation(
-			{ query: DELETE_APPOINTMENT, variables: { appointmentId: appointment.id } },
-			{ contextValue: contextWithToken(token) },
-		);
-
-		const { errors, data } = response.body.singleResult;
-		expect(errors).toBeUndefined();
-		expect(data.deleteAppointment).toMatch(/deleted successfully/);
-	});
-
-	it('rejects deletion by a user who is neither the owner nor an Admin', async () => {
-		const { user: owner } = await createArtistUser();
-		const { user: otherArtist } = await createArtistUser();
-		const appointment = await createAppointment(owner.id);
-		const token = signTestToken(otherArtist);
-		const server = createTestServer();
-
-		const response = await server.executeOperation(
-			{ query: DELETE_APPOINTMENT, variables: { appointmentId: appointment.id } },
-			{ contextValue: contextWithToken(token) },
-		);
-
-		const { errors, data } = response.body.singleResult;
-		expect(data.deleteAppointment).toBeNull();
-		expect(errors[0].message).toMatch(/Action not allowed/);
-	});
-
-	// Was "an Admin, regardless of ownership". The global role is gone; a shop admin can delete an
-	// appointment belonging to an artist at their own shop, and nobody can reach another shop's.
-	it('allows a shop admin to delete an appointment belonging to an artist at their shop', async () => {
-		const { user: owner } = await createArtistUser();
-		const { user: shopAdmin, shop } = await createShopAdminUser();
-		await connectArtistToShop(owner.id, shop.id);
-		const appointment = await createAppointment(owner.id);
-		const token = signTestToken(shopAdmin);
-		const server = createTestServer();
-
-		const response = await server.executeOperation(
-			{ query: DELETE_APPOINTMENT, variables: { appointmentId: appointment.id } },
-			{ contextValue: contextWithToken(token) },
-		);
-
-		const { errors, data } = response.body.singleResult;
-		expect(errors).toBeUndefined();
-		expect(data.deleteAppointment).toMatch(/deleted successfully/);
-	});
-
-	it('refuses a shop admin deleting an appointment at a different shop', async () => {
-		const { user: owner } = await createArtistUser();
-		const { shop: shopA } = await createShopAdminUser();
-		const { user: adminB } = await createShopAdminUser();
-		await connectArtistToShop(owner.id, shopA.id);
-		const appointment = await createAppointment(owner.id);
-		const token = signTestToken(adminB);
-		const server = createTestServer();
-
-		const response = await server.executeOperation(
-			{ query: DELETE_APPOINTMENT, variables: { appointmentId: appointment.id } },
-			{ contextValue: contextWithToken(token) },
-		);
-
-		const { errors, data } = response.body.singleResult;
-		expect(data).toBeNull();
-		expect(errors[0].message).toMatch(/Action not allowed/);
-	});
-});
-
 // Regression coverage for a real gap found while building the artist dashboard (see
 // PRODUCTION_ROADMAP.md): getAppointmentsByArtist/getAppointmentsByShop were withAuth-wrapped
 // with no ownership check at all - any authenticated user could pass an arbitrary userId/shopId
 // and read that artist's or shop's full appointment/financial history.
+const DELETE_APPOINTMENT = `
+	mutation DeleteAppointment($appointmentId: ID) {
+		deleteAppointment(appointmentId: $appointmentId)
+	}
+`;
+
+// deleteAppointment is the one delete* mutation that survived the cull, and the guard is the
+// reason it could. An empty scheduled slot holds nothing and removing it is a normal thing to
+// want; a completed one holds the session total, the tip, the shop's cut and any deposit applied
+// to it, and deleting that removes a transaction rather than a calendar entry. The artist's
+// earnings and the shop's ledger would both move, silently, with nothing left to reconcile.
+describe('deleteAppointment: only when nothing is attached', () => {
+	it('deletes an empty scheduled slot', async () => {
+		const { user: owner } = await createArtistUser();
+		const appointment = await createAppointment(owner.id, { appointmentStatus: 'scheduled' });
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: DELETE_APPOINTMENT, variables: { appointmentId: appointment.id } },
+			{ contextValue: contextWithToken(signTestToken(owner)) },
+		);
+
+		expect(response.body.singleResult.errors).toBeUndefined();
+		expect(response.body.singleResult.data.deleteAppointment).toMatch(/deleted successfully/);
+		expect(await Appointment.findById(appointment.id)).toBeNull();
+	});
+
+	it('refuses a completed appointment and says what to do instead', async () => {
+		const { user: owner } = await createArtistUser();
+		const appointment = await createAppointment(owner.id, {
+			appointmentStatus: 'completed',
+			totalCents: 40000,
+		});
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: DELETE_APPOINTMENT, variables: { appointmentId: appointment.id } },
+			{ contextValue: contextWithToken(signTestToken(owner)) },
+		);
+
+		const { errors } = response.body.singleResult;
+		// Thrown via UserInputError('Errors', { errors: {...} }) - the detail is in
+		// extensions.errors.appointmentId, not message (which is literally "Errors").
+		expect(errors[0].extensions.errors.appointmentId).toMatch(/cancelled or no-show/);
+		expect(await Appointment.findById(appointment.id)).not.toBeNull();
+	});
+
+	it('refuses a scheduled consult that is holding a deposit', async () => {
+		// Status alone isn't enough: a consult can be 'scheduled' and still hold real money.
+		const { user: owner } = await createArtistUser();
+		const appointment = await createAppointment(owner.id, {
+			appointmentStatus: 'scheduled',
+			appointmentType: 'consult',
+			depositCents: 10000,
+			depositStatus: 'available',
+		});
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: DELETE_APPOINTMENT, variables: { appointmentId: appointment.id } },
+			{ contextValue: contextWithToken(signTestToken(owner)) },
+		);
+
+		expect(response.body.singleResult.errors[0].extensions.errors.appointmentId).toMatch(
+			/deposit was taken/,
+		);
+		expect(await Appointment.findById(appointment.id)).not.toBeNull();
+	});
+
+	it('refuses one whose shop cut is already in flight', async () => {
+		const { user: owner } = await createArtistUser();
+		const appointment = await createAppointment(owner.id, {
+			appointmentStatus: 'scheduled',
+			shopCutStatus: 'pending_confirmation',
+		});
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: DELETE_APPOINTMENT, variables: { appointmentId: appointment.id } },
+			{ contextValue: contextWithToken(signTestToken(owner)) },
+		);
+
+		expect(response.body.singleResult.errors[0].extensions.errors.appointmentId).toMatch(
+			/shop cut/,
+		);
+		expect(await Appointment.findById(appointment.id)).not.toBeNull();
+	});
+
+	it('refuses an artist deleting somebody else\'s empty slot', async () => {
+		const { user: owner } = await createArtistUser();
+		const { user: otherArtist } = await createArtistUser();
+		const appointment = await createAppointment(owner.id, { appointmentStatus: 'scheduled' });
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: DELETE_APPOINTMENT, variables: { appointmentId: appointment.id } },
+			{ contextValue: contextWithToken(signTestToken(otherArtist)) },
+		);
+
+		expect(response.body.singleResult.errors[0].message).toMatch(/Action not allowed/);
+		expect(await Appointment.findById(appointment.id)).not.toBeNull();
+	});
+});
+
 describe('getAppointmentsByArtist: ownership', () => {
 	it('allows an artist to read their own appointments', async () => {
 		const { user } = await createArtistUser();

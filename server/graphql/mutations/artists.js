@@ -57,24 +57,6 @@ module.exports = {
     const artist = await newArtist.save();
     return artist;
   }, Constants.ROLES.SHOP_ADMIN),
-  // Was ADMIN-gated, i.e. reachable only by the global role that no longer exists. Now a shop
-  // admin who actually shares a shop with this artist.
-  deleteArtist: withAuth(async (_, { artistId }, context, info, user) => {
-    try {
-      const artist = await Artist.findById(artistId);
-      if (artist) {
-        await assertCanManageArtist(user, artist.userId);
-      }
-      //TODO: revisit rule that allows a user to delete an artist.  Might want to inactive artist instead of delete in order to prevent historical documents from breaking
-      if (artist) {
-        await Artist.deleteOne({ _id: artistId });
-        return 'Artist deleted successfully';
-      }
-      throw new Error('Artist not found');
-    } catch (err) {
-      throw new Error(err);
-    }
-  }, Constants.ROLES.SHOP_ADMIN),
   updateArtist: withAuth(async (_, args, context, info, user) => {
     try{
       const artist = args.artist;

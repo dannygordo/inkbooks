@@ -104,23 +104,65 @@ module.exports = {
       const appt = await newAppointment.save();
       return appt;
     }),
-    // Ownership check here (Admin, or the appointment's own artist/user) can't be expressed as a
-    // single withAuth minRole, so it stays inline using the `user` withAuth provides.
+    /**
+     * Deletes an appointment that never happened - cancelling a booking, or clearing a slot put
+     * in by mistake.
+     *
+     * The other seven delete* mutations were removed outright (see the note on the Mutation type
+     * in typeDefs.js). This one stays because it has two real callers and a real button behind
+     * each: the calendar event modal (UpdateEventDialog.jsx) and the session view
+     * (SessionDetail.jsx). Taking it away would have broken both.
+     *
+     * But it refuses anything carrying history. A scheduled slot holds nothing; a completed one
+     * holds the session total, the tip, the shop's cut, the Square invoice it was billed under,
+     * and any deposit applied to it. Deleting that doesn't remove a calendar entry, it removes a
+     * transaction - the artist's earnings and the shop's ledger both change, silently, and there
+     * is nothing left to reconcile against. Appointment.appointmentStatus already has 'cancelled'
+     * and 'no_show' for the cases where something was scheduled and then didn't happen; those are
+     * the honest record and the right answer here.
+     */
     deleteAppointment: withAuth(async (_, { appointmentId }, context, info, user) => {
-      try {
-        const appointment = await Appointment.findById(appointmentId);
-        //TODO: revisit rule that allows a user to delete an appointment.  Might want to inactive appointment instead of delete in order to prevent historical documents from breaking
-        // Was "the global ADMIN, or the appointment's own artist". The global role is gone, so
-        // this is now the artist themselves or a shop admin at their shop - the same rule the
-        // rest of this file uses.
-        if (appointment && (await canManageArtist(user, appointment.userId))) {
-          await Appointment.deleteOne({ _id: appointmentId });
-          return 'Appointment deleted successfully';
-        }
-        throw new AuthenticationError('Action not allowed');
-      } catch (err) {
-        throw new Error(err);
+      const appointment = await Appointment.findById(appointmentId);
+      if (!appointment) {
+        throw new UserInputError('Errors', { errors: { appointmentId: 'Appointment not found' } });
       }
+      // The appointment's own artist, or a shop admin at their shop.
+      if (!(await canManageArtist(user, appointment.userId))) {
+        throw new AuthenticationError('Action not allowed');
+      }
+
+      // Each of these means real money or a real record is attached. Checked as a list rather
+      // than just `appointmentStatus === 'completed'` because they come apart: a consult can hold
+      // a deposit while still being 'scheduled', and a session can be invoiced for the shop cut
+      // before anyone marks it complete.
+      const blockers = [];
+      if (appointment.appointmentStatus === 'completed') {
+        blockers.push('it is marked completed');
+      }
+      if (appointment.totalCents > 0 || appointment.subtotalCents > 0 || appointment.tipCents > 0) {
+        blockers.push('money has been recorded against it');
+      }
+      if (appointment.depositCents > 0) {
+        blockers.push('a deposit was taken on it');
+      }
+      if (appointment.depositCreditCents > 0) {
+        blockers.push('a deposit was applied to it');
+      }
+      if (appointment.shopCutStatus && appointment.shopCutStatus !== 'none') {
+        blockers.push('the shop cut is in progress or settled');
+      }
+      if (blockers.length > 0) {
+        throw new UserInputError('Errors', {
+          errors: {
+            appointmentId:
+              `This appointment can't be deleted because ${blockers[0]}. ` +
+              'Set its status to cancelled or no-show instead, so the record stays intact.',
+          },
+        });
+      }
+
+      await Appointment.deleteOne({ _id: appointmentId });
+      return 'Appointment deleted successfully';
     }),
     updateAppointment: withAuth(async (_, args, context, info, user) => {
       const appointment = args.appointmentInput;

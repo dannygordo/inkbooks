@@ -79,24 +79,6 @@ module.exports = {
     await linkClientToUsersShops(clientId, artistId);
     return project;
   }, Constants.ROLES.CLIENT),
-  // Was ADMIN-gated, i.e. reachable only by the global role that no longer exists. Now the
-  // project's own artist, or a shop admin at that artist's shop.
-  deleteProject: withAuth(async (_, { projectId }, context, info, user) => {
-    try {
-      const project = await Project.findById(projectId);
-      if (project && !(await canManageArtist(user, project.artistId))) {
-        throw new AuthenticationError('Action not allowed');
-      }
-      //TODO: revisit rule that allows a user to delete an project.  Might want to inactive project instead of delete in order to prevent historical documents from breaking
-      if (project) {
-        await Project.deleteOne({ _id: projectId });
-        return 'Project deleted successfully';
-      }
-      throw new Error('Project not found');
-    } catch (err) {
-      throw new Error(err);
-    }
-  }),
   // NOTE on project.artistId: per the Project resolver in resolvers/index.js
   // (Artist.findOne({ userId: project.artistId })), artistId stores the artist's *User* _id,
   // not the Artist collection's own _id - so comparing it directly against the JWT's user.id

@@ -39,24 +39,6 @@ module.exports = {
       const conversation = await newConversation.save();
       return conversation;
     }),
-    // Was ADMIN-gated, i.e. reachable only by the global role that no longer exists. Now a
-    // member of the thread, or a shop admin at a member's own shop.
-    deleteConversation: withAuth(async (_, { conversationId }, context, info, user) => {
-      try {
-        const conversation = await Conversation.findById(conversationId);
-        if (conversation && !(await canAccessConversation(user, conversation))) {
-          throw new AuthenticationError('Action not allowed');
-        }
-        //TODO: revisit rule that allows a user to delete an conversation.  Might want to inactive conversation instead of delete in order to prevent historical documents from breaking
-        if (conversation) {
-          await Conversation.deleteOne({ _id: conversationId });
-          return 'Conversation deleted successfully';
-        }
-        throw new Error('Conversation not found');
-      } catch (err) {
-        throw new Error(err);
-      }
-    }),
     updateConversation: withAuth(async (_, args, context, info, user) => {
       const conversation = args.conversation;
       const { valid, errors } = validate(updateConversationInputSchema, conversation);

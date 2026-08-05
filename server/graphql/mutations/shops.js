@@ -44,22 +44,6 @@ module.exports = {
       const shop = await newShop.save();
       return shop;
     }, Constants.ROLES.SHOP_ADMIN),
-    // Was ADMIN-gated, i.e. reachable only by the global role that no longer exists. Now the
-    // shop's own admin, and only their own shop.
-    deleteShop: withAuth(async (_, { shopId }, context, info, user) => {
-      await assertCanAccessShop(user, shopId);
-      try {
-        const shop = await Shop.findById(shopId);
-        //TODO: revisit rule that allows a user to delete an shop.  Might want to inactive shop instead of delete in order to prevent historical documents from breaking
-        if (shop) {
-          await Shop.deleteOne({ _id: shopId });
-          return 'Shop deleted successfully';
-        }
-        throw new Error('Shop not found');
-      } catch (err) {
-        throw new Error(err);
-      }
-    }, Constants.ROLES.SHOP_ADMIN),
     updateShop: withAuth(async (_, args, context, info, user) => {
       try{
         const shop = args.shop;

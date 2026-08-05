@@ -48,24 +48,6 @@ module.exports = {
     await linkClientToUsersShops(client._id, user.id);
     return client;
   }, Constants.ROLES.CLIENT),
-  // Was ADMIN-gated, i.e. reachable only by the global role that no longer exists. Now a shop
-  // admin whose own shop actually works with this client.
-  deleteClient: withAuth(async (_, { clientId }, context, info, user) => {
-    try {
-      const client = await Client.findById(clientId);
-      if (client) {
-        await assertCanAccessClient(user, client);
-      }
-      //TODO: revisit rule that allows a user to delete an client.  Might want to inactive client instead of delete in order to prevent historical documents from breaking
-      if (client) {
-        await Client.deleteOne({ _id: clientId });
-        return 'Client deleted successfully';
-      }
-      throw new Error('Client not found');
-    } catch (err) {
-      throw new Error(err);
-    }
-  }, Constants.ROLES.SHOP_ADMIN),
   // The minRole was the whole check here too - any shop admin could rewrite any client's name,
   // email, phone and address anywhere on the platform.
   updateClient: withAuth(async (_, args, context, info, user) => {

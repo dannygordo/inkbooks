@@ -406,21 +406,9 @@ describe('shop records themselves are not reachable across shops', () => {
 		expect(stored.shopCutPercent).not.toBe(0);
 	});
 
-	it("refuses deleting another shop", async () => {
-		const { shopA, adminB } = await twoShops();
-		const server = createTestServer();
-
-		const response = await server.executeOperation(
-			{
-				query: `mutation A($shopId: ID!) { deleteShop(shopId: $shopId) }`,
-				variables: { shopId: shopA.id },
-			},
-			asOutsideAdmin(adminB),
-		);
-
-		expectRefused(response, 'deleteShop');
-		expect(await Shop.findById(shopA.id)).not.toBeNull();
-	});
+	// "refuses deleting another shop" used to sit here. deleteShop no longer exists - see the note
+	// on the Mutation type in typeDefs.js for why all eight delete* mutations were removed rather
+	// than re-gated. updateShop above covers the same boundary with a mutation that still exists.
 
 	it("refuses planting an account on another shop", async () => {
 		// The nastiest of the write cases: createArtistAccount returns an invite link, so a
