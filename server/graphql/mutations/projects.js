@@ -3,7 +3,7 @@ const withAuth = require('../../utils/with-auth');
 const { AuthenticationError, UserInputError } = require('../../utils/errors');
 const { Constants } = require('../../utils/constants');
 const { updateProjectInputSchema, createProjectInputSchema, validate } = require('../../utils/validation');
-const { canManageArtist } = require('../../utils/shop-membership');
+const { canManageArtist, linkClientToUsersShops } = require('../../utils/shop-membership');
 
 // IBImageInput/IBNoteInput's `id` field is GraphQL's name for the field, but Mongoose subdocuments
 // use `_id` as their real identity (`id` is only a computed virtual, never a settable schema path -
@@ -72,6 +72,11 @@ module.exports = {
         depositAmount,
     });
     const project = await newProject.save();
+    // The artist's shop has now demonstrably worked with this client, so record it. This is the
+    // catch-all of the three link points (client wizard, public booking form, here): whatever
+    // route a client arrived by, creating work for them ties them to the shop doing it. No-ops
+    // for an independent artist, who has no shop - see linkClientToShops.
+    await linkClientToUsersShops(clientId, artistId);
     return project;
   }, Constants.ROLES.CLIENT),
   // Was ADMIN-gated, i.e. reachable only by the global role that no longer exists. Now the

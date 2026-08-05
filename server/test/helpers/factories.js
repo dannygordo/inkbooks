@@ -115,6 +115,10 @@ async function createClientUser(overrides = {}) {
 		lastName: user.lastName,
 		email: user.email,
 		userId: user._id,
+		// Deliberately no shopIds by default. A client with no shop link is the harder case for
+		// every access check (it's what a brand-new record looks like before anything ties it to a
+		// shop), so tests that want the link have to ask for it - `{ client: { shopIds: [shop._id] } }`
+		// - rather than getting it for free and never exercising the other path.
 		...overrides.client,
 	}).save();
 	return { user, client };

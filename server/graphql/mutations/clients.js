@@ -1,37 +1,12 @@
 const { GraphQLError } = require('graphql');
 const Client = require('../../models/Client');
-const Project = require('../../models/Project');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 const { AuthenticationError } = require('../../utils/errors');
 const {
-  getShopIdsForUser,
-  getArtistIdsForShops,
+  assertCanAccessClient,
+  linkClientToUsersShops,
 } = require('../../utils/shop-membership');
-
-/**
- * Throws unless the caller's own shop has a Project with this client.
- *
- * A Client has no shopId of its own (unlike Staff and Artist), so there is no direct "is this
- * your client" field to check - the Projects connecting a shop's artists to them are the only
- * path. Same join getClient/getClients already use on the read side (see resolvers/clients.js);
- * pulled out here because three mutations now need it.
- */
-async function assertSharesProjectWithClient(user, client) {
-  let artistIds;
-  if (user.role === Constants.ROLES.ARTIST) {
-    artistIds = [user.id];
-  } else {
-    const shopIds = await getShopIdsForUser(user.id);
-    artistIds = await getArtistIdsForShops(shopIds);
-  }
-  const hasSharedProject =
-    artistIds.length > 0 &&
-    (await Project.exists({ artistId: { $in: artistIds }, clientId: client._id }));
-  if (!hasSharedProject) {
-    throw new AuthenticationError('Action not allowed');
-  }
-}
 
 module.exports = {
   createClient: withAuth(async (
@@ -50,7 +25,11 @@ module.exports = {
       avatar,
       userId,
     },
+    context,
+    info,
+    user,
   ) => {
+    // Same link the wizard makes - see createClientAccount in mutations/accounts.js.
     const newClient = new Client({
       firstName,
       lastName,
@@ -66,6 +45,7 @@ module.exports = {
       userId,
     });
     const client = await newClient.save();
+    await linkClientToUsersShops(client._id, user.id);
     return client;
   }, Constants.ROLES.CLIENT),
   // Was ADMIN-gated, i.e. reachable only by the global role that no longer exists. Now a shop
@@ -74,7 +54,7 @@ module.exports = {
     try {
       const client = await Client.findById(clientId);
       if (client) {
-        await assertSharesProjectWithClient(user, client);
+        await assertCanAccessClient(user, client);
       }
       //TODO: revisit rule that allows a user to delete an client.  Might want to inactive client instead of delete in order to prevent historical documents from breaking
       if (client) {
@@ -95,7 +75,7 @@ module.exports = {
       if (!existing) {
         throw new Error('Client not found');
       }
-      await assertSharesProjectWithClient(user, existing);
+      await assertCanAccessClient(user, existing);
       const res = await Client.findByIdAndUpdate({_id: client.id}, client, {new: true});
       return res;
     } catch (err) {
@@ -124,9 +104,10 @@ module.exports = {
         throw new AuthenticationError('Action not allowed');
       }
       // Was `role <= SHOP_ADMIN` skipping this entirely - any shop admin could write internal
-      // notes on any shop's client. Nobody skips it now; a shop admin reaches the client the same
-      // way an artist does, through a shared Project.
-      await assertSharesProjectWithClient(user, client);
+      // notes on any shop's client. Nobody skips it now. The self-check above is the part that
+      // makes this stricter than a plain read: a client may read their own record but must never
+      // edit the notes written about them.
+      await assertCanAccessClient(user, client);
       return await Client.findByIdAndUpdate({ _id: clientId }, { notes }, { new: true });
     } catch (err) {
       if (err instanceof GraphQLError) {

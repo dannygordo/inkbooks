@@ -6,7 +6,7 @@ const Staff = require('../../models/Staff');
 const Client = require('../../models/Client');
 const ArtistShopConnection = require('../../models/ArtistShopConnection');
 const withAuth = require('../../utils/with-auth');
-const { assertCanAccessShop } = require('../../utils/shop-membership');
+const { assertCanAccessShop, linkClientToUsersShops } = require('../../utils/shop-membership');
 const { Constants } = require('../../utils/constants');
 const { UserInputError } = require('../../utils/errors');
 const { issuePasswordToken, generateUnusablePassword } = require('../../utils/password-tokens');
@@ -249,7 +249,7 @@ module.exports = {
    * Staff-and-above rather than shop-admin: adding a walk-in client is front-desk work.
    */
   createClientAccount: withAuth(
-    async (_, { input }) => {
+    async (_, { input }, context, info, user) => {
       try {
         const email = String(input.email || '').trim().toLowerCase();
         if (!email || !input.firstName || !input.lastName) {
@@ -264,6 +264,10 @@ module.exports = {
           email,
           phone: input.phone,
         });
+        // This is what makes a brand new walk-in editable. Without it the shop that just created
+        // the record has no relationship to it until a project exists, so a receptionist couldn't
+        // correct a typo in the email they'd just typed - see canAccessClient.
+        await linkClientToUsersShops(client._id, user.id);
 
         // The remaining fields aren't part of the booking-flow shape, so they're applied after.
         const extras = {};

@@ -281,7 +281,8 @@ async function seed() {
       firstName: def.firstName,
       lastName: def.lastName,
       hasSetPassword: true,
-      // Clients have no shop concept at all - same no-shop fallback as an independent artist.
+      // A client's TAG COLOUR has no shop to be unique within - same no-shop fallback as an
+      // independent artist. Separate question from shopIds below, which is about access.
       tagColor: await pickDefaultTagColor(null),
     }).save();
     const clientDoc = await new Client({
@@ -290,6 +291,10 @@ async function seed() {
       email: def.email,
       phone: def.phone,
       userId: clientUser._id,
+      // These are the shop's walk-in clients, so they carry the link the client wizard and the
+      // public booking form both write in the real app - without it the shop couldn't so much as
+      // correct a typo in their email. See models/Client.js.
+      shopIds: [shop._id],
     }).save();
     clients.push({ user: clientUser, client: clientDoc });
   }

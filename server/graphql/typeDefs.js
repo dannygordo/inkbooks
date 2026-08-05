@@ -198,6 +198,11 @@ module.exports = gql`
     avatar: String
     userId: ID!
     user: User
+    # Which shops have worked with this person. Plural, and append-only: Client.email is unique
+    # platform-wide, so there is one row per person shared across shops, and a single shopId could
+    # never describe someone tattooed at two of them. This is one of the two things that make a
+    # client "ours" - see models/Client.js and canAccessClient in utils/shop-membership.js.
+    shopIds: [ID]
     # Everything below powers the client dashboard (client/src/components/clientDashboard).
     # Resolved on demand rather than stored, so nothing has to be kept in sync - see
     # resolvers/index.js's Client field resolvers.

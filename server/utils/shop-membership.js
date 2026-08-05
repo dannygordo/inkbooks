@@ -1,4 +1,7 @@
+const mongoose = require('mongoose');
 const Staff = require('../models/Staff');
+const Client = require('../models/Client');
+const Project = require('../models/Project');
 const Artist = require('../models/Artist');
 const ArtistShopConnection = require('../models/ArtistShopConnection');
 const { Constants } = require('./constants');
@@ -158,6 +161,75 @@ async function canAccessConversation(user, conversation) {
   return memberShopIds.some((ids) => ids.some((id) => myShopIds.has(String(id))));
 }
 
+/**
+ * Records that a shop has worked with a client, so "is this your client?" can be answered from
+ * the moment the record exists rather than from the first project.
+ *
+ * $addToSet, not $push - this is called from several places in a booking flow that can legitimately
+ * run more than once for the same pair, and a duplicated shopId would be noise in every later read.
+ * Silently does nothing when there are no shops to add, which is the normal case for an independent
+ * artist: they have no shop, their clients get no shopIds, and the shared-Project path in
+ * canAccessClient is what reaches them instead.
+ */
+async function linkClientToShops(clientId, shopIds) {
+  if (!clientId || !shopIds || shopIds.length === 0) {
+    return;
+  }
+  await Client.updateOne(
+    { _id: clientId },
+    { $addToSet: { shopIds: { $each: shopIds.map((id) => new mongoose.Types.ObjectId(String(id))) } } },
+  );
+}
+
+// Convenience wrapper for the common case: link a client to whichever shops this user works at.
+async function linkClientToUsersShops(clientId, userId) {
+  const shopIds = await getShopIdsForUser(userId);
+  await linkClientToShops(clientId, shopIds);
+}
+
+/**
+ * "May this caller act on this client's record?"
+ *
+ * Three ways in, and each covers a case the others don't:
+ *   - it's them (a client reading their own record)
+ *   - a shop in common (Client.shopIds - true from the moment a shop adds them, which is what
+ *     makes fixing a typo in a brand new client possible)
+ *   - a shared Project (the only path for an INDEPENDENT artist, who has no shop at all, and the
+ *     path that still works for records created before shopIds existed)
+ *
+ * This does NOT answer "may they write shop-internal notes about them" - see updateClientNotes in
+ * mutations/clients.js, which additionally refuses the client themselves.
+ */
+async function canAccessClient(user, client) {
+  if (!client) {
+    return false;
+  }
+  if (String(user.id) === String(client.userId)) {
+    return true;
+  }
+  const myShopIds = await getShopIdsForUser(user.id);
+  const clientShopIds = (client.shopIds || []).map(String);
+  if (myShopIds.some((id) => clientShopIds.includes(String(id)))) {
+    return true;
+  }
+  // An ARTIST is their own "shop" for this purpose - an independent artist's clients are reached
+  // through the work, since there's no shop to share.
+  const artistIds =
+    user.role === Constants.ROLES.ARTIST ? [user.id] : await getArtistIdsForShops(myShopIds);
+  if (artistIds.length === 0) {
+    return false;
+  }
+  return Boolean(
+    await Project.exists({ artistId: { $in: artistIds }, clientId: client._id }),
+  );
+}
+
+async function assertCanAccessClient(user, client) {
+  if (!(await canAccessClient(user, client))) {
+    throw new AuthenticationError('Action not allowed');
+  }
+}
+
 // True when two users are affiliated with at least one shop in common. Used to answer "may this
 // staff member look at this artist?" without a flat role gate: Staff at one shop have no business
 // reading an artist's books at a different shop, and role alone can't express that.
@@ -172,6 +244,10 @@ async function sharesShopWith(userId, otherUserId) {
 
 module.exports = {
   assertCanAccessShop,
+  linkClientToShops,
+  linkClientToUsersShops,
+  canAccessClient,
+  assertCanAccessClient,
   canManageArtist,
   assertCanManageArtist,
   canAccessConversation,

@@ -14,7 +14,7 @@ const { findOrCreateGuestClient } = require('../../utils/guest-client');
 const { resolveGuestToken } = require('../../utils/guest-auth');
 const { checkRateLimit, getClientIp } = require('../../utils/rate-limit');
 const { tryCheckAuth } = require('../../utils/check-auth');
-const { assertCanManageArtist } = require('../../utils/shop-membership');
+const { assertCanManageArtist, linkClientToUsersShops } = require('../../utils/shop-membership');
 const {
   createBookingRequestInputSchema,
   guestMessageInputSchema,
@@ -80,6 +80,10 @@ module.exports = {
       email: data.email,
       phone: data.phone,
     });
+    // Somebody who submits the public intake form for one of a shop's artists is that shop's
+    // client from this moment, before any project exists. Unauthenticated call, so this is keyed
+    // off the ARTIST being booked, not off a caller.
+    await linkClientToUsersShops(client._id, data.artistId);
 
     const now = new Date();
     const conversation = await new Conversation({
