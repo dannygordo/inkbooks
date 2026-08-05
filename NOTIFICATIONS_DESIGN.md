@@ -271,7 +271,17 @@ Notification                      (stored EVENTS only)
 ```
 
 Indexes: `{ userId, readAt }` for the badge, `{ userId, createdAt }` for the inbox,
-`{ subjectType, subjectId }` for grouping.
+`{ subjectType, subjectId }` for grouping, and a TTL on `createdAt` at the deletion horizon (§11).
+
+Two new fields elsewhere, both for digest timing (§11):
+
+```
+Shop.timezone   — IANA name ('America/Los_Angeles'), the SOURCE of a default
+User.timezone   — IANA name, what delivery time is actually computed from
+```
+
+Never an offset. Offsets are wrong twice a year, and a digest that arrives an hour late every
+March is the kind of bug nobody reports and everybody notices.
 
 **Conditions have no model.** They are functions in `utils/attention.js` returning the same shape as
 a `Notification` so the inbox can render both without knowing which is which. Each is a single
@@ -334,8 +344,10 @@ demonstrated the cost of work that isn't verifiable until it's finished.
    useful with zero new storage.
 3. **The scheduler.** Interval + lock + the condition sweep. Time-based catchers light up.
 4. **Stored events.** Emit from the money and schedule mutations. Inbox now shows both.
-5. **Preferences + digests.** Six toggles, defaults per §7, daily digest job.
-6. **Inbox UI.** Bell, grouping by subject, read/done.
+5. **Preferences + digests + the client settings page.** Six toggles and the defaults per §7,
+   the `User.timezone` field and its shop-sourced default, the daily digest job, and the first
+   client-facing settings route — built together rather than retrofitted (§11).
+6. **Inbox UI.** Bell, grouping by subject, read/done, and the 90-day inbox filter (§11).
 
 ---
 
@@ -355,14 +367,77 @@ Shipped ahead of this document, and consistent with it:
 
 ---
 
-## 11. Open questions
+## 11. Decisions
 
-- **Timezones.** A "daily digest" needs a day boundary. Shops have opening hours; artists travel.
-  Deferred deliberately — first implementation can use a fixed UTC hour, but this will need
-  revisiting before it annoys anyone.
-- **Client-side notification preferences.** Clients currently have no settings surface at all. Their
-  notifications (receipts, reminders) are transactional enough to arguably not need one.
-- **Do staff need money notifications?** Defaulted to off above on the grounds that a front desk
-  manages the schedule, not the books. Worth confirming against how a real shop runs.
-- **Retention.** Stored notifications grow without bound. Ninety days then archive is the obvious
-  answer; it needs deciding before the collection is large enough to make the decision expensive.
+The four questions parked in the first draft, answered August 5.
+
+### Digest day boundary — the shop's local time
+
+**Decided.** A digest arriving at 4pm because the boundary was UTC is worse than no digest.
+
+*Mechanism.* There is currently no timezone field anywhere in the codebase — `Shop` carries
+city/state/zip and nothing else, so "the shop's local time" is not derivable today. It needs
+`Shop.timezone`, an IANA name (`America/Los_Angeles`), not an offset — offsets are wrong twice a
+year.
+
+*The gap this leaves.* An independent artist has no shop, so "shop local time" has no answer for
+them, and they are a first-class supported case here.
+
+*Proposed resolution:* the field that decides delivery time is **`User.timezone`**, defaulted from
+the shop's timezone when someone joins a shop, and capturable from the browser at login when unset.
+This honours the decision — a shop's artists and staff all get shop-local digests, because that's
+what their default resolves to — while giving the independent artist the same field rather than a
+special case. It also avoids `Shop.timezone` and `User.timezone` becoming two records of one fact,
+which is the failure catalogued in §2: a person is in a timezone; a shop is only where they usually
+are. `Shop.timezone` remains, as the *source of the default*, never read directly at send time.
+
+### Staff money notifications — off
+
+**Decided.** Off by default, as in the §7 table. Revisit if a real front desk turns out to take
+deposits and reconcile the drawer, in which case it's one row in a defaults table.
+
+### Client preferences — build the settings page alongside the preferences model
+
+**Decided.** Clients get a real settings surface, built with the preferences model rather than
+retrofitted onto it. This moves into the build order at step 5 rather than sitting as a later
+addition.
+
+Note that clients have no settings page of any kind today, so this is a new route and a new page,
+not a new section on an existing one. Their notifications are narrow — receipts and appointment
+reminders — so the page is small, but it's the first client-facing settings surface in the app and
+it establishes the pattern for anything else clients ever configure.
+
+### Retention — 90 days, then archive
+
+**Decided.** With one distinction that matters at implementation time:
+
+**Archive and delete are different mechanisms, and "90 days then archive" means both.** A Mongo TTL
+index *deletes*; it cannot archive. So:
+
+- **Out of the inbox after 90 days** — a query filter on the inbox, not a deletion. Nothing is
+  destroyed.
+- **Deleted after a longer horizon** — a TTL index at, say, two years.
+
+Keeping the rows past 90 days is close to free (they are small) and preserves the audit answer
+§2 argued for: *"did we tell the shop about that payment?"* is a real question about money, and a
+90-day hard delete makes it permanently unanswerable. The inbox stays clean either way, because
+what makes it clean is the query, not the deletion.
+
+The TTL index should be created with the collection. Adding one to a large collection later is a
+migration; adding it at creation is a line of schema.
+
+---
+
+## 12. Still open
+
+Genuinely undecided, and none of it blocks starting:
+
+- **Where `User.timezone` comes from on day one.** Browser detection at login is the obvious
+  source, but it needs a fallback for accounts created by an admin that have never logged in — an
+  invited artist who hasn't redeemed yet has no browser to detect from.
+- **Digest send hour.** "Morning" is the obvious answer; whether that's 7am or 9am, and whether it
+  differs for a shop admin versus an artist, is a product call best made once someone has lived
+  with it.
+- **Whether an unread in-app notification should still email later.** A notification read in the
+  app arguably shouldn't also arrive by email an hour later. That's the same reset-on-read logic
+  already built for message throttling, generalised — worth doing, not yet specified.
