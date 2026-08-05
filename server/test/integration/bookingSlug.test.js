@@ -298,3 +298,53 @@ describe('the no-slug state', () => {
 		expect(res.body.singleResult.data.getPublicArtistProfile.bookingSlug).toBeNull();
 	});
 });
+
+// updateArtistRateSettings is not about booking links, but it is the mutation updateMyBookingSlug
+// was written by copying, and it carried the same bug: `user.userType !== ARTIST` against a JWT
+// payload that has no userType, so the comparison was always true and every caller was refused.
+//
+// It has existed without a test the whole time, which is why nobody noticed that an artist has
+// never once been able to save their own rates. Covered here, next to the mutation that exposed
+// it, rather than left uncovered again.
+describe('updateArtistRateSettings', () => {
+	const UPDATE_RATES = `
+		mutation UpdateArtistRateSettings($hourlyRate: Int, $flatRate: Int, $billingType: String!) {
+			updateArtistRateSettings(
+				hourlyRate: $hourlyRate
+				flatRate: $flatRate
+				billingType: $billingType
+			) {
+				id
+				hourlyRate
+				flatRate
+				billingType
+			}
+		}
+	`;
+
+	it('lets an artist save their own rates', async () => {
+		const { user } = await createArtistUser();
+		const server = createTestServer();
+
+		const res = await server.executeOperation(
+			{ query: UPDATE_RATES, variables: { hourlyRate: 185, billingType: 'hourly' } },
+			asUser(user),
+		);
+
+		expect(res.body.singleResult.errors).toBeUndefined();
+		expect(res.body.singleResult.data.updateArtistRateSettings.hourlyRate).toBe(185);
+	});
+
+	it('refuses somebody with no artist profile', async () => {
+		const { user: admin } = await createShopAdminUser();
+		const server = createTestServer();
+
+		const res = await server.executeOperation(
+			{ query: UPDATE_RATES, variables: { hourlyRate: 999, billingType: 'hourly' } },
+			asUser(admin),
+		);
+
+		expect(res.body.singleResult.errors).toBeDefined();
+		expect(res.body.singleResult.errors[0].message).toMatch(/not allowed/i);
+	});
+});

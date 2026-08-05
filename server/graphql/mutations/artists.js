@@ -9,6 +9,34 @@ const { getActiveShopIdForArtist } = require('../../utils/artist-shop');
 const { assertNoArchiveTransition } = require('../../utils/archiving');
 const { normalizeSlug, assertSlugAvailable } = require('../../utils/booking-slug');
 
+/**
+ * "Is the caller an artist?" - answered by whether they have an Artist profile, not by a field on
+ * their token.
+ *
+ * Both self-service mutations below used to ask `user.userType !== ARTIST`. withAuth hands them
+ * checkAuth's decoded JWT, and that payload is {id, email, role} - there is no userType on it and
+ * never has been. So the comparison was `undefined !== 'artist'`, which is unconditionally true,
+ * which means BOTH mutations rejected every caller including the artist they existed for.
+ *
+ * updateArtistRateSettings has been broken this way the whole time it has existed - an artist has
+ * never once been able to save their own rates - and it had no test, so nothing said so. It was
+ * found only because updateMyBookingSlug was written by copying its shape and the new mutation
+ * did have tests.
+ *
+ * The fix is the rule this codebase already settled on for shop membership (see
+ * utils/shop-membership.js): ask the database about a real relationship rather than branching on
+ * something the token claims. An Artist row keyed to this user IS what being an artist means.
+ */
+async function loadOwnArtistProfile(user) {
+  const artist = await Artist.findOne({ userId: user.id });
+  if (!artist) {
+    // Same message as any other refusal - a non-artist calling this learns nothing about whether
+    // some other account exists.
+    throw new AuthenticationError('Action not allowed');
+  }
+  return artist;
+}
+
 module.exports = {
   createArtist: withAuth(async (
     _,
@@ -191,18 +219,13 @@ module.exports = {
     if (!valid) {
       throw new UserInputError('Errors', { errors });
     }
-    if (user.userType !== Constants.USER_TYPE.ARTIST) {
-      throw new AuthenticationError('Action not allowed');
-    }
-    const artist = await Artist.findOneAndUpdate(
-      { userId: user.id },
+    // The profile lookup IS the "are you an artist" check - see loadOwnArtistProfile.
+    const own = await loadOwnArtistProfile(user);
+    return Artist.findByIdAndUpdate(
+      own._id,
       { hourlyRate: data.hourlyRate, flatRate: data.flatRate, billingType: data.billingType },
       { new: true },
     );
-    if (!artist) {
-      throw new UserInputError('Errors', { errors: { artistId: 'Artist profile not found' } });
-    }
-    return artist;
   }),
 
   // Self-service booking link, separate from updateArtist for exactly the reason
@@ -216,13 +239,7 @@ module.exports = {
   // /book/<id> page still works. It has to be $unset rather than stored as '', because the unique
   // index would otherwise treat every artist who cleared theirs as holding the same value.
   updateMyBookingSlug: withAuth(async (_, { slug }, context, info, user) => {
-    if (user.userType !== Constants.USER_TYPE.ARTIST) {
-      throw new AuthenticationError('Action not allowed');
-    }
-    const existing = await Artist.findOne({ userId: user.id }).select('_id');
-    if (!existing) {
-      throw new UserInputError('Errors', { errors: { artistId: 'Artist profile not found' } });
-    }
+    const existing = await loadOwnArtistProfile(user);
 
     const value = normalizeSlug(slug);
     const update = value === ''
