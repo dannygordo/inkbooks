@@ -217,6 +217,9 @@ async function seed() {
     firstName: 'Maya',
     lastName: 'Chen',
     email: artist1User.email,
+    // Real booking links, so /book/<slug> is testable straight after a seed rather than needing
+    // an artist's ObjectId copied out of the database first. See utils/booking-slug.js.
+    bookingSlug: 'maya-chen',
     phone: '555-010-0103',
     userId: artist1User._id,
     title: 'Fine Line / Botanical',
@@ -240,6 +243,7 @@ async function seed() {
     firstName: 'Jonas',
     lastName: 'Petrov',
     email: artist2User.email,
+    bookingSlug: 'jonas-petrov',
     phone: '555-010-0104',
     userId: artist2User._id,
     title: 'Traditional / Blackwork',
@@ -265,6 +269,7 @@ async function seed() {
     firstName: 'Robin',
     lastName: 'Ashby',
     email: independentArtistUser.email,
+    bookingSlug: 'robin-ashby',
     // Deliberately no ArtistShopConnection below - that's the whole point of this fixture, and
     // it's now the only thing that would make them shop-affiliated (Artist.shopId is no longer
     // read or written - see utils/artist-shop.js). userId is NOT optional though: every Artist
@@ -558,6 +563,11 @@ async function seed() {
   console.log(`  Client          jordan.lee@example.dev`);
   console.log(`  Client          taylor.brooks@example.dev`);
   console.log(`  Client          morgan.diaz@example.dev`);
+  console.log('\nPublic booking pages (no login needed - this is what a client sees):');
+  console.log('  http://localhost:3000/book/maya-chen');
+  console.log('  http://localhost:3000/book/jonas-petrov');
+  console.log('  http://localhost:3000/book/robin-ashby   - independent artist, no shop');
+  console.log('\nSubmitted requests land in that artist\'s Booking Requests inbox.');
   console.log(`\nShop: Copper Wolf Tattoo Co. (${shop._id})`);
 }
 

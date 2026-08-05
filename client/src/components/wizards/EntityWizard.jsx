@@ -117,18 +117,34 @@ const EntityWizard = ({ steps, onSubmit, submitLabel = "Create", onClose }) => {
 				<h3 className="entityWizardTitle">{step.title}</h3>
 				{step.subtitle && <p className="entityWizardSubtitle">{step.subtitle}</p>}
 
-				{step.fields.map((field) => (
-					<IBInput
-						key={field.name}
-						id={field.name}
-						label={field.required ? `${field.label} *` : field.label}
-						type={field.type === "email" ? "email" : field.type || "text"}
-						defaultValue={values[field.name] || ""}
-						error={Boolean(errors[field.name])}
-						helperText={errors[field.name] || field.helperText || " "}
-						onChange={(e) => setValue(field.name, e.target.value)}
-					/>
-				))}
+				{step.fields.map((field) =>
+					// A field can supply its own control via `render`, for the cases a labelled
+					// text box genuinely can't cover - today that's the booking slug, which needs
+					// a live availability check against the server as you type. The alternative
+					// was teaching this component about slugs specifically, which would make the
+					// generic wizard carry knowledge of one caller's one field.
+					field.render ? (
+						<React.Fragment key={field.name}>
+							{field.render({
+								value: values[field.name] || "",
+								setValue: (v) => setValue(field.name, v),
+								error: errors[field.name],
+								values,
+							})}
+						</React.Fragment>
+					) : (
+						<IBInput
+							key={field.name}
+							id={field.name}
+							label={field.required ? `${field.label} *` : field.label}
+							type={field.type === "email" ? "email" : field.type || "text"}
+							defaultValue={values[field.name] || ""}
+							error={Boolean(errors[field.name])}
+							helperText={errors[field.name] || field.helperText || " "}
+							onChange={(e) => setValue(field.name, e.target.value)}
+						/>
+					)
+				)}
 
 				{submitError && <div className="entityWizardError">{submitError}</div>}
 			</DialogContent>

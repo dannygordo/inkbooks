@@ -1,10 +1,13 @@
+const mongoose = require('mongoose');
 const BookingRequest = require('../../models/BookingRequest');
 const User = require('../../models/User');
+const Artist = require('../../models/Artist');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 const { resolveGuestToken } = require('../../utils/guest-auth');
 const { assertCanManageArtist } = require('../../utils/shop-membership');
 const { UserInputError } = require('../../utils/errors');
+const { normalizeSlug } = require('../../utils/booking-slug');
 
 module.exports = {
   Query: {
@@ -16,12 +19,47 @@ module.exports = {
     // business being reachable by an unauthenticated caller who only has a User id. Returns null
     // (not a thrown error) for both "no such user" and "that id isn't an artist" - deliberately
     // not distinguishing the two, so this can't be used to probe which ids exist in the system.
+    //
+    // Takes EITHER a bookingSlug or a raw artist ObjectId under the same `artistId` argument.
+    // Slug first, because that is what a shared link contains now; the ObjectId path stays so
+    // that links handed out before slugs existed keep working, and so an artist who has not
+    // chosen a slug yet still has a reachable booking page.
+    //
+    // Slug lookup goes through Artist and then to the User, since bookingSlug lives on the
+    // artist's profile rather than on their account (see utils/booking-slug.js on why).
     async getPublicArtistProfile(_, { artistId }) {
-      const user = await User.findById(artistId).catch(() => null);
+      let artist = null;
+      let user = null;
+
+      const slug = normalizeSlug(artistId);
+      if (slug) {
+        artist = await Artist.findOne({ bookingSlug: slug });
+        if (artist) {
+          user = await User.findById(artist.userId).catch(() => null);
+        }
+      }
+
+      // Only fall back to an id lookup if the slug missed. isValidObjectId first, because
+      // findById on a non-ObjectId string throws a CastError rather than returning null - the
+      // existing .catch(() => null) already swallowed that, but checking is clearer than relying
+      // on an exception for control flow on the common path (every slug is a non-ObjectId).
+      if (!user && mongoose.isValidObjectId(artistId)) {
+        user = await User.findById(artistId).catch(() => null);
+        if (user) {
+          artist = await Artist.findOne({ userId: user._id });
+        }
+      }
+
       if (!user || user.userType !== Constants.USER_TYPE.ARTIST) {
         return null;
       }
-      return { id: user.id, firstName: user.firstName, lastName: user.lastName, avatar: user.avatar };
+      return {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        avatar: user.avatar,
+        bookingSlug: artist ? artist.bookingSlug || null : null,
+      };
     },
     // Artist-only (withAuth) - the artist's own dashboard list, not the guest-facing side.
     // source: 'public_form' only - a real guest submission via the public intake form. Excludes

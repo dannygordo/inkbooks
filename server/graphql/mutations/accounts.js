@@ -10,6 +10,7 @@ const { Constants } = require('../../utils/constants');
 const { UserInputError, rethrow } = require('../../utils/errors');
 const { issuePasswordToken, generateUnusablePassword } = require('../../utils/password-tokens');
 const { sendAccountInviteEmail, buildSetPasswordLink } = require('../../utils/email');
+const { assertSlugAvailable } = require('../../utils/booking-slug');
 const { pickDefaultTagColor } = require('../../utils/tag-color');
 const { findOrCreateGuestClient } = require('../../utils/guest-client');
 const Shop = require('../../models/Shop');
@@ -135,10 +136,21 @@ module.exports = {
           createdBy: user.id,
         });
 
+        // Verified before anything is written, so a taken link fails the whole creation rather
+        // than producing an artist whose booking page silently doesn't exist. Optional: an artist
+        // created without one is a legal state (the sparse index allows any number of them) and
+        // /book/<their id> still works, so a shop admin in a hurry isn't blocked on inventing a
+        // handle for somebody else.
+        const bookingSlug = input.bookingSlug ? await assertSlugAvailable(input.bookingSlug) : undefined;
+
         const artist = await new Artist({
           firstName: input.firstName,
           lastName: input.lastName,
           email,
+          // Only set when actually chosen. Assigning `undefined` would be fine, but writing '' or
+          // null here would put every slug-less artist on the same indexed value and the second
+          // one would collide - see models/Artist.js.
+          ...(bookingSlug ? { bookingSlug } : {}),
           title: input.title || '',
           phone: input.phone || '',
           instagram: input.instagram || '',

@@ -305,8 +305,11 @@ function App() {
 						<Route path="/register" element={user?.id ? <Home /> : <Register />} />
 						{/* Public, unauthenticated by design - no AuthRoute wrapper, same as
 						/login, /register, /resetPassword above. This is the public intake form a
-						prospective client fills out before any account exists. */}
-						<Route path="/book/:artistId" element={<BookingRequest />} />
+						prospective client fills out before any account exists.
+						The param is the artist's chosen bookingSlug (/book/maya-chen), and the
+						resolver also accepts a raw artist id so links handed out before slugs
+						existed keep working - see getPublicArtistProfile. */}
+						<Route path="/book/:artistHandle" element={<BookingRequest />} />
 						{/* Token-gated, not auth-gated - see utils/guest-auth.js server-side.
 						Intentionally public/no AuthRoute: the whole point is a guest with no
 						account can reach this. */}

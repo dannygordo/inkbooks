@@ -1,4 +1,4 @@
-import { gql, useQuery, useMutation } from "@apollo/client";
+import { gql, useQuery, useLazyQuery, useMutation } from "@apollo/client";
 export const ArtistService = (() => {
 
 	const _fetchArtist = (artistId) => {
@@ -23,6 +23,7 @@ export const ArtistService = (() => {
 					hourlyRate
 					flatRate
 					billingType
+					bookingSlug
 					shopId
 					userId
 					status
@@ -154,7 +155,38 @@ export const ArtistService = (() => {
 		}
 	`;
 
+	// Live "is this booking link free" check for the slug field. Lazy, not a useQuery: it fires on
+	// a debounce as the artist types, not on render. See server/graphql/resolvers/artists.js -
+	// public, and rate-limited there so this can't be walked to enumerate every artist's handle.
+	const _CHECK_BOOKING_SLUG = gql`
+		query CheckBookingSlugAvailable($slug: String!) {
+			checkBookingSlugAvailable(slug: $slug) {
+				slug
+				available
+				reason
+			}
+		}
+	`;
+	const _useCheckBookingSlug = () =>
+		useLazyQuery(_CHECK_BOOKING_SLUG, {
+			// Always ask. A cached "taken" from thirty seconds ago is a worse answer than a fresh
+			// one when the artist is actively trying to find a link that works.
+			fetchPolicy: "network-only",
+		});
+
+	const _UPDATE_MY_BOOKING_SLUG_MUTATION = gql`
+		mutation UpdateMyBookingSlug($slug: String!) {
+			updateMyBookingSlug(slug: $slug) {
+				id
+				bookingSlug
+			}
+		}
+	`;
+
 	return {
+		UPDATE_MY_BOOKING_SLUG_MUTATION: _UPDATE_MY_BOOKING_SLUG_MUTATION,
+		useCheckBookingSlug: _useCheckBookingSlug,
+		CHECK_BOOKING_SLUG: _CHECK_BOOKING_SLUG,
 		fetchArtist: _fetchArtist,
 		fetchArtists: _fetchArtists,
         updateArtist: _updateArtist,

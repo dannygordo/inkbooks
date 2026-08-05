@@ -7,6 +7,7 @@ const { updateArtistRateSettingsInputSchema, validate } = require('../../utils/v
 const { assertCanAccessShop, assertCanManageArtist } = require('../../utils/shop-membership');
 const { getActiveShopIdForArtist } = require('../../utils/artist-shop');
 const { assertNoArchiveTransition } = require('../../utils/archiving');
+const { normalizeSlug, assertSlugAvailable } = require('../../utils/booking-slug');
 
 module.exports = {
   createArtist: withAuth(async (
@@ -137,10 +138,44 @@ module.exports = {
         });
       }
     }
+    // Validated and normalised before the write. undefined means "not editing the slug" and is
+    // left alone; an explicit empty string means "remove my booking link", which is a legitimate
+    // thing to want and must NOT be stored as '' - the unique index treats every empty string as
+    // the same value, so the second artist to clear theirs would collide with the first. $unset
+    // is what "no slug" actually looks like, and is what the sparse index is built around.
+    let slugUpdate = {};
+    if (artist.bookingSlug !== undefined) {
+      const value = normalizeSlug(artist.bookingSlug);
+      if (value === '') {
+        slugUpdate = { $unset: { bookingSlug: '' } };
+      } else {
+        await assertSlugAvailable(value, artist.id);
+        artist.bookingSlug = value;
+      }
+    }
     try{
-      const res = await Artist.findByIdAndUpdate({_id: artist.id}, artist, {new: true});
+      // bookingSlug is deleted from the $set payload when it's being unset, since Mongo refuses a
+      // field appearing in both $set and $unset in one update.
+      const payload = slugUpdate.$unset ? { ...artist } : artist;
+      if (slugUpdate.$unset) {
+        delete payload.bookingSlug;
+      }
+      const res = await Artist.findByIdAndUpdate(
+        { _id: artist.id },
+        { ...payload, ...slugUpdate },
+        { new: true },
+      );
       return res;
     } catch (err) {
+        // A duplicate-key error here means two artists claimed the same slug between the
+        // availability check above and this write. The check is a courtesy that produces a good
+        // message; the unique index is the actual guarantee. Translated so the loser of that race
+        // gets "that link is taken" on the right field rather than a raw E11000.
+        if (err && err.code === 11000 && err.keyPattern && err.keyPattern.bookingSlug) {
+          throw new UserInputError('Errors', {
+            errors: { bookingSlug: 'That booking link is already taken.' },
+          });
+        }
         rethrow(err);
     }
   }, Constants.ROLES.SHOP_ADMIN),
@@ -168,5 +203,44 @@ module.exports = {
       throw new UserInputError('Errors', { errors: { artistId: 'Artist profile not found' } });
     }
     return artist;
+  }),
+
+  // Self-service booking link, separate from updateArtist for exactly the reason
+  // updateArtistRateSettings above is: updateArtist is gated to SHOP_ADMIN-or-better, so a plain
+  // ARTIST has never been able to call it on their own record. Their own public booking handle is
+  // the clearest possible case of something they should be able to change without asking an
+  // admin. Looked up by the caller's own userId rather than a client-supplied artistId, so there
+  // is no ownership check to get wrong.
+  //
+  // An empty slug means "remove my booking link", which is a legitimate choice - their
+  // /book/<id> page still works. It has to be $unset rather than stored as '', because the unique
+  // index would otherwise treat every artist who cleared theirs as holding the same value.
+  updateMyBookingSlug: withAuth(async (_, { slug }, context, info, user) => {
+    if (user.userType !== Constants.USER_TYPE.ARTIST) {
+      throw new AuthenticationError('Action not allowed');
+    }
+    const existing = await Artist.findOne({ userId: user.id }).select('_id');
+    if (!existing) {
+      throw new UserInputError('Errors', { errors: { artistId: 'Artist profile not found' } });
+    }
+
+    const value = normalizeSlug(slug);
+    const update = value === ''
+      ? { $unset: { bookingSlug: '' } }
+      : { $set: { bookingSlug: await assertSlugAvailable(value, existing._id) } };
+
+    try {
+      return await Artist.findByIdAndUpdate(existing._id, update, { new: true });
+    } catch (err) {
+      // The availability check above is a courtesy that produces a good message; this index is
+      // the actual guarantee. Two artists claiming the same link in the same instant both pass
+      // the check and one lands here.
+      if (err && err.code === 11000 && err.keyPattern && err.keyPattern.bookingSlug) {
+        throw new UserInputError('Errors', {
+          errors: { bookingSlug: 'That booking link is already taken.' },
+        });
+      }
+      rethrow(err);
+    }
   }),
 };

@@ -3,6 +3,8 @@ import { useMutation } from "@apollo/client";
 import EntityWizard from "./EntityWizard";
 import AccountService from "../../services/AccountService";
 import { useAuth } from "../../context/auth";
+import BookingSlugField from "../artist/BookingSlugField";
+import { suggestSlugOrBlank } from "../../utils/bookingSlug";
 import "./entityWizard.css";
 
 /**
@@ -106,6 +108,28 @@ export const CreateArtistWizard = ({ onClose, onCreated }) => {
 			],
 		},
 		{
+			title: "Booking link",
+			subtitle:
+				"The link this artist hands out for booking requests. Optional - they can choose one later from Settings, and their booking page works either way.",
+			fields: [
+				{
+					name: "bookingSlug",
+					label: "Booking link",
+					// Prefilled from the name, never applied silently. An auto-assigned handle
+					// nobody chose and nobody was shown is exactly what User.username was, and it
+					// was invisible to its owner right up until it locked them out. The admin sees
+					// the suggestion and can overwrite it before anything is written.
+					render: ({ value, setValue, error, values }) => (
+						<BookingSlugField
+							value={value || suggestSlugOrBlank(values.firstName, values.lastName)}
+							setValue={setValue}
+							error={error}
+						/>
+					),
+				},
+			],
+		},
+		{
 			title: "Contact and rate",
 			subtitle: "All optional - the artist can fill these in themselves.",
 			fields: [
@@ -135,6 +159,15 @@ export const CreateArtistWizard = ({ onClose, onCreated }) => {
 						input: {
 							...values,
 							hourlyRate: values.hourlyRate ? parseInt(values.hourlyRate, 10) : null,
+							// Prefilled from the name when the admin left the field untouched -
+							// the suggestion is what they saw on screen, so it's what they agreed
+							// to. Empty string rather than undefined would be wrong: the server
+							// treats a blank as "no slug", and '' on a unique index collides
+							// across every slug-less artist (see models/Artist.js).
+							bookingSlug:
+								(values.bookingSlug ||
+									suggestSlugOrBlank(values.firstName, values.lastName)) ||
+								undefined,
 							// The creating admin's own shop. There's no shop picker because there's
 							// no shop switcher anywhere in this app yet (see PRODUCTION_ROADMAP.md)
 							// - inventing one here would be the only place it exists.

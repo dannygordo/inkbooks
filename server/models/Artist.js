@@ -24,6 +24,24 @@ const ArtistSchema = new mongoose.Schema(
     flatRate: { type: Number },
     billingType: { type: String, enum: ['hourly', 'flat_rate'], default: 'hourly' },
     avatar: { type: String, default: "" },
+    // The artist's public booking handle - /book/<slug>. See utils/booking-slug.js.
+    //
+    // sparse, because unique + null is a trap: without it, the SECOND artist created without a
+    // slug collides with the first on a shared null. sparse means the index only covers documents
+    // that actually have one, so "no booking link yet" stays a legal state for as many artists as
+    // like. (This is the same shape of bug that the deleted User.username left behind in a stale
+    // index - see the syncIndexes note in scripts/seed.js.)
+    //
+    // Chosen by the artist, never derived and assigned silently. An auto-generated handle nobody
+    // picked and nobody was shown is exactly what username was, and it was invisible to its owner
+    // right until it locked them out. suggestSlug() prefills the field; the artist confirms it.
+    bookingSlug: {
+      type: String,
+      unique: true,
+      sparse: true,
+      lowercase: true,
+      trim: true,
+    },
     // No shopId here, deliberately. Which shop an artist works at is ArtistShopConnection and
     // nothing else (see utils/artist-shop.js). This model used to carry the field as well, and the
     // two disagreed: connectArtistToShop only ever wrote the connection, so an artist connected

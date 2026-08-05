@@ -1,0 +1,48 @@
+.bookingSlugField {
+	display: flex;
+	flex-direction: column;
+}
+
+/* Sits directly under the input, tight to it, so the URL reads as a preview of the field rather
+   than as a separate piece of information. Negative margin pulls it up under IBInput's own
+   helperText gutter, which is always reserved (a single space) to stop the layout jumping when an
+   error appears. */
+.bookingSlugPreview {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	flex-wrap: wrap;
+	margin-top: -14px;
+	margin-bottom: 10px;
+	padding: 0 14px;
+	font-size: 12px;
+}
+
+.bookingSlugPreviewUrl {
+	color: #6b6b6b;
+	word-break: break-all;
+}
+
+.bookingSlugPreviewUrl strong {
+	color: #333;
+	font-weight: 600;
+}
+
+.bookingSlugStatus {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	white-space: nowrap;
+	color: #6b6b6b;
+}
+
+/* Not colour alone - each state also carries its own icon and its own words, so the difference
+   survives a colourblind reader and a greyscale screenshot. */
+.bookingSlugStatusOk {
+	color: #2e7d32;
+}
+
+.bookingSlugStatusBad {
+	color: #c62828;
+}

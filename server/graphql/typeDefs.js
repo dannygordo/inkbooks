@@ -68,6 +68,10 @@ module.exports = gql`
     hourlyRate: Int
     flatRate: Int
     billingType: String
+    # The artist's public booking handle - the /book/<slug> link they hand out. Nullable: an
+    # artist without one is a legal state, and /book/<objectId> still resolves. See
+    # utils/booking-slug.js.
+    bookingSlug: String
     # Was ID! - broke the moment any independent artist (no shop connection at all, the
     # headline scenario of the artist-centric tenancy redesign - see PRODUCTION_ROADMAP.md) got
     # serialized in a list query: Artist.js's Mongoose schema already allows shopId to be unset,
@@ -101,6 +105,7 @@ module.exports = gql`
     hourlyRate: Int
     flatRate: Int
     billingType: String
+    bookingSlug: String
     shopId: ID
     userId: ID
     status: Int
@@ -330,11 +335,20 @@ module.exports = gql`
   }
   # Deliberately narrow - see getPublicArtistProfile in resolvers/bookingRequests.js for why this
   # isn't just the full Artist/User type.
+  # Both fields matter to the form: available drives the tick or cross, and reason is what gets
+  # shown when it is false. A bare boolean would leave the UI guessing between "taken", "too
+  # short" and "that word is reserved" - three different things for the person typing to do next.
+  type BookingSlugAvailability {
+    slug: String!
+    available: Boolean!
+    reason: String
+  }
   type PublicArtistProfile {
     id: ID!
     firstName: String!
     lastName: String!
     avatar: String
+    bookingSlug: String
   }
   # See PRODUCTION_ROADMAP.md's "Booking request & guest correspondence" section for the full
   # design. This is the structured intake content only - back-and-forth correspondence after
@@ -648,6 +662,10 @@ module.exports = gql`
     firstName: String!
     lastName: String!
     email: String!
+    # Optional. An artist created without one still has a working /book/<id> page and can choose
+    # a link later from Settings - a shop admin shouldn't be blocked on inventing a handle for
+    # somebody else. See utils/booking-slug.js.
+    bookingSlug: String
     title: String
     phone: String
     instagram: String
@@ -860,7 +878,15 @@ module.exports = gql`
 
     # Public, unauthenticated - see resolvers/bookingRequests.js for why this returns a narrow
     # PublicArtistProfile rather than the full Artist/User type.
+    # Takes EITHER a bookingSlug or a raw artist ObjectId, so /book/maya-chen and the older
+    # /book/<objectId> links both resolve. See resolvers/bookingRequests.js.
     getPublicArtistProfile(artistId: ID!): PublicArtistProfile
+    # Live "is this link free" check for the slug field, so an artist finds out while typing
+    # rather than on submit. Public on purpose - it is the same information /book/<slug> already
+    # gives away by returning a profile or not, so gating it would protect nothing while making
+    # the signup form worse. Rate-limited (see resolvers/artists.js) so it cannot be walked to
+    # enumerate every artist on the platform at speed.
+    checkBookingSlugAvailable(slug: String!): BookingSlugAvailability!
     # Artist-only (withAuth) - the artist's own dashboard list, not the guest-facing side.
     getBookingRequests(artistId: ID!): [BookingRequest]
     getBookingRequest(bookingRequestId: ID!): BookingRequest
@@ -992,6 +1018,10 @@ module.exports = gql`
     updateArtist(artist: ArtistInput): Artist
     # Self-service - see mutations/artists.js's comment on why this is separate from updateArtist
     # (which is SHOP_ADMIN-or-better only, so a plain artist could never call it on themselves).
+    # Self-service: an artist setting their own public booking link. Pass an empty string to
+    # remove it (their /book/<id> page still works). Separate from updateArtist, which is
+    # SHOP_ADMIN-gated - see mutations/artists.js.
+    updateMyBookingSlug(slug: String!): Artist!
     updateArtistRateSettings(hourlyRate: Int, flatRate: Int, billingType: String!): Artist!
 
     ######### Shops ###########

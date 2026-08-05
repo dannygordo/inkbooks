@@ -10,6 +10,8 @@ import { ArtistService } from "../../services/ArtistService";
 import ArtistShopConnectionService from "../../services/ArtistShopConnectionService";
 import ShopService from "../../services/ShopService";
 import { ALERT_CONSTANTS, APP_SETTINGS_CONSTANTS } from "../../constants";
+import BookingSlugField from "../../components/artist/BookingSlugField";
+import { bookingUrl } from "../../utils/bookingSlug";
 
 // New top-level settings section - see PRODUCTION_ROADMAP.md's "Rates & settings" entry for why
 // this didn't just get bolted onto Profile.jsx: it's going to keep growing (rate config today,
@@ -160,6 +162,58 @@ const Settings = () => {
 	const [rateSource, setRateSource] = useState("shop");
 	const [billingTypeHydrated, setBillingTypeHydrated] = useState(false);
 	const [rateSourceHydrated, setRateSourceHydrated] = useState(false);
+
+	// Same uncontrolled-with-local-edits shape as the rate fields above: fall back to the query's
+	// own value for anything untouched, so a slow fetch doesn't blank the field.
+	const [editedSlug, setEditedSlug] = useState(undefined);
+	const [copiedLink, setCopiedLink] = useState(false);
+	const currentSlug = artistData?.getArtist?.bookingSlug || "";
+	const slugValue = editedSlug !== undefined ? editedSlug : currentSlug;
+	const slugChanged = slugValue.trim().toLowerCase() !== currentSlug.toLowerCase();
+
+	const [updateMyBookingSlug, { loading: savingSlug }] = useMutation(
+		ArtistService.UPDATE_MY_BOOKING_SLUG_MUTATION
+	);
+
+	const handleSaveSlug = (e) => {
+		e.preventDefault();
+		updateMyBookingSlug({ variables: { slug: slugValue.trim().toLowerCase() } })
+			.then(() => {
+				setEditedSlug(undefined);
+				setAlert({
+					isAlert: true,
+					severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
+					message: "Booking link saved.",
+					timeout: ALERT_CONSTANTS.TIMEOUT,
+					location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
+				});
+			})
+			.catch((err) => {
+				// Surfaced rather than swallowed: "that link is taken" is the single most likely
+				// outcome of this form, and it's the one the artist needs to act on.
+				setAlert({
+					isAlert: true,
+					severity: ALERT_CONSTANTS.SEVERITY.ERROR,
+					message:
+						err.graphQLErrors?.[0]?.extensions?.errors?.bookingSlug || err.message,
+					timeout: ALERT_CONSTANTS.TIMEOUT,
+					location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
+				});
+			});
+	};
+
+	const handleCopyBookingLink = () => {
+		// navigator.clipboard is unavailable over plain http on anything but localhost, so this
+		// can genuinely fail in a LAN test setup. Reverting the label is a truthful "it didn't
+		// work" rather than a tick over nothing on the clipboard.
+		navigator.clipboard
+			?.writeText(bookingUrl(currentSlug))
+			.then(() => {
+				setCopiedLink(true);
+				setTimeout(() => setCopiedLink(false), 2000);
+			})
+			.catch(() => setCopiedLink(false));
+	};
 
 	const [updateArtistRateSettings, { loading: savingRates }] = useMutation(
 		ArtistService.UPDATE_ARTIST_RATE_SETTINGS_MUTATION
@@ -397,6 +451,44 @@ const Settings = () => {
 					) : (
 						connectForm("Connect to Shop")
 					)}
+				</IBCardWrapper>
+
+				{/* The artist's public booking page. Before this, the only way to reach one was
+				    /book/<their Mongo ObjectId> - a real URL, and not one anybody can hand to a
+				    client. Nothing in the app displayed it either, so an artist had no way to find
+				    their own booking link at all. */}
+				<IBCardWrapper>
+					<div>
+						<h1>Booking link</h1>
+						<h6 style={{ color: "#bbb", marginBottom: 15 }}>
+							Share this with clients so they can send you booking requests. It shows
+							your name and photo, and nothing else about your account.
+						</h6>
+						<BookingSlugField
+							value={slugValue}
+							setValue={setEditedSlug}
+							currentSlug={currentSlug}
+							helperText="Lowercase letters, numbers and hyphens."
+						/>
+						<div className="settingsActions">
+							<button
+								className="ibButton"
+								disabled={savingSlug || !slugChanged}
+								onClick={handleSaveSlug}
+							>
+								{savingSlug ? "Saving..." : "Save link"}
+							</button>
+							{currentSlug && (
+								<button
+									className="ibButtonSecondary"
+									onClick={handleCopyBookingLink}
+									type="button"
+								>
+									{copiedLink ? "Copied" : "Copy link"}
+								</button>
+							)}
+						</div>
+					</div>
 				</IBCardWrapper>
 
 				<IBCardWrapper>

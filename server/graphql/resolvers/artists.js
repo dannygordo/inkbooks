@@ -1,7 +1,7 @@
 const Artist = require('../../models/Artist');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
-const { UserInputError, AuthenticationError, rethrow } = require('../../utils/errors');
+const { UserInputError, AuthenticationError, RateLimitError, rethrow } = require('../../utils/errors');
 const {
   getShopIdsForUser,
   assertCanAccessShop,
@@ -9,6 +9,12 @@ const {
 const { excludeArchived, archiveFilter } = require('../../utils/archiving');
 const { findArtistsForShops, getActiveShopIdForArtist } = require('../../utils/artist-shop');
 const { paginateArray, normalizePage } = require('../../utils/pagination');
+const { checkRateLimit, getClientIp } = require('../../utils/rate-limit');
+const {
+  normalizeSlug,
+  slugFormatError,
+  isSlugAvailable,
+} = require('../../utils/booking-slug');
 
 // A caller with no shops still gets a well-formed page rather than a bare array, so the client has
 // exactly one response shape to read whatever the answer turns out to be.
@@ -19,6 +25,43 @@ function emptyPage(page) {
 
 module.exports = {
   Query: {
+    // Public and unauthenticated, matching getPublicArtistProfile - the artist-creation wizard
+    // needs this before the invited artist has an account, and the same information leaks from
+    // /book/<slug> anyway (it either shows a profile or it doesn't), so requiring a token would
+    // protect nothing while making the one form that needs it worse.
+    //
+    // Rate-limited because "is this slug taken" answered instantly and without limit is an
+    // enumeration oracle: walk a dictionary, learn every artist's handle on the platform. Thirty
+    // per minute is far more than a person typing into a debounced field will ever produce and
+    // far less than a script wants.
+    //
+    // Returns a REASON, not just a boolean. "Unavailable" covers "someone has it", "too short"
+    // and "that word is reserved" - three different things for the person typing to do next, and
+    // a form that can't tell them apart makes them guess.
+    async checkBookingSlugAvailable(_, { slug }, context) {
+      const ip = getClientIp(context.req);
+      const { allowed, retryAfterSeconds } = checkRateLimit(`${ip}:checkBookingSlugAvailable`, {
+        windowMs: 60 * 1000,
+        max: 30,
+      });
+      if (!allowed) {
+        throw new RateLimitError(
+          `Too many checks from this address. Try again in ${retryAfterSeconds} seconds.`,
+        );
+      }
+
+      const value = normalizeSlug(slug);
+      const formatError = slugFormatError(value);
+      if (formatError) {
+        return { slug: value, available: false, reason: formatError };
+      }
+      const free = await isSlugAvailable(value);
+      return {
+        slug: value,
+        available: free,
+        reason: free ? null : 'That booking link is already taken.',
+      };
+    },
     // Was withAuth with no restriction at all - any authenticated user, including a Client,
     // could list every artist at every shop on the platform. SHOP_ADMIN-or-better still sees
     // everyone - see the matching comment in resolvers/shops.js. Staff/Artist callers only see

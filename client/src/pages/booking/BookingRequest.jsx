@@ -12,13 +12,18 @@ import { APP_SETTINGS_CONSTANTS } from "../../constants";
 const UPLOAD_URL =
   APP_SETTINGS_CONSTANTS[import.meta.env.MODE.toUpperCase()].GRAPHQL_SERVER_URL + "booking-uploads";
 
+// The argument is still named artistId server-side, but it accepts either a bookingSlug or a raw
+// artist id - see getPublicArtistProfile in server/graphql/resolvers/bookingRequests.js. `id` in
+// the selection is what matters below: whatever the URL carried, the booking request itself must
+// be submitted against the artist's real id.
 const GET_PUBLIC_ARTIST_PROFILE = gql`
-  query getPublicArtistProfile($artistId: ID!) {
-    getPublicArtistProfile(artistId: $artistId) {
+  query getPublicArtistProfile($artistHandle: ID!) {
+    getPublicArtistProfile(artistId: $artistHandle) {
       id
       firstName
       lastName
       avatar
+      bookingSlug
     }
   }
 `;
@@ -51,7 +56,10 @@ async function uploadReferenceImages(files) {
 }
 
 const BookingRequest = () => {
-  const { artistId } = useParams();
+  // Either a slug (/book/maya-chen) or a raw artist id (/book/<objectId>, for links handed out
+  // before slugs existed). Deliberately NOT called artistId: it usually isn't one, and treating
+  // it as one is exactly the mistake that would send a slug to createBookingRequest.
+  const { artistHandle } = useParams();
 
   const firstName = useRef();
   const lastName = useRef();
@@ -77,8 +85,8 @@ const BookingRequest = () => {
     loading: artistLoading,
     error: artistError,
   } = useQuery(GET_PUBLIC_ARTIST_PROFILE, {
-    variables: { artistId },
-    skip: !artistId,
+    variables: { artistHandle },
+    skip: !artistHandle,
   });
 
   const [createBookingRequest, { loading: submitting }] = useMutation(CREATE_BOOKING_REQUEST, {
@@ -123,7 +131,10 @@ const BookingRequest = () => {
     createBookingRequest({
       variables: {
         bookingRequestInput: {
-          artistId,
+          // The RESOLVED id, never the URL param. When the link is a slug, artistHandle is
+          // "maya-chen" - submitting that as artistId would fail ObjectId coercion at best and
+          // attach the request to nothing at worst.
+          artistId: artistData?.getPublicArtistProfile?.id,
           firstName: firstName.current.value,
           lastName: lastName.current.value,
           email: email.current.value,
@@ -141,7 +152,7 @@ const BookingRequest = () => {
     });
   };
 
-  if (!artistId) {
+  if (!artistHandle) {
     return (
       <div className="bookingRequest">
         <div className="bookingRequestWrapper">
