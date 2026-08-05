@@ -5,6 +5,10 @@ const withAuth = require('../../utils/with-auth');
 const { AuthenticationError, UserInputError, rethrow } = require('../../utils/errors');
 const { applyShopCut } = require('../../utils/shop-cut');
 const { assertCanManageArtist } = require('../../utils/shop-membership');
+const { notifySafely } = require('../../utils/notifications');
+const { moneyAudienceForArtist } = require('../../utils/notification-audience');
+const { actorName } = require('../../utils/notification-copy');
+const { formatCents } = require('../../utils/money');
 
 /**
  * Deposits.
@@ -115,6 +119,26 @@ module.exports = {
         depositCents + (appointment.taxCents || 0) + (appointment.feeCents || 0) + (appointment.tipCents || 0);
       await applyShopCut(appointment);
       await appointment.save();
+
+      // The artist who took it is NOT told - they were standing there. Their shop admin is, because
+      // money arrived at their shop and they weren't present for it. This is the founding example
+      // in NOTIFICATIONS_DESIGN.md §1, and the actor filter in notify() enforces it even if this
+      // recipient list were wrong.
+      //
+      // An independent artist has no shop, so the audience is empty and nothing is written. That is
+      // the shop-versus-solo distinction falling out of the data rather than out of a branch.
+      await notifySafely({
+        actorId: user.id,
+        recipientIds: await moneyAudienceForArtist(appointment.userId),
+        type: 'deposit_collected',
+        category: 'money',
+        subjectType: 'appointment',
+        subjectId: appointment._id,
+        amountCents: depositCents,
+        title: `${formatCents(depositCents)} deposit collected${appointment.title ? ` — ${appointment.title}` : ''}`,
+        body: `Taken by ${await actorName(user.id)} in ${paymentMethod === 'square' ? 'card' : 'cash'}.`,
+      });
+
       return appointment;
     } catch (err) {
       rethrow(err);

@@ -11,6 +11,9 @@ const {
 } = require('../../utils/validation');
 const { isUnsetTagColor, pickDefaultTagColor } = require('../../utils/tag-color');
 const { assertCanAccessShop } = require('../../utils/shop-membership');
+const { notifySafely } = require('../../utils/notifications');
+const { shopAdminUserIds } = require('../../utils/notification-audience');
+const { actorName } = require('../../utils/notification-copy');
 
 // The artist themselves, or a shop admin OF THIS SHOP. The old version was role-only ("a shop
 // admin, of anywhere"), which meant any shop admin could attach an artist to - or detach them
@@ -118,6 +121,20 @@ module.exports = {
       await artist.save();
     }
 
+    // Either the artist connecting themselves or an admin connecting them - notify() filters out
+    // whichever one is the actor, so this list is written once and is correct in both directions.
+    // The shop admins hear when an artist joins; the artist hears when an admin adds them.
+    await notifySafely({
+      actorId: user.id,
+      recipientIds: [...(await shopAdminUserIds(data.shopId)), data.artistId],
+      type: 'artist_connected',
+      category: 'roster',
+      subjectType: 'artist',
+      subjectId: data.artistId,
+      title: `${await actorName(data.artistId)} joined ${shop ? shop.name : 'the shop'}`,
+      body: 'Their sessions, shop cuts and calendar now belong to this shop.',
+    });
+
     return connection;
   }),
   // Either party can disconnect at any time, per the design - doesn't touch any Appointment
@@ -142,6 +159,21 @@ module.exports = {
     connection.status = 'disconnected';
     connection.disconnectedAt = new Date();
     await connection.save();
+
+    // The higher-stakes half of the pair. An artist leaving changes who is owed what, so the shop
+    // admins need to know even if the artist did it themselves at 2am - and the artist needs to
+    // know if an admin did it to them.
+    await notifySafely({
+      actorId: user.id,
+      recipientIds: [...(await shopAdminUserIds(data.shopId)), data.artistId],
+      type: 'artist_disconnected',
+      category: 'roster',
+      subjectType: 'artist',
+      subjectId: data.artistId,
+      title: `${await actorName(data.artistId)} is no longer connected to this shop`,
+      body: 'Past appointments and shop cuts are unaffected; new work will not be attached to the shop.',
+    });
+
     return connection;
   }),
   // Which side's rate (the shop's, or this artist's own) this artist's sessions bill against at

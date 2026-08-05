@@ -152,9 +152,36 @@ async function markDone(userId, notificationIds, at = new Date()) {
   return result.modifiedCount || 0;
 }
 
+/**
+ * notify(), but a failure here never fails the thing that caused it.
+ *
+ * Every emit site is a side effect of something the person actually asked for - taking a deposit,
+ * booking a session, connecting an artist. Losing that work because a notification could not be
+ * written would be a strictly worse trade than the missing notification, every time.
+ *
+ * The failure is REPORTED rather than swallowed, though. The last time this codebase had a
+ * notification path that failed into a bare console.warn, it was broken for weeks and only found
+ * by accident - so the outcome comes back as a value the caller can act on, and the message says
+ * plainly that a notification was lost rather than being one line in a log nobody reads.
+ *
+ * Use this at emit sites. Use notify() directly where the notification IS the point.
+ */
+async function notifySafely(event) {
+  try {
+    const created = await notify(event);
+    return { ok: true, created: created.length };
+  } catch (err) {
+    console.warn(
+      `[notifications] LOST a ${event && event.type} notification: ${err.message}. ` +
+        'The action itself succeeded; only the notification failed.',
+    );
+    return { ok: false, error: err.message };
+  }
+}
+
 /** Unread count for the bell. */
 async function unreadCount(userId) {
   return Notification.countDocuments({ userId, readAt: null });
 }
 
-module.exports = { notify, markRead, markDone, unreadCount, EMAIL_GRACE_MS };
+module.exports = { notify, notifySafely, markRead, markDone, unreadCount, EMAIL_GRACE_MS };

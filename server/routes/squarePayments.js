@@ -6,6 +6,10 @@ const { processSquarePaymentInputSchema, validate } = require('../utils/validati
 const { checkRateLimit, getClientIp } = require('../utils/rate-limit');
 const Appointment = require('../models/Appointment');
 const { applyShopCut } = require('../utils/shop-cut');
+const { notifySafely } = require('../utils/notifications');
+const { moneyAudienceForArtist } = require('../utils/notification-audience');
+const { actorName } = require('../utils/notification-copy');
+const { formatCents } = require('../utils/money');
 const { Constants } = require('../utils/constants');
 
 const router = express.Router();
@@ -136,6 +140,24 @@ router.post('/square/process-payment', express.json(), async (req, res) => {
       // construction - see utils/shop-cut.js.
       await applyShopCut(appointment);
       await appointment.save();
+
+      // The person who took the payment is the actor. There IS one here - this route is
+      // authenticated (checkAuth above), so unlike a Square webhook it never has to guess.
+      //
+      // If this ever moves to a webhook, the actor is the artist whose session was paid, NOT null.
+      // notify() throws on a missing actorId precisely so that decision gets made rather than
+      // defaulted into notifying everybody including the person who caused it.
+      await notifySafely({
+        actorId: user.id,
+        recipientIds: await moneyAudienceForArtist(appointment.userId),
+        type: 'session_charged',
+        category: 'money',
+        subjectType: 'appointment',
+        subjectId: appointment._id,
+        amountCents: req.body.amountCents,
+        title: `${formatCents(req.body.amountCents)} charged${appointment.title ? ` — ${appointment.title}` : ''}`,
+        body: `Taken by ${await actorName(user.id)} by card.`,
+      });
     }
 
     return res.status(200).json({

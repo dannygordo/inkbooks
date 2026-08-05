@@ -31,6 +31,9 @@ const {
   sendNewBookingRequestNotificationToArtist,
 } = require('../../utils/email');
 const { notifyNewMessage } = require('../../utils/message-notifications');
+const { notifySafely } = require('../../utils/notifications');
+const { scheduleAudienceForArtist } = require('../../utils/notification-audience');
+const { actorName } = require('../../utils/notification-copy');
 
 module.exports = {
   // Public and unauthenticated by design - this is the intake form, submitted before any
@@ -129,6 +132,20 @@ module.exports = {
       to: artist.email,
       artistFirstName: artist.firstName,
       clientName: `${clientUser.firstName} ${clientUser.lastName}`,
+    });
+
+    // The actor is the CLIENT who submitted the form, not the artist and not nobody. This mutation
+    // is public, so there is no logged-in caller to reach for - which is exactly the case where
+    // passing null is tempting and wrong. The client caused it; the artist hears about it.
+    await notifySafely({
+      actorId: clientUser._id,
+      recipientIds: [artist._id],
+      type: 'booking_request_received',
+      category: 'schedule',
+      subjectType: 'bookingRequest',
+      subjectId: bookingRequest._id,
+      title: `New booking request from ${clientUser.firstName} ${clientUser.lastName}`,
+      body: (data.description || '').slice(0, 140),
     });
 
     return bookingRequest;
@@ -418,6 +435,27 @@ module.exports = {
     bookingRequest.status = data.outcome;
     bookingRequest.resultingAppointmentId = appointment.id;
     await bookingRequest.save();
+
+    // A booking is the shop's business - the calendar just changed and the front desk manages it.
+    // Schedule audience rather than money: staff see the schedule, not the books (§7).
+    //
+    // The artist who converted it is the actor and is filtered out. An independent artist has no
+    // shop, so this writes nothing at all, which is right - there is nobody else to tell.
+    if (data.outcome === 'session_booked' || data.outcome === 'consult_booked') {
+      await notifySafely({
+        actorId: user.id,
+        recipientIds: await scheduleAudienceForArtist(bookingRequest.artistId),
+        type: data.outcome === 'session_booked' ? 'session_booked' : 'consult_booked',
+        category: 'schedule',
+        subjectType: 'appointment',
+        subjectId: appointment._id,
+        title:
+          data.outcome === 'session_booked'
+            ? `${await actorName(user.id)} booked a session — ${data.projectTitle}`
+            : `${await actorName(user.id)} booked a consult — ${derivedTitle}`,
+        body: `For ${clientForAppointment.firstName} ${clientForAppointment.lastName}.`,
+      });
+    }
 
     return bookingRequest;
   }),

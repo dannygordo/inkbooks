@@ -137,7 +137,7 @@ Legend: **Now** = immediate. **Digest** = rolled into a daily summary. **—** =
 | Deposit collected | — | Digest | Receipt |
 | Session charged | — | Digest | Receipt |
 | Payment failed / card declined | **Now** | **Now** | — |
-| Shop cut invoice issued | **Now** | — | — |
+| Shop cut invoiced *(artist invoices themselves — see below)* | — | **Now** | — |
 | Artist marks shop cut paid | — | **Now** *(needs their confirmation)* | — |
 | Shop confirms shop cut paid | **Now** | — | — |
 | Shop cut overdue *(condition)* | **Now** | **Now** | — |
@@ -156,6 +156,13 @@ Legend: **Now** = immediate. **Digest** = rolled into a daily summary. **—** =
 | Appointment tomorrow *(condition)* | Digest | — | **Now** |
 | Client no-show marked | — | Digest | — |
 | Session completed, no payment recorded *(condition)* | **Now** | **Now** | — |
+
+> **Correction, found during implementation.** The row above originally had "shop cut invoice
+> issued" going *to* the artist, on the assumption that the shop issues the bill. It doesn't:
+> `createShopCutInvoice` is artist-initiated and refuses anyone but the appointment's own artist —
+> the artist invoices *themselves* through Square so the shop gets paid. So the artist is the
+> actor, and the shop admins are the audience. Recorded here rather than quietly fixed in code,
+> because a design doc that disagrees with the code is worse than no design doc.
 
 ### Roster / operational
 

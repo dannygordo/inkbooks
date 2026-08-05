@@ -44,4 +44,16 @@ function percentOfCents(cents, percent) {
   return Math.round((cents * percent) / 100);
 }
 
-module.exports = { dollarsToCents, centsToDollars, percentOfCents };
+/**
+ * For display - notification titles, email subjects.
+ *
+ * Lives here rather than being written inline wherever it's needed, because
+ * `$${(cents / 100).toFixed(2)}` appearing in six places is six chances for one of them to divide
+ * by the wrong number or forget the decimals. utils/email.js already had its own copy; that is one
+ * copy too many for a formatting rule that is this easy to get subtly wrong.
+ */
+function formatCents(cents) {
+  return `$${((cents || 0) / 100).toFixed(2)}`;
+}
+
+module.exports = { dollarsToCents, centsToDollars, percentOfCents, formatCents };

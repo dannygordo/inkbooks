@@ -5,6 +5,10 @@ const withAuth = require('../../utils/with-auth');
 const { AuthenticationError, UserInputError } = require('../../utils/errors');
 const { Constants } = require('../../utils/constants');
 const { assertCanAccessShop } = require('../../utils/shop-membership');
+const { notifySafely } = require('../../utils/notifications');
+const { shopAdminUserIds } = require('../../utils/notification-audience');
+const { actorName } = require('../../utils/notification-copy');
+const { formatCents } = require('../../utils/money');
 const square = require('../../utils/square');
 const {
   sendShopCutMarkedPaidNotificationToShop,
@@ -87,6 +91,28 @@ module.exports = {
     appointment.shopCutStatus = 'invoice_sent';
     appointment.shopCutPaymentMethod = 'square_invoice';
     await appointment.save();
+
+    // NOTE - this is the reverse of what NOTIFICATIONS_DESIGN.md §4 assumed.
+    //
+    // The catalogue has "shop cut invoice issued" going TO the artist, because it assumed the shop
+    // issues the bill. It doesn't: this mutation is artist-initiated and refuses anyone but the
+    // appointment's own artist (see the guard above) - the artist invoices themselves through
+    // Square so the shop gets paid. So the artist is the actor, and notifying them would be
+    // telling somebody about a button they just pressed.
+    //
+    // The audience is the shop admins: money is on its way to them and they weren't involved. The
+    // design doc row has been corrected rather than left to disagree with the code.
+    await notifySafely({
+      actorId: user.id,
+      recipientIds: await shopAdminUserIds(appointment.shopId),
+      type: 'shop_cut_invoiced',
+      category: 'money',
+      subjectType: 'appointment',
+      subjectId: appointment._id,
+      amountCents: targetAmountCents,
+      title: `${await actorName(user.id)} invoiced their ${formatCents(targetAmountCents)} shop cut`,
+      body: 'Sent through Square. It will settle when they pay it.',
+    });
 
     return { appointment, invoiceUrl: invoiceResult.publicUrl };
   }),
@@ -219,6 +245,24 @@ module.exports = {
       });
     }
 
+    // Needs the shop's action, so it goes to the people who can take it. The artist who marked it
+    // is the actor and is filtered out - they know, they just did it.
+    //
+    // The shop EMAIL above goes to Shop.email, a shared mailbox; this goes to the shop admins as
+    // people, with read and done state. Both, deliberately: the email reaches somebody who isn't
+    // logged in, the notification is the one that can be marked handled.
+    await notifySafely({
+      actorId: user.id,
+      recipientIds: await shopAdminUserIds(appointment.shopId),
+      type: 'shop_cut_marked_paid',
+      category: 'money',
+      subjectType: 'appointment',
+      subjectId: appointment._id,
+      amountCents: appointment.shopCutCents,
+      title: `${await actorName(user.id)} marked a ${formatCents(appointment.shopCutCents)} shop cut paid`,
+      body: 'Waiting on your confirmation before it counts as settled.',
+    });
+
     return appointment;
   }),
 
@@ -256,6 +300,20 @@ module.exports = {
         shopName: shop ? shop.name : 'the shop',
       });
     }
+
+    // The other direction, and the reverse audience. The admin confirming is the actor; the artist
+    // is the one who has been waiting to hear that their payment landed.
+    await notifySafely({
+      actorId: user.id,
+      recipientIds: [appointment.userId],
+      type: 'shop_cut_confirmed',
+      category: 'money',
+      subjectType: 'appointment',
+      subjectId: appointment._id,
+      amountCents: appointment.shopCutCents,
+      title: `${shop ? shop.name : 'Your shop'} confirmed your ${formatCents(appointment.shopCutCents)} shop cut`,
+      body: 'Settled - nothing further owed on this one.',
+    });
 
     return appointment;
   }, Constants.ROLES.SHOP_ADMIN),
