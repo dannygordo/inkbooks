@@ -1,7 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { CircularProgress } from "@mui/material";
-import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
-import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
+// Named barrel import, matching the 18 other files in this codebase that use icons. Also note the
+// spelling: @mui/icons-material v9 has no bare `CheckCircleOutline`/`ErrorOutline` - the outline
+// variants are `CheckCircleOutlined`/`ErrorOutlined`. Both of the names originally written here
+// were plausible, wrong, and only failed at dev-server transform time.
+import { CheckCircleOutlined, ErrorOutlined } from "@mui/icons-material";
 import IBInput from "../inputs/IBInput";
 import { ArtistService } from "../../services/ArtistService";
 import "./bookingSlugField.css";
@@ -76,13 +79,13 @@ const BookingSlugField = ({
 	} else if (showStatus && result?.available) {
 		statusNode = (
 			<span className="bookingSlugStatus bookingSlugStatusOk">
-				<CheckCircleOutlineIcon fontSize="small" /> Available
+				<CheckCircleOutlined fontSize="small" /> Available
 			</span>
 		);
 	} else if (showStatus && result && !result.available) {
 		statusNode = (
 			<span className="bookingSlugStatus bookingSlugStatusBad">
-				<ErrorOutlineIcon fontSize="small" /> {result.reason}
+				<ErrorOutlined fontSize="small" /> {result.reason}
 			</span>
 		);
 	}
