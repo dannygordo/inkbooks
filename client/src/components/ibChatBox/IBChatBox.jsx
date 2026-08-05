@@ -1,4 +1,4 @@
-import { useMutation } from "@apollo/client";
+import { useApolloClient, useMutation } from "@apollo/client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "../../context/auth";
 import MessengerService from "../../services/MessengerService";
@@ -32,6 +32,14 @@ const IBChatBox = ({ widget, conversation, setActiveMessages, messages, isInputD
 
 	//create socket context
 	const socket = useSocket();
+	// Both badges - the sidebar total and the per-thread counts - are separate queries that this
+	// component's socket traffic never touches. Refetched by operation name when a message lands.
+	const apollo = useApolloClient();
+	const refetchUnread = useCallback(() => {
+		apollo.refetchQueries({
+			include: ["GetUnreadMessageCount", "GetConversationsByMemberId"],
+		});
+	}, [apollo]);
 
 	const addMessageToConversation = useCallback(({recipients, sender, message}) => {
 		console.log(recipients);
@@ -47,9 +55,21 @@ const IBChatBox = ({ widget, conversation, setActiveMessages, messages, isInputD
 		if(socket === null) {
 			return;
 		}
-		socket.on('receive-message', addMessageToConversation);	
-		return () => socket.off('receive-message');
-	}, [socket, addMessageToConversation]);
+		const onReceive = (message) => {
+			addMessageToConversation(message);
+			// The socket delivers the message straight into the open thread without any GraphQL
+			// query running, so nothing else would tell the badges a message had arrived. Without
+			// this, a message that lands while the messenger is open shows in the thread and the
+			// sidebar count stays where it was until the next poll - the number visibly disagreeing
+			// with what is on screen, which is the fastest way to make people stop believing it.
+			//
+			// Refetching rather than incrementing locally: the server owns the count (it knows what
+			// this user has read), and a client-side +1 is a second place that arithmetic happens.
+			refetchUnread();
+		};
+		socket.on('receive-message', onReceive);
+		return () => socket.off('receive-message', onReceive);
+	}, [socket, addMessageToConversation, refetchUnread]);
 
 	
 

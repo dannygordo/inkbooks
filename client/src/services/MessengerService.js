@@ -103,6 +103,10 @@ const MessengerService = (() => {
 				}
 				createdAt
 				updatedAt
+				# The CALLER's unread count for this thread - what the per-conversation badge in the
+				# chat menu shows. Resolved server-side from their own lastReadAt, so it can't
+				# disagree with the sidebar total.
+				unreadCount
 				membersInfo {
 					firstName
 					lastName
@@ -146,7 +150,40 @@ const MessengerService = (() => {
 		}
 	`;
 
+	// The sidebar badge. Its own query rather than summing the conversation list, because the
+	// sidebar is mounted on every page and shouldn't have to fetch every thread and every message
+	// in them to render one number. Server-side it's a single aggregation - see
+	// utils/conversation-reads.js.
+	const _GET_UNREAD_MESSAGE_COUNT = gql`
+		query GetUnreadMessageCount {
+			getUnreadMessageCount
+		}
+	`;
+	const _useUnreadMessageCount = () =>
+		useQuery(_GET_UNREAD_MESSAGE_COUNT, {
+			// The count changes because of something someone ELSE did, so a cached answer is stale
+			// by nature. Shows the cached number instantly and corrects it from the network.
+			fetchPolicy: "cache-and-network",
+			// There is nothing in this tab to refetch off - the event that changes this number
+			// happens in someone else's browser. The socket updates it immediately while the
+			// messenger is open; this is the fallback for every other page, where an artist has
+			// the app open on the calendar and a message arrives.
+			pollInterval: 60000,
+		});
+
+	const _MARK_CONVERSATION_READ = gql`
+		mutation MarkConversationRead($conversationId: ID!) {
+			markConversationRead(conversationId: $conversationId) {
+				id
+				unreadCount
+			}
+		}
+	`;
+
 	return {
+		GET_UNREAD_MESSAGE_COUNT: _GET_UNREAD_MESSAGE_COUNT,
+		useUnreadMessageCount: _useUnreadMessageCount,
+		MARK_CONVERSATION_READ: _MARK_CONVERSATION_READ,
 		fetchProjectConversation: _fetchProjectConversation,
 		fetchProjectConversationQuery: FETCH_PROJECT_CONVERSATION_QUERY,
 		fetchShopConversations: _fetchShopConversations,

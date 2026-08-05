@@ -96,10 +96,37 @@ function createArtistShopIdLoader() {
   });
 }
 
+/**
+ * Unread counts for the caller, computed at most once per request.
+ *
+ * Not a batching loader like the one above - a memoiser. Conversation.unreadCount is a field
+ * resolver, so rendering a list of a dozen threads calls it a dozen times, and each call
+ * independently would be a separate count query against the message collection. The underlying
+ * unreadSummaryForUser already answers for every conversation at once, so the right shape here is
+ * to run it once and let each field read its own entry out of the result.
+ *
+ * Keyed by userId even though there's only ever one caller per request, so a future resolver that
+ * asks about somebody else can't silently get the first user's answer back.
+ */
+function createUnreadLoader() {
+  const { unreadSummaryForUser } = require('./conversation-reads');
+  const cache = new Map();
+  return {
+    summaryFor(userId) {
+      const key = String(userId);
+      if (!cache.has(key)) {
+        cache.set(key, unreadSummaryForUser(key));
+      }
+      return cache.get(key);
+    },
+  };
+}
+
 // Fresh per request - see the note above on why this must never be shared.
 function createLoaders() {
   return {
     artistShopId: createArtistShopIdLoader(),
+    unread: createUnreadLoader(),
   };
 }
 

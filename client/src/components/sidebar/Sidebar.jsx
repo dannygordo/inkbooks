@@ -24,6 +24,7 @@ import { APP_SETTINGS_CONSTANTS, ROUTE_CONSTANTS, ROLES, roleLabel } from "../..
 import InputBase from "@mui/material/InputBase";
 import { useNavigate } from "react-router-dom";
 import IBAvatar from "../inputs/IBAvatar";
+import MessengerService from "../../services/MessengerService";
 import {
 	AccountBox,
 	AccountCircle,
@@ -189,6 +190,14 @@ export default function Sidebar() {
 	// Settings.jsx) - hidden for everyone else rather than linking to a page that just says
 	// "nothing to configure here yet".
 	const isArtistUser = user.userType === "artist";
+	// Unread messages, for the badge on Messenger below. Polled as well as refetched: a message
+	// arriving from someone else is not something this tab does, so there is nothing local to
+	// trigger a refresh off. Sixty seconds is slow enough to be free and fast enough that an
+	// artist who leaves the app open sees a new message without reloading; the socket in
+	// IBChatBox updates it immediately when the messenger itself is open.
+	const { data: unreadData } = MessengerService.useUnreadMessageCount();
+	const unreadMessageCount = unreadData?.getUnreadMessageCount || 0;
+
 	const [anchorEl, setAnchorEl] = useState(null);
 	const openProfile = Boolean(anchorEl);
 
@@ -733,7 +742,14 @@ export default function Sidebar() {
 								justifyContent: "center",
 							}}
 						>
-							<Message />
+							{/* On the ICON, not the label - so the count survives the drawer being
+							    collapsed, which is exactly when the label is hidden and the badge is
+							    the only thing left saying there's something waiting.
+							    badgeContent renders nothing at 0 by default, so no invisible-zero
+							    special-casing is needed here. */}
+							<Badge badgeContent={unreadMessageCount} color="error">
+								<Message />
+							</Badge>
 						</ListItemIcon>
 						<ListItemText
 							primary="Messenger"

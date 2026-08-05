@@ -4,6 +4,7 @@ const { Constants } = require('../../utils/constants');
 const { UserInputError, AuthenticationError, rethrow } = require('../../utils/errors');
 const { updateConversationInputSchema, createConversationInputSchema, validate } = require('../../utils/validation');
 const { canAccessConversation } = require('../../utils/shop-membership');
+const { markConversationRead } = require('../../utils/conversation-reads');
 
 module.exports = {
     // Not called anywhere in the client (grepped - real conversations are created directly via
@@ -56,5 +57,32 @@ module.exports = {
       } catch (err) {
           rethrow(err);
       }
-    }, Constants.ROLES.SHOP_ADMIN)
+    }, Constants.ROLES.SHOP_ADMIN),
+
+    /**
+     * Marks a conversation read for the caller, as of now.
+     *
+     * Membership, not role. A shop admin marking someone else's thread read would silently clear
+     * that person's badge - which is worse than it sounds, because the messages stay unread in
+     * every sense that matters and the only signal that they exist is gone. Reading is something
+     * only the reader can do.
+     *
+     * Idempotent, so the client can call it on every thread open and every focus without
+     * bookkeeping.
+     */
+    markConversationRead: withAuth(async (_, { conversationId }, context, info, user) => {
+      const conversation = await Conversation.findById(conversationId).select('members');
+      if (!conversation) {
+        throw new UserInputError('Errors', {
+          errors: { conversationId: 'Conversation not found.' },
+        });
+      }
+      const isMember = (conversation.members || []).some(
+        (memberId) => String(memberId) === String(user.id),
+      );
+      if (!isMember) {
+        throw new AuthenticationError('Action not allowed');
+      }
+      return markConversationRead(conversationId, user.id);
+    }),
   };

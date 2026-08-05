@@ -13,6 +13,13 @@ const { findOrCreateConversationForMembers } = require('../../utils/conversation
 
 module.exports = {
   Query: {
+    // What the sidebar badge shows. Self-only by construction - it takes no argument, so there is
+    // no id to tamper with and no ownership check to get wrong. Contrast getConversationsByMemberId
+    // below, which takes a memberId and therefore needs a guard.
+    getUnreadMessageCount: withAuth(async (_, args, context, info, user) => {
+      const summary = await context.loaders.unread.summaryFor(user.id);
+      return summary.total;
+    }),
     // getConversations (every private thread on the platform) was deleted - see the note on
     // getUsers in resolvers/users.js for why these three went rather than getting scoped. Reading
     // messages goes through getConversationsByMemberId or the Conversation.messages field

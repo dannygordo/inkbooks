@@ -1,3 +1,4 @@
+const { tryCheckAuth } = require('../../utils/check-auth');
 const artistsResolvers = require('./artists');
 const usersResolvers = require('./users');
 const artistsMutations = require('../mutations/artists');
@@ -295,12 +296,30 @@ module.exports = {
     }
   },
   Conversation: {
+    // Sorted by createdAt, not updatedAt. They were the same until editing a message became
+    // possible; after that, sorting by updatedAt makes an edited message jump to the bottom of the
+    // thread as though it had just been sent. A message's place in a conversation is when it was
+    // sent.
     messages: async(conversation, args, context, info) => {
-      return (await Message.find({conversationId: conversation.id}).sort({updatedAt: 1}))
+      return (await Message.find({conversationId: conversation.id}).sort({createdAt: 1}))
     },
     membersInfo: async(conversation, args, context, info) => {
       return (await User.find({_id: {$in: conversation.members}}));
-    }
+    },
+    // The CALLER's unread count for this thread, from the per-request memoiser - so a list of a
+    // dozen conversations is one aggregation rather than a dozen counts. See utils/loaders.js.
+    //
+    // Zero rather than a thrown error for an unauthenticated caller: this field hangs off queries
+    // that already enforce their own access (getConversationsByMemberId is self-only), and a
+    // notification count is not the place to introduce a second, differently-shaped auth failure.
+    unreadCount: async(conversation, args, context) => {
+      const caller = tryCheckAuth(context);
+      if (!caller) {
+        return 0;
+      }
+      const summary = await context.loaders.unread.summaryFor(caller.id);
+      return summary.byConversationId.get(String(conversation._id)) || 0;
+    },
   },
   Message: {
     // Had three real bugs: (1) `Staff` was never imported in this file, so any message from a

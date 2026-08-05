@@ -1,13 +1,10 @@
 const Message = require('../../models/Message');
 const Conversation = require('../../models/Conversation');
-const BookingRequest = require('../../models/BookingRequest');
-const Client = require('../../models/Client');
-const User = require('../../models/User');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 const { UserInputError, AuthenticationError, rethrow } = require('../../utils/errors');
 const { updateMessageInputSchema, createMessageInputSchema, validate } = require('../../utils/validation');
-const { sendNewMessageNotificationToGuest } = require('../../utils/email');
+const { notifyNewMessage } = require('../../utils/message-notifications');
 const { canAccessConversation } = require('../../utils/shop-membership');
 
 module.exports = {
@@ -46,36 +43,48 @@ module.exports = {
       if (!valid) {
         throw new UserInputError('Errors', { errors });
       }
+      // Stamped HERE, ignoring whatever createdAt/updatedAt the caller sent.
+      //
+      // The arguments still exist on the schema so existing callers don't break, but they are no
+      // longer written. A message's timestamp decides two things that must not be caller-
+      // controlled: where it sits in the thread, and whether it counts as unread - unread is
+      // `createdAt > my lastReadAt` (see models/Conversation.js). A client with a skewed clock, or
+      // one simply choosing a value, could post a message that sorts into the middle of yesterday's
+      // conversation and is born already-read, permanently invisible as a notification.
+      //
+      // Nobody was exploiting this; every real caller sent Date.now(). But "every caller currently
+      // passes the right thing" is not a property the server should depend on, and it is exactly
+      // the assumption that made client-supplied `role` an escalation bug in register().
+      const now = new Date();
       const newMessage = new Message({
         conversationId,
         senderId,
         message,
-        createdAt,
-        updatedAt
+        createdAt: now,
+        updatedAt: now,
       });
       const msg = await newMessage.save();
 
-      // If this conversation belongs to a booking request, the other side may be a guest with
-      // no way to know a reply arrived except by email - see
-      // PRODUCTION_ROADMAP.md's "Booking request & guest correspondence" section. Best-effort:
-      // a lookup/send failure here shouldn't fail the message send itself.
-      try {
-        const bookingRequest = await BookingRequest.findOne({ conversationId });
-        if (bookingRequest && String(bookingRequest.artistId) === String(senderId)) {
-          const bookingClient = await Client.findById(bookingRequest.clientId);
-          const guestUser = bookingClient ? await User.findById(bookingClient.userId) : null;
-          const artist = await User.findById(bookingRequest.artistId);
-          if (guestUser && artist) {
-            await sendNewMessageNotificationToGuest({
-              to: guestUser.email,
-              firstName: guestUser.firstName,
-              artistName: artist.firstName,
-              guestToken: bookingRequest.guestToken,
-            });
-          }
-        }
-      } catch (notifyErr) {
-        console.warn('[messages] Failed to notify guest of new message:', notifyErr.message);
+      // Bumped so conversation lists can sort by real activity without a per-thread lookup of the
+      // newest message. Also what the notification throttle reads.
+      await Conversation.updateOne({ _id: conversationId }, { $set: { updatedAt: now } });
+
+      // Tell the other side. This used to be inlined here and only covered one case: a booking
+      // request whose sender was the artist. A client with a real account messaging about a
+      // project was notified by nothing, and there was no throttle, and every failure was a
+      // console.warn - so "we never tried" and "it failed" looked identical from everywhere except
+      // the server's stdout. See utils/message-notifications.js.
+      //
+      // Still never throws - the message is what the person asked for and an email problem must
+      // not lose it - but the outcome is now a value rather than a log line, so callers and tests
+      // can see what actually happened.
+      const notifications = await notifyNewMessage({ conversationId, senderId });
+      const failed = notifications.filter((n) => n.outcome === 'failed');
+      if (failed.length > 0) {
+        console.warn(
+          '[messages] Notification failed for:',
+          failed.map((f) => `${f.userId} (${f.error})`).join(', '),
+        );
       }
 
       return msg;

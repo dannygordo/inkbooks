@@ -28,10 +28,9 @@ const {
 const { getShopIdsForUser } = require('../../utils/shop-membership');
 const {
   sendBookingRequestReceivedEmail,
-  sendNewMessageNotificationToGuest,
   sendNewBookingRequestNotificationToArtist,
-  sendNewMessageNotificationToArtist,
 } = require('../../utils/email');
+const { notifyNewMessage } = require('../../utils/message-notifications');
 
 module.exports = {
   // Public and unauthenticated by design - this is the intake form, submitted before any
@@ -174,14 +173,19 @@ module.exports = {
       updatedAt: now,
     }).save();
 
-    const artist = await User.findById(bookingRequest.artistId);
-    if (artist) {
-      await sendNewMessageNotificationToArtist({
-        to: artist.email,
-        artistFirstName: artist.firstName,
-        clientName: `${user.firstName} ${user.lastName}`,
-      });
-    }
+    // Same path as an in-app message now (see utils/message-notifications.js) rather than a
+    // second hand-rolled copy: same throttle, same link, same per-recipient outcome. This one
+    // notified without any throttle and with an email that said "log in to InkBooks to view it"
+    // and gave no link, while the other direction had a link and no throttle - two flavours of the
+    // same notification, differing for no reason other than being written in two places.
+    await Conversation.updateOne(
+      { _id: bookingRequest.conversationId },
+      { $set: { updatedAt: now } },
+    );
+    await notifyNewMessage({
+      conversationId: bookingRequest.conversationId,
+      senderId: user.id,
+    });
 
     return newMessage;
   },

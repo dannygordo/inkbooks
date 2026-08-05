@@ -15,3 +15,15 @@
 	font-weight: 500;
     margin-left: 20px;
 }
+
+/* The currently open thread. Was unstyled entirely - the chat menu gave no indication of which
+   conversation you were reading. */
+.ibConversationActive {
+	background-color: rgba(0, 0, 0, 0.06);
+}
+
+/* A thread with unread messages. Weight rather than colour alone, so the distinction survives a
+   greyscale screen and doesn't rely on the badge being noticed. */
+.ibConversationUnread .ibConversationName {
+	font-weight: 700;
+}

@@ -22,6 +22,11 @@ module.exports = gql`
     members: [ID!]!
     membersInfo: [User]
     messages: [Message]
+    # Unread FOR THE CALLER - messages newer than their own lastReadAt that they didn't send.
+    # Always the viewer's count, never a property of the conversation itself, which is why it
+    # takes no argument: asking for someone else's unread count is not a thing this should
+    # answer. See utils/conversation-reads.js.
+    unreadCount: Int!
     createdAt: DateTime
     updatedAt: DateTime
   }
@@ -866,6 +871,10 @@ module.exports = gql`
 
     ######### Conversations ###########
 
+    # Total unread across every conversation the caller is in - what the sidebar badge shows.
+    # Separate from Conversation.unreadCount so the badge, which is mounted on every page, is one
+    # cheap aggregation rather than a fetch of every thread the person has.
+    getUnreadMessageCount: Int!
     getConversation(conversationId: ID!): Conversation
     getConversationsByShopId(shopId: ID!): [Conversation!]
     getProjectConversation(artistId: ID!, clientId: ID!): Conversation
@@ -1156,6 +1165,10 @@ module.exports = gql`
 
     ######### Messages ###########
 
+    # Marks everything in a conversation read for the caller, as of now. Idempotent - opening a
+    # thread twice, or a component re-rendering, costs one write and changes nothing the second
+    # time.
+    markConversationRead(conversationId: ID!): Conversation!
     createMessage(
       conversationId: ID!
       senderId: ID!

@@ -103,14 +103,21 @@ async function sendNewBookingRequestNotificationToArtist({ to, artistFirstName, 
   });
 }
 
-async function sendNewMessageNotificationToArtist({ to, artistFirstName, clientName }) {
+// conversationId is optional but should always be passed - it turns "log in to InkBooks and find
+// it" into a link that opens the actual thread. The Messenger reads ?conversation= (see
+// pages/messenger/Messenger.jsx); without one this still sends, it just lands on the message list.
+async function sendNewMessageNotificationToArtist({ to, artistFirstName, clientName, conversationId }) {
+  const link = conversationId
+    ? `${Constants.URLS.INKBOOKS_WEBAPP}/messenger?conversation=${conversationId}`
+    : `${Constants.URLS.INKBOOKS_WEBAPP}/messenger`;
   return sendEmail({
     to,
     subject: `New message from ${clientName}`,
     htmlBody:
-      `<p>Hi ${artistFirstName},</p><p>${clientName} replied to your conversation. Log in to ` +
-      `InkBooks to view it.</p>`,
-    textBody: `Hi ${artistFirstName},\n\n${clientName} replied to your conversation. Log in to InkBooks to view it.`,
+      `<p>Hi ${artistFirstName},</p><p>${clientName} sent you a new message. Read it and reply here:</p>` +
+      `<p><a href="${link}">${link}</a></p>`,
+    textBody:
+      `Hi ${artistFirstName},\n\n${clientName} sent you a new message. Read it and reply here:\n${link}`,
   });
 }
 
