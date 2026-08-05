@@ -94,7 +94,6 @@ describe("Register", () => {
 	it("renders all the expected inputs", () => {
 		renderRegister();
 		[
-			"Username",
 			"First Name",
 			"Last Name",
 			"Avatar",
@@ -104,6 +103,11 @@ describe("Register", () => {
 		].forEach((placeholder) => {
 			expect(screen.getByPlaceholderText(placeholder)).toBeInTheDocument();
 		});
+
+		// Email is the identity - there is no username field to fill in. Asserted explicitly
+		// rather than just dropped from the list above, because a deletion from a list is invisible
+		// the next time someone reads this file.
+		expect(screen.queryByPlaceholderText("Username")).not.toBeInTheDocument();
 	});
 
 	it("blocks submission client-side when confirmPassword does not match password", async () => {
