@@ -11,7 +11,7 @@ import { setContext } from "@apollo/client/link/context";
 import { BrowserRouter } from "react-router-dom";
 import { CacheService } from "./services/CacheService";
 import { io } from "socket.io-client";
-import { APP_SETTINGS_CONSTANTS } from "./constants";
+import { apiBaseUrl } from "./utils/apiUrl";
 import { AuthProvider } from "./context/auth";
 
 const httpLink = createHttpLink({
@@ -19,7 +19,10 @@ const httpLink = createHttpLink({
 	// instead, which is "development" under the dev server and "production" for a real build,
 	// matching CRA's process.env.NODE_ENV values exactly, so this uppercased lookup still works
 	// unchanged against APP_SETTINGS_CONSTANTS's PRODUCTION/DEVELOPMENT keys.
-	uri: APP_SETTINGS_CONSTANTS[`${import.meta.env.MODE.toUpperCase()}`].GRAPHQL_SERVER_URL,
+	// Through apiBaseUrl() like everywhere else. This one is the app entry point and is never
+	// imported by a test, so the missing-mode crash could not reach it - but leaving one direct
+	// lookup behind is how the pattern comes back.
+	uri: apiBaseUrl(),
 });
 const authLink = setContext((_, { headers }) => {
 	// get the authentication token from local storage if it exists

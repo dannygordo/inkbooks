@@ -3,14 +3,16 @@ import { useParams } from "react-router-dom";
 import { CircularProgress } from "@mui/material";
 import { gql, useMutation, useQuery } from "@apollo/client";
 import "./bookingRequest.css";
-import { APP_SETTINGS_CONSTANTS } from "../../constants";
+import { apiUrl } from "../../utils/apiUrl";
 
-// Same import.meta.env.MODE-scoped lookup index.js/SocketProvider.js already use for the
-// GraphQL endpoint (see index.js's comment on why this replaced process.env.NODE_ENV under
-// Vite) - /booking-uploads is a plain Express route on that same server, not a separate host,
-// so it reuses GRAPHQL_SERVER_URL rather than introducing a second env-specific constant.
-const UPLOAD_URL =
-  APP_SETTINGS_CONSTANTS[import.meta.env.MODE.toUpperCase()].GRAPHQL_SERVER_URL + "booking-uploads";
+// /booking-uploads is a plain Express route on the same server as GraphQL, not a separate host,
+// so it reuses that base rather than introducing a second env-specific constant.
+//
+// Resolved through apiUrl() rather than indexing APP_SETTINGS_CONSTANTS directly: that object has
+// only PRODUCTION and DEVELOPMENT keys, so the direct lookup throws under any other Vite mode -
+// including "test". At module level that is an IMPORT-time crash, which takes down every test that
+// transitively imports this page. It hadn't bitten here yet only because nothing imported it.
+const UPLOAD_URL = apiUrl("booking-uploads");
 
 // The argument is still named artistId server-side, but it accepts either a bookingSlug or a raw
 // artist id - see getPublicArtistProfile in server/graphql/resolvers/bookingRequests.js. `id` in

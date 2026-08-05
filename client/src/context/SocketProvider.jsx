@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useState } from "react";
 import { io } from "socket.io-client";
-import { APP_SETTINGS_CONSTANTS } from "../constants";
+import { socketUrl } from "../utils/apiUrl";
 
 const SocketContext = React.createContext();
 
@@ -19,7 +19,7 @@ export function SocketProvider({ id, children }) {
 		// used for GRAPHQL_SERVER_URL in index.js.
 		// import.meta.env.MODE (Vite) replaces process.env.NODE_ENV (CRA/webpack) - see index.js's
 		// comment on the same swap. Values match exactly ("development"/"production").
-		const newSocket = io(APP_SETTINGS_CONSTANTS[import.meta.env.MODE.toUpperCase()].SOCKET_IO_SERVER_URL, {
+		const newSocket = io(socketUrl(), {
 			query: { id },
 		});
         setSocket(newSocket);

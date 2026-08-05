@@ -16,10 +16,7 @@
 // A nonce is only chargeable by the application that minted it. So the app id and the access token
 // are not two related settings - they are one setting, and it now lives in exactly one place: the
 // server's environment. See GET /square/config in server/routes/squarePayments.js.
-import { APP_SETTINGS_CONSTANTS } from "../../constants";
-
-const CONFIG_URL =
-	APP_SETTINGS_CONSTANTS[import.meta.env.MODE.toUpperCase()].GRAPHQL_SERVER_URL + "square/config";
+import { apiUrl } from "../../utils/apiUrl";
 
 // Cached for the page's lifetime - the card form can mount several times in one session (a
 // multi-sitting booking, a retry after a decline) and this answer doesn't change.
@@ -27,7 +24,10 @@ let configPromise = null;
 
 export function loadSquareConfig() {
 	if (!configPromise) {
-		configPromise = fetch(CONFIG_URL)
+		// Resolved HERE, not at module level. A module-level lookup throws at IMPORT time, which
+		// takes down every test that transitively imports this file rather than just the feature -
+		// see utils/apiUrl.js.
+		configPromise = fetch(apiUrl("square/config"))
 			.then(async (response) => {
 				const data = await response.json().catch(() => ({}));
 				if (!response.ok) {

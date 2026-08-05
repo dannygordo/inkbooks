@@ -3,7 +3,7 @@ import { Alert, Box, Button, CircularProgress } from "@mui/material";
 import { useAuth } from "../../context/auth";
 import { loadSquareSdk } from "./loadSquareSdk";
 import { loadSquareConfig } from "./squareConfig";
-import { APP_SETTINGS_CONSTANTS } from "../../constants";
+import { apiUrl } from "../../utils/apiUrl";
 
 // Real, working replacement for the previous version of this component, which was built against
 // Square's SqPaymentForm API - retired by Square years before this was ever written - and was
@@ -110,9 +110,7 @@ const IBSquarePaymentForm = ({
 			// Same host as GraphQL/socket.io - this is a plain Express route, not a GraphQL
 			// mutation, same pattern BookingRequest.jsx already uses for its own non-GraphQL
 			// upload endpoint.
-			const processUrl =
-				APP_SETTINGS_CONSTANTS[import.meta.env.MODE.toUpperCase()]
-					.GRAPHQL_SERVER_URL + "square/process-payment";
+			const processUrl = apiUrl("square/process-payment");
 			const response = await fetch(processUrl, {
 				method: "POST",
 				headers: {
