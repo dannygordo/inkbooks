@@ -41,6 +41,20 @@ const { findOrCreateConversationForMembers } = require('../../utils/conversation
 const { ensureTagColor } = require('../../utils/tag-color');
 const { getActiveShopIdForArtist } = require('../../utils/artist-shop');
 
+// Both Artist.shop and Artist.shopId need the same answer, and a directory asks for it once per
+// row - so it goes through the request's loader, which turns N queries into one. Falls back to a
+// direct lookup when there's no loader on the context: every real path has one (index.js and
+// test/helpers/testServer.js both build them), but a field resolver silently returning null
+// because a context was assembled slightly differently is precisely the class of bug this field
+// already caused once.
+async function resolveArtistShopId(artist, context) {
+  if (context && context.loaders && context.loaders.artistShopId) {
+    return context.loaders.artistShopId.load(artist.userId);
+  }
+  return getActiveShopIdForArtist(artist.userId);
+}
+
+
 module.exports = {
   Date: DateResolver,
   DateTime: DateTimeResolver,
@@ -208,13 +222,13 @@ module.exports = {
     // written with no shop at all: no shop cut, and the revenue missing from the shop's books.
     // See utils/artist-shop.js.
     shop: async(artist, args, context, info) => {
-      const shopId = await getActiveShopIdForArtist(artist.userId);
+      const shopId = await resolveArtistShopId(artist, context);
       return shopId ? (await Shop.findById(shopId)) : null;
     },
     // Same source as `shop` above. Kept as a field so existing callers that only need the id
     // don't have to fetch the whole Shop, but it is NOT the stored Artist.shopId any more.
     shopId: async(artist, args, context, info) => {
-      return getActiveShopIdForArtist(artist.userId);
+      return resolveArtistShopId(artist, context);
     },
     user: async(artist, args, context, info) => {
       return (await User.findById(artist.userId));

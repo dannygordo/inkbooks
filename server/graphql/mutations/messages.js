@@ -89,7 +89,7 @@ module.exports = {
       // The minRole was the whole check - any shop admin could edit anyone's message text.
       const existing = await Message.findById(message.id).select('conversationId');
       if (!existing) {
-        throw new Error('Message not found');
+        throw new UserInputError('Errors', { errors: { id: 'Message not found.' } });
       }
       const conversation = await Conversation.findById(existing.conversationId).select('members');
       if (!(await canAccessConversation(user, conversation))) {

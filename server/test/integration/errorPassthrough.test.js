@@ -157,6 +157,29 @@ describe('validation failures keep their field-level detail', () => {
 		expect(error.extensions.errors.status).toMatch(/archiveClient/);
 	});
 
+	it('a not-found names the argument that was wrong', async () => {
+		// These were `throw new Error('Artist not found')` - a bare Error, which the enclosing
+		// catch then rewrapped into "Error: Error: Artist not found" and which carried nothing a
+		// form could act on. Twenty of them across the resolvers. The message is the same; what's
+		// new is that it says WHICH argument didn't resolve, which matters the moment a mutation
+		// takes more than one id.
+		const { user: shopAdmin } = await createShopAdminUser();
+		const server = createTestServer();
+
+		const res = await server.executeOperation(
+			{
+				query: `query A($artistId: ID!) { getArtist(artistId: $artistId) { id } }`,
+				variables: { artistId: '000000000000000000000000' },
+			},
+			asUser(shopAdmin),
+		);
+
+		const error = res.body.singleResult.errors[0];
+		expect(error.extensions.code).toBe('BAD_USER_INPUT');
+		expect(error.extensions.errors.artistId).toMatch(/Artist not found/);
+		expect(error.message).not.toMatch(/^Error:/);
+	});
+
 	it('createArtistAccount: a duplicate email keeps its field-level error', async () => {
 		const { user: admin, shop } = await createShopAdminUser();
 		const { user: existing } = await createClientUser();

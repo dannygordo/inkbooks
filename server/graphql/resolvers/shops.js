@@ -4,7 +4,7 @@ const { Constants } = require('../../utils/constants');
 const square = require('../../utils/square');
 const { signState } = require('../../routes/squareOAuth');
 const { getShopIdsForUser, assertCanAccessShop } = require('../../utils/shop-membership');
-const { rethrow } = require('../../utils/errors');
+const { UserInputError, rethrow } = require('../../utils/errors');
 
 module.exports = {
     Query: {
@@ -39,7 +39,7 @@ module.exports = {
                 const shop = await Shop.findById(shopId);
                 if (shop) {
                   return shop;
-                } throw new Error('Shop not found');
+                } throw new UserInputError('Errors', { errors: { shopId: 'Shop not found.' } });
               } catch (err) {
                 rethrow(err);
             }
@@ -56,7 +56,7 @@ module.exports = {
           await assertCanAccessShop(user, shopId);
           const shop = await Shop.findById(shopId);
           if (!shop) {
-            throw new Error('Shop not found');
+            throw new UserInputError('Errors', { errors: { shopId: 'Shop not found.' } });
           }
           return square.buildAuthorizationUrl(signState(shopId));
         }, Constants.ROLES.SHOP_ADMIN),

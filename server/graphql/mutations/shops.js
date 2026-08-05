@@ -2,7 +2,7 @@ const Shop = require('../../models/Shop');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 const { assertCanAccessShop } = require('../../utils/shop-membership');
-const { rethrow } = require('../../utils/errors');
+const { UserInputError, rethrow } = require('../../utils/errors');
 
 module.exports = {
     createShop: withAuth(async (
@@ -67,7 +67,7 @@ module.exports = {
       await assertCanAccessShop(user, shopId);
       const shop = await Shop.findById(shopId);
       if (!shop) {
-        throw new Error('Shop not found');
+        throw new UserInputError('Errors', { errors: { shopId: 'Shop not found.' } });
       }
       shop.squareConnected = false;
       shop.squareMerchantId = undefined;

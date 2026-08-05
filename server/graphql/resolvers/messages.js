@@ -1,7 +1,7 @@
 const Message = require('../../models/Message');
 const Conversation = require('../../models/Conversation');
 const withAuth = require('../../utils/with-auth');
-const { AuthenticationError, rethrow } = require('../../utils/errors');
+const { UserInputError, AuthenticationError, rethrow } = require('../../utils/errors');
 const { canAccessConversation } = require('../../utils/shop-membership');
 
 module.exports = {
@@ -37,7 +37,7 @@ module.exports = {
       try {
         const message = await Message.findById(messageId);
         if (!message) {
-          throw new Error('Message not found');
+          throw new UserInputError('Errors', { errors: { messageId: 'Message not found.' } });
         }
         const conversation = await Conversation.findById(message.conversationId).select('members');
         if (!(await canAccessConversation(user, conversation))) {

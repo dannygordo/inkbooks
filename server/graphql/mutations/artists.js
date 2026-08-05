@@ -5,6 +5,7 @@ const { Constants } = require('../../utils/constants');
 const { AuthenticationError, UserInputError, rethrow } = require('../../utils/errors');
 const { updateArtistRateSettingsInputSchema, validate } = require('../../utils/validation');
 const { assertCanAccessShop, assertCanManageArtist } = require('../../utils/shop-membership');
+const { getActiveShopIdForArtist } = require('../../utils/artist-shop');
 const { assertNoArchiveTransition } = require('../../utils/archiving');
 
 module.exports = {
@@ -120,6 +121,22 @@ module.exports = {
     await assertCanManageArtist(user, existing.userId);
     // Archiving has one door, and this isn't it - see utils/archiving.js.
     assertNoArchiveTransition(existing, artist.status, 'archiveArtist');
+    // Same shape, different field. ArtistInput still carries shopId because createArtist needs it
+    // to know which shop to connect the new artist to - but there is no Artist.shopId to write any
+    // more, so an update sending one was being silently discarded. Connecting or moving an artist
+    // is connectArtistToShop, which disconnects the old shop and asks before doing it; letting an
+    // ordinary profile save do it quietly would put back exactly what that confirmation exists to
+    // prevent. See utils/artist-shop.js.
+    if (artist.shopId !== undefined && artist.shopId !== null) {
+      const currentShopId = await getActiveShopIdForArtist(existing.userId);
+      if (String(currentShopId || '') !== String(artist.shopId)) {
+        throw new UserInputError('Errors', {
+          errors: {
+            shopId: 'Use connectArtistToShop to change which shop this artist works at.',
+          },
+        });
+      }
+    }
     try{
       const res = await Artist.findByIdAndUpdate({_id: artist.id}, artist, {new: true});
       return res;

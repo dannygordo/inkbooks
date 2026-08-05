@@ -13,6 +13,7 @@ console.log('NODE_ENV:', process.env.NODE_ENV);
 
 const http = require('http');
 const express = require('express');
+const { createLoaders } = require('./utils/loaders');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const { Server } = require('socket.io');
@@ -123,7 +124,10 @@ async function start() {
     '/',
     express.json(),
     expressMiddleware(server, {
-      context: async ({ req }) => ({ req }),
+      // loaders are built fresh for every operation, never shared. They batch the per-row
+      // lookups field resolvers do (see utils/loaders.js); a loader that outlived a request would
+      // be a cache serving a stale answer to "which shop does this artist work at".
+      context: async ({ req }) => ({ req, loaders: createLoaders() }),
     }),
   );
 

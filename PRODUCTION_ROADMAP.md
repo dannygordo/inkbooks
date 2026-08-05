@@ -101,10 +101,10 @@ through as the same object; anything else keeps the old behaviour exactly, so ge
 failures surface as they always did. `test/integration/errorPassthrough.test.js` pins the shape — a
 code, an un-prefixed message, structured extensions — rather than any one resolver.
 
-Related and still open: `throw new Error('Artist not found')` inside one of these try blocks used
-to reach the client as `Error: Error: Artist not found`. `rethrow` doesn't fix that (a plain Error
-isn't a GraphQLError, by design), and the real answer is that those should be `UserInputError`s
-with a field, not bare Errors. Worth a pass when the not-found messages are next touched.
+Done alongside it: the twenty `throw new Error('X not found')` sites are now `UserInputError`s
+carrying the argument that didn't resolve (`extensions.errors.artistId` and so on). The message is
+the same; what's new is that it names WHICH id was wrong, which starts mattering the moment a
+mutation takes more than one.
 
 ### The tenancy rule: nobody reaches a shop they aren't assigned to
 
@@ -181,9 +181,26 @@ directions. Deliberately narrow rather than stripping `status` from the input: `
 trap. Nothing in the UI sets a status today, which is precisely why it's enforced and tested rather
 than noted - a field nothing sets deliberately is one somebody starts setting later.
 
-Still open: a redaction action for GDPR/CCPA erasure requests, which must null the PII in place and
-keep the financial row - tax retention runs the other way, so deletion is the wrong tool even
-there.
+**Erasure requests are `redactClient`** (`utils/redaction.js`). Overwrites identity in place -
+Client and User name/email/phone/address/socials/avatar, shop-side notes, and appointment titles,
+which carry the client's name in plain text for consults. Every row, id and amount survives, so the
+shop's revenue is byte-identical before and after. The account is left unusable. Irreversible,
+unlike archiving, and it archives the client in the same call, since a row named "Redacted" sitting
+in the active list helps nobody.
+
+Placeholders are unique, not constant: `Client.email` and `User.email`/`username` are all UNIQUE, so
+a fixed value would work exactly once and then fail with a duplicate key - surfacing as a failed
+legal request at the worst possible moment. `.invalid` is the RFC 2606 reserved TLD, so a redacted
+address can never reach a real mailbox.
+
+**Deliberately no UI.** This is rare and legally initiated, and putting "permanently erase this
+person" next to "Archive" invites the one misclick it cannot recover from.
+
+**Two things a human has to decide, not me.** Message bodies and `BookingRequest.description` are
+NOT erased: they're free text the person wrote, so arguably their personal data, but also one half
+of a two-party conversation whose other half is the artist's record of what was agreed about work
+actually done. Erasing them may be required in some jurisdictions and defensible to keep in others.
+Nothing here makes a shop compliant - the mechanism is built, the scope is the open question.
 
 **Coverage:** `server/test/integration/shopIsolation.test.js` is the boundary test — two complete
 shops, and shop B's admin (a real, legitimate user) attempting every read and write against shop A
@@ -231,9 +248,19 @@ multi-shop artists, invite-link shop bootstrapping, the searchable shop director
 request/accept connection flows. An artist genuinely working at two shops uses InkBooks as an
 independent.
 
-**Known cost:** `Artist.shop`/`shopId` are now per-artist connection lookups, so a directory of N
-artists does N+1 queries. Fine at current list sizes; the fix when it matters is a DataLoader, and
-it belongs with pagination rather than on its own.
+**The N+1 that created is fixed.** `Artist.shop`/`shopId` batch through a request-scoped loader
+(`utils/loaders.js`), so a roster resolves in one query instead of one per artist. Hand-written
+rather than the `dataloader` package - the behaviour needed is a few lines, and the call shape
+matches so it can be swapped later. Request-scoped always: a loader that outlived a request would
+be a cache serving a stale answer to "which shop does this artist work at" the moment somebody
+moves shops.
+
+`updateArtist` no longer silently discards a `shopId`. `ArtistInput` still carries the field
+because `createArtist` needs it, but there's no `Artist.shopId` to write, so an update sending a
+DIFFERENT one now refuses and points at `connectArtistToShop` - letting an ordinary profile save
+move an artist between shops would put back exactly what that mutation's confirmation exists to
+prevent. Sending the current one is a no-op, which is what the edit form does (it spreads the whole
+fetched artist).
 
 ### Artist-centric tenancy model — original design notes (superseded in part by the above)
 

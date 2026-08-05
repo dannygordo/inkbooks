@@ -4,6 +4,7 @@ const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 const { resolveGuestToken } = require('../../utils/guest-auth');
 const { assertCanManageArtist } = require('../../utils/shop-membership');
+const { UserInputError } = require('../../utils/errors');
 
 module.exports = {
   Query: {
@@ -39,7 +40,7 @@ module.exports = {
     getBookingRequest: withAuth(async (_, { bookingRequestId }, context, info, user) => {
       const bookingRequest = await BookingRequest.findById(bookingRequestId);
       if (!bookingRequest) {
-        throw new Error('Booking request not found');
+        throw new UserInputError('Errors', { errors: { bookingRequestId: 'Booking request not found.' } });
       }
       await assertCanManageArtist(user, bookingRequest.artistId);
       return bookingRequest;

@@ -1,12 +1,13 @@
 const Client = require('../../models/Client');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
-const { AuthenticationError, rethrow } = require('../../utils/errors');
+const { UserInputError, AuthenticationError, rethrow } = require('../../utils/errors');
 const {
   assertCanAccessClient,
   linkClientToUsersShops,
 } = require('../../utils/shop-membership');
 const { assertNoArchiveTransition } = require('../../utils/archiving');
+const { redactClient } = require('../../utils/redaction');
 
 module.exports = {
   createClient: withAuth(async (
@@ -48,12 +49,39 @@ module.exports = {
     await linkClientToUsersShops(client._id, user.id);
     return client;
   }, Constants.ROLES.CLIENT),
+  /**
+   * Erasure request (GDPR/CCPA). Overwrites who this person was; keeps everything transacted.
+   *
+   * IRREVERSIBLE - there is no unredact, unlike archiving. Deliberately has no button in the UI:
+   * this is a rare, legally-initiated action, and putting "permanently erase this person" next to
+   * "Archive" invites the misclick it can't recover from. Reached deliberately, by someone acting
+   * on a request.
+   *
+   * Archives them too, in the same call. A redacted client left in the active list is a row named
+   * "Redacted" that staff can't identify and shouldn't be picking for new work.
+   *
+   * See utils/redaction.js - including what it deliberately does NOT erase, and why that scope is
+   * a legal decision rather than an engineering one.
+   */
+  redactClient: withAuth(async (_, { clientId }, context, info, user) => {
+    const client = await Client.findById(clientId);
+    if (!client) {
+      throw new UserInputError('Errors', { errors: { clientId: 'Client not found.' } });
+    }
+    await assertCanAccessClient(user, client);
+    const summary = await redactClient(client);
+    await Client.updateOne(
+      { _id: client._id },
+      { $set: { status: Constants.CLIENT_STATUS.ARCHIVED } },
+    );
+    return summary;
+  }, Constants.ROLES.SHOP_ADMIN),
   // Same shape as archiveArtist - see the note there. A client's projects, appointments and the
   // money on them are untouched; they simply stop appearing in the client list and in pickers.
   archiveClient: withAuth(async (_, { clientId }, context, info, user) => {
     const client = await Client.findById(clientId);
     if (!client) {
-      throw new Error('Client not found');
+      throw new UserInputError('Errors', { errors: { clientId: 'Client not found.' } });
     }
     await assertCanAccessClient(user, client);
     client.status = Constants.CLIENT_STATUS.ARCHIVED;
@@ -63,7 +91,7 @@ module.exports = {
   unarchiveClient: withAuth(async (_, { clientId }, context, info, user) => {
     const client = await Client.findById(clientId);
     if (!client) {
-      throw new Error('Client not found');
+      throw new UserInputError('Errors', { errors: { clientId: 'Client not found.' } });
     }
     await assertCanAccessClient(user, client);
     client.status = Constants.CLIENT_STATUS.ACTIVE;
@@ -101,7 +129,7 @@ module.exports = {
     try {
       const client = await Client.findById(clientId);
       if (!client) {
-        throw new Error('Client not found');
+        throw new UserInputError('Errors', { errors: { clientId: 'Client not found.' } });
       }
       // Checked before the role gate below, not after: a Client's role (30) would fail that check
       // anyway, but only incidentally. Stating it explicitly means the rule survives someone

@@ -1,7 +1,7 @@
 const Conversation = require('../../models/Conversation');
 const Client = require('../../models/Client');
 const withAuth = require('../../utils/with-auth');
-const { AuthenticationError, rethrow } = require('../../utils/errors');
+const { UserInputError, AuthenticationError, rethrow } = require('../../utils/errors');
 const {
   getShopIdsForUser,
   getArtistIdsForShops,
@@ -77,7 +77,7 @@ module.exports = {
       try {
         const conversation = await Conversation.findById(conversationId);
         if (!conversation) {
-          throw new Error('Conversation not found');
+          throw new UserInputError('Errors', { errors: { conversationId: 'Conversation not found.' } });
         }
         // A member, or a shop admin at the shop one of the members works at. The old check let
         // any shop admin anywhere read any thread in the system; these are private messages
@@ -105,7 +105,7 @@ module.exports = {
       try {
         const client = await Client.findById(clientId).select('userId');
         if (!client) {
-          throw new Error('Client not found');
+          throw new UserInputError('Errors', { errors: { clientId: 'Client not found.' } });
         }
         if (
           String(user.id) !== String(artistId) &&

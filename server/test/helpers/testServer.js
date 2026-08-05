@@ -7,6 +7,7 @@ const { ApolloServer } = require('@apollo/server');
 const { DateTypeDefs } = require('graphql-scalars');
 const ibTypeDefs = require('../../graphql/typeDefs');
 const resolvers = require('../../graphql/resolvers');
+const { createLoaders } = require('../../utils/loaders');
 
 function createTestServer() {
 	return new ApolloServer({
@@ -23,6 +24,11 @@ function contextWithToken(token) {
 		req: {
 			headers: token ? { authorization: `Bearer ${token}` } : {},
 		},
+		// Matching index.js: fresh per operation. Field resolvers that batch through a loader fall
+		// back to a direct query when it's absent (see resolvers/index.js), so a context built
+		// without this still works - but then the tests wouldn't be exercising the path the real
+		// server takes, which is the whole reason this helper mirrors index.js in the first place.
+		loaders: createLoaders(),
 	};
 }
 

@@ -8,7 +8,7 @@ const {
   assertCanAccessClient,
 } = require('../../utils/shop-membership');
 const { archiveFilter } = require('../../utils/archiving');
-const { rethrow } = require('../../utils/errors');
+const { UserInputError, rethrow } = require('../../utils/errors');
 
 module.exports = {
   Query: {
@@ -55,7 +55,7 @@ module.exports = {
     getClient: withAuth(async (_, { clientId }, context, info, user) => {
       const client = await Client.findById(clientId);
       if (!client) {
-        throw new Error('Client not found');
+        throw new UserInputError('Errors', { errors: { clientId: 'Client not found.' } });
       }
       // Outside any try/catch: an authorization failure shouldn't be rewrapped as if the lookup
       // broke, which is what the old `rethrow(err)` around this did.

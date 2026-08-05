@@ -1,6 +1,6 @@
 const Staff = require('../../models/Staff');
 const withAuth = require('../../utils/with-auth');
-const { AuthenticationError, rethrow } = require('../../utils/errors');
+const { UserInputError, AuthenticationError, rethrow } = require('../../utils/errors');
 const { getShopIdsForUser } = require('../../utils/shop-membership');
 const { archiveFilter } = require('../../utils/archiving');
 
@@ -31,7 +31,7 @@ module.exports = {
       try {
         const staff = await Staff.findById(staffId);
         if (!staff) {
-          throw new Error('Staff not found');
+          throw new UserInputError('Errors', { errors: { staffId: 'Staff not found.' } });
         }
         if (String(user.id) !== String(staff.userId)) {
           const shopIds = await getShopIdsForUser(user.id);

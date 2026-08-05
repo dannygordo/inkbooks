@@ -5,7 +5,7 @@ const Project = require('../../models/Project');
 const ArtistShopConnection = require('../../models/ArtistShopConnection');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
-const { AuthenticationError, rethrow } = require('../../utils/errors');
+const { UserInputError, AuthenticationError, rethrow } = require('../../utils/errors');
 const {
   getShopIdsForUser,
   getArtistIdsForShops,
@@ -98,7 +98,7 @@ module.exports = {
       try {
         const appointment = await Appointment.findById(appointmentId);
         if (!appointment) {
-          throw new Error('Appointment not found');
+          throw new UserInputError('Errors', { errors: { appointmentId: 'Appointment not found.' } });
         }
         if (
           String(user.id) !== String(appointment.userId) &&
@@ -120,7 +120,7 @@ module.exports = {
     getAppointmentsByProject: withAuth(async (_, { projectId }, context, info, user) => {
       const project = await Project.findById(projectId);
       if (!project) {
-        throw new Error('Project not found');
+        throw new UserInputError('Errors', { errors: { projectId: 'Project not found.' } });
       }
       if (String(user.id) !== String(project.artistId)) {
         const myClient = await Client.findOne({ userId: user.id }).select('_id');

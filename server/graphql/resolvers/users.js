@@ -303,7 +303,7 @@ module.exports = {
         const foundUser = await User.findById(userId);
         if (foundUser) {
           return foundUser;
-        } throw new Error('User not found');
+        } throw new UserInputError('Errors', { errors: { userId: 'User not found.' } });
       } catch (err) {
         rethrow(err);
       }

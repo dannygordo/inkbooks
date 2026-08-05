@@ -56,7 +56,7 @@ module.exports = {
   archiveStaff: withAuth(async (_, { staffId }, context, info, user) => {
     const staff = await Staff.findById(staffId);
     if (!staff) {
-      throw new Error('Staff not found');
+      throw new UserInputError('Errors', { errors: { staffId: 'Staff not found.' } });
     }
     await assertCanAccessShop(user, staff.shopId);
     staff.status = Constants.STAFF_STATUS.ARCHIVED;
@@ -66,7 +66,7 @@ module.exports = {
   unarchiveStaff: withAuth(async (_, { staffId }, context, info, user) => {
     const staff = await Staff.findById(staffId);
     if (!staff) {
-      throw new Error('Staff not found');
+      throw new UserInputError('Errors', { errors: { staffId: 'Staff not found.' } });
     }
     await assertCanAccessShop(user, staff.shopId);
     staff.status = Constants.STAFF_STATUS.ACTIVE;

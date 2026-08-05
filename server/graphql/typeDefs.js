@@ -698,6 +698,15 @@ module.exports = gql`
   # No invite for clients - see mutations/accounts.js. isNewAccount is false when the email
   # already had an account (they booked online before), so the wizard can say the record was
   # updated rather than implying it created one.
+  # What a redaction actually touched. Returned so the shop can record that the request was
+  # carried out, which is itself usually a compliance requirement.
+  type RedactionResult {
+    clientId: ID!
+    userRedacted: Boolean!
+    projectsAffected: Int!
+    appointmentsRetitled: Int!
+  }
+
   type ClientAccountResult {
     client: Client!
     isNewAccount: Boolean!
@@ -805,6 +814,10 @@ module.exports = gql`
     archiveStaff(staffId: ID!): Staff
     unarchiveStaff(staffId: ID!): Staff
     archiveClient(clientId: ID!): Client
+    # Erasure request (GDPR/CCPA): overwrites who this person was, keeps everything transacted.
+    # IRREVERSIBLE, and deliberately has no button in the UI - see mutations/clients.js and
+    # utils/redaction.js, including what it does NOT erase and why that scope is a legal call.
+    redactClient(clientId: ID!): RedactionResult
     unarchiveClient(clientId: ID!): Client
 
     # deleteAppointment is the only surviving delete* mutation, and it now refuses anything

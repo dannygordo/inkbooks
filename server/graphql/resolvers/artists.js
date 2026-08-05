@@ -1,7 +1,7 @@
 const Artist = require('../../models/Artist');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
-const { AuthenticationError, rethrow } = require('../../utils/errors');
+const { UserInputError, AuthenticationError, rethrow } = require('../../utils/errors');
 const {
   getShopIdsForUser,
   assertCanAccessShop,
@@ -56,7 +56,7 @@ module.exports = {
       try {
         const artist = await Artist.findById(artistId);
         if (!artist) {
-          throw new Error('Artist not found');
+          throw new UserInputError('Errors', { errors: { artistId: 'Artist not found.' } });
         }
         const isSelf = String(user.id) === String(artist.userId);
         if (!isSelf) {

@@ -31,6 +31,7 @@ const Staff = require('../../models/Staff');
 const Client = require('../../models/Client');
 const Project = require('../../models/Project');
 const Appointment = require('../../models/Appointment');
+const User = require('../../models/User');
 const { Constants } = require('../../utils/constants');
 
 const ARCHIVE_ARTIST = `mutation A($artistId: ID!) { archiveArtist(artistId: $artistId) { id status } }`;
@@ -59,6 +60,11 @@ const UPDATE_CLIENT = `
 `;
 const UPDATE_ARTIST = `
 	mutation A($artist: ArtistInput) { updateArtist(artist: $artist) { id status } }
+`;
+const REDACT_CLIENT = `
+	mutation A($clientId: ID!) {
+		redactClient(clientId: $clientId) { clientId userRedacted projectsAffected appointmentsRetitled }
+	}
 `;
 const SHOP_ANALYTICS = `
 	query A($shopId: ID!, $start: DateTime!, $end: DateTime!) {
@@ -493,6 +499,137 @@ describe('archiving has one door', () => {
 
 		expect(res.body.singleResult.errors).toBeUndefined();
 		expect(res.body.singleResult.data.updateClient.phone).toBe('555-0142');
+	});
+});
+
+describe('redaction: erase who, keep what', () => {
+	// Not archiving's sibling - its opposite in one respect. Archiving is reversible and touches
+	// nothing; this overwrites identity permanently. What they share is the rule that matters: the
+	// money is never involved. A shop has to keep transaction records for tax and erase personal
+	// data on request, and those only reconcile if erasure means overwriting who rather than
+	// deleting what.
+	it('erases the identity and leaves every amount alone', async () => {
+		const { shopAdmin, client, project, appointment } = await shopWithEarningArtist();
+		const server = createTestServer();
+
+		const res = await server.executeOperation(
+			{ query: REDACT_CLIENT, variables: { clientId: client.id } },
+			asUser(shopAdmin),
+		);
+
+		expect(res.body.singleResult.errors).toBeUndefined();
+		expect(res.body.singleResult.data.redactClient.projectsAffected).toBe(1);
+
+		const stored = await Client.findById(client.id);
+		expect(stored).not.toBeNull();
+		expect(stored.firstName).toBe('Redacted');
+		expect(stored.email).not.toBe(client.email);
+		expect(stored.email).toMatch(/@redacted\.invalid$/);
+		expect(stored.phone).toBe('');
+
+		// The half that has to survive.
+		const storedProject = await Project.findById(project.id);
+		expect(String(storedProject.clientId)).toBe(String(client.id));
+		const storedAppointment = await Appointment.findById(appointment.id);
+		expect(storedAppointment.totalCents).toBe(40000);
+		expect(storedAppointment.shopCutCents).toBe(7000);
+	});
+
+	it("leaves the shop's revenue exactly where it was", async () => {
+		const { shopAdmin, shop, client } = await shopWithEarningArtist();
+		const server = createTestServer();
+
+		const before = await server.executeOperation(
+			{ query: SHOP_ANALYTICS, variables: { shopId: shop.id, ...RANGE } },
+			asUser(shopAdmin),
+		);
+
+		await server.executeOperation(
+			{ query: REDACT_CLIENT, variables: { clientId: client.id } },
+			asUser(shopAdmin),
+		);
+
+		const after = await server.executeOperation(
+			{ query: SHOP_ANALYTICS, variables: { shopId: shop.id, ...RANGE } },
+			asUser(shopAdmin),
+		);
+		expect(after.body.singleResult.data.getShopAnalytics).toEqual(
+			before.body.singleResult.data.getShopAnalytics,
+		);
+	});
+
+	it('scrubs the name off appointment titles, where it sat in plain text', async () => {
+		// A consult's title is set to the client's own name at conversion (see
+		// mutations/bookingRequests.js), so erasing the Client row alone would leave their name
+		// legible on the calendar.
+		const { shopAdmin, client, project } = await shopWithEarningArtist();
+		await Appointment.updateMany({ projectId: project._id }, { $set: { title: 'Jane Doe' } });
+		const server = createTestServer();
+
+		await server.executeOperation(
+			{ query: REDACT_CLIENT, variables: { clientId: client.id } },
+			asUser(shopAdmin),
+		);
+
+		const titles = await Appointment.find({ projectId: project._id }).select('title');
+		titles.forEach((a) => expect(a.title).toBe('Redacted'));
+	});
+
+	it('leaves the account unusable', async () => {
+		const { shopAdmin, client } = await shopWithEarningArtist();
+		const server = createTestServer();
+		const before = await User.findById(client.userId);
+
+		await server.executeOperation(
+			{ query: REDACT_CLIENT, variables: { clientId: client.id } },
+			asUser(shopAdmin),
+		);
+
+		const after = await User.findById(client.userId);
+		expect(after.email).not.toBe(before.email);
+		expect(after.username).not.toBe(before.username);
+		expect(after.firstName).toBe('Redacted');
+		// Randomised and discarded - nobody, including this server, knows it.
+		expect(after.password).not.toBe(before.password);
+	});
+
+	it('can erase two people without colliding', async () => {
+		// Client.email and User.email/username are all UNIQUE. A constant placeholder would work
+		// exactly once and then throw a duplicate-key error - surfacing as a failed legal request,
+		// at the worst possible moment.
+		const { shopAdmin, shop, client: first } = await shopWithEarningArtist();
+		const { client: second } = await createClientUser({ client: { shopIds: [shop._id] } });
+		const server = createTestServer();
+
+		const one = await server.executeOperation(
+			{ query: REDACT_CLIENT, variables: { clientId: first.id } },
+			asUser(shopAdmin),
+		);
+		const two = await server.executeOperation(
+			{ query: REDACT_CLIENT, variables: { clientId: second.id } },
+			asUser(shopAdmin),
+		);
+
+		expect(one.body.singleResult.errors).toBeUndefined();
+		expect(two.body.singleResult.errors).toBeUndefined();
+		const a = await Client.findById(first.id);
+		const b = await Client.findById(second.id);
+		expect(a.email).not.toBe(b.email);
+	});
+
+	it("refuses a shop admin erasing another shop's client", async () => {
+		const { client } = await shopWithEarningArtist();
+		const { user: outsideAdmin } = await createShopAdminUser();
+		const server = createTestServer();
+
+		const res = await server.executeOperation(
+			{ query: REDACT_CLIENT, variables: { clientId: client.id } },
+			asUser(outsideAdmin),
+		);
+
+		expect(res.body.singleResult.errors[0].message).toMatch(/Action not allowed/);
+		const stored = await Client.findById(client.id);
+		expect(stored.firstName).not.toBe('Redacted');
 	});
 });
 
