@@ -10,6 +10,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MockedProvider } from "@apollo/client/testing";
+import { MemoryRouter } from "react-router-dom";
 import UpdateEventDialog from "./UpdateEventDialog";
 import { AuthContext } from "../../context/auth";
 import { AppointmentService } from "../../services/AppointmentService";
@@ -98,12 +99,18 @@ function renderDialog({ event, mocks, contextOverrides = {} } = {}) {
 		setAlert: vi.fn(),
 		...contextOverrides,
 	};
+	// MemoryRouter, because the dialog calls useNavigate - "View Project" and "Convert to Session"
+	// both navigate away, and react-router throws outright rather than degrading if the hook runs
+	// with no Router above it. Added when those two actions were, but this file wasn't updated at
+	// the time, so every test here failed on render for several commits.
 	render(
-		<MockedProvider mocks={mocks}>
-			<AuthContext.Provider value={contextValue}>
-				<UpdateEventDialog selectedDay={new Date("2026-08-01T12:00:00Z")} event={event} />
-			</AuthContext.Provider>
-		</MockedProvider>,
+		<MemoryRouter>
+			<MockedProvider mocks={mocks}>
+				<AuthContext.Provider value={contextValue}>
+					<UpdateEventDialog selectedDay={new Date("2026-08-01T12:00:00Z")} event={event} />
+				</AuthContext.Provider>
+			</MockedProvider>
+		</MemoryRouter>,
 	);
 	return contextValue;
 }
