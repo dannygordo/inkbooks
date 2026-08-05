@@ -14,6 +14,8 @@ console.log('NODE_ENV:', process.env.NODE_ENV);
 const http = require('http');
 const express = require('express');
 const { createLoaders } = require('./utils/loaders');
+const { startScheduler } = require('./utils/scheduler');
+const { notificationJobs } = require('./utils/notification-jobs');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const { Server } = require('socket.io');
@@ -188,6 +190,16 @@ async function start() {
   // than carrying it forward on faith.
   await mongoose.connect(mongoUri);
   console.log('MongoDB Connected!');
+
+  // Started only after Mongo is connected. The very first thing every job does is claim a lock
+  // row, so a scheduler running before the database is up would throw on its first tick.
+  //
+  // The lock (models/ScheduledRun.js) is what makes this safe to run on more than one instance:
+  // both tick, both try to claim the same period, exactly one wins. Without it, scaling past a
+  // single instance would send every email twice - and that failure is invisible in development,
+  // where there is only ever one instance.
+  startScheduler(notificationJobs());
+  console.log('Scheduler started');
 
   const PORT = process.env.PORT || 5500;
   await new Promise((resolve) => httpServer.listen(PORT, resolve));

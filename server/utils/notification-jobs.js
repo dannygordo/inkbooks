@@ -1,0 +1,168 @@
+const Notification = require('../models/Notification');
+const User = require('../models/User');
+const { sendEmail } = require('./email');
+
+/**
+ * The scheduled half of the notification system.
+ *
+ * Two sweeps, both idempotent, both safe to run more often than needed - which matters, because
+ * the scheduler ticks more frequently than any job's cadence and relies on the lock rather than
+ * on precise timing.
+ */
+
+// A queued email that never sent is invisible unless something looks for it. This is the
+// notification system's own silent-failure catcher, and building the feature without it would be
+// indefensible given that catching silent failures is most of why the feature exists
+// (NOTIFICATIONS_DESIGN.md §5, §12).
+const ORPHAN_AFTER_MS = 60 * 60 * 1000;
+
+/**
+ * Sends the emails whose grace has expired and which nobody read in time.
+ *
+ * The grace is the whole point: a notification read in-app before its email goes out has already
+ * done its job, and the email would be about something the person has finished with. markRead()
+ * flips those to 'cancelled', so they simply aren't in this query.
+ *
+ * Claims each row BEFORE sending, by flipping it out of 'pending' with a conditional update. Two
+ * instances racing the same row means the second one's update matches nothing, so it doesn't send.
+ * Sending first and recording after would double-send on a race and lose the record on a crash -
+ * the wrong way round for something whose whole job is not to send twice.
+ *
+ * `send` is injectable so tests are deterministic rather than dependent on whether the environment
+ * happens to have mail credentials. Nothing in production passes it.
+ */
+async function sendDueEmails({ now = new Date(), limit = 200, send = sendEmail } = {}) {
+  const due = await Notification.find({
+    emailStatus: 'pending',
+    emailAfter: { $lte: now },
+  })
+    .sort({ emailAfter: 1 })
+    .limit(limit);
+
+  let sent = 0;
+  let skipped = 0;
+  let failed = 0;
+
+  for (const notification of due) {
+    // Conditional on still being pending. This is the claim - if another instance got here first,
+    // matchedCount is 0 and this one moves on without sending.
+    const claimed = await Notification.updateOne(
+      { _id: notification._id, emailStatus: 'pending' },
+      { $set: { emailStatus: 'sent' } },
+    );
+    if (claimed.matchedCount === 0) {
+      continue;
+    }
+
+    try {
+      const recipient = await User.findById(notification.userId).select('email firstName');
+      if (!recipient || !recipient.email) {
+        await Notification.updateOne(
+          { _id: notification._id },
+          { $set: { emailStatus: 'skipped', emailError: 'no email address' } },
+        );
+        skipped += 1;
+        continue;
+      }
+
+      // The stored title and body, exactly as they were written. Re-rendering here would let a
+      // copy change rewrite what somebody was told - see models/Notification.js.
+      const result = await send({
+        to: recipient.email,
+        subject: notification.title,
+        htmlBody: `<p>Hi ${recipient.firstName},</p><p>${notification.body || notification.title}</p>`,
+        textBody: `Hi ${recipient.firstName},\n\n${notification.body || notification.title}`,
+      });
+
+      // sendEmail() returns null rather than throwing when email isn't configured, or when the
+      // provider rejects the message (see utils/email.js). Recording those as 'sent' would put a
+      // false claim in the audit trail - and in a dev environment with no email set up, EVERY
+      // notification would claim it had been emailed. Not-sent is recorded as not-sent.
+      if (!result) {
+        await Notification.updateOne(
+          { _id: notification._id },
+          {
+            $set: {
+              emailStatus: 'skipped',
+              emailError: 'no result from the mail provider - not configured, or rejected',
+            },
+          },
+        );
+        skipped += 1;
+        continue;
+      }
+      sent += 1;
+    } catch (err) {
+      // Rolled back to 'failed' rather than left as 'sent'. A row claiming an email went out when
+      // it didn't is worse than no record at all, because it's the record somebody would trust.
+      await Notification.updateOne(
+        { _id: notification._id },
+        { $set: { emailStatus: 'failed', emailError: err.message } },
+      );
+      failed += 1;
+    }
+  }
+
+  return { sent, skipped, failed, considered: due.length };
+}
+
+/**
+ * Finds emails that were queued and then never resolved either way.
+ *
+ * A row still 'pending' an hour after its grace expired means the send sweep isn't running, or is
+ * dying before it reaches this row. Nothing else in the system would ever say so - the
+ * notifications look fine in-app, and the only symptom is email that quietly stopped.
+ *
+ * Reports rather than fixing. A sweep that silently repaired its own backlog would hide the fact
+ * that it had one.
+ */
+async function findOrphanedEmails({ now = new Date() } = {}) {
+  const cutoff = new Date(now.getTime() - ORPHAN_AFTER_MS);
+  const count = await Notification.countDocuments({
+    emailStatus: 'pending',
+    emailAfter: { $lte: cutoff },
+  });
+  return { orphaned: count };
+}
+
+/**
+ * The jobs, as the scheduler wants them.
+ *
+ * Both cadences are deliberately shorter than they strictly need to be. The email sweep every five
+ * minutes keeps the delay between "grace expired" and "email sent" close to the three minutes the
+ * grace promises; running it hourly would make the real delay up to an hour and turn a considered
+ * pause into an apparent outage.
+ */
+function notificationJobs({ onReport = console.warn } = {}) {
+  return [
+    {
+      name: 'notification-emails',
+      everyMs: 5 * 60 * 1000,
+      run: async () => {
+        const result = await sendDueEmails();
+        return `sent=${result.sent} skipped=${result.skipped} failed=${result.failed}`;
+      },
+    },
+    {
+      name: 'notification-email-orphans',
+      everyMs: 60 * 60 * 1000,
+      run: async () => {
+        const { orphaned } = await findOrphanedEmails();
+        if (orphaned > 0) {
+          onReport(
+            `[notifications] ${orphaned} email(s) queued over an hour ago and still unsent. ` +
+              'The send sweep is not completing - see utils/notification-jobs.js.',
+          );
+        }
+        return `orphaned=${orphaned}`;
+      },
+    },
+  ];
+}
+
+module.exports = {
+  sendDueEmails,
+  findOrphanedEmails,
+  notificationJobs,
+  ORPHAN_AFTER_MS,
+};
