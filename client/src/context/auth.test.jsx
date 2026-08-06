@@ -19,6 +19,13 @@ vi.mock("firebase/auth", () => ({
 	signOut: vi.fn(() => Promise.resolve()),
 }));
 
+import {
+	ApolloClient,
+	ApolloLink,
+	ApolloProvider,
+	InMemoryCache,
+	gql,
+} from "@apollo/client";
 import { signInWithCustomToken, signOut } from "firebase/auth";
 import { AuthProvider, useAuth } from "./auth";
 import { AUTH_SETTINGS_CONSTANTS } from "../constants";
@@ -35,6 +42,9 @@ function TestConsumer() {
 			<button onClick={() => login({ id: "1", email: "gordo@example.com", accessToken: "tok123" })}>
 				loginNoFirebase
 			</button>
+			<button onClick={() => login({ id: "2", email: "admin@example.com", accessToken: "tok456" })}>
+				loginAsSomeoneElse
+			</button>
 			<button onClick={() => updateCurrentUser({ id: "1", email: "renamed@example.com", accessToken: "tok123" })}>
 				update
 			</button>
@@ -43,12 +53,59 @@ function TestConsumer() {
 	);
 }
 
+// A stand-in for anything the signed-in user's screens have read - a shop's client list is the one
+// that actually leaked.
+//
+// A REAL document against the real schema, paging and all. It could have been any two made-up
+// fields, but check-graphql-documents.js validates every document in this repo including this one -
+// and it rejected the made-up version, which is the check earning its keep on a test fixture.
+const SOMEBODY_ELSES_DATA = gql`
+	query GetClients {
+		getClients {
+			items {
+				id
+				firstName
+			}
+		}
+	}
+`;
+
+/**
+ * A REAL InMemoryCache, not MockedProvider's, and returned so tests can look inside it.
+ *
+ * The leak is a fact about what is sitting in the cache after a session ends, so the assertion has
+ * to be about the cache's actual contents. Spying on a clearStore() call would pass just as happily
+ * against a version that clears the wrong store, or clears it too late.
+ */
 function renderWithProvider() {
-	return render(
-		<AuthProvider>
-			<TestConsumer />
-		</AuthProvider>,
+	const cache = new InMemoryCache();
+	const client = new ApolloClient({ cache, link: ApolloLink.empty() });
+	const result = render(
+		<ApolloProvider client={client}>
+			<AuthProvider>
+				<TestConsumer />
+			</AuthProvider>
+		</ApolloProvider>,
 	);
+	return { ...result, cache };
+}
+
+/** Puts one user's data in the cache, the way their screens would have. */
+function seedCache(cache) {
+	cache.writeQuery({
+		query: SOMEBODY_ELSES_DATA,
+		data: {
+			getClients: {
+				__typename: "ClientPage",
+				items: [
+					{ __typename: "Client", id: "c1", firstName: "ShopAdminsClient" },
+				],
+			},
+		},
+	});
+	// Guards the guard: if writeQuery silently did nothing, every assertion below would pass by
+	// accident.
+	expect(Object.keys(cache.extract()).length).toBeGreaterThan(0);
 }
 
 beforeEach(() => {
@@ -113,6 +170,25 @@ describe("AuthProvider", () => {
 		expect(screen.getByTestId("user")).toHaveTextContent("renamed@example.com");
 	});
 
+	it("updateCurrentUser() leaves the cached data alone - it is the same person", async () => {
+		// The other side of the rule below, and it matters: nobody signed in or out, so wiping here
+		// would refetch the whole screen somebody is standing on every time they rename themselves
+		// or the signup wizard re-reads their account. The distinction that makes the leak dangerous
+		// is "whose session is this", and that is exactly what has not changed.
+		const user = userEvent.setup();
+		const { cache } = renderWithProvider();
+		await act(async () => {
+			await user.click(screen.getByText("login"));
+		});
+		seedCache(cache);
+
+		await act(async () => {
+			await user.click(screen.getByText("update"));
+		});
+
+		expect(cache.extract()).not.toEqual({});
+	});
+
 	it("logout() clears state, the cache, and signs out of Firebase", async () => {
 		const user = userEvent.setup();
 		renderWithProvider();
@@ -127,5 +203,54 @@ describe("AuthProvider", () => {
 		expect(screen.getByTestId("user")).toHaveTextContent("no-user");
 		expect(localStorage.getItem(AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE)).toBeNull();
 		expect(signOut).toHaveBeenCalled();
+	});
+});
+
+describe("one session's data never reaches the next", () => {
+	// THE REPORTED BUG, and the worst one in this codebase so far: log in as an artist, log out, log
+	// in as a shop admin, log out, log back in as the artist - and the shop admin's CLIENTS were on
+	// the artist's screen, for an artist not connected to that shop.
+	//
+	// There is one InMemoryCache, built at module load in index.jsx, and it lived as long as the
+	// browser tab. logout() cleared localStorage and Firebase and never touched it, so every
+	// normalised entity and every ROOT_QUERY field the previous session read stayed put. Apollo's
+	// default fetchPolicy is cache-first, so a query already answered for those variables is served
+	// from memory and never sent - the server's shop-scoping was never consulted, which is why no
+	// server-side test could have caught this.
+
+	it("destroys the cache when a session ends", async () => {
+		const user = userEvent.setup();
+		const { cache } = renderWithProvider();
+		await act(async () => {
+			await user.click(screen.getByText("login"));
+		});
+		seedCache(cache);
+
+		await act(async () => {
+			await user.click(screen.getByText("logout"));
+		});
+
+		expect(cache.extract()).toEqual({});
+	});
+
+	it("destroys it on signing in too, not only on signing out", async () => {
+		// Logging out is not the only way a session ends, and the wipe cannot depend on the tidy
+		// path being taken. A token expiring, a second account signing in over the first, or any
+		// sign-in route added later must not be able to inherit the previous user's data - so the
+		// rule is "any authentication event discards everything", with no exception to get wrong.
+		const user = userEvent.setup();
+		const { cache } = renderWithProvider();
+		await act(async () => {
+			await user.click(screen.getByText("login"));
+		});
+		seedCache(cache);
+
+		// Straight from one account to another. No logout in between, deliberately.
+		await act(async () => {
+			await user.click(screen.getByText("loginAsSomeoneElse"));
+		});
+
+		expect(screen.getByTestId("user")).toHaveTextContent("admin@example.com");
+		expect(cache.extract()).toEqual({});
 	});
 });
