@@ -12,9 +12,25 @@ import { prettyMessageTime, fullMessageTime } from "../../utils/messageTime";
 import { ROUTE_CONSTANTS } from "../../constants";
 import "./artistBookingRequests.css";
 
+// Which statuses each filter asks the SERVER for. Closed requests are never loaded unless the
+// artist actively asks for them - they are terminal, they accumulate for as long as someone keeps
+// working, and an inbox that only grows stops being an inbox.
+//
+// `open` sends no statuses at all rather than listing the three open ones, so the default lives in
+// exactly one place (the resolver). A list here would be a second copy, free to drift the first
+// time a status is added.
+const STATUS_FILTERS = {
+  open: { label: "Open", statuses: undefined },
+  closed: { label: "Declined & not booked", statuses: ["declined", "not_booked"] },
+  all: {
+    label: "All",
+    statuses: ["pending", "consult_booked", "session_booked", "declined", "not_booked"],
+  },
+};
+
 const GET_BOOKING_REQUESTS = gql`
-  query getBookingRequests($artistId: ID!) {
-    getBookingRequests(artistId: $artistId) {
+  query getBookingRequests($artistId: ID!, $statuses: [String!]) {
+    getBookingRequests(artistId: $artistId, statuses: $statuses) {
       id
       status
       description
@@ -120,12 +136,13 @@ const ArtistBookingRequests = () => {
   const [showReassignPicker, setShowReassignPicker] = useState(false);
   // The open request's messages, loaded on selection rather than arriving with the list.
   const [threadMessages, setThreadMessages] = useState([]);
+  const [statusFilter, setStatusFilter] = useState("open");
   const messageInput = useRef();
 
   const shopId = user.userInfo?.shop?.id;
 
   const { data, loading, error, refetch } = useQuery(GET_BOOKING_REQUESTS, {
-    variables: { artistId: user.id },
+    variables: { artistId: user.id, statuses: STATUS_FILTERS[statusFilter].statuses },
   });
 
   // Only meaningful when the caller has a shop - an independent artist has no shop-mates to
@@ -329,8 +346,31 @@ const ArtistBookingRequests = () => {
     <div className="artistBookingRequests">
       <div className="bookingRequestsList">
         <h3 className="bookingRequestsListTitle">Booking Requests</h3>
+        {/* Changing this changes the QUERY, not a client-side filter - closed requests are never
+            fetched until they're asked for. */}
+        <select
+          className="bookingRequestsFilter"
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value);
+            // The selected request may not exist in the new list. Clearing lets the render fall
+            // back to the first of whatever comes back, rather than showing a detail pane for a
+            // request that is no longer listed beside it.
+            setSelectedId(null);
+          }}
+        >
+          {Object.entries(STATUS_FILTERS).map(([key, { label }]) => (
+            <option key={key} value={key}>
+              {label}
+            </option>
+          ))}
+        </select>
         {requests.length === 0 && (
-          <div className="bookingRequestsEmpty">No booking requests yet.</div>
+          <div className="bookingRequestsEmpty">
+            {statusFilter === "open"
+              ? "No open booking requests."
+              : "Nothing here."}
+          </div>
         )}
         {requests.map((req) => (
           <div

@@ -964,7 +964,13 @@ module.exports = gql`
     # enumerate every artist on the platform at speed.
     checkBookingSlugAvailable(slug: String!): BookingSlugAvailability!
     # Artist-only (withAuth) - the artist's own dashboard list, not the guest-facing side.
-    getBookingRequests(artistId: ID!): [BookingRequest]
+    # statuses omitted means the OPEN ones - pending, consult_booked, session_booked. Requests that
+    # ended (declined, not_booked) are not loaded unless asked for by name, because they accumulate
+    # forever and an inbox that grows without bound stops being an inbox.
+    #
+    # A list rather than a boolean: "open", "closed" and "everything" are all just different lists,
+    # and a flag would need a second flag the first time somebody wants one specific status.
+    getBookingRequests(artistId: ID!, statuses: [String!]): [BookingRequest]
     getBookingRequest(bookingRequestId: ID!): BookingRequest
     # Public, token-gated (not withAuth) - resolves a guest's magic link to their own request.
     # See utils/guest-auth.js.

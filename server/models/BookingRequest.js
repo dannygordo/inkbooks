@@ -1,5 +1,22 @@
 const mongoose = require('mongoose');
 
+// Written once, used by the schema enum AND by the query that filters on it. Two copies of a list
+// of statuses is two chances for a filter to silently exclude a value that really exists - and
+// Mongo returns an empty set rather than an error when you filter on something impossible, so that
+// mistake reads as "no results" rather than as a bug.
+const BOOKING_REQUEST_STATUSES = [
+  'pending',
+  'consult_booked',
+  'session_booked',
+  'declined',
+  'not_booked',
+];
+
+// The ones still live in the funnel. declined and not_booked are terminal - they never move again,
+// they accumulate forever, and loading them by default would grow the artist's inbox without bound.
+// They remain reachable by asking for them explicitly (see getBookingRequests).
+const OPEN_BOOKING_REQUEST_STATUSES = ['pending', 'consult_booked', 'session_booked'];
+
 // See PRODUCTION_ROADMAP.md's "Booking request & guest correspondence" section for the full
 // design this implements.
 //
@@ -37,7 +54,7 @@ const BookingRequestSchema = new mongoose.Schema(
       type: String,
       required: true,
       default: 'pending',
-      enum: ['pending', 'consult_booked', 'session_booked', 'declined', 'not_booked'],
+      enum: BOOKING_REQUEST_STATUSES,
     },
     description: { type: String, required: true },
     // Plain URL strings, not [IBImageSchema] - see the matching comment in graphql/typeDefs.js
@@ -75,4 +92,11 @@ const BookingRequestSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model('BookingRequest', BookingRequestSchema);
+const BookingRequest = mongoose.model('BookingRequest', BookingRequestSchema);
+
+// Attached to the model rather than exported separately, so `require('../models/BookingRequest')`
+// keeps returning the model itself and every existing call site is untouched.
+BookingRequest.STATUSES = BOOKING_REQUEST_STATUSES;
+BookingRequest.OPEN_STATUSES = OPEN_BOOKING_REQUEST_STATUSES;
+
+module.exports = BookingRequest;

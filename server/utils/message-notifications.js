@@ -23,9 +23,13 @@ const { readRowFor, markConversationNotified } = require('./conversation-reads')
  * something the caller has to know.
  */
 
-// An artist replying four times in a row is one notification, not four. Slack, Intercom and every
+// Someone replying four times in a row is one notification, not four. Slack, Intercom and every
 // other tool that got this wrong once converge on the same idea: past the first message, the
 // recipient already knows there's a conversation waiting.
+//
+// APPLIES TO PEOPLE WITH ACCOUNTS ONLY. See the comment at the point of use - a guest whose only
+// route back is the emailed magic link is emailed every single time, because for them a
+// suppressed email is a suppressed message.
 //
 // Fifteen minutes is a guess, and deliberately a single named constant rather than a number buried
 // in a condition, so it's one edit if it turns out to be wrong.
@@ -97,11 +101,6 @@ async function notifyNewMessage({
 
   for (const recipientId of recipientIds) {
     try {
-      if (!shouldNotify(conversation, recipientId, now)) {
-        results.push({ userId: String(recipientId), outcome: 'throttled' });
-        continue;
-      }
-
       const recipient = await User.findById(recipientId);
       if (!recipient || !recipient.email) {
         results.push({ userId: String(recipientId), outcome: 'no-email' });
@@ -122,6 +121,23 @@ async function notifyNewMessage({
             )
           : null;
         guestToken = bookingRequest ? bookingRequest.guestToken : null;
+      }
+
+      // THE THROTTLE APPLIES ONLY TO PEOPLE WHO HAVE ANOTHER WAY TO FIND OUT.
+      //
+      // This check used to come first, and applied to everyone. That was wrong for the person it
+      // mattered most for. An artist who misses an email still has the app: a bell, a nav badge,
+      // a per-thread count, an inbox. Suppressing their fourth email in ten minutes costs them
+      // nothing. A guest client has NONE of that. Email is not a notification about the
+      // conversation, it IS the conversation - the magic link is the only door they have. A
+      // suppressed email is a message they may simply never learn exists.
+      //
+      // So it is keyed off the same reachability question that already decides WHICH email to
+      // send, rather than being a second, independent policy that could disagree with it. Same
+      // principle as the branch below: what someone can reach, not what role they hold.
+      if (!guestToken && !shouldNotify(conversation, recipientId, now)) {
+        results.push({ userId: String(recipientId), outcome: 'throttled' });
+        continue;
       }
 
       if (guestToken) {

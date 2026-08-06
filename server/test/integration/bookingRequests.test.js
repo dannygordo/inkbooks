@@ -42,8 +42,8 @@ const CREATE_BOOKING_REQUEST = `
 `;
 
 const GET_BOOKING_REQUESTS = `
-	query GetBookingRequests($artistId: ID!) {
-		getBookingRequests(artistId: $artistId) {
+	query GetBookingRequests($artistId: ID!, $statuses: [String!]) {
+		getBookingRequests(artistId: $artistId, statuses: $statuses) {
 			id
 			status
 			source
@@ -724,6 +724,92 @@ describe('getBookingRequests', () => {
 		expect(errors).toBeUndefined();
 		expect(data.getBookingRequests).toHaveLength(1);
 		expect(data.getBookingRequests[0].source).toBe('public_form');
+	});
+
+	// declined and not_booked are terminal - nothing ever moves them again, and they accumulate for
+	// as long as the artist keeps working. Loading them by default turns the inbox into an archive.
+	describe('the status filter', () => {
+		async function artistWithOneOfEachStatus() {
+			const { user: artistUser } = await createArtistUser();
+			const server = createTestServer();
+			for (const status of [
+				'pending',
+				'consult_booked',
+				'session_booked',
+				'declined',
+				'not_booked',
+			]) {
+				const res = await server.executeOperation(
+					{
+						query: CREATE_BOOKING_REQUEST,
+						variables: { bookingRequestInput: bookingInput(artistUser.id) },
+					},
+					{ contextValue: { req: { headers: {}, ip: fakeIp() } } },
+				);
+				// Set directly rather than driving each one through convertBookingRequest - that
+				// mutation enforces a transition order, and this test is about the QUERY.
+				await BookingRequest.findByIdAndUpdate(
+					res.body.singleResult.data.createBookingRequest.id,
+					{ status },
+				);
+			}
+			return { artistUser, server };
+		}
+
+		async function fetch(server, artistUser, statuses) {
+			const response = await server.executeOperation(
+				{ query: GET_BOOKING_REQUESTS, variables: { artistId: artistUser.id, statuses } },
+				{ contextValue: contextWithToken(signTestToken(artistUser)) },
+			);
+			return response.body.singleResult;
+		}
+
+		it('leaves the closed ones out by default', async () => {
+			const { artistUser, server } = await artistWithOneOfEachStatus();
+			const { errors, data } = await fetch(server, artistUser);
+
+			expect(errors).toBeUndefined();
+			expect(data.getBookingRequests.map((r) => r.status).sort()).toEqual([
+				'consult_booked',
+				'pending',
+				'session_booked',
+			]);
+		});
+
+		it('returns them when they are asked for by name', async () => {
+			const { artistUser, server } = await artistWithOneOfEachStatus();
+			const { data } = await fetch(server, artistUser, ['declined', 'not_booked']);
+
+			expect(data.getBookingRequests.map((r) => r.status).sort()).toEqual([
+				'declined',
+				'not_booked',
+			]);
+		});
+
+		it('can be asked for everything at once', async () => {
+			const { artistUser, server } = await artistWithOneOfEachStatus();
+			const { data } = await fetch(server, artistUser, [
+				'pending',
+				'consult_booked',
+				'session_booked',
+				'declined',
+				'not_booked',
+			]);
+
+			expect(data.getBookingRequests).toHaveLength(5);
+		});
+
+		it('rejects a status that does not exist instead of returning nothing', async () => {
+			// THE test here. Mongo filters happily on an impossible value and returns an empty set,
+			// so a typo'd status would read as "this artist has no requests" - indistinguishable
+			// from the truth, and the artist would simply stop seeing their own inbox. Same
+			// silent-empty-set trap as querying Staff for a role field it does not carry.
+			const { artistUser, server } = await artistWithOneOfEachStatus();
+			const { errors } = await fetch(server, artistUser, ['pending', 'canceled']);
+
+			expect(errors).toBeDefined();
+			expect(errors[0].message).toMatch(/Errors/);
+		});
 	});
 });
 

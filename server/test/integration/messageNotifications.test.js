@@ -176,9 +176,15 @@ describe('which email goes out', () => {
 });
 
 describe('when we stay quiet', () => {
-	it('sends once for a burst, not once per message', async () => {
-		// An artist typing four short messages in a row is one notification. Past the first, the
-		// recipient already knows there is a conversation waiting.
+	it('emails a guest EVERY time, with no throttle at all', async () => {
+		// THE test in this file.
+		//
+		// A guest has no app: no bell, no badge, no inbox. The emailed magic link is their only
+		// route into the conversation, so a suppressed email is not a suppressed notification
+		// about a message - it is a suppressed message. They may never learn it exists.
+		//
+		// This used to throttle everyone identically, which meant an artist sending three quick
+		// follow-ups delivered one of them and silently dropped two.
 		const { artist, conversation } = await guestThread();
 		const { sendToGuest, sendToArtist } = senders();
 		const args = { conversationId: conversation._id, senderId: artist.id, sendToGuest, sendToArtist };
@@ -187,24 +193,46 @@ describe('when we stay quiet', () => {
 		const second = await notifyNewMessage(args);
 		const third = await notifyNewMessage(args);
 
+		expect([first[0].outcome, second[0].outcome, third[0].outcome]).toEqual([
+			'sent',
+			'sent',
+			'sent',
+		]);
+		expect(sendToGuest.calls).toHaveLength(3);
+		// Every one of them carries the way back in. An email about a conversation a guest cannot
+		// reach is worse than no email.
+		expect(sendToGuest.calls.every((c) => !!c.guestToken)).toBe(true);
+	});
+
+	it('does throttle a burst at someone who has the app', async () => {
+		// The other half of the asymmetry. An artist who misses an email still has a bell, a nav
+		// badge and a per-thread count, so suppressing the fourth email in ten minutes costs them
+		// nothing - which is exactly what makes it safe here and unsafe above.
+		const { artist, client, conversation } = await accountThread();
+		const { sendToGuest, sendToArtist } = senders();
+		const args = { conversationId: conversation._id, senderId: client.id, sendToGuest, sendToArtist };
+
+		const first = await notifyNewMessage(args);
+		const second = await notifyNewMessage(args);
+
+		expect(first[0].userId).toBe(String(artist.id));
 		expect(first[0].outcome).toBe('sent');
 		expect(second[0].outcome).toBe('throttled');
-		expect(third[0].outcome).toBe('throttled');
-		expect(sendToGuest.calls).toHaveLength(1);
+		expect(sendToArtist.calls).toHaveLength(1);
 	});
 
 	it('speaks up again once the throttle window has passed', async () => {
-		const { artist, guest, conversation } = await guestThread();
+		const { artist, client, conversation } = await accountThread();
 		const { sendToGuest, sendToArtist } = senders();
 
 		await markConversationNotified(
 			conversation._id,
-			guest.id,
+			artist.id,
 			new Date(Date.now() - NOTIFY_THROTTLE_MS - 1000),
 		);
 		const results = await notifyNewMessage({
 			conversationId: conversation._id,
-			senderId: artist.id,
+			senderId: client.id,
 			sendToGuest,
 			sendToArtist,
 		});
@@ -216,16 +244,16 @@ describe('when we stay quiet', () => {
 		// Someone who has caught up and then receives a new message is in the same position as
 		// someone being told for the first time. Staying quiet because we happened to email them
 		// ten minutes ago would drop a genuinely new notification.
-		const { artist, guest, conversation } = await guestThread();
+		const { artist, client, conversation } = await accountThread();
 		const { sendToGuest, sendToArtist } = senders();
-		const args = { conversationId: conversation._id, senderId: artist.id, sendToGuest, sendToArtist };
+		const args = { conversationId: conversation._id, senderId: client.id, sendToGuest, sendToArtist };
 
 		await notifyNewMessage(args);
-		await markConversationRead(conversation._id, guest.id);
+		await markConversationRead(conversation._id, artist.id);
 		const afterReading = await notifyNewMessage(args);
 
 		expect(afterReading[0].outcome).toBe('sent');
-		expect(sendToGuest.calls).toHaveLength(2);
+		expect(sendToArtist.calls).toHaveLength(2);
 	});
 
 	it('reports a recipient with no email rather than silently doing nothing', async () => {

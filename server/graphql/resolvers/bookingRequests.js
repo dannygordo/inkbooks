@@ -68,12 +68,30 @@ module.exports = {
     // artist scheduled directly from their own calendar - those were never a "booking request"
     // from the artist's own point of view and shouldn't be echoed back at them in this inbox. See
     // BookingRequest.js's own comment on the source field.
-    getBookingRequests: withAuth(async (_, { artistId }, context, info, user) => {
+    getBookingRequests: withAuth(async (_, { artistId, statuses }, context, info, user) => {
       // The artist themselves, or a shop admin at their shop. Previously any shop admin, at any
       // shop, could read an artist's whole inbox - each request carries a client's name, email
       // and the description of the work they want.
       await assertCanManageArtist(user, artistId);
-      return BookingRequest.find({ artistId, source: 'public_form' }).sort({ createdAt: -1 });
+
+      // Validated against the enum rather than passed straight through. Mongo will happily filter
+      // on a value that cannot exist and return an empty set instead of complaining, so a typo'd
+      // status would look exactly like "this artist has no requests" - the same silent-empty-set
+      // trap as querying Staff for a role field it doesn't have (see notification-audience.js).
+      const requested = (statuses || []).filter((s) => BookingRequest.STATUSES.includes(s));
+      if (statuses && requested.length !== statuses.length) {
+        throw new UserInputError('Errors', {
+          errors: {
+            statuses: `Unknown status. Valid values: ${BookingRequest.STATUSES.join(', ')}`,
+          },
+        });
+      }
+
+      return BookingRequest.find({
+        artistId,
+        source: 'public_form',
+        status: { $in: requested.length > 0 ? requested : BookingRequest.OPEN_STATUSES },
+      }).sort({ createdAt: -1 });
     }),
     getBookingRequest: withAuth(async (_, { bookingRequestId }, context, info, user) => {
       const bookingRequest = await BookingRequest.findById(bookingRequestId);
