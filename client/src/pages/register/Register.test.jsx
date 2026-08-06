@@ -13,7 +13,7 @@ import React from "react";
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { MockedProvider } from "@apollo/client/testing";
 import { gql } from "@apollo/client";
 import Register from "./Register";
@@ -173,21 +173,29 @@ describe("Register wizard", () => {
 		// The other half of removing the route guard. A live session visiting /register should still
 		// end up in the app - that redirect just has to live in the component now, decided once at
 		// mount, so it cannot fire again when step 2 logs the new account in.
+		//
+		// Rendered inside REAL ROUTES, unlike every other test in this file. Those render <Register />
+		// directly, which is fine for testing the wizard but useless here: navigate() has nothing to
+		// swap to, so the component stays mounted and an assertion that the wizard disappeared can
+		// never pass no matter how correct the redirect is. This mounts a destination so the
+		// navigation has somewhere to land and the test observes routing rather than the absence of
+		// a DOM node.
 		const contextValue = { login: vi.fn(), user: { id: "already-here" } };
 		render(
-			<MemoryRouter>
+			<MemoryRouter initialEntries={["/register"]}>
 				<MockedProvider mocks={[]}>
 					<AuthContext.Provider value={contextValue}>
-						<Register />
+						<Routes>
+							<Route path="/register" element={<Register />} />
+							<Route path="/" element={<div>dashboard stand-in</div>} />
+						</Routes>
 					</AuthContext.Provider>
 				</MockedProvider>
 			</MemoryRouter>,
 		);
 
-		// Redirected away, so the wizard's first question never appears.
-		await waitFor(() =>
-			expect(screen.queryByText("I run a shop")).not.toBeInTheDocument(),
-		);
+		expect(await screen.findByText("dashboard stand-in")).toBeInTheDocument();
+		expect(screen.queryByText("I run a shop")).not.toBeInTheDocument();
 	});
 
 	it("never lets the browser prefill a saved password", async () => {
