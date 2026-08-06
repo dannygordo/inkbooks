@@ -17,7 +17,9 @@ const {
 	createStaffUser,
 	createArtistUser,
 	createClientUser,
+	createUser,
 } = require('../helpers/factories');
+const { Constants } = require('../../utils/constants');
 const User = require('../../models/User');
 const Artist = require('../../models/Artist');
 const Staff = require('../../models/Staff');
@@ -147,6 +149,69 @@ describe('createArtistAccount', () => {
 		expect(String(connection.shopId)).toBe(String(shop.id));
 	});
 
+	it('connects the artist to the creating admin\'s shop when no shopId is sent', async () => {
+		// THE regression this guards. Both wizards read shopId out of the login payload cached in
+		// the browser (user.userInfo?.shop?.id). When that was empty - a stale session, a login
+		// query that didn't select it, a shop admin whose Staff row was incomplete - the mutation
+		// took `input.shopId || null`, skipped the connection block, and RETURNED SUCCESS. The
+		// artist existed and appeared in no directory, no calendar, no ledger.
+		//
+		// The creator is a shop admin by definition here, so the server can answer this itself.
+		const { user: admin, shop } = await createShopAdminUser();
+		const server = createTestServer();
+
+		const res = await server.executeOperation(
+			{
+				query: CREATE_ARTIST,
+				variables: {
+					input: {
+						firstName: 'Nolan',
+						lastName: 'Reyes',
+						email: 'nolan@example.com',
+						// No shopId, deliberately.
+					},
+				},
+			},
+			asUser(admin),
+		);
+		expect(res.body.singleResult.errors).toBeUndefined();
+
+		const created = await User.findOne({ email: 'nolan@example.com' });
+		const connection = await ArtistShopConnection.findOne({ artistId: created._id });
+		expect(connection).toBeTruthy();
+		expect(String(connection.shopId)).toBe(String(shop.id));
+		expect(connection.status).toBe('active');
+	});
+
+	it('refuses rather than creating an artist belonging to no shop', async () => {
+		// A creator with no shop of their own - the seeded platform admin is exactly this: a User
+		// with userType STAFF and deliberately no Staff record. Previously this produced an
+		// unconnected artist and no error. Failing loudly is the only useful outcome; an artist
+		// nobody can see is not a thing worth creating quietly.
+		const platformAdmin = await createUser({
+			role: Constants.ROLES.SHOP_ADMIN,
+			userType: Constants.USER_TYPE.STAFF,
+		});
+		const server = createTestServer();
+
+		const res = await server.executeOperation(
+			{
+				query: CREATE_ARTIST,
+				variables: {
+					input: {
+						firstName: 'Orphan',
+						lastName: 'Artist',
+						email: 'orphan@example.com',
+					},
+				},
+			},
+			asUser(platformAdmin),
+		);
+
+		expect(res.body.singleResult.errors).toBeDefined();
+		expect(await User.findOne({ email: 'orphan@example.com' })).toBeNull();
+	});
+
 	it('gives the new artist a real tag colour, unique within the shop', async () => {
 		const { user: admin, shop } = await createShopAdminUser();
 		const { user: existing } = await createArtistUser({ tagColor: '#2ea2dc' });
@@ -237,6 +302,35 @@ describe('createArtistAccount', () => {
 });
 
 describe('createStaffAccount', () => {
+	it("lands staff in the creating admin's shop when no shopId is sent", async () => {
+		// The staff half of the same problem, with a different symptom. CreateStaffAccountInput.shopId
+		// was ID!, so an empty cached shop id in the browser failed GraphQL VALIDATION before the
+		// resolver ran - an unactionable error rather than a silent orphan, but equally a dead end,
+		// and it made the answer the server already had unreachable.
+		const { user: admin, shop } = await createShopAdminUser();
+		const server = createTestServer();
+
+		const res = await server.executeOperation(
+			{
+				query: CREATE_STAFF,
+				variables: {
+					input: {
+						firstName: 'Dani',
+						lastName: 'Okafor',
+						email: 'dani@example.com',
+						// No shopId, deliberately.
+					},
+				},
+			},
+			asUser(admin),
+		);
+		expect(res.body.singleResult.errors).toBeUndefined();
+
+		const staff = await Staff.findOne({ email: 'dani@example.com' });
+		expect(staff).toBeTruthy();
+		expect(String(staff.shopId)).toBe(String(shop.id));
+	});
+
 	it('creates staff at SHOP_STAFF, never shop admin', async () => {
 		// Promoting someone to admin has real consequences - shop-wide financials, the ability to
 		// create more accounts - and shouldn't be reachable from a create form a shop admin fills

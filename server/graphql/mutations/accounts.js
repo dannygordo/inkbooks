@@ -5,7 +5,11 @@ const Staff = require('../../models/Staff');
 const Client = require('../../models/Client');
 const ArtistShopConnection = require('../../models/ArtistShopConnection');
 const withAuth = require('../../utils/with-auth');
-const { assertCanAccessShop, linkClientToUsersShops } = require('../../utils/shop-membership');
+const {
+  assertCanAccessShop,
+  linkClientToUsersShops,
+  getShopIdsForUser,
+} = require('../../utils/shop-membership');
 const { Constants } = require('../../utils/constants');
 const { UserInputError, rethrow } = require('../../utils/errors');
 const { issuePasswordToken, generateUnusablePassword } = require('../../utils/password-tokens');
@@ -101,6 +105,47 @@ async function createUserWithInvite({ firstName, lastName, email, role, userType
   return { user, inviteLink: buildSetPasswordLink(rawToken) };
 }
 
+/**
+ * Which shop a newly created artist or staff member belongs to.
+ *
+ * DERIVED FROM THE CREATOR, not taken on faith from the client.
+ *
+ * Both wizards sent `shopId: user.userInfo?.shop?.id` - read out of the login payload cached in the
+ * browser. That works right up until it doesn't, and when it doesn't it fails SILENTLY: an absent
+ * shopId meant `shopId = input.shopId || null`, the connection block was skipped, and the mutation
+ * returned success. The artist existed and appeared nowhere - not the directory, not the shop
+ * calendar, not analytics, not the shop-cut ledger, all of which resolve membership through
+ * ArtistShopConnection. "Created successfully, invisible everywhere" is the worst possible outcome
+ * and the one that required no error to produce it.
+ *
+ * The creator IS a shop admin - that is enforced by withAuth on both mutations - so their shop is
+ * knowable here, from the same membership source everything else uses. An explicit input.shopId
+ * still wins (a platform admin with no shop of their own has to say which one), it just stops being
+ * the only way to get an answer.
+ *
+ * Throws rather than returning null. An artist or staff member created by a shop, belonging to no
+ * shop, is not a state this app has any use for.
+ */
+async function resolveShopIdForNewAccount(creator, explicitShopId) {
+  if (explicitShopId) {
+    return explicitShopId;
+  }
+  const shopIds = await getShopIdsForUser(creator.id);
+  if (shopIds.length === 0) {
+    throw new UserInputError('Errors', {
+      errors: {
+        shopId:
+          'You are not connected to a shop, so there is nowhere to add this account. Pick a shop explicitly.',
+      },
+    });
+  }
+  // A shop admin belongs to exactly one shop in practice - Staff.shopId is a single foreign key and
+  // an artist has one active connection (enforced in utils/artist-shop.js). Taking the first is
+  // therefore not a guess; if that ever stops being true, the caller has to be explicit, which is
+  // the safe direction for the failure to break in.
+  return shopIds[0];
+}
+
 module.exports = {
   /**
    * Artist + User, connected to the creating admin's shop.
@@ -121,10 +166,15 @@ module.exports = {
         }
         await assertEmailAvailable(email);
 
-        const shopId = input.shopId || null;
+        // Falls back to the creator's own shop when the client doesn't say - see
+        // resolveShopIdForNewAccount. It used to be `input.shopId || null`, and a null meant the
+        // artist was created with no connection at all and no error.
+        const shopId = await resolveShopIdForNewAccount(user, input.shopId);
         // Creating an artist attaches them to shopId and gives them a tag colour there. Without
         // this a shop admin could plant a working account, with an invite link they hold, on
-        // someone else's shop calendar.
+        // someone else's shop calendar. Still checked even when the id was derived above: the
+        // derivation and the permission are different questions, and collapsing them would mean a
+        // future change to one silently weakens the other.
         await assertCanAccessShop(user, shopId);
         const { user: newUser, inviteLink } = await createUserWithInvite({
           firstName: input.firstName,
@@ -164,13 +214,14 @@ module.exports = {
           startDate: new Date(),
         }).save();
 
-        if (shopId) {
-          await new ArtistShopConnection({
-            artistId: newUser._id,
-            shopId,
-            status: 'active',
-          }).save();
-        }
+        // Unconditional now. shopId is guaranteed by resolveShopIdForNewAccount - it either
+        // resolved one or threw - so there is no longer a path that creates an artist and quietly
+        // skips the record that makes them exist to the rest of the app.
+        await new ArtistShopConnection({
+          artistId: newUser._id,
+          shopId,
+          status: 'active',
+        }).save();
 
         return { artist, inviteLink };
       } catch (err) {
@@ -193,14 +244,14 @@ module.exports = {
             errors: { email: 'First name, last name and email are required.' },
           });
         }
-        if (!input.shopId) {
-          throw new UserInputError('Errors', {
-            errors: { shopId: 'A staff member must belong to a shop.' },
-          });
-        }
+        // Was a hard error when the client omitted shopId. Same fallback as the artist path now:
+        // the creator's own shop is the obvious answer and the server can work it out, so a stale
+        // or empty login payload in the browser stops being able to block onboarding a
+        // receptionist. Still throws when there genuinely is no shop to infer.
+        const shopId = await resolveShopIdForNewAccount(user, input.shopId);
         // Same reasoning as createArtistAccount - and staff are more sensitive, since the account
         // created here can read that shop's client list.
-        await assertCanAccessShop(user, input.shopId);
+        await assertCanAccessShop(user, shopId);
         await assertEmailAvailable(email);
 
         const { user: newUser, inviteLink } = await createUserWithInvite({
@@ -213,7 +264,9 @@ module.exports = {
           // fills in while onboarding a receptionist.
           role: Constants.ROLES.SHOP_STAFF,
           userType: Constants.USER_TYPE.STAFF,
-          shopId: input.shopId,
+          // The RESOLVED id, not input.shopId - otherwise a client that omitted it would create the
+          // Staff row against undefined while everything above had already agreed on a real shop.
+          shopId,
           createdBy: user.id,
         });
 
@@ -226,7 +279,7 @@ module.exports = {
           instagram: input.instagram || '',
           facebook: input.facebook || '',
           userId: newUser._id,
-          shopId: input.shopId,
+          shopId,
           status: Constants.STAFF_STATUS.ACTIVE,
         }).save();
 

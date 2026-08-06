@@ -759,8 +759,15 @@ module.exports = gql`
     phone: String
     instagram: String
     facebook: String
-    # Required - a staff member with no shop has nothing to administer.
-    shopId: ID!
+    # OPTIONAL at the schema level, and still required in effect - the server falls back to the
+    # creating admin's own shop and refuses if there isn't one (see resolveShopIdForNewAccount in
+    # mutations/accounts.js).
+    #
+    # It was ID!, which meant a client with an empty cached shop id failed GraphQL VALIDATION -
+    # "Variable $input got invalid value; shopId of required type ID! was not provided" - before the
+    # resolver ever ran. That's an unactionable error for a shop admin adding a receptionist, and it
+    # made the answer the server already knows unreachable.
+    shopId: ID
   }
   input CreateClientAccountInput {
     firstName: String!

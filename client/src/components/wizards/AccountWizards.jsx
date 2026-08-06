@@ -2,7 +2,6 @@ import React from "react";
 import { useMutation } from "@apollo/client";
 import EntityWizard from "./EntityWizard";
 import AccountService from "../../services/AccountService";
-import { useAuth } from "../../context/auth";
 import BookingSlugField from "../artist/BookingSlugField";
 import { suggestSlugOrBlank } from "../../utils/bookingSlug";
 import "./entityWizard.css";
@@ -93,7 +92,9 @@ export const CreateClientWizard = ({ onClose, onCreated }) => {
 };
 
 export const CreateArtistWizard = ({ onClose, onCreated }) => {
-	const { user } = useAuth();
+	// No useAuth() here any more. The only thing this wizard needed the logged-in user for was the
+	// shop id it sent, and the server works that out itself now - leaving the hook in place would
+	// suggest the browser still has a say in which shop an artist joins.
 	const [createArtistAccount] = useMutation(AccountService.CREATE_ARTIST_ACCOUNT);
 
 	const steps = [
@@ -168,10 +169,15 @@ export const CreateArtistWizard = ({ onClose, onCreated }) => {
 								(values.bookingSlug ||
 									suggestSlugOrBlank(values.firstName, values.lastName)) ||
 								undefined,
-							// The creating admin's own shop. There's no shop picker because there's
-							// no shop switcher anywhere in this app yet (see PRODUCTION_ROADMAP.md)
-							// - inventing one here would be the only place it exists.
-							shopId: user.userInfo?.shop?.id,
+							// NO shopId. The server derives it from the creating admin (see
+							// resolveShopIdForNewAccount in mutations/accounts.js).
+							//
+							// This used to send user.userInfo?.shop?.id - the shop id cached in the
+							// browser at login. Two ways that goes wrong and neither is visible
+							// here: empty, and the artist was created with no shop connection and
+							// no error; stale, and it names a shop this admin may no longer belong
+							// to, which the server refuses with "Action not allowed". The browser
+							// has no business answering a question the server can answer exactly.
 						},
 					},
 				});
@@ -191,7 +197,6 @@ export const CreateArtistWizard = ({ onClose, onCreated }) => {
 };
 
 export const CreateStaffWizard = ({ onClose, onCreated }) => {
-	const { user } = useAuth();
 	const [createStaffAccount] = useMutation(AccountService.CREATE_STAFF_ACCOUNT);
 
 	const steps = [
@@ -224,7 +229,8 @@ export const CreateStaffWizard = ({ onClose, onCreated }) => {
 			onSubmit={async (values) => {
 				const { data } = await createStaffAccount({
 					variables: {
-						input: { ...values, shopId: user.userInfo?.shop?.id },
+						// Same as the artist wizard: the server resolves the shop from the creator.
+						input: values,
 					},
 				});
 				if (onCreated) {
