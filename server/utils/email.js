@@ -58,6 +58,17 @@ async function sendEmail({ to, subject, htmlBody, textBody }) {
       );
       return null;
     }
+    // Logged on SUCCESS as well, which is not noise here - it is the only handoff point between
+    // code we can read and a system we cannot.
+    //
+    // Once Resend has accepted a message, nothing on this side knows whether it was delivered,
+    // bounced, or filtered. The id is the join key: it is what the Resend dashboard indexes by, so
+    // printing it turns "no email arrived" from an argument into a lookup. The recipient is printed
+    // beside it because "sent to the wrong address" and "sent and not delivered" look identical
+    // from in here, and they have completely different fixes.
+    console.log(
+      `[email] accepted "${subject}" to ${to} id=${data && data.id ? data.id : '(none returned)'}`,
+    );
     return data;
   } catch (err) {
     console.warn(`[email] FAILED to send "${subject}" to ${to}:`, err.message);
