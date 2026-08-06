@@ -25,6 +25,7 @@ import InputBase from "@mui/material/InputBase";
 import { useNavigate } from "react-router-dom";
 import IBAvatar from "../inputs/IBAvatar";
 import MessengerService from "../../services/MessengerService";
+import { usePendingBookingRequestCount } from "../../services/BookingRequestService";
 import NotificationBell from "../notifications/NotificationBell";
 import {
 	AccountBox,
@@ -217,11 +218,12 @@ export default function Sidebar() {
 	// IBChatBox updates it immediately when the messenger itself is open.
 	const { data: unreadData } = MessengerService.useUnreadMessageCount();
 	const unreadMessageCount = unreadData?.getUnreadMessageCount || 0;
-	// Booking-request threads that Messenger deliberately doesn't show. These two counts are
-	// disjoint by construction - one query excludes exactly what the other includes - so together
-	// they still account for every unread message rather than double-counting any.
-	const { data: unreadBookingData } = MessengerService.useUnreadBookingRequestCount();
-	const unreadBookingRequestCount = unreadBookingData?.getUnreadBookingRequestCount || 0;
+	// Requests still awaiting a decision - NOT unread messages, which is what this badge used to
+	// count and which made it clear the moment you opened a request you still hadn't answered. It
+	// also read zero for a new request, since createBookingRequest writes no message at all. This
+	// only moves when a request's status moves. See services/BookingRequestService.js.
+	const { data: pendingBookingData } = usePendingBookingRequestCount();
+	const pendingBookingRequestCount = pendingBookingData?.getPendingBookingRequestCount || 0;
 
 	const [anchorEl, setAnchorEl] = useState(null);
 	const openProfile = Boolean(anchorEl);
@@ -814,7 +816,7 @@ export default function Sidebar() {
 								{/* On the icon, same as Messenger's - it has to survive the drawer
 								    collapsing, which is the moment the label disappears and the
 								    badge is the only thing left saying somebody is waiting. */}
-								<Badge badgeContent={unreadBookingRequestCount} color="error">
+								<Badge badgeContent={pendingBookingRequestCount} color="error">
 									<InboxIcon />
 								</Badge>
 							</ListItemIcon>

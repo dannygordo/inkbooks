@@ -69,14 +69,11 @@ const IBChatBox = ({ widget, conversation, setActiveMessages, messages, isInputD
 	const apollo = useApolloClient();
 	const refetchUnread = useCallback(() => {
 		apollo.refetchQueries({
-			// Both section badges, because a message can land in either and this component is
-			// mounted in both the messenger and the project widget. Refetching only the messages
-			// count would leave the booking-request badge stale.
-			include: [
-				"GetUnreadMessageCount",
-				"GetUnreadBookingRequestCount",
-				"GetConversationsByMemberId",
-			],
+			// The Booking Requests badge is deliberately NOT here. It counts requests awaiting a
+			// decision, not unread messages, so a message arriving cannot change it - see
+			// services/BookingRequestService.js. This used to refetch it, back when the two badges
+			// measured the same thing.
+			include: ["GetUnreadMessageCount", "GetConversationsByMemberId"],
 		});
 	}, [apollo]);
 

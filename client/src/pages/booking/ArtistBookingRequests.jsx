@@ -6,6 +6,7 @@ import moment from "moment";
 import { useAuth } from "../../context/auth";
 import { ArtistService } from "../../services/ArtistService";
 import MessengerService from "../../services/MessengerService";
+import { BOOKING_BADGE_REFETCH } from "../../services/BookingRequestService";
 import Pager from "../../components/pagination/Pager";
 import IBDateTimePicker from "../../components/inputs/IBDateTimePicker";
 import BookSessionDatesForm from "../../components/booking/BookSessionDatesForm";
@@ -187,11 +188,15 @@ const ArtistBookingRequests = () => {
     MessengerService.fetchMessagesByConversationId();
 
   // Opening a request reads its thread, exactly as opening a conversation does in the messenger.
-  // Without this the Booking Requests badge would count messages the artist is looking at and
-  // never come down - a badge that cannot be cleared is one people learn to ignore, which defeats
-  // the whole point of adding it.
+  //
+  // This no longer touches the Booking Requests badge, and that is the fix rather than an
+  // oversight. The badge used to count unread messages, so reading a thread cleared it - which
+  // meant the number telling an artist somebody was waiting disappeared the instant they glanced
+  // at a request they still hadn't decided on. It counts PENDING REQUESTS now, so only a decision
+  // moves it. The Messages count is still refetched: a request that has been BOOKED has its thread
+  // back in Messages, and reading it there does lower that badge.
   const [markConversationRead] = useMutation(MessengerService.MARK_CONVERSATION_READ, {
-    refetchQueries: ["GetUnreadBookingRequestCount", "GetUnreadMessageCount"],
+    refetchQueries: ["GetUnreadMessageCount"],
   });
 
   const refreshThread = useCallback(() => {
@@ -250,6 +255,11 @@ const ArtistBookingRequests = () => {
   });
 
   const [convertBookingRequest, { loading: converting }] = useMutation(CONVERT_BOOKING_REQUEST, {
+    // THE ONE MUTATION THAT MOVES A REQUEST OUT OF PENDING - booking it as a consult or a session,
+    // declining it, or marking it not booked all come through here with a different outcome. So
+    // this is where the nav badge has to be told, and refetch() below is not enough: that reloads
+    // this page's list, and the badge is a separate query on a component mounted everywhere.
+    refetchQueries: BOOKING_BADGE_REFETCH,
     onCompleted() {
       setConvertError(null);
       setPendingOutcome(null);

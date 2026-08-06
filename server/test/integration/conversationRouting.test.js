@@ -31,8 +31,10 @@ const UNREAD_MESSAGES = `
 	query GetUnreadMessageCount { getUnreadMessageCount }
 `;
 
-const UNREAD_BOOKING = `
-	query GetUnreadBookingRequestCount { getUnreadBookingRequestCount }
+// Requests awaiting a DECISION - not unread messages in their threads, which is what this badge
+// used to count. See utils/booking-inbox.js for why that was the wrong question.
+const PENDING_REQUESTS = `
+	query GetPendingBookingRequestCount { getPendingBookingRequestCount }
 `;
 
 const CREATE_MESSAGE = `
@@ -89,12 +91,20 @@ async function conversationIdsFor(server, user) {
 	return res.body.singleResult.data.getConversationsByMemberId.map((c) => c.id);
 }
 
+/**
+ * The two numbers in the sidebar.
+ *
+ * THEY MEASURE DIFFERENT THINGS, and that is the point rather than an inconsistency. `messages` is
+ * unread messages; `pending` is requests awaiting a decision. Adding them together would be
+ * meaningless - an earlier version of this file asserted `messages + booking === 3` back when both
+ * counted messages, and that invariant is gone along with the count it described.
+ */
 async function counts(server, user) {
 	const messages = await server.executeOperation({ query: UNREAD_MESSAGES }, asUser(user));
-	const booking = await server.executeOperation({ query: UNREAD_BOOKING }, asUser(user));
+	const pending = await server.executeOperation({ query: PENDING_REQUESTS }, asUser(user));
 	return {
 		messages: messages.body.singleResult.data.getUnreadMessageCount,
-		booking: booking.body.singleResult.data.getUnreadBookingRequestCount,
+		pending: pending.body.singleResult.data.getPendingBookingRequestCount,
 	};
 }
 
@@ -180,9 +190,10 @@ describe('which section owns a thread', () => {
 });
 
 describe('the two badges', () => {
-	it('splits unread between them without double counting', async () => {
-		// Disjoint by construction - one query excludes exactly what the other includes - so the
-		// two together still account for every unread message and neither counts one twice.
+	it('counts unread only on threads Messages will actually show', async () => {
+		// The Messages badge still has to exclude exactly what the Messages list excludes. Two
+		// unread messages on a pending request and one on a booked request, and only the booked one
+		// is counted - because only the booked one's thread appears in that list.
 		const { user: artist } = await createArtistUser();
 		const { user: client } = await createClientUser();
 		const { conversation: pending } = await requestAtStatus(artist, client, 'pending');
@@ -193,10 +204,60 @@ describe('the two badges', () => {
 		await say(server, client, pending._id, 'any update?');
 		await say(server, client, booked._id, 'see you tuesday');
 
-		const { messages, booking } = await counts(server, artist);
-		expect(booking).toBe(2);
+		const { messages, pending: pendingCount } = await counts(server, artist);
 		expect(messages).toBe(1);
-		expect(messages + booking).toBe(3);
+		// Three messages arrived and the pending count didn't move. It counts REQUESTS - one of the
+		// two here is still awaiting a decision - so no amount of talking changes it.
+		expect(pendingCount).toBe(1);
+	});
+
+	it('badges a brand new request that nobody has said anything on', async () => {
+		// THE REPORTED BUG, and the reason the old badge was replaced rather than repaired.
+		// createBookingRequest writes a Conversation and a BookingRequest but NO Message - the
+		// intake text lives on the request itself - so a count of unread MESSAGES was structurally
+		// zero for exactly the event the badge exists to announce. Note there is no say() call
+		// here: that absence is the test.
+		const { user: artist } = await createArtistUser();
+		const { user: client } = await createClientUser();
+		await requestAtStatus(artist, client, 'pending');
+		const server = createTestServer();
+
+		expect(await counts(server, artist)).toEqual({ messages: 0, pending: 1 });
+	});
+
+	it('does not count a request the artist raised for their own calendar', async () => {
+		// source: 'artist_created' is the appointment wizard booking a walk-in. It is a record of
+		// something already done, not a lead to triage, and getBookingRequests excludes it - so
+		// badging it would point at a page that will not list it.
+		const { user: artist } = await createArtistUser();
+		const { user: client } = await createClientUser();
+		await requestAtStatus(artist, client, 'pending', { source: 'artist_created' });
+		const server = createTestServer();
+
+		expect((await counts(server, artist)).pending).toBe(0);
+	});
+
+	it('does not badge one artist for another artist requests', async () => {
+		const { user: artist } = await createArtistUser();
+		const { user: other } = await createArtistUser();
+		const { user: client } = await createClientUser();
+		await requestAtStatus(other, client, 'pending');
+		const server = createTestServer();
+
+		expect((await counts(server, artist)).pending).toBe(0);
+	});
+
+	it('stops counting a request that was declined or marked not booked', async () => {
+		// Closed requests leave the count even though their threads stay in the Booking Requests
+		// section behind a filter. The badge is "what do I owe an answer on", and a declined
+		// request has had its answer.
+		const { user: artist } = await createArtistUser();
+		const { user: client } = await createClientUser();
+		await requestAtStatus(artist, client, 'declined');
+		await requestAtStatus(artist, client, 'not_booked');
+		const server = createTestServer();
+
+		expect((await counts(server, artist)).pending).toBe(0);
 	});
 
 	it('never counts what its own list will not show', async () => {
@@ -215,14 +276,17 @@ describe('the two badges', () => {
 		expect(messages).toBe(0);
 	});
 
-	it('moves a thread between the two counts when the request gets booked', async () => {
+	it('hands the thread over to Messages when the request gets booked', async () => {
+		// Both badges move on the same event, in opposite directions: the request stops awaiting a
+		// decision, and its thread stops being hidden from Messages. That handover is the whole
+		// reason a thread has exactly one home - see utils/conversation-routing.js.
 		const { user: artist } = await createArtistUser();
 		const { user: client } = await createClientUser();
 		const { conversation, bookingRequest } = await requestAtStatus(artist, client, 'pending');
 		const server = createTestServer();
 
 		await say(server, client, conversation._id, 'can we book something?');
-		expect(await counts(server, artist)).toEqual({ messages: 0, booking: 1 });
+		expect(await counts(server, artist)).toEqual({ messages: 0, pending: 1 });
 
 		await BookingRequest.findByIdAndUpdate(bookingRequest._id, { status: 'consult_booked' });
 
@@ -230,7 +294,7 @@ describe('the two badges', () => {
 		// fresh context - and therefore fresh loaders - on every call, exactly as index.js does.
 		// Checked rather than assumed; a per-server cache here would have made this test pass on
 		// stale data and hidden the very thing it is asserting.
-		expect(await counts(server, artist)).toEqual({ messages: 1, booking: 0 });
+		expect(await counts(server, artist)).toEqual({ messages: 1, pending: 0 });
 	});
 });
 

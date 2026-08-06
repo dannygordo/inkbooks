@@ -108,6 +108,11 @@ const AppointmentWizard = ({ selectedDay }) => {
 	const [createBookingRequest] = useMutation(
 		BookingRequestService.CREATE_BOOKING_REQUEST_MUTATION
 	);
+	// NO BOOKING_BADGE_REFETCH here, unlike the other two callers of this mutation, and deliberately
+	// so. This wizard creates its own request with source: 'artist_created' and converts it in the
+	// same breath - such a request is never in the pending inbox (see utils/booking-inbox.js), so
+	// the badge cannot have changed. Refetching would be a query that can only ever return the same
+	// number, and it would suggest to the next reader that this path does affect the inbox.
 	const [convertBookingRequest] = useMutation(
 		BookingRequestService.CONVERT_BOOKING_REQUEST_MUTATION
 	);

@@ -113,8 +113,10 @@ function createUnreadLoader() {
   const { bookingInboxConversationIds } = require('./conversation-routing');
   const cache = new Map();
 
-  // Resolved once per request and shared by both scoped summaries, so asking for the Messages
-  // badge and the Booking Requests badge in the same query costs one routing lookup, not two.
+  // Resolved once per request. This was shared by two scoped summaries; the 'bookingInbox' one is
+  // gone (the Booking Requests badge counts pending REQUESTS now - see utils/booking-inbox.js), so
+  // today it has a single reader. Kept memoised anyway: it is the same lookup either way, and the
+  // reason it exists is that this runs on a component mounted on every page.
   let routingPromise = null;
   function bookingInboxIds(userId) {
     if (!routingPromise) {
@@ -126,12 +128,16 @@ function createUnreadLoader() {
   return {
     /**
      * @param {string} userId
-     * @param {'messages'|'bookingInbox'|'all'} scope
+     * @param {'messages'|'all'} scope
+     *
+     * 'messages' excludes threads sitting in this viewer's Booking Requests inbox; 'all' counts
+     * every conversation they are in.
      *
      * The scope is part of the CACHE KEY. It was previously keyed on userId alone, which was
-     * correct when there was one answer; with three it would hand whichever scope asked first to
-     * everyone after it, and the symptom would be a Booking Requests badge showing the Messages
-     * count. Silent, plausible, and wrong.
+     * correct when there was one answer; with more than one it would hand whichever scope asked
+     * first to everyone after it, and the symptom would be one badge showing another badge's
+     * count. Silent, plausible, and wrong - so this stays keyed even though there are two scopes
+     * left rather than three.
      */
     async summaryFor(userId, scope = 'all') {
       const key = `${String(userId)}:${scope}`;
@@ -143,9 +149,7 @@ function createUnreadLoader() {
               return unreadSummaryForUser(userId);
             }
             const ids = await bookingInboxIds(userId);
-            return scope === 'bookingInbox'
-              ? unreadSummaryForUser(userId, { only: ids })
-              : unreadSummaryForUser(userId, { excluding: ids });
+            return unreadSummaryForUser(userId, { excluding: ids });
           })(),
         );
       }

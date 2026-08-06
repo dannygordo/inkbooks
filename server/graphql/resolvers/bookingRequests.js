@@ -9,6 +9,7 @@ const { assertCanManageArtist } = require('../../utils/shop-membership');
 const { UserInputError } = require('../../utils/errors');
 const { normalizeSlug } = require('../../utils/booking-slug');
 const { paginate } = require('../../utils/pagination');
+const { bookingInboxFilter, pendingBookingRequestCount } = require('../../utils/booking-inbox');
 
 module.exports = {
   Query: {
@@ -88,16 +89,27 @@ module.exports = {
         });
       }
 
+      // Shared with the nav badge - see utils/booking-inbox.js for why that matters. The badge is
+      // this same filter with no statuses passed, so "the badge says 3" and "the page opens with 3
+      // rows" are the same query rather than two queries that agree by inspection.
       return paginate(
         BookingRequest,
-        {
-          artistId,
-          source: 'public_form',
-          status: { $in: requested.length > 0 ? requested : BookingRequest.INBOX_STATUSES },
-        },
+        bookingInboxFilter(artistId, requested),
         { sort: { createdAt: -1 }, page },
       );
     }),
+
+    /**
+     * How many requests the CALLER still owes an answer on - the Booking Requests nav badge.
+     *
+     * Takes no argument, deliberately. The old badge query didn't either, and the reason holds:
+     * asking for somebody else's inbox count is not a thing a badge needs, and an argument here
+     * would be a permission check to get wrong. A shop admin who wants to see an artist's inbox
+     * opens getBookingRequests with that artist's id, which is gated by assertCanManageArtist.
+     */
+    getPendingBookingRequestCount: withAuth(async (_, args, context, info, user) =>
+      pendingBookingRequestCount(user.id),
+    ),
     getBookingRequest: withAuth(async (_, { bookingRequestId }, context, info, user) => {
       const bookingRequest = await BookingRequest.findById(bookingRequestId);
       if (!bookingRequest) {

@@ -971,10 +971,13 @@ module.exports = gql`
     getInbox(includeRead: Boolean): InboxSummary!
     getNotificationSettings: NotificationSettings!
     getUnreadMessageCount: Int!
-    # Unread messages on booking requests that have NOT been booked yet - the ones whose threads
-    # Messages deliberately doesn't show. Without this the split would make a client's reply on a
-    # pending request silent everywhere, which is worse than the duplication it replaced.
-    getUnreadBookingRequestCount: Int!
+    # getUnreadBookingRequestCount is gone. It counted unread MESSAGES in booking-request threads,
+    # which is the wrong question for that nav item and produced a badge that cleared as soon as you
+    # looked at a request you still hadn't decided on - and that read zero for a brand new request,
+    # since createBookingRequest writes no Message at all. Replaced by
+    # getPendingBookingRequestCount (see the Booking Requests section below). A reply on a request
+    # that HAS been booked still counts, through getUnreadMessageCount, because booking moves the
+    # thread into Messages.
     getConversation(conversationId: ID!): Conversation
     getConversationsByShopId(shopId: ID!): [Conversation!]
     getProjectConversation(artistId: ID!, clientId: ID!): Conversation
@@ -1009,6 +1012,11 @@ module.exports = gql`
     # ever grows - every request an artist has ever turned away or lost, forever - and an unbounded
     # query over it would download a career to render a screenful.
     getBookingRequests(artistId: ID!, statuses: [String!], page: PageInput): BookingRequestPage!
+    # The nav badge: how many requests the CALLER still owes an answer on. Same filter as
+    # getBookingRequests with no statuses passed - literally the same function, see
+    # utils/booking-inbox.js - so the number on the nav item and the rows on the page it leads to
+    # cannot disagree. Only changes when a request's STATUS changes, never on read.
+    getPendingBookingRequestCount: Int!
     getBookingRequest(bookingRequestId: ID!): BookingRequest
     # Public, token-gated (not withAuth) - resolves a guest's magic link to their own request.
     # See utils/guest-auth.js.

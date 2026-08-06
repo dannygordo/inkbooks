@@ -29,10 +29,10 @@ module.exports = {
     // decided on yet still produces a visible signal somewhere. Without this, moving those threads
     // out of Messages would make them silent, which is a strictly worse outcome than showing them
     // in two places.
-    getUnreadBookingRequestCount: withAuth(async (_, args, context, info, user) => {
-      const summary = await context.loaders.unread.summaryFor(user.id, 'bookingInbox');
-      return summary.total;
-    }),
+    // getUnreadBookingRequestCount lived here and is gone. See typeDefs.js and
+    // utils/booking-inbox.js: the Booking Requests badge counts requests awaiting a decision now,
+    // not unread messages in their threads. The 'bookingInbox' scope on the unread loader went with
+    // it; the 'messages' scope stays, and is what keeps those threads out of the Messages badge.
     // getConversations (every private thread on the platform) was deleted - see the note on
     // getUsers in resolvers/users.js for why these three went rather than getting scoped. Reading
     // messages goes through getConversationsByMemberId or the Conversation.messages field

@@ -9,7 +9,9 @@ import { Button, IconButton, ToggleButton, ToggleButtonGroup } from "@mui/materi
 import { Add, Close } from "@mui/icons-material";
 import IBDateTimePicker from "../inputs/IBDateTimePicker";
 import IBInput from "../inputs/IBInput";
-import BookingRequestService from "../../services/BookingRequestService";
+import BookingRequestService, {
+	BOOKING_BADGE_REFETCH,
+} from "../../services/BookingRequestService";
 import { AppointmentService } from "../../services/AppointmentService";
 import DepositService from "../../services/DepositService";
 import IBSquarePaymentForm from "../IBSquarePayments/IBSquarePaymentForm";
@@ -81,7 +83,13 @@ const BookSessionDatesForm = ({
 	const depositCents = depositDollars ? dollarsToCents(depositDollars) : 0;
 	const needsMethod = depositCents > 0 && Boolean(consultAppointmentId);
 
-	const [convertBookingRequest] = useMutation(BookingRequestService.CONVERT_BOOKING_REQUEST_MUTATION);
+	// Booking the session is what takes this request out of the pending inbox, so the nav badge has
+	// to be refetched here too - not only on the Booking Requests page. This form is reached from
+	// the consult page and from the calendar's event dialog, neither of which has that list mounted.
+	const [convertBookingRequest] = useMutation(
+		BookingRequestService.CONVERT_BOOKING_REQUEST_MUTATION,
+		{ refetchQueries: BOOKING_BADGE_REFETCH },
+	);
 	const [createAppointment] = useMutation(AppointmentService.CREATE_APPOINTMENT);
 	// See AppointmentService.CALENDAR_REFETCH_QUERIES - by operation name, all of them, because
 	// refetchQueries skips whatever isn't mounted and this form is reached from two different
