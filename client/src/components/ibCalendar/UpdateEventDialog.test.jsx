@@ -154,8 +154,18 @@ describe("UpdateEventDialog", () => {
 		// Display label from APPOINTMENT_TYPE, not the raw stored 'session'.
 		expect(screen.getByText("Session")).toBeInTheDocument();
 		expect(screen.getByText("Half sleeve - koi")).toBeInTheDocument();
-		// MUI's Select renders with role="combobox" - neither field should be one any more.
-		expect(screen.queryAllByRole("combobox")).toHaveLength(0);
+
+		// Asserted BY NAME, not by counting.
+		//
+		// This was `queryAllByRole("combobox")).toHaveLength(0)` - "there are no dropdowns at all"
+		// as a stand-in for "type and project are not dropdowns". That proxy held only while the
+		// dialog contained no other select, and broke the moment one arrived: the duration picker's
+		// minutes field is a legitimate combobox and has nothing to do with this invariant.
+		//
+		// Naming the two fields tests what the rule actually is, and keeps testing it however many
+		// unrelated selects the dialog grows later.
+		expect(screen.queryByRole("combobox", { name: /appointment type/i })).toBeNull();
+		expect(screen.queryByRole("combobox", { name: /project/i })).toBeNull();
 	});
 
 	it("falls back to a placeholder when the appointment has no project", async () => {
