@@ -235,15 +235,22 @@ describe('a notification failure never fails the action', () => {
 });
 
 describe('booking requests', () => {
-	// createBookingRequest has TWO callers and they differ in who is standing there. The public
-	// intake form is anonymous and the client is the actor. The appointment wizard is the artist
-	// scheduling a walk-in, logged in, and the artist is the actor - a fact the resolver originally
-	// hardcoded away by always naming the client, so notify()'s actor filter had nothing to catch
-	// and told the artist about the consult they were in the middle of booking.
+	// createBookingRequest serves TWO DIFFERENT EVENTS and the actor differs between them. The
+	// public intake form is a CLIENT submitting their details; the appointment wizard is an artist
+	// or admin scheduling a walk-in. `source` is what tells them apart, and it decides who the actor
+	// is - notify() then applies the actor rule on top, which is what keeps the third and fourth
+	// cases below working.
 	//
-	// Deriving the actor from the request is what makes the third case below work as well, and it
-	// is why this isn't a `source === 'artist_created'` check: the wizard sends that flag no matter
-	// who is driving it.
+	// Two revisions of that one line have been wrong in opposite directions, and BOTH failed
+	// silently, because notify() returning nothing when every recipient is the actor is normal
+	// operation - no error, no warning:
+	//
+	//   hardcoded to the client  - the wizard told an artist about their own consult.
+	//   "logged in" = the actor  - the public form told nobody whenever the submitting browser
+	//                              carried the artist's session, which the client attaches to every
+	//                              request including the public booking page.
+	//
+	// Each of the four cases below pins one of those down.
 	function bookingInput(artistId, overrides = {}) {
 		return {
 			artistId,
@@ -287,6 +294,32 @@ describe('booking requests', () => {
 		});
 		expect(forArtist).toHaveLength(1);
 		expect(forArtist[0].title).toContain('Arya Stark');
+	});
+
+	it('tells the artist even when their own session was attached to the submission', async () => {
+		// THE REPORTED BUG: a booking request arrived and no notification appeared.
+		//
+		// client/src/index.jsx's authLink puts an Authorization header on EVERY request, the public
+		// booking page included. So an artist with a live session who opens their own booking link -
+		// to test it, or to type in a walk-in at the counter - sends a public_form submission that
+		// looks authenticated. The resolver read that as "the caller is the actor", the actor was
+		// the artist, and notify()'s actor rule filtered out the only recipient. Nothing was written
+		// and nothing complained.
+		//
+		// The session token is incidental. The form carries the CLIENT's name, email and
+		// description; a client is who submitted it. Note this test differs from the one above by
+		// exactly one thing - the auth context - which is the whole point.
+		const { user: artist } = await createArtistUser();
+		const server = createTestServer();
+
+		await submit(server, artist.id, asUser(artist));
+
+		expect(
+			await Notification.countDocuments({
+				userId: artist.id,
+				type: 'booking_request_received',
+			}),
+		).toBe(1);
 	});
 
 	it('says nothing when the artist books it themselves', async () => {

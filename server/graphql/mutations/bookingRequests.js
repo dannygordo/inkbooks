@@ -77,11 +77,8 @@ module.exports = {
       throw new UserInputError('Errors', { errors: { artistId: 'Artist not found' } });
     }
 
-    // A logged-in caller is the actor; an anonymous submission means the client is. Resolved here,
-    // once, because both the artist's email and the artist's notification hang off it.
-    const callerIsTheArtist =
-      !!authenticatedCaller && String(authenticatedCaller.id) === String(artist._id);
-
+    // Resolved below, once the client exists, because both the artist's email and the artist's
+    // notification hang off the same fact - see actorUserId.
     const { user: clientUser, client } = await findOrCreateGuestClient({
       firstName: data.firstName,
       lastName: data.lastName,
@@ -94,7 +91,41 @@ module.exports = {
     // and the artist is the only party guaranteed to be present in every path through here.
     await linkClientToUsersShops(client._id, data.artistId);
 
-    const actorUserId = authenticatedCaller ? authenticatedCaller.id : clientUser._id;
+    /**
+     * WHO CAUSED THIS EVENT - decided by WHICH FORM was submitted, not by whether a session token
+     * happened to ride along on the request.
+     *
+     * This mutation serves two genuinely different events and the caller already distinguishes them
+     * with `source`:
+     *
+     *   public_form    - the public intake form. A CLIENT submitted this. Their name, email and
+     *                    description are on it. That is true whether they were anonymous, signed in
+     *                    as themselves, or typed into a browser somebody else was logged into.
+     *   artist_created - the appointment wizard. The artist or admin driving it really did cause it,
+     *                    and telling them about their own consult is the noise this exists to stop.
+     *
+     * THE BUG THIS FIXES. `authenticatedCaller ? authenticatedCaller.id : clientUser._id` read
+     * "logged in" as "is the actor". The client attaches its Authorization header to EVERY request,
+     * including the public booking page (see client/src/index.jsx's authLink) - so an artist with a
+     * live session who opened their own booking link became the actor of a client's request, and
+     * notify()'s actor rule correctly filtered the only recipient out. No notification, no email,
+     * no error: notify() returning an empty array because everybody was the actor is normal
+     * operation, so there was nothing to see anywhere.
+     *
+     * NOT the same as keying the SUPPRESSION off source, which would be wrong for the reason the
+     * previous fix documented: a shop admin using the wizard on an artist's behalf sends
+     * artist_created, and that artist must still be told. Here source only decides who the actor
+     * IS; notify() still applies the actor rule afterwards, so that case still notifies because the
+     * admin is the actor and the artist is not.
+     */
+    const source = data.source || 'public_form';
+    const actorUserId =
+      source === 'public_form'
+        ? clientUser._id
+        : (authenticatedCaller ? authenticatedCaller.id : clientUser._id);
+    // One derived fact rather than two conditions that can drift: the artist is told unless the
+    // artist is the one who did it. Same question the notification asks.
+    const artistIsActor = String(actorUserId) === String(artist._id);
 
     const now = new Date();
     const conversation = await new Conversation({
@@ -120,11 +151,12 @@ module.exports = {
       availability: data.availability,
       isCoverUp: data.isCoverUp,
       howHeard: data.howHeard,
-      // Defaults to 'public_form' (the Mongoose schema's own default) when the caller doesn't
-      // send one - covers the real public intake form and anything else calling this mutation
-      // without an opinion. AppointmentWizard.jsx is the one caller that explicitly sends
-      // 'artist_created'. See BookingRequest.js's own comment on what this distinguishes.
-      source: data.source || 'public_form',
+      // Resolved above, where it also decides who the actor is. Defaults to 'public_form' (the
+      // Mongoose schema's own default) when the caller doesn't send one - covers the real public
+      // intake form and anything else calling this mutation without an opinion.
+      // AppointmentWizard.jsx is the one caller that explicitly sends 'artist_created'. See
+      // BookingRequest.js's own comment on what this distinguishes.
+      source,
     }).save();
 
     // Best-effort notifications, sent after the record is safely persisted - a delivery
@@ -140,7 +172,12 @@ module.exports = {
     // appointment wizard hits this same mutation, and mailing them "you have a new booking
     // request" about the thing they are currently looking at is noise of the worst kind: it makes
     // every OTHER email from this system slightly less worth opening.
-    if (!callerIsTheArtist) {
+    //
+    // Gated on the ACTOR rather than on the caller, so this and the in-app notification below
+    // answer one question instead of two that can drift. It also means a public-form submission
+    // emails the artist even when their own session token was attached to the request - the actor
+    // there is the client, because that is who filled the form in.
+    if (!artistIsActor) {
       await sendNewBookingRequestNotificationToArtist({
         to: artist.email,
         artistFirstName: artist.firstName,
@@ -148,18 +185,18 @@ module.exports = {
       });
     }
 
-    // WHO CAUSED THIS, not who the form is about.
+    // The actor is resolved from `source` further up - see the long note there. Two revisions of
+    // this one line have now been wrong in opposite directions:
     //
-    // This was hardcoded to the client, on the reasoning that a public intake form has no logged-in
-    // caller. True for the public form - and wrong for the other caller, because the appointment
-    // wizard reaches this same mutation with the artist logged in. The artist was then the actor of
-    // record for an event they themselves caused, so notify()'s actor filter had nothing to catch
-    // and dutifully told them about their own consult.
+    //   hardcoded to the client   - the wizard then told an artist about their own consult.
+    //   "logged in" = the actor   - the public form then told nobody, because the client attaches
+    //                               an Authorization header to every request, so an artist with a
+    //                               live session became the actor of a client's submission and
+    //                               notify() filtered out the only recipient.
     //
-    // Deriving the actor from the request rather than assuming it means the artist filters
-    // themselves out, and a shop admin booking a walk-in on an artist's behalf still notifies the
-    // artist - which is correct, and which a `source === 'artist_created'` check would have got
-    // wrong, since the wizard sends that flag no matter who is driving it.
+    // Both are silent. notify() returning an empty array because every recipient was the actor is
+    // normal operation, so there is no error, no warning and no failing test - which is why this
+    // needs to be decided by what was submitted rather than by what happened to be in a header.
     await notifySafely({
       actorId: actorUserId,
       recipientIds: [artist._id],
