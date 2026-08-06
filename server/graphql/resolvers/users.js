@@ -29,6 +29,7 @@ const {
 } = require('../../utils/shop-membership');
 const { DEFAULT_NO_SHOP_TAG_COLOR, isUnsetTagColor, pickDefaultTagColor } = require('../../utils/tag-color');
 const { findArtistsForShops } = require('../../utils/artist-shop');
+const { assertSlugAvailable } = require('../../utils/booking-slug');
 
 // A real bcrypt hash of a value nobody knows, compared against when no account matches, so a
 // missing account and a wrong password take the same time to answer. Generated once at module
@@ -190,6 +191,20 @@ module.exports = {
       }
 
       const isShop = data.accountType === Constants.SIGNUP_TYPE.SHOP;
+
+      // BEFORE anything is written, including the Shop.
+      //
+      // assertSlugAvailable throws on a bad shape, a reserved word or a taken handle. Doing it here
+      // rather than at the Artist save means a rejected link fails the whole signup cleanly - order
+      // matters more than usual on this path, because the shop branch creates a Shop first, and a
+      // slug collision discovered afterwards would leave an orphaned Shop row behind with no owner
+      // and a name somebody else can no longer use.
+      //
+      // Optional throughout: signing up without a link is legal, /book/<id> still works, and one
+      // can be chosen later from Settings. Nobody should be stuck at the last step of a signup
+      // form inventing a handle.
+      const bookingSlug = data.bookingSlug ? await assertSlugAvailable(data.bookingSlug) : undefined;
+
       const hashedPassword = await bcrypt.hash(data.password, 12);
 
       // The Shop first, so its id is available for the tag colour and the connection below. Its
@@ -231,6 +246,9 @@ module.exports = {
         firstName: data.firstName,
         lastName: data.lastName,
         email: normalizedEmail,
+        // Only set when actually chosen. Writing '' or null here would put every slug-less artist
+        // on the same indexed value and the second one would collide - see models/Artist.js.
+        ...(bookingSlug ? { bookingSlug } : {}),
         userId: newUser._id,
         status: Constants.ARTIST_STATUS.ACTIVE,
         startDate: new Date(),

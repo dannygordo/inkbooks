@@ -13,6 +13,16 @@ const IBInput = ({
 	type,
 	sx,
 	defaultValue,
+	// CONTROLLED when provided, uncontrolled otherwise.
+	//
+	// Only defaultValue existed, which is fine for a field whose value is known at mount and never
+	// changes underneath the user - which was every caller until one needed a value that updates
+	// while the field is on screen (the registration form suggests a booking link as you type your
+	// name). An uncontrolled input ignores that: React state changes, the box does not, and the
+	// form submits something nobody ever saw.
+	//
+	// Passing both to MUI logs a warning and picks one, so exactly one is forwarded below.
+	value,
     required=false,
     autoFocus=false,
     fullWidth=true,
@@ -34,7 +44,7 @@ const IBInput = ({
 			sx={sx}
 			label={label}
 			type={type}
-			defaultValue={defaultValue}
+			{...(value !== undefined ? { value } : { defaultValue })}
 			fullWidth={fullWidth}
 			required={required}
 			inputRef={inputRef}

@@ -129,8 +129,10 @@ describe("Register", () => {
 							email: "jon@example.com",
 							password: "longenoughpassword",
 							confirmPassword: "longenoughpassword",
-							// No shopName key. MockedProvider matches variables deeply, so this is a
-							// real assertion: sending `shopName: ""` would fail to match.
+							// Auto-suggested from the name - see the dedicated test below. No shopName
+							// key at all: MockedProvider matches variables deeply, so this is a real
+							// assertion and sending `shopName: ""` would fail to match.
+							bookingSlug: "jon-snow",
 						},
 					},
 				},
@@ -162,6 +164,9 @@ describe("Register", () => {
 							password: "longenoughpassword",
 							confirmPassword: "longenoughpassword",
 							shopName: "Copper Wolf",
+							// The owner gets a booking link too - one account, one login, and they
+							// take bookings themselves.
+							bookingSlug: "jon-snow",
 						},
 					},
 				},
@@ -176,6 +181,38 @@ describe("Register", () => {
 		await user.click(screen.getByText("Create account"));
 
 		await waitFor(() => expect(contextValue.login).toHaveBeenCalledWith(shopUser));
+	});
+
+	it("suggests a booking link from the name, on both paths", async () => {
+		// Offered to a shop owner as well as an independent artist - the 99% case is one person who
+		// owns a studio and tattoos in it, and they need a link as much as anyone.
+		//
+		// Suggested, never assigned silently: a handle nobody chose and nobody was shown is exactly
+		// what the deleted username was. See utils/bookingSlug.js.
+		const user = userEvent.setup();
+		renderRegister();
+
+		await chooseShop(user);
+		await user.type(screen.getByPlaceholderText("First name"), "Jon");
+		await user.type(screen.getByPlaceholderText("Last name"), "Snow");
+
+		expect(screen.getByDisplayValue("jon-snow")).toBeInTheDocument();
+	});
+
+	it("stops following the name once the link has been edited", async () => {
+		// Otherwise typing a surname silently overwrites a handle already chosen - at the one moment
+		// somebody is least likely to look back up the form and notice.
+		const user = userEvent.setup();
+		renderRegister();
+
+		await chooseArtist(user);
+		await user.type(screen.getByPlaceholderText("First name"), "Jon");
+		await user.clear(screen.getByDisplayValue("jon"));
+		await user.type(screen.getByLabelText(/booking link/i), "needle-and-thread");
+		await user.type(screen.getByPlaceholderText("Last name"), "Snow");
+
+		expect(screen.getByDisplayValue("needle-and-thread")).toBeInTheDocument();
+		expect(screen.queryByDisplayValue("jon-snow")).not.toBeInTheDocument();
 	});
 
 	it("renders the field errors the server returns, rather than failing silently", async () => {
@@ -197,6 +234,7 @@ describe("Register", () => {
 							email: "taken@example.com",
 							password: "longenoughpassword",
 							confirmPassword: "longenoughpassword",
+							bookingSlug: "jon-snow",
 						},
 					},
 				},

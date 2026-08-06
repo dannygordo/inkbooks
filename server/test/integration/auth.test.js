@@ -184,6 +184,93 @@ describe('registerAccount mutation', () => {
 		expect(errors[0].message).toMatch(/role/i);
 	});
 
+	it('sets the booking link chosen at signup, on both paths', async () => {
+		// A shop owner needs one as much as an independent artist does - one account, one login, and
+		// they take bookings themselves. Offering it only on the artist path would mean the 99% case
+		// (a studio owner who tattoos) finishes signup without the link they came for.
+		const server = createTestServer();
+
+		const artistInput = baseRegisterInput({ bookingSlug: 'ink-by-jon' });
+		const artistRes = await server.executeOperation(
+			{ query: REGISTER_MUTATION, variables: { input: artistInput } },
+			{ contextValue: contextWithToken() },
+		);
+		expect(artistRes.body.singleResult.errors).toBeUndefined();
+		const soloUser = await User.findOne({ email: artistInput.email.toLowerCase() });
+		expect((await Artist.findOne({ userId: soloUser._id })).bookingSlug).toBe('ink-by-jon');
+
+		const shopInput = baseRegisterInput({
+			accountType: 'shop',
+			shopName: 'Copper Wolf',
+			bookingSlug: 'copper-wolf-dee',
+		});
+		const shopRes = await server.executeOperation(
+			{ query: REGISTER_MUTATION, variables: { input: shopInput } },
+			{ contextValue: contextWithToken() },
+		);
+		expect(shopRes.body.singleResult.errors).toBeUndefined();
+		const ownerUser = await User.findOne({ email: shopInput.email.toLowerCase() });
+		expect((await Artist.findOne({ userId: ownerUser._id })).bookingSlug).toBe('copper-wolf-dee');
+	});
+
+	it('leaves the booking link unset when none is chosen', async () => {
+		// Optional on purpose. /book/<id> still resolves, and a slug can be picked later from
+		// Settings - nobody should be stuck at the end of a signup form inventing a handle.
+		//
+		// UNSET, not empty string: Artist.bookingSlug is uniquely indexed, so writing '' would put
+		// every slug-less artist on the same value and the second signup would collide.
+		const server = createTestServer();
+		const input = baseRegisterInput();
+		await server.executeOperation(
+			{ query: REGISTER_MUTATION, variables: { input } },
+			{ contextValue: contextWithToken() },
+		);
+
+		const created = await User.findOne({ email: input.email.toLowerCase() });
+		const artist = await Artist.findOne({ userId: created._id });
+		expect(artist.bookingSlug === undefined || artist.bookingSlug === null).toBe(true);
+	});
+
+	it('refuses a taken booking link without leaving a half-built shop behind', async () => {
+		// THE ordering test. The shop branch creates a Shop BEFORE the User, so a slug collision
+		// discovered at the Artist save would leave an orphaned Shop row - a name nobody owns and
+		// nobody else can now use. The slug is verified before anything is written.
+		const server = createTestServer();
+		const first = baseRegisterInput({ bookingSlug: 'taken-handle' });
+		await server.executeOperation(
+			{ query: REGISTER_MUTATION, variables: { input: first } },
+			{ contextValue: contextWithToken() },
+		);
+
+		const second = baseRegisterInput({
+			accountType: 'shop',
+			shopName: 'Should Not Exist',
+			bookingSlug: 'taken-handle',
+		});
+		const res = await server.executeOperation(
+			{ query: REGISTER_MUTATION, variables: { input: second } },
+			{ contextValue: contextWithToken() },
+		);
+
+		expect(res.body.singleResult.errors).toBeDefined();
+		expect(await Shop.findOne({ name: 'Should Not Exist' })).toBeNull();
+		expect(await User.findOne({ email: second.email.toLowerCase() })).toBeNull();
+	});
+
+	it('refuses a reserved word as a booking link', async () => {
+		// /book/support with a studio's branding on it is a phishing surface, which is why the
+		// reserved list exists (see utils/booking-slug.js). Asserted here because signup is the
+		// first place anyone gets to choose one.
+		const server = createTestServer();
+		const res = await server.executeOperation(
+			{ query: REGISTER_MUTATION, variables: { input: baseRegisterInput({ bookingSlug: 'support' }) } },
+			{ contextValue: contextWithToken() },
+		);
+
+		expect(res.body.singleResult.errors).toBeDefined();
+		expect(res.body.singleResult.data).toBeNull();
+	});
+
 	it('refuses a shop with no name', async () => {
 		// A Shop row requires a name, so this would otherwise fail at save time as a Mongoose
 		// validation error rather than as a message pointing at the field somebody left blank.

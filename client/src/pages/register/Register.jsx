@@ -7,6 +7,8 @@ import { CircularProgress } from "@mui/material";
 import { gql, useMutation } from "@apollo/client";
 import { ROUTE_CONSTANTS } from "../../constants";
 import { AuthContext } from "../../context/auth";
+import BookingSlugField from "../../components/artist/BookingSlugField";
+import { suggestSlugOrBlank } from "../../utils/bookingSlug";
 import "./register.css";
 
 /**
@@ -72,7 +74,12 @@ const Register = () => {
 		password: "",
 		confirmPassword: "",
 		shopName: "",
+		bookingSlug: "",
 	});
+	// Whether the person has edited the link themselves. Until they do, it tracks their name -
+	// see setField below. Without this flag, typing a surname would silently overwrite a handle
+	// they had already chosen, which is the worst possible moment to lose it.
+	const [slugTouched, setSlugTouched] = useState(false);
 	const [errors, setErrors] = useState({});
 
 	const [registerAccount, { loading }] = useMutation(REGISTER_ACCOUNT, {
@@ -90,7 +97,22 @@ const Register = () => {
 	});
 
 	const setField = (name) => (e) => {
-		setValues((prev) => ({ ...prev, [name]: e.target.value }));
+		const next = e.target.value;
+		setValues((prev) => {
+			const updated = { ...prev, [name]: next };
+			// The suggestion follows the name until the person takes it over. A prefill they can see
+			// and overwrite is the whole design of this field (see utils/bookingSlug.js): a handle
+			// assigned silently is what the deleted username was.
+			if (!slugTouched && (name === "firstName" || name === "lastName")) {
+				updated.bookingSlug = suggestSlugOrBlank(updated.firstName, updated.lastName);
+			}
+			return updated;
+		});
+	};
+
+	const setBookingSlug = (next) => {
+		setSlugTouched(true);
+		setValues((prev) => ({ ...prev, bookingSlug: next }));
 	};
 
 	const handleSubmit = (e) => {
@@ -108,6 +130,10 @@ const Register = () => {
 					// Omitted entirely for an artist rather than sent blank. The server only requires
 					// it for a shop, and an empty string would read as an answer that was given.
 					...(accountType === "shop" ? { shopName: values.shopName } : {}),
+					// Same rule: omitted when blank rather than sent as "". The server treats an
+					// absent slug as "didn't choose one" and a blank string would land on the
+					// unique index alongside every other slug-less artist.
+					...(values.bookingSlug ? { bookingSlug: values.bookingSlug } : {}),
 				},
 			},
 		});
@@ -197,6 +223,17 @@ const Register = () => {
 								type="password"
 								value={values.confirmPassword}
 								onChange={setField("confirmPassword")}
+							/>
+							{/* Offered on BOTH paths. A shop owner is an artist too - one account, one
+							    login - so they need a link of their own exactly as much as an
+							    independent artist does. Live availability check included, because
+							    finding out a handle is taken after submitting a whole form is the
+							    one failure this field exists to avoid. */}
+							<BookingSlugField
+								value={values.bookingSlug}
+								setValue={setBookingSlug}
+								error={errors.bookingSlug}
+								helperText="Optional - you can change this later in Settings."
 							/>
 							<button className="registerButton" type="submit" disabled={loading}>
 								{loading ? (

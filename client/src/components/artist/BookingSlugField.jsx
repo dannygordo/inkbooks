@@ -95,7 +95,13 @@ const BookingSlugField = ({
 			<IBInput
 				id="bookingSlug"
 				label={label}
-				defaultValue={value || ""}
+				// CONTROLLED. This was defaultValue, which meant the box ignored any change to
+				// `value` after mount - fine for the two callers that knew the slug up front, and
+				// silently wrong for the registration form, which suggests a handle from the name as
+				// it is typed. The suggestion would have gone into state and been submitted without
+				// ever appearing on screen, which is the precise failure the "suggested, never
+				// assigned" rule at the top of utils/bookingSlug.js exists to prevent.
+				value={value || ""}
 				error={Boolean(error) || Boolean(showStatus && result && !result.available)}
 				helperText={error || helperText || " "}
 				onChange={(e) => {

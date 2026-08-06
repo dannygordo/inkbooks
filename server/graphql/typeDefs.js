@@ -535,6 +535,12 @@ module.exports = gql`
     confirmPassword: String!
     # Required when accountType is 'shop', meaningless otherwise.
     shopName: String
+    # The public booking handle - /book/<slug>. Offered on BOTH paths: a shop owner is an artist
+    # too (see registerAccount), so they need one as much as an independent artist does.
+    #
+    # Optional. An account created without one still has a working /book/<id> page and can choose
+    # a link later from Settings - nobody should be blocked at signup on inventing a handle.
+    bookingSlug: String
   }
   input AppointmentInput {
     id: ID

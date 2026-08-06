@@ -65,6 +65,11 @@ const registerAccountInputSchema = z
     // Only meaningful for a shop. Checked by the refine below rather than made required outright,
     // so an artist isn't asked for a shop name they don't have.
     shopName: z.string().trim().optional(),
+    // The public booking handle, chosen at signup by BOTH paths - a shop owner is an artist too
+    // and needs a link of their own. Shape, reserved words and availability are all the server's
+    // answer (utils/booking-slug.js); this only says the field exists and is optional. An account
+    // without one still has a working /book/<id> page.
+    bookingSlug: z.string().trim().optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: 'Passwords must match',
