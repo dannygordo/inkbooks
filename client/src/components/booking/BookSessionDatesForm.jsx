@@ -9,6 +9,7 @@ import BookingRequestService from "../../services/BookingRequestService";
 import { AppointmentService } from "../../services/AppointmentService";
 import DepositService from "../../services/DepositService";
 import IBSquarePaymentForm from "../IBSquarePayments/IBSquarePaymentForm";
+import DaySchedule from "../appointments/DaySchedule";
 import { useAuth } from "../../context/auth";
 import { dollarsToCents, formatCents } from "../../utils/money";
 import "./bookSessionDatesForm.css";
@@ -278,21 +279,30 @@ const BookSessionDatesForm = ({
 			/>
 			<div className="bookSessionDatesList">
 				{sessionDates.map((date, index) => (
-					<div className="bookSessionDateRow" key={index}>
-						<IBDateTimePicker
-							label={`Session ${index + 1}`}
-							val={date}
-							setVal={(val) => updateDate(index, val)}
-						/>
-						{sessionDates.length > 1 && (
-							<IconButton
-								size="small"
-								aria-label="Remove this session"
-								onClick={() => removeDate(index)}
-							>
-								<Close fontSize="small" />
-							</IconButton>
-						)}
+					// Fragment keyed on the index so the schedule hint stays attached to its own
+					// row - it belongs to that date, not to the group.
+					<div className="bookSessionDateGroup" key={index}>
+						<div className="bookSessionDateRow">
+							<IBDateTimePicker
+								label={`Session ${index + 1}`}
+								val={date}
+								setVal={(val) => updateDate(index, val)}
+							/>
+							{sessionDates.length > 1 && (
+								<IconButton
+									size="small"
+									aria-label="Remove this session"
+									onClick={() => removeDate(index)}
+								>
+									<Close fontSize="small" />
+								</IconButton>
+							)}
+						</div>
+						{/* What's already on the books that day. Renders nothing when the day is
+						    clear, so a clean schedule stays silent instead of printing an empty
+						    panel under every row. Without this the artist had to leave the project,
+						    open their calendar, and come back - or guess. */}
+						<DaySchedule artistUserId={user.id} date={date} />
 					</div>
 				))}
 			</div>

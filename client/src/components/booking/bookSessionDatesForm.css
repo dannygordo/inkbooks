@@ -13,6 +13,14 @@
 	gap: 6px;
 }
 
+/* Wraps one date field together with the schedule hint that belongs to it, so the hint stays with
+   its own row when several sittings are being booked at once. */
+.bookSessionDateGroup {
+	display: flex;
+	flex-direction: column;
+	margin-bottom: 4px;
+}
+
 .bookSessionDateRow {
 	display: flex;
 	align-items: center;

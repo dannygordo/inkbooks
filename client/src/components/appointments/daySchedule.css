@@ -1,0 +1,63 @@
+.daySchedule {
+    margin: 6px 0 4px 2px;
+    padding: 8px 10px;
+    border-left: 3px solid #e0e0e0;
+    background-color: #fafafa;
+    border-radius: 0 6px 6px 0;
+}
+
+.dayScheduleHeader {
+    font-size: 12px;
+    font-weight: 600;
+    color: #666;
+    margin-bottom: 6px;
+}
+
+.dayScheduleList {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.dayScheduleItem {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #444;
+}
+
+.dayScheduleTime {
+    /* Fixed width so the times form a column and can be scanned vertically, rather than ragging
+       with the length of "9:00 AM" versus "11:30 AM". */
+    min-width: 68px;
+    font-variant-numeric: tabular-nums;
+    color: #333;
+    font-weight: 500;
+}
+
+.dayScheduleTitle {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Amber, not red. This is "worth a look", not "you have made a mistake" - the data cannot support
+   the stronger claim (there is no duration on an appointment), and a red warning that turns out to
+   be fine teaches people to dismiss the next one. */
+.dayScheduleItemNearby {
+    color: #8a5a00;
+    font-weight: 500;
+}
+
+.dayScheduleNearby {
+    font-size: 11px;
+    color: #8a5a00;
+    background-color: #fdf0d5;
+    border-radius: 999px;
+    padding: 1px 8px;
+    white-space: nowrap;
+}

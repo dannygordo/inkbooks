@@ -1,6 +1,16 @@
 .appointments {
     flex: 4;
 }
+.appointmentsViewToggle {
+    display: flex;
+    justify-content: flex-end;
+    padding: 8px 20px 0 10px;
+}
+.appointmentsViewToggleLabel {
+    margin-left: 6px;
+    font-size: 13px;
+    text-transform: none;
+}
 .appointmentsListContainer {
     display: flex;
     flex-direction: column;

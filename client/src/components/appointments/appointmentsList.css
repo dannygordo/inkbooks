@@ -1,0 +1,104 @@
+.appointmentsList {
+    display: flex;
+    flex-direction: column;
+    margin: 10px 20px 0 10px;
+}
+
+.appointmentsListControls {
+    margin-bottom: 16px;
+}
+
+.appointmentsListLoading {
+    display: flex;
+    justify-content: center;
+    padding: 40px 0;
+    color: #888;
+}
+
+.appointmentsListEmpty {
+    padding: 32px 12px;
+    color: #777;
+    font-size: 15px;
+}
+
+.appointmentsListEmptyHint {
+    margin-top: 4px;
+    font-size: 13px;
+    color: #aaa;
+}
+
+/* Amber, not red: the list is correct as far as it goes, it just isn't all of it. */
+.appointmentsListTruncated {
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    background-color: #fdf0d5;
+    color: #8a5a00;
+    font-size: 13px;
+}
+
+.appointmentsListDay {
+    margin-bottom: 18px;
+}
+
+.appointmentsListDayHeader {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid #e6e6e6;
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.appointmentsListDayCount {
+    background-color: #eee;
+    color: #666;
+    border-radius: 999px;
+    padding: 0 8px;
+    font-size: 11px;
+    letter-spacing: 0;
+}
+
+.appointmentsListRow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 8px;
+    border-bottom: 1px solid #f2f2f2;
+    cursor: pointer;
+}
+
+.appointmentsListRow:hover {
+    background-color: #f7f9fc;
+}
+
+.appointmentsListRow:focus-visible {
+    outline: 2px solid #1775ee;
+    outline-offset: -2px;
+}
+
+.appointmentsListTime {
+    /* Fixed width and tabular figures so the times form a scannable column instead of ragging
+       between "9:00 AM" and "11:30 AM". */
+    min-width: 78px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+    color: #333;
+}
+
+.appointmentsListTitle {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.appointmentsListArtist {
+    color: #777;
+    font-size: 13px;
+    white-space: nowrap;
+}
