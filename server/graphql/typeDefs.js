@@ -846,6 +846,10 @@ module.exports = gql`
     items: [Appointment!]!
     pageInfo: PageInfo!
   }
+  type BookingRequestPage {
+    items: [BookingRequest!]!
+    pageInfo: PageInfo!
+  }
 
   # What an appointment list is actually being asked for. One filter rather than a query per
   # screen: the calendar wants a month, the dashboard wants "upcoming" and "recently completed",
@@ -983,7 +987,10 @@ module.exports = gql`
     #
     # A list rather than a boolean: "open", "closed" and "everything" are all just different lists,
     # and a flag would need a second flag the first time somebody wants one specific status.
-    getBookingRequests(artistId: ID!, statuses: [String!]): [BookingRequest]
+    # Paged. The pending queue is short by nature, but the closed filter is an archive that only
+    # ever grows - every request an artist has ever turned away or lost, forever - and an unbounded
+    # query over it would download a career to render a screenful.
+    getBookingRequests(artistId: ID!, statuses: [String!], page: PageInput): BookingRequestPage!
     getBookingRequest(bookingRequestId: ID!): BookingRequest
     # Public, token-gated (not withAuth) - resolves a guest's magic link to their own request.
     # See utils/guest-auth.js.

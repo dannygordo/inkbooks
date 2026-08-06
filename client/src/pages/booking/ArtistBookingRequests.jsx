@@ -6,6 +6,7 @@ import moment from "moment";
 import { useAuth } from "../../context/auth";
 import { ArtistService } from "../../services/ArtistService";
 import MessengerService from "../../services/MessengerService";
+import Pager from "../../components/pagination/Pager";
 import IBDateTimePicker from "../../components/inputs/IBDateTimePicker";
 import BookSessionDatesForm from "../../components/booking/BookSessionDatesForm";
 import { prettyMessageTime, fullMessageTime } from "../../utils/messageTime";
@@ -34,8 +35,10 @@ const STATUS_FILTERS = {
 };
 
 const GET_BOOKING_REQUESTS = gql`
-  query getBookingRequests($artistId: ID!, $statuses: [String!]) {
-    getBookingRequests(artistId: $artistId, statuses: $statuses) {
+  query getBookingRequests($artistId: ID!, $statuses: [String!], $page: PageInput) {
+    getBookingRequests(artistId: $artistId, statuses: $statuses, page: $page) {
+      pageInfo { totalCount hasMore limit offset }
+      items {
       id
       status
       description
@@ -66,6 +69,7 @@ const GET_BOOKING_REQUESTS = gql`
         # nav badge actionable: a count of 3 with no indication of WHICH three is a number that
         # tells you to go hunting.
         unreadCount
+      }
       }
     }
   }
@@ -146,12 +150,19 @@ const ArtistBookingRequests = () => {
   // The open request's messages, loaded on selection rather than arriving with the list.
   const [threadMessages, setThreadMessages] = useState([]);
   const [statusFilter, setStatusFilter] = useState("pending");
+  // 25 rather than the shared default of 50: each row carries a name, a status and a description
+  // snippet, and this list sits in a narrow column beside the detail pane.
+  const [page, setPage] = useState({ limit: 25, offset: 0 });
   const messageInput = useRef();
 
   const shopId = user.userInfo?.shop?.id;
 
   const { data, loading, error, refetch } = useQuery(GET_BOOKING_REQUESTS, {
-    variables: { artistId: user.id, statuses: STATUS_FILTERS[statusFilter].statuses },
+    variables: {
+      artistId: user.id,
+      statuses: STATUS_FILTERS[statusFilter].statuses,
+      page,
+    },
   });
 
   // Only meaningful when the caller has a shop - an independent artist has no shop-mates to
@@ -164,7 +175,8 @@ const ArtistBookingRequests = () => {
 
   // Which request is open, resolved before any early return, because the thread-loading effect
   // below is a hook and hooks cannot live after a conditional return.
-  const requests = data?.getBookingRequests || [];
+  const requests = data?.getBookingRequests?.items || [];
+  const pageInfo = data?.getBookingRequests?.pageInfo;
   const selected = requests.find((r) => r.id === selectedId) || requests[0];
   const selectedConversationId = selected?.conversation?.id || null;
 
@@ -381,6 +393,9 @@ const ArtistBookingRequests = () => {
             // back to the first of whatever comes back, rather than showing a detail pane for a
             // request that is no longer listed beside it.
             setSelectedId(null);
+            // And back to page one: staying on page 3 while switching from an archive of 200 to a
+            // queue of 2 asks for rows 50-75 of a set that has none, and the list goes blank.
+            setPage((prev) => ({ ...prev, offset: 0 }));
           }}
         >
           {Object.entries(STATUS_FILTERS).map(([key, { label }]) => (
@@ -438,6 +453,15 @@ const ArtistBookingRequests = () => {
             <div className="bookingRequestsListItemSnippet">{req.description}</div>
           </div>
         ))}
+        {/* Selection is cleared on a page change for the same reason as on a filter change - the
+            open request is about to leave the list beside it. */}
+        <Pager
+          pageInfo={pageInfo}
+          onChange={(next) => {
+            setPage(next);
+            setSelectedId(null);
+          }}
+        />
       </div>
 
       <div className="bookingRequestDetail">

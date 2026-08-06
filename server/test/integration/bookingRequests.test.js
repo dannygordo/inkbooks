@@ -44,9 +44,12 @@ const CREATE_BOOKING_REQUEST = `
 const GET_BOOKING_REQUESTS = `
 	query GetBookingRequests($artistId: ID!, $statuses: [String!]) {
 		getBookingRequests(artistId: $artistId, statuses: $statuses) {
-			id
-			status
-			source
+			pageInfo { totalCount hasMore limit offset }
+			items {
+				id
+				status
+				source
+			}
 		}
 	}
 `;
@@ -722,8 +725,8 @@ describe('getBookingRequests', () => {
 
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeUndefined();
-		expect(data.getBookingRequests).toHaveLength(1);
-		expect(data.getBookingRequests[0].source).toBe('public_form');
+		expect(data.getBookingRequests.items).toHaveLength(1);
+		expect(data.getBookingRequests.items[0].source).toBe('public_form');
 	});
 
 	// declined and not_booked are terminal - nothing ever moves them again, and they accumulate for
@@ -772,7 +775,7 @@ describe('getBookingRequests', () => {
 			const { errors, data } = await fetch(server, artistUser);
 
 			expect(errors).toBeUndefined();
-			expect(data.getBookingRequests.map((r) => r.status)).toEqual(['pending']);
+			expect(data.getBookingRequests.items.map((r) => r.status)).toEqual(['pending']);
 		});
 
 		it('returns booked ones when asked, even though their threads moved to Messenger', async () => {
@@ -782,7 +785,7 @@ describe('getBookingRequests', () => {
 			const { artistUser, server } = await artistWithOneOfEachStatus();
 			const { data } = await fetch(server, artistUser, ['consult_booked', 'session_booked']);
 
-			expect(data.getBookingRequests.map((r) => r.status).sort()).toEqual([
+			expect(data.getBookingRequests.items.map((r) => r.status).sort()).toEqual([
 				'consult_booked',
 				'session_booked',
 			]);
@@ -792,7 +795,7 @@ describe('getBookingRequests', () => {
 			const { artistUser, server } = await artistWithOneOfEachStatus();
 			const { data } = await fetch(server, artistUser, ['declined', 'not_booked']);
 
-			expect(data.getBookingRequests.map((r) => r.status).sort()).toEqual([
+			expect(data.getBookingRequests.items.map((r) => r.status).sort()).toEqual([
 				'declined',
 				'not_booked',
 			]);
@@ -808,7 +811,7 @@ describe('getBookingRequests', () => {
 				'not_booked',
 			]);
 
-			expect(data.getBookingRequests).toHaveLength(5);
+			expect(data.getBookingRequests.items).toHaveLength(5);
 		});
 
 		it('rejects a status that does not exist instead of returning nothing', async () => {

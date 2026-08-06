@@ -8,6 +8,7 @@ const { resolveGuestToken } = require('../../utils/guest-auth');
 const { assertCanManageArtist } = require('../../utils/shop-membership');
 const { UserInputError } = require('../../utils/errors');
 const { normalizeSlug } = require('../../utils/booking-slug');
+const { paginate } = require('../../utils/pagination');
 
 module.exports = {
   Query: {
@@ -68,7 +69,7 @@ module.exports = {
     // artist scheduled directly from their own calendar - those were never a "booking request"
     // from the artist's own point of view and shouldn't be echoed back at them in this inbox. See
     // BookingRequest.js's own comment on the source field.
-    getBookingRequests: withAuth(async (_, { artistId, statuses }, context, info, user) => {
+    getBookingRequests: withAuth(async (_, { artistId, statuses, page }, context, info, user) => {
       // The artist themselves, or a shop admin at their shop. Previously any shop admin, at any
       // shop, could read an artist's whole inbox - each request carries a client's name, email
       // and the description of the work they want.
@@ -87,11 +88,15 @@ module.exports = {
         });
       }
 
-      return BookingRequest.find({
-        artistId,
-        source: 'public_form',
-        status: { $in: requested.length > 0 ? requested : BookingRequest.INBOX_STATUSES },
-      }).sort({ createdAt: -1 });
+      return paginate(
+        BookingRequest,
+        {
+          artistId,
+          source: 'public_form',
+          status: { $in: requested.length > 0 ? requested : BookingRequest.INBOX_STATUSES },
+        },
+        { sort: { createdAt: -1 }, page },
+      );
     }),
     getBookingRequest: withAuth(async (_, { bookingRequestId }, context, info, user) => {
       const bookingRequest = await BookingRequest.findById(bookingRequestId);

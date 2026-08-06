@@ -6,6 +6,7 @@ import { useAuth } from "../../context/auth";
 import { AppointmentService } from "../../services/AppointmentService";
 import DateRangePicker from "../analytics/DateRangePicker";
 import AppointmentTypeChip from "./AppointmentTypeChip";
+import Pager from "../pagination/Pager";
 import { getDefaultRange } from "../../utils/dateRanges";
 import { ROUTE_CONSTANTS } from "../../constants";
 import "./appointmentsList.css";
@@ -45,26 +46,36 @@ const AppointmentsList = () => {
 		[range]
 	);
 
+	// 50 a page. Enough that most ranges are one page, few enough that the browser isn't rendering
+	// a thousand rows nobody scrolled to.
+	const [page, setPage] = useState({ limit: 50, offset: 0 });
+
+	// Back to the first page whenever the RANGE changes. Without this, moving from a year to a week
+	// while on page 4 asks for rows 150-200 of a set that now has eleven, and the screen goes blank
+	// with no explanation - the classic paging bug, and the one people report as "it lost my data".
+	const setRangeAndReset = (next) => {
+		setRange(next);
+		setPage((prev) => ({ ...prev, offset: 0 }));
+	};
+
 	const shopId = user.userInfo?.shop?.id;
 	const { data: shopData, loading: shopLoading } = AppointmentService.getAppointmentsByShop(
 		shopId,
-		filter
+		filter,
+		page
 	);
 	const { data: artistData, loading: artistLoading } =
-		AppointmentService.getAppointmentsByArtistForCalendar(shopId ? undefined : user.id, filter);
+		AppointmentService.getAppointmentsByArtistForCalendar(
+			shopId ? undefined : user.id,
+			filter,
+			page
+		);
 
 	const loading = shopId ? shopLoading : artistLoading;
 
-	// Both queries fetch a single page of 200 - a limit chosen for the calendar, which only ever
-	// asks for one month. A list can be pointed at twelve, and a busy shop will exceed it.
-	//
-	// Surfaced rather than paged, for now, because a truncated list that says nothing is the worst
-	// of the three options: it looks complete and is not, and the person reconciling against it has
-	// no way to know. Paging is the better answer and is a bigger change than this one.
 	const pageInfo = shopId
 		? shopData?.getAppointmentsByShop?.pageInfo
 		: artistData?.getAppointmentsByArtist?.pageInfo;
-	const truncated = Boolean(pageInfo?.hasMore);
 
 	const appointments = useMemo(() => {
 		const items = shopId
@@ -105,19 +116,12 @@ const AppointmentsList = () => {
 	return (
 		<div className="appointmentsList">
 			<div className="appointmentsListControls">
-				<DateRangePicker value={range} onChange={setRange} />
+				<DateRangePicker value={range} onChange={setRangeAndReset} />
 			</div>
 
 			{loading && (
 				<div className="appointmentsListLoading">
 					<CircularProgress size="24px" />
-				</div>
-			)}
-
-			{!loading && truncated && (
-				<div className="appointmentsListTruncated">
-					Showing the first {appointments.length} of {pageInfo.totalCount}. Narrow the
-					date range to see the rest.
 				</div>
 			)}
 
@@ -172,6 +176,9 @@ const AppointmentsList = () => {
 						))}
 					</div>
 				))}
+
+			{/* Renders nothing when it all fits on one page, so a short range stays clean. */}
+			{!loading && <Pager pageInfo={pageInfo} onChange={setPage} />}
 		</div>
 	);
 };

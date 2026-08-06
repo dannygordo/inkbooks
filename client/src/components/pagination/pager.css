@@ -1,0 +1,19 @@
+.pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 4px;
+    border-top: 1px solid #eee;
+}
+
+.pagerRange {
+    font-size: 13px;
+    color: #666;
+    font-variant-numeric: tabular-nums;
+}
+
+.pagerButtons {
+    display: flex;
+    gap: 4px;
+}

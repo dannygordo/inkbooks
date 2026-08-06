@@ -61,14 +61,16 @@ export const AppointmentService = (() => {
     // range is { from, to } covering exactly the grid the calendar is drawing - see
     // IBCalendar.jsx. Skipped without one as well as without a shopId: firing this unbounded
     // would fetch the shop's whole history, which is the thing the range exists to stop.
-    const _getAppointmentsByShop = (shopId, range) => {
+    const _getAppointmentsByShop = (shopId, range, page) => {
         return useQuery(_FETCH_APPOINTMENTS_BY_SHOP, {
 			variables: {
 				shopId,
 				filter: range,
-				// A month of one shop's appointments, in one response. Paging it would just mean
-				// stitching the pages back together in the browser to draw the grid.
-				page: { limit: 200 },
+				// A month of one shop's appointments, in one response, when no page is asked for.
+				// Paging the CALENDAR would just mean stitching the pages back together in the
+				// browser to draw the grid - but a list over an arbitrary range genuinely needs to
+				// page, so callers can now say so.
+				page: page || { limit: 200 },
 			},
 			skip: !shopId || !range,
 		});
@@ -246,9 +248,13 @@ export const AppointmentService = (() => {
             }
         }
     `;
-    const _getAppointmentsByArtistForCalendar = (userId, range) => {
+    // page is optional: the calendar wants one month in one response and passes nothing, the
+    // appointments list drives real paging through it. Defaulting here rather than at each call
+    // site keeps the calendar's "give me the grid" behaviour unchanged while letting a list ask
+    // for a window it can page through.
+    const _getAppointmentsByArtistForCalendar = (userId, range, page) => {
         return useQuery(_FETCH_APPOINTMENTS_BY_ARTIST_FOR_CALENDAR, {
-            variables: { userId, filter: range, page: { limit: 200 } },
+            variables: { userId, filter: range, page: page || { limit: 200 } },
             skip: !userId || !range,
         });
     };
