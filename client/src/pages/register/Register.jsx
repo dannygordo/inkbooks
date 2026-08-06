@@ -1,7 +1,7 @@
 // Explicit React import - see scripts/check-react-in-tested-components.mjs. Under Vitest,
 // @vitejs/plugin-react compiles JSX with the classic runtime, so anything a test renders needs
 // React in scope.
-import React, { useContext, useMemo, useState } from "react";
+import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CircularProgress, MenuItem, TextField } from "@mui/material";
 import { gql, useMutation } from "@apollo/client";
@@ -145,6 +145,22 @@ const Register = () => {
 		messageEmail: undefined,
 	});
 	const [slugTouched, setSlugTouched] = useState(false);
+
+	// Whether there was already a session when this page mounted.
+	//
+	// The /register route renders this component unconditionally, because the wizard logs you in at
+	// step 2 and has to keep running afterwards. That means the "you are already signed in, go to
+	// the dashboard" redirect has to live here instead - and it has to be decided ONCE, at mount,
+	// from a ref rather than from context.user. Reading context.user in an effect would fire again
+	// the moment step 2 logs the new account in, which is precisely the bounce this replaces.
+	const hadSessionOnMount = useRef(Boolean(context.user?.id));
+	useEffect(() => {
+		if (hadSessionOnMount.current) {
+			navigate(ROUTE_CONSTANTS.HOME);
+		}
+		// Mount only, deliberately - see above.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	const [registerAccount, { loading: registering }] = useMutation(REGISTER_ACCOUNT);
 	const [updateNotificationSettings] = useMutation(NotificationService.UPDATE_SETTINGS);
@@ -403,6 +419,13 @@ const Register = () => {
 									id="password"
 									fullWidth
 									type="password"
+									// Stops the browser filling in a SAVED credential. Without it,
+									// Chrome and Safari treat any type="password" field as a login
+									// box and prefill the password for whatever account they have
+									// stored for this origin - on a signup form that is both
+									// confusing and a way to create an account whose password
+									// nobody chose.
+									autoComplete="new-password"
 									value={values.password}
 									onChange={setField("password")}
 									error={Boolean(errors.password)}
@@ -414,6 +437,7 @@ const Register = () => {
 									id="confirmPassword"
 									fullWidth
 									type="password"
+									autoComplete="new-password"
 									value={values.confirmPassword}
 									onChange={setField("confirmPassword")}
 									error={Boolean(errors.confirmPassword)}

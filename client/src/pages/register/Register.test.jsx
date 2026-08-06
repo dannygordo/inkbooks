@@ -144,6 +144,71 @@ describe("Register wizard", () => {
 		expect(await screen.findByText(/how should we reach you/i)).toBeInTheDocument();
 	});
 
+	it("stays on the wizard after signing in, instead of bouncing to the dashboard", async () => {
+		// THE regression. Step 2 logs the new account in so the later steps can save with
+		// authenticated mutations - and the /register route used to be
+		// `user?.id ? <Home/> : <Register/>`, so that login swapped the element out from under the
+		// wizard and dumped somebody straight into the app. Steps 3 to 5 never rendered.
+		//
+		// Asserted through the STEP COUNTER rather than "some later text is present", because the
+		// counter is what proves the wizard is still driving rather than that a heading happens to
+		// exist somewhere.
+		const user = userEvent.setup();
+		renderRegister({ mocks: [artistSignupMock()] });
+
+		await chooseArtist(user);
+		await fillAccountStep(user);
+		// An artist path is 5 steps: type, account, notifications, rates, done. Written out rather
+		// than matched loosely, so adding a step to one path and not the other fails here instead
+		// of silently shifting what "step 3" means.
+		expect(screen.getByText("Step 2 of 5")).toBeInTheDocument();
+
+		await user.click(screen.getByText("Create account"));
+
+		expect(await screen.findByText("Step 3 of 5")).toBeInTheDocument();
+		expect(screen.getByText(/how should we reach you/i)).toBeInTheDocument();
+	});
+
+	it("sends somebody who is already signed in to the dashboard", async () => {
+		// The other half of removing the route guard. A live session visiting /register should still
+		// end up in the app - that redirect just has to live in the component now, decided once at
+		// mount, so it cannot fire again when step 2 logs the new account in.
+		const contextValue = { login: vi.fn(), user: { id: "already-here" } };
+		render(
+			<MemoryRouter>
+				<MockedProvider mocks={[]}>
+					<AuthContext.Provider value={contextValue}>
+						<Register />
+					</AuthContext.Provider>
+				</MockedProvider>
+			</MemoryRouter>,
+		);
+
+		// Redirected away, so the wizard's first question never appears.
+		await waitFor(() =>
+			expect(screen.queryByText("I run a shop")).not.toBeInTheDocument(),
+		);
+	});
+
+	it("never lets the browser prefill a saved password", async () => {
+		// Both password boxes are autoComplete="new-password". Without it Chrome and Safari treat
+		// any type="password" field as a login box and fill in the credential they have stored for
+		// this origin - so a signup form arrives with a password nobody on this screen chose.
+		const user = userEvent.setup();
+		renderRegister();
+
+		await chooseArtist(user);
+
+		expect(screen.getByLabelText(/^password$/i)).toHaveAttribute(
+			"autocomplete",
+			"new-password",
+		);
+		expect(screen.getByLabelText(/confirm password/i)).toHaveAttribute(
+			"autocomplete",
+			"new-password",
+		);
+	});
+
 	it("lets every step after the account be skipped", async () => {
 		// An onboarding wizard that traps somebody on a number they haven't decided yet is one they
 		// close. Skipping is offered explicitly, not hidden behind a back button.

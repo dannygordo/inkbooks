@@ -321,7 +321,15 @@ function App() {
 						    server/utils/password-tokens.js). */}
 						<Route path="/set-password/:token" element={<SetPassword />} />
 						<Route path="/login" element={user?.id ? <Home /> : <Login />} />
-						<Route path="/register" element={user?.id ? <Home /> : <Register />} />
+						{/* Always Register, unlike /login above.
+						    Signup is a WIZARD that logs you in partway through: the account is created at
+						    step 2 so the remaining steps can save settings with authenticated mutations.
+						    With `user?.id ? <Home/> : <Register/>` here, that login swapped the element
+						    under the wizard and threw somebody straight into the dashboard mid-setup -
+						    steps 3 to 5 never rendered.
+						    Register redirects an ALREADY signed-in visitor itself, on mount, so typing
+						    /register with a live session still lands on the dashboard. */}
+						<Route path="/register" element={<Register />} />
 						{/* Public, unauthenticated by design - no AuthRoute wrapper, same as
 						/login, /register, /resetPassword above. This is the public intake form a
 						prospective client fills out before any account exists.
