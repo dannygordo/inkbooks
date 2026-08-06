@@ -60,7 +60,16 @@ const Search = styled("div")(({ theme }) => ({
 	width: "100%",
 	[theme.breakpoints.up("sm")]: {
 		marginLeft: theme.spacing(3),
+		// Grows with the header instead of sitting at a fixed width. `width: auto` sized the box to
+		// the input's own 20ch, so it stayed the same small pill whether the window was 900px or
+		// 2500px, and the space it should have taken went to the empty spacer beside it.
+		//
+		// A maxWidth as well as flexGrow: unbounded, this would stretch to a search field the width
+		// of a desk on a wide monitor, which is worse than too small - the cursor ends up miles from
+		// the results it produces.
+		flexGrow: 1,
 		width: "auto",
+		maxWidth: 520,
 	},
 }));
 
@@ -86,10 +95,11 @@ const StyledInputBase = styled(InputBase)(({ theme }) => ({
 		// vertical padding + font size from searchIcon
 		paddingLeft: `calc(1em + ${theme.spacing(4)})`,
 		transition: theme.transitions.create("width"),
+		// 100% at every size now. The `20ch` override at md was what pinned the field's width, so
+		// making the wrapper flexible without removing this would have left a wide box containing a
+		// narrow input - the growth has to happen in both or it shows up as dead space inside the
+		// control.
 		width: "100%",
-		[theme.breakpoints.up("md")]: {
-			width: "20ch",
-		},
 	},
 }));
 

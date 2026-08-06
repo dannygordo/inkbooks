@@ -1,0 +1,20 @@
+.appointmentTypeChip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 10px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.6;
+    letter-spacing: 0.2px;
+    white-space: nowrap;
+    /* Colours come from the style attribute (utils/appointmentType.js) rather than from a class
+       per type, so there is exactly one place that decides what a consult looks like. */
+}
+
+.appointmentTypeChipSmall {
+    padding: 1px 8px;
+    font-size: 11px;
+}

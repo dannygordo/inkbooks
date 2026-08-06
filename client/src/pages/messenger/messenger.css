@@ -3,6 +3,10 @@
     height: calc(100vh - 70px);
     flex: 4;
     margin-left: 10px;
+    /* The chat box was the rightmost element on the page and sat flush against the viewport edge,
+       so message bubbles ran right up to it. Matches the left margin, so the messenger sits evenly
+       inside the main column rather than looking pushed over. */
+    margin-right: 20px;
 }
 .messengerContainer {
     display: flex;

@@ -139,15 +139,22 @@
     border-color: #1775ee;
 }
 
+/* Same centring fix as artistBookingRequests.css - see the comment there for why a fixed-height
+   button needs this rather than relying on default text positioning. */
 .guestConversationSendButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     height: 44px;
     padding: 0 20px;
     border-radius: 8px;
     border: none;
     background-color: #1775ee;
     color: white;
+    font-family: inherit;
     font-size: 15px;
     font-weight: 600;
+    line-height: 1;
     cursor: pointer;
 }
 

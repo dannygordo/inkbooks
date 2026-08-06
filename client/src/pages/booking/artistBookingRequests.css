@@ -222,13 +222,27 @@
 }
 
 .bookingRequestReplyRow button {
+    /* inline-flex + centring on both axes, rather than trusting a button's default text
+       positioning. With a fixed height and `padding: 0`, the label rides on the font's baseline
+       inside the box, which puts it visibly high - and the button also swaps its label for a
+       16px CircularProgress while sending, which an inline layout aligns on that same baseline
+       instead of in the middle. One rule fixes both states. */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     height: 42px;
     padding: 0 18px;
     border-radius: 8px;
     border: none;
     background-color: #1775ee;
     color: white;
+    /* Inherited, so the button matches the input beside it - a bare <button> otherwise falls back
+       to the browser's own UI font, which has different metrics and is half the reason the label
+       looked off in the first place. */
+    font-family: inherit;
+    font-size: 14px;
     font-weight: 600;
+    line-height: 1;
     cursor: pointer;
 }
 

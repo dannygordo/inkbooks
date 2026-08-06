@@ -8,6 +8,7 @@ import AnalyticsService from "../../services/AnalyticsService";
 import { getDefaultRange } from "../../utils/dateRanges";
 import { AppointmentService } from "../../services/AppointmentService";
 import ShopCutPayoutList from "./ShopCutPayoutList";
+import AppointmentTypeChip from "../appointments/AppointmentTypeChip";
 import { ROUTE_CONSTANTS } from "../../constants";
 import { formatCents } from "../../utils/money";
 import { tagColorRowStyle } from "../../utils/tagColor";
@@ -93,7 +94,11 @@ const AppointmentRow = ({ appt, onNavigate, showEarnings = false }) => {
 					{appt.tipCents ? ` (${formatCents(appt.tipCents)} tip)` : ""}
 				</span>
 			)}
-			<span className="artistUpcomingType">{appt.appointmentType}</span>
+			{/* Was the raw enum value in plain text - "consult" lowercase, visually identical to
+			    "session" at a glance, so telling the two lists apart meant reading every row. */}
+			<span className="artistUpcomingType">
+				<AppointmentTypeChip type={appt.appointmentType} size="small" />
+			</span>
 		</li>
 	);
 };

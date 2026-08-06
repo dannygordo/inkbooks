@@ -75,7 +75,12 @@ function App() {
 					documented fix for exactly this "permanent mini-drawer + fixed AppBar" layout - it
 					tracks the AppBar's real rendered height (which changes across breakpoints) instead
 					of a hardcoded magic-number offset that could silently drift out of sync. */}
-					<Box component="main" sx={{ flexGrow: 1, minWidth: 0 }}>
+					{/* pb here, not on each page. Content was running flush into the bottom of the
+					    viewport - the last row of a list ends exactly at the edge, which reads as
+					    "there is more below" even when there isn't, and leaves no room for a
+					    scrollbar or a mobile browser's bottom chrome. One rule on the shared main
+					    element covers every route, including ones that don't exist yet. */}
+					<Box component="main" sx={{ flexGrow: 1, minWidth: 0, pb: "50px" }}>
 						{user && <Toolbar />}
 						<Routes>
 						<Route

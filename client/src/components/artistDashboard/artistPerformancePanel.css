@@ -115,7 +115,11 @@
 	white-space: nowrap;
 }
 
+/* A wrapper for the chip now, not the label itself - text-transform and colour moved into
+   AppointmentTypeChip so the type reads the same wherever it appears. Fixed width so the chips
+   line up down the list instead of ragging with the word length. */
 .artistUpcomingType {
-	text-transform: capitalize;
-	color: #555;
+	display: flex;
+	justify-content: flex-end;
+	min-width: 76px;
 }
