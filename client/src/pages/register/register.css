@@ -1,134 +1,288 @@
+/* Signup / onboarding wizard.
+ *
+ * SPACING IS THE POINT OF THIS FILE, so it is worth stating the system rather than leaving a pile
+ * of numbers. Everything is a multiple of 8px, and the gaps get larger as the grouping gets
+ * looser:
+ *
+ *     8px   inside a control - label to input
+ *     16px  between the parts of one field - help text to control
+ *     32px  between fields
+ *     40px  between a section and the card edge
+ *     48px  card padding
+ *
+ * The old form set no gaps at all and leaned on MUI's own margins, which is why it read as cramped:
+ * six inputs at default density with nothing between them is a wall, and a wall is what makes a
+ * form feel like a chore rather than a setup.
+ */
+
 .register {
-    width: 100vw;
-    height: 100vh;
+    min-height: 100vh;
+    width: 100%;
     background-color: #f0f2f5;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
+    /* Vertical breathing room around the card itself, and enough at the bottom that the last
+       action never sits against the viewport edge. Scrolls rather than centring on a tall step -
+       a centred card taller than the screen clips its own top, which is unrecoverable. */
+    padding: 48px 24px 80px;
+    box-sizing: border-box;
 }
 
-.registerWrapper {
-    width: 70%;
-    height: 70%;
+.onboardCard {
+    width: 100%;
+    max-width: 640px;
+    background-color: #fff;
+    border-radius: 14px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+}
+
+/* --- Header and progress ------------------------------------------------------------------ */
+
+.onboardHeader {
     display: flex;
-}
-
-.registerLeft,
-.registerRight {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-}
-
-.registerLogo {
-    font-size: 50px;
-    font-weight: 800;
-    color: #1775ee;
-    margin-bottom: 10px;
-}
-
-.registerDesc {
-    font-size: 24px;
-}
-
-.registerBox{
-    height: 400px;
-    padding: 20px;
-    background-color: white;
-    border-radius: 10px;
-    display: flex;
-    flex-direction: column;
+    align-items: baseline;
     justify-content: space-between;
+    padding: 32px 48px 20px;
 }
 
-/* .registerInput{
-    height: 50px;
-    border-radius: 10px;
-    border: 1px solid gray;
-    font-size: 18px;
-    padding-left: 20px;
-}
-
-.registerInput:focus{
-    outline: none;
-} */
-
-/* .registerButton{
-    height: 50px;
-    border-radius: 10px;
-    border: none;
-    background-color: #1775ee;
-    color: white;
-    font-size: 20px;
-    font-weight: 500;
-    cursor: pointer;
-} */
-
-.registerForgot{
-    text-align: center;
+.onboardLogo {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 700;
     color: #1775ee;
 }
-/* --- Account-type step ------------------------------------------------------------------- */
 
-.registerStepTitle {
-    margin: 0 0 4px;
-    font-size: 18px;
-    font-weight: 600;
-    color: #333;
+.onboardProgress {
+    font-size: 13px;
+    color: #888;
+    font-variant-numeric: tabular-nums;
 }
 
-/* A card, not a radio button. The choice carries real consequences - one creates a shop with a
-   roster and books, the other creates a single artist - so each option gets room to say what it
-   does. A radio label has room for two words, which is how people pick the wrong one. */
-.registerTypeCard {
+.onboardProgressBar {
+    height: 3px;
+    background-color: #eef0f3;
+}
+
+.onboardProgressBarFill {
+    height: 100%;
+    background-color: #1775ee;
+    transition: width 240ms ease;
+}
+
+/* --- Body ---------------------------------------------------------------------------------- */
+
+.onboardBody {
+    padding: 40px 48px 8px;
+}
+
+.onboardTitle {
+    margin: 0 0 8px;
+    font-size: 22px;
+    font-weight: 600;
+    color: #1c1c1c;
+    line-height: 1.3;
+}
+
+.onboardSubtitle {
+    margin: 0 0 8px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #666;
+    /* Stops a long subtitle running the full width of the card. Around 60 characters a line is
+       where prose stays readable; a single line spanning 640px makes the eye lose its place
+       returning to the left edge. */
+    max-width: 52ch;
+}
+
+.onboardFields {
+    display: flex;
+    flex-direction: column;
+    /* THE gap that stops this looking crammed. */
+    gap: 32px;
+    margin-top: 32px;
+}
+
+/* Two fields side by side (first/last name, password/confirm) on anything but a narrow screen.
+   They collapse below it, because two 4-character-wide inputs are worse than two stacked ones. */
+.onboardRow {
+    display: flex;
+    gap: 24px;
+}
+
+.onboardRow > * {
+    flex: 1;
+    min-width: 0;
+}
+
+@media (max-width: 560px) {
+    .onboardRow {
+        flex-direction: column;
+        gap: 32px;
+    }
+    .onboardHeader,
+    .onboardBody,
+    .onboardActions {
+        padding-left: 24px;
+        padding-right: 24px;
+    }
+}
+
+/* --- A field, with its explanation --------------------------------------------------------- */
+
+.onboardField {
+    display: flex;
+    flex-direction: column;
+}
+
+.onboardFieldLabel {
+    font-size: 15px;
+    font-weight: 600;
+    color: #222;
+    margin-bottom: 6px;
+}
+
+/* The explanation, above the control rather than below it. Read before the decision is made, not
+   after - help text under an input is help you find once you are already stuck. */
+.onboardFieldHelp {
+    margin: 0 0 12px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #777;
+    max-width: 56ch;
+}
+
+.onboardFieldControl {
+    display: flex;
+    flex-direction: column;
+}
+
+/* --- The account-type choice --------------------------------------------------------------- */
+
+.onboardChoices {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.onboardChoice {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 4px;
-    width: 100%;
-    padding: 14px 16px;
-    border: 1px solid #ddd;
-    border-radius: 10px;
+    gap: 8px;
+    /* Generous, because these are the two biggest decisions on the screen and they should look
+       like it rather than like list rows. */
+    padding: 24px 28px;
+    border: 1px solid #dfe3e8;
+    border-radius: 12px;
     background-color: #fff;
     text-align: left;
     cursor: pointer;
     font-family: inherit;
+    transition: border-color 140ms ease, background-color 140ms ease;
 }
 
-.registerTypeCard:hover {
+.onboardChoice:hover {
     border-color: #1775ee;
     background-color: #f7faff;
 }
 
-.registerTypeTitle {
-    font-size: 15px;
+.onboardChoiceSelected {
+    border-color: #1775ee;
+    background-color: #f2f7ff;
+}
+
+.onboardChoiceTitle {
+    font-size: 17px;
     font-weight: 600;
-    color: #222;
+    color: #1c1c1c;
 }
 
-.registerTypeBlurb {
-    font-size: 13px;
+.onboardChoiceBlurb {
+    font-size: 14px;
+    line-height: 1.6;
     color: #666;
-    line-height: 1.4;
 }
 
-.registerChosenType {
+/* --- Errors and the final screen ----------------------------------------------------------- */
+
+.onboardErrors {
+    margin-top: 28px;
+    padding: 16px 20px;
+    border-radius: 8px;
+    background-color: #fdeded;
+    color: #b3261e;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.onboardErrors ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.onboardDone {
+    font-size: 16px;
+    line-height: 1.7;
+    color: #333;
+}
+
+/* --- Actions ------------------------------------------------------------------------------- */
+
+.onboardActions {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
-    font-size: 13px;
-    color: #666;
+    gap: 24px;
+    /* Wide top padding so the primary action is clearly separated from the last field rather than
+       reading as part of it. */
+    padding: 32px 48px 40px;
 }
 
-.registerLinkButton {
+.onboardActionsLeft {
+    display: flex;
+    gap: 20px;
+}
+
+.onboardPrimaryButton {
+    min-width: 180px;
+    /* Tall enough to be a comfortable target and to look deliberate next to 32px field gaps. */
+    padding: 14px 28px;
+    border: none;
+    border-radius: 8px;
+    background-color: #1775ee;
+    color: #fff;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.onboardPrimaryButton:hover:not(:disabled) {
+    background-color: #1465cc;
+}
+
+.onboardPrimaryButton:disabled {
+    background-color: #9dc2f2;
+    cursor: not-allowed;
+}
+
+.onboardLinkButton {
     border: none;
     background: none;
     padding: 0;
     color: #1775ee;
-    font-size: 13px;
     font-family: inherit;
+    font-size: 14px;
     cursor: pointer;
     text-decoration: underline;
+}
+
+.onboardLinkButton:hover {
+    color: #1465cc;
 }
