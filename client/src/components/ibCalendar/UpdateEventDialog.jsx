@@ -42,7 +42,10 @@ const UpdateEventDialog = ({ selectedDay, event }) => {
 	const navigate = useNavigate();
 	const titleRef = useRef(event.title);
 	const descriptionRef = useRef(event.description);
-	const [startDateTime, setStartDateTime] = useState(moment.utc(event.appointmentDate));
+	// LOCAL, not moment.utc(). A utc-mode moment makes the picker interpret whatever the artist
+	// picks as a UTC wall clock, so "10:00" is stored as 10:00Z - seven hours early in PDT. The
+	// appointment is an INSTANT; the picker works in the viewer's zone and toISOString() converts.
+	const [startDateTime, setStartDateTime] = useState(moment(event.appointmentDate));
 	// Seeded from the stored value, falling back for records written before durationMinutes
 	// existed - the server resolver has the same fallback, so this only matters until a re-seed.
 	const [durationMinutes, setDurationMinutes] = useState(
@@ -261,7 +264,7 @@ const UpdateEventDialog = ({ selectedDay, event }) => {
 								    the thing being moved. */}
 								<AppointmentSlotPicker
 									label="Select Date"
-									date={moment.utc(startDateTime)}
+									date={moment(startDateTime)}
 									onDateChange={setStartDateTime}
 									durationMinutes={durationMinutes}
 									onDurationChange={setDurationMinutes}

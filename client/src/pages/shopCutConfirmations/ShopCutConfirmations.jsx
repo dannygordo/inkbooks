@@ -78,7 +78,7 @@ const ShopCutConfirmations = () => {
 								</div>
 								<div className="shopCutConfirmationDetail">
 									{item.title || "Appointment"} -{" "}
-									{moment.utc(item.appointmentDate).format("MMM D, YYYY")}
+									{moment(item.appointmentDate).format("MMM D, YYYY")}
 								</div>
 								<div className="shopCutConfirmationAmount">
 									{typeof item.shopCutCents === "number"
@@ -88,7 +88,7 @@ const ShopCutConfirmations = () => {
 								<div className="shopCutConfirmationMarkedAt">
 									Marked paid{" "}
 									{item.shopCutMarkedPaidAt
-										? moment.utc(item.shopCutMarkedPaidAt).fromNow()
+										? moment(item.shopCutMarkedPaidAt).fromNow()
 										: ""}
 								</div>
 							</div>

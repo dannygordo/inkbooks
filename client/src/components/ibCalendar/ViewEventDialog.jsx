@@ -41,7 +41,7 @@ const ViewEventDialog = ({ event }) => {
 					<span className="viewEventType">{event.appointmentType}</span>
 				</div>
 				<p className="viewEventDate">
-					{moment.utc(event.appointmentDate).format("LLL")}
+					{moment(event.appointmentDate).format("LLL")}
 				</p>
 				<p className="viewEventTitle">{displayTitle}</p>
 				{clientUser && (

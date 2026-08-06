@@ -60,7 +60,10 @@ const AppointmentWizard = ({ selectedDay }) => {
 
 	const [type, setType] = useState(null); // 'consult' | 'session' | 'other' | null
 	const [step, setStep] = useState("type");
-	const [startDateTime, setStartDateTime] = useState(moment.utc(selectedDay));
+	// LOCAL, not moment.utc(). A utc-mode moment makes the picker interpret whatever the artist
+	// picks as a UTC wall clock, so "10:00" is stored as 10:00Z - seven hours early in PDT. The
+	// appointment is an INSTANT; the picker works in the viewer's zone and toISOString() converts.
+	const [startDateTime, setStartDateTime] = useState(moment(selectedDay));
 	// One duration for whichever appointment this wizard ends up creating. Seeded per TYPE the
 	// moment the type is chosen (see setTypeAndDefaultDuration below) rather than left at a single
 	// constant, because a consult and a session are wildly different lengths and a default that is

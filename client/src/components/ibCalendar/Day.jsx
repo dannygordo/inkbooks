@@ -93,15 +93,13 @@ const Day = ({ day, rowIdx }) => {
 							key={index}
 							title={
 								evt.projectId
-									? `${moment
-											.utc(evt.appointmentDate)
+									? `${moment(evt.appointmentDate)
 											.format("h:mma")} ${
                                                 evt.project.client.user.firstName
                                             } ${evt.project.client.user.lastName} - ${
 											displayTitle(evt)
 									  }`
-									: `${moment
-											.utc(evt.appointmentDate)
+									: `${moment(evt.appointmentDate)
 											.format("h:mma")} - ${displayTitle(evt)}`
 							}
 						>
@@ -115,14 +113,12 @@ const Day = ({ day, rowIdx }) => {
 								}}
 								style={{ backgroundColor: resolveTagColor(evt.user?.tagColor) }}
 							>
-								{evt.projectId ? `${moment
-									.utc(evt.appointmentDate)
+								{evt.projectId ? `${moment(evt.appointmentDate)
 									.format("h:mma")} ${
                                         evt.project.client.user.firstName
                                     } ${evt.project.client.user.lastName} - ${
 									displayTitle(evt)
-								}`: `${moment
-									.utc(evt.appointmentDate)
+								}`: `${moment(evt.appointmentDate)
 									.format("h:mma")}  - ${
 									displayTitle(evt)
 								}`}
