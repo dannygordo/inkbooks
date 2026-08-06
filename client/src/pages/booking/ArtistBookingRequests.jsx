@@ -7,6 +7,7 @@ import { useAuth } from "../../context/auth";
 import { ArtistService } from "../../services/ArtistService";
 import IBDateTimePicker from "../../components/inputs/IBDateTimePicker";
 import BookSessionDatesForm from "../../components/booking/BookSessionDatesForm";
+import { prettyMessageTime, fullMessageTime } from "../../utils/messageTime";
 import { ROUTE_CONSTANTS } from "../../constants";
 import "./artistBookingRequests.css";
 
@@ -470,6 +471,12 @@ const ArtistBookingRequests = () => {
                   }
                 >
                   <div className="guestMessageBubble">{msg.message}</div>
+                  {/* Same formatter as the messenger (utils/messageTime.js). This pane had no
+                      timestamp at all, so a request could sit for a week with no indication of
+                      whether the last word was yours or theirs, or when. */}
+                  <div className="guestMessageTime" title={fullMessageTime(msg.createdAt)}>
+                    {prettyMessageTime(msg.createdAt)}
+                  </div>
                 </div>
               ))}
             </div>

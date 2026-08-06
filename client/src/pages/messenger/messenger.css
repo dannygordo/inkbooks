@@ -6,21 +6,30 @@
 }
 .messengerContainer {
     display: flex;
+    height: 100%;
 }
+/* Two columns now. The third - an "online friends" panel - rendered a hardcoded name and has been
+   removed along with its component. The list keeps flex: 3 against the chat box's flex: 6, so the
+   thread absorbs the space the old panel held rather than the list stretching to fill it. */
 .chatMenu {
-    flex: 3
+    flex: 3;
+    min-width: 0;
 }
 .chatMenuInput {
     width: 90%;
     padding: 10px 0px;
-
 }
-.chatOnline {
-    flex: 3
+.chatMenuEmpty {
+    padding: 16px 4px;
+    color: #888;
+    font-size: 14px;
 }
-.chatMenuWrapper 
-.chatOnlineWrapper {
+/* Was `.chatMenuWrapper\n.chatOnlineWrapper { ... }` - a missing comma, which makes that a
+   DESCENDANT selector rather than a group, so none of these rules ever applied to .chatMenuWrapper
+   at all. It only looked fine because the defaults were close enough to notice nothing. */
+.chatMenuWrapper {
     padding: 5px;
     height: 100%;
     margin: 10px;
+    overflow-y: auto;
 }

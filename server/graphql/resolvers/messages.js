@@ -22,9 +22,13 @@ module.exports = {
           if (!(await canAccessConversation(user, conversation))) {
             throw new AuthenticationError('Action not allowed');
           }
+          // createdAt, not updatedAt. A thread is in the order things were SAID; sorting on
+          // updatedAt means editing an old message teleports it to the bottom of the conversation,
+          // rewriting the apparent order of a discussion. updateMessage exists, so this is
+          // reachable rather than theoretical.
           const message = await Message.find({
               conversationId: conversationId
-          }).sort({ updatedAt: 1 });
+          }).sort({ createdAt: 1 });
           return message;
         } catch (err) {
           rethrow(err);

@@ -13,7 +13,7 @@ import { io } from "socket.io-client";
 import { APP_SETTINGS_CONSTANTS } from "../../constants";
 import { useSocket } from "../../context/SocketProvider";
 
-const IBChatBox = ({ widget, conversation, setActiveMessages, messages, isInputDisabled = false }) => {
+const IBChatBox = ({ widget, conversation, setActiveMessages, messages, isInputDisabled = false, loadingMessages = false }) => {
 	const { user } = useAuth();
 	const messageRef = useRef();
 	//const scrollRef = useRef();
@@ -107,7 +107,14 @@ const IBChatBox = ({ widget, conversation, setActiveMessages, messages, isInputD
 					lastName: user.lastName,
 					avatar: user.avatar
 				},
-				message: msg.message
+				message: msg.message,
+				// The SERVER's timestamp, not the local one built above. This was omitted
+				// entirely, which happened to look right - moment(undefined) means "now", and a
+				// message you just sent really is from now - so the bug only showed up as the
+				// message jumping to a different time on the next refetch. It also travels over
+				// the socket to the other person, for whom "now" is not the same guess.
+				createdAt: msg.createdAt,
+				updatedAt: msg.updatedAt
 			};
 
 			const newMessageList = [...messages, savedMessage];
@@ -202,6 +209,9 @@ const IBChatBox = ({ widget, conversation, setActiveMessages, messages, isInputD
 							widget ? "ibChatBoxTop widget" : "ibChatBoxTop"
 						}
 					>
+						{loadingMessages && messages.length === 0 && (
+							<div className="ibChatBoxLoading">Loading conversation...</div>
+						)}
 						{messages.map((message, index) => {
 							if (user.id === message.senderId) {
 								return (

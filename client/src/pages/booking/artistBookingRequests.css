@@ -235,16 +235,28 @@
 /* Message bubble styles - same class names/appearance as guestConversation.css's guest-facing
    thread, kept as duplicate rules here rather than a cross-file dependency, since this app's CSS
    is global/unscoped and each page otherwise only imports its own stylesheet. */
+/* A column, so the timestamp stacks UNDER the bubble. This was `display: flex` with
+   justify-content doing the left/right placement, which put the time beside the bubble the moment
+   a second child appeared. align-items now does the same placement job on the cross axis. */
 .guestMessage {
     display: flex;
+    flex-direction: column;
+    margin-bottom: 10px;
 }
 
 .guestMessageMine {
-    justify-content: flex-end;
+    align-items: flex-end;
 }
 
 .guestMessageTheirs {
-    justify-content: flex-start;
+    align-items: flex-start;
+}
+
+.guestMessageTime {
+    font-size: 11px;
+    color: #888;
+    margin-top: 3px;
+    padding: 0 4px;
 }
 
 .guestMessageBubble {

@@ -36,3 +36,9 @@
 	height: 700px;
 	margin: 10px;
 }
+
+.ibChatBoxLoading {
+	padding: 20px 10px;
+	color: #888;
+	font-size: 14px;
+}

@@ -1,4 +1,4 @@
-import { gql, useQuery, useMutation } from "@apollo/client";
+import { gql, useQuery, useLazyQuery, useMutation } from "@apollo/client";
 
 const MessengerService = (() => {
 	const FETCH_PROJECT_CONVERSATION_QUERY = gql`
@@ -83,24 +83,21 @@ const MessengerService = (() => {
 		});
 	};
 
+	// DELIBERATELY NO `messages` HERE.
+	//
+	// This used to request the full message list - text, timestamps, and a nested `user` per
+	// message - for every conversation the caller belongs to, with fetchPolicy: "network-only" so
+	// none of it was ever cached. Opening the messenger therefore pulled every message of every
+	// thread on every visit, to render a list that shows a name and a badge. An artist with a
+	// year of client history would have paid for all of it to see who had written to them.
+	//
+	// Nothing about the list needs message bodies. The thread is fetched on click instead, by
+	// FETCH_MESSAGES_BY_CONVERSATION_ID below.
 	const FETCH_CONVERSATIONS_BY_MEMBER_ID_QUERY = gql`
 		query GetConversationsByMemberId($memberId: ID!) {
 			getConversationsByMemberId(memberId: $memberId) {
 				id
 				members
-				messages {
-					id
-					senderId
-					user {
-						firstName
-						lastName
-						avatar
-					}
-					message
-					createdAt
-					updatedAt
-					conversationId
-				}
 				createdAt
 				updatedAt
 				# The CALLER's unread count for this thread - what the per-conversation badge in the
@@ -122,6 +119,39 @@ const MessengerService = (() => {
 				memberId,
 			},
             fetchPolicy: "network-only"
+		});
+	};
+
+	// One thread, fetched when a conversation is opened. Guarded server-side by
+	// canAccessConversation - a member, or a shop admin at a member's shop - so this is not a
+	// looser door than the list it came from.
+	const FETCH_MESSAGES_BY_CONVERSATION_ID_QUERY = gql`
+		query GetMessagesByConversationId($conversationId: ID!) {
+			getMessagesByConversationId(conversationId: $conversationId) {
+				id
+				conversationId
+				senderId
+				message
+				createdAt
+				updatedAt
+				user {
+					firstName
+					lastName
+					avatar
+				}
+			}
+		}
+	`;
+	/**
+	 * Lazy on purpose: nothing should load until a conversation is actually opened, which is the
+	 * whole point of taking `messages` off the list query.
+	 */
+	const _fetchMessagesByConversationId = () => {
+		return useLazyQuery(FETCH_MESSAGES_BY_CONVERSATION_ID_QUERY, {
+			// The thread has to reflect messages that arrived since it was last opened. Apollo
+			// would otherwise serve the cached copy from the previous visit and show a stale
+			// conversation next to an unread badge that says otherwise.
+			fetchPolicy: "network-only",
 		});
 	};
 
@@ -183,6 +213,9 @@ const MessengerService = (() => {
 		fetchConversationsByMemberId: _fetchConversationsByMemberId,
 		fetchConversationsByMemberIdQuery:
 			FETCH_CONVERSATIONS_BY_MEMBER_ID_QUERY,
+		fetchMessagesByConversationId: _fetchMessagesByConversationId,
+		fetchMessagesByConversationIdQuery:
+			FETCH_MESSAGES_BY_CONVERSATION_ID_QUERY,
         CREATE_MESSAGE_MUTATION: _CREATE_MESSAGE_MUTATION
 	};
 })();

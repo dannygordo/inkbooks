@@ -1,5 +1,5 @@
-import moment from 'moment';
 import IBAvatar from '../inputs/IBAvatar';
+import { prettyMessageTime, fullMessageTime } from '../../utils/messageTime';
 import './ibMessage.css';
 
 const IBMessage = ({own, messageData}) => {
@@ -17,7 +17,9 @@ const IBMessage = ({own, messageData}) => {
             }
             <p className="ibMessageText">{messageData.message}</p>
         </div>
-        <div className="ibMessageBottom">{moment(messageData.createdAt).fromNow()}</div>
+        <div className="ibMessageBottom" title={fullMessageTime(messageData.createdAt)}>
+            {prettyMessageTime(messageData.createdAt)}
+        </div>
     </div>
   )
 }

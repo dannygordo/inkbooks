@@ -1,14 +1,20 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useMutation } from "@apollo/client";
 import { useSearchParams } from "react-router-dom";
+import { TextField } from "@mui/material";
 import IBChatBox from "../../components/ibChatBox/IBChatBox";
-import IBChatOnline from "../../components/ibChatOnline/IBChatOnline";
 import IBConversation from "../../components/ibConversation/IBConversation";
 import IBPageLoader from "../../components/ibPageLoader/IBPageLoader";
-import IBMultilineInput from "../../components/inputs/IBMultilineInput";
 import { useAuth } from "../../context/auth";
 import MessengerService from "../../services/MessengerService";
 import "./messenger.css";
+
+/** Everyone in this conversation except the viewer - who the thread is actually *with*. */
+function otherMembers(conversation, myId) {
+	return (conversation.membersInfo || []).filter(
+		(member) => String(member.id) !== String(myId),
+	);
+}
 
 const Messenger = () => {
 	const { user } = useAuth();
@@ -23,6 +29,12 @@ const Messenger = () => {
 	// each render means the open conversation is always the current one.
 	const [activeConversationId, setActiveConversationId] = useState(null);
 	const [activeMessages, setActiveMessages] = useState([]);
+	const [search, setSearch] = useState("");
+
+	// The thread, fetched only when a conversation is opened. The list query no longer carries
+	// message bodies - see MessengerService for what that was costing.
+	const [loadMessages, { loading: loadingMessages }] =
+		MessengerService.fetchMessagesByConversationId();
 
 	const [markConversationRead] = useMutation(MessengerService.MARK_CONVERSATION_READ, {
 		// The sidebar badge is a separate query on a component that isn't re-rendered by this
@@ -78,10 +90,52 @@ const Messenger = () => {
 		});
 	}, [activeConversationId, activeUnread, markConversationRead]);
 
-	// Follows the messages of whichever conversation is open, including across refetches.
+	// Loads the open thread, and nothing else.
+	//
+	// Keyed on the ID rather than on the conversation object: the object is a new reference on
+	// every refetch of the list (a badge changing, a new message landing), so depending on it here
+	// would re-fetch the whole thread every time any conversation anywhere updated - which is the
+	// cost this change exists to remove, reintroduced one level down.
 	useEffect(() => {
-		setActiveMessages(activeConversation.messages || []);
-	}, [activeConversation]);
+		if (!activeConversationId) {
+			setActiveMessages([]);
+			return;
+		}
+		let cancelled = false;
+		loadMessages({ variables: { conversationId: activeConversationId } })
+			.then((res) => {
+				// Guarded because a fast click through several threads can land responses out of
+				// order, and the last one to arrive is not necessarily the one you are looking at.
+				if (!cancelled) {
+					setActiveMessages(res?.data?.getMessagesByConversationId || []);
+				}
+			})
+			.catch(() => {
+				if (!cancelled) {
+					setActiveMessages([]);
+				}
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, [activeConversationId, loadMessages]);
+
+	// Name match on either part, so "sam" finds Sam Rivera and "rivera" does too. Filters what's
+	// RENDERED without touching which thread is selected - typing in the search box shouldn't
+	// yank you out of the conversation you're reading.
+	const visibleConversations = useMemo(() => {
+		const term = search.trim().toLowerCase();
+		if (!term) {
+			return conversations;
+		}
+		return conversations.filter((conversation) =>
+			otherMembers(conversation, user.id).some((member) =>
+				`${member.firstName || ""} ${member.lastName || ""}`
+					.toLowerCase()
+					.includes(term),
+			),
+		);
+	}, [conversations, search, user.id]);
 
 	const handleConversationClick = (conversation) => {
 		setActiveConversationId(conversation.id);
@@ -103,13 +157,28 @@ const Messenger = () => {
 			<div className="messengerContainer">
 				<div className="chatMenu">
 					<div className="chatMenuWrapper">
-						<IBMultilineInput
-							id="searchForUsers"
-							label="Search for users"
+						{/* Filters as you type. The old control was an IBMultilineInput labelled
+						    "Search for users" with helper text telling you to hit enter - it had no
+						    state, no handler and no id referenced anywhere else, so it did nothing
+						    at all. A single-line field, because a multiline box for a name is a
+						    control that invites the wrong gesture. */}
+						<TextField
+							id="conversationSearch"
+							label="Search"
+							size="small"
+							variant="outlined"
 							className="chatMenuInput"
-							helperText="Type name and hit enter"
+							value={search}
+							onChange={(e) => setSearch(e.target.value)}
 						/>
-						{conversations.map((conversation) => (
+						{visibleConversations.length === 0 && (
+							<div className="chatMenuEmpty">
+								{search.trim()
+									? "No conversations with that name."
+									: "No conversations yet."}
+							</div>
+						)}
+						{visibleConversations.map((conversation) => (
 							<IBConversation
 								// The key was `${Date.now()}${conversation.id}`, which is a new key
 								// on every render - so React threw away and rebuilt every row each
@@ -127,12 +196,8 @@ const Messenger = () => {
 					conversation={activeConversation}
 					messages={activeMessages}
 					setActiveMessages={setActiveMessages}
+					loadingMessages={loadingMessages}
 				/>
-				<div className="chatOnline">
-					<div className="chatOnlineWrapper">
-						<IBChatOnline />
-					</div>
-				</div>
 			</div>
 		</div>
 	);

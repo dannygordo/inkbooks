@@ -76,16 +76,28 @@
     padding: 20px 0;
 }
 
+/* Column, so the timestamp sits under the bubble rather than beside it - see the matching rule in
+   artistBookingRequests.css. These two files are deliberately duplicated (this app's CSS is global
+   and each page imports only its own sheet), so a change to one belongs in the other. */
 .guestMessage {
     display: flex;
+    flex-direction: column;
+    margin-bottom: 10px;
 }
 
 .guestMessageMine {
-    justify-content: flex-end;
+    align-items: flex-end;
 }
 
 .guestMessageTheirs {
-    justify-content: flex-start;
+    align-items: flex-start;
+}
+
+.guestMessageTime {
+    font-size: 11px;
+    color: #888;
+    margin-top: 3px;
+    padding: 0 4px;
 }
 
 .guestMessageBubble {

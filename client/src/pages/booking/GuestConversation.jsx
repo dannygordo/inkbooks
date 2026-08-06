@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { CircularProgress } from "@mui/material";
 import { gql, useMutation, useQuery } from "@apollo/client";
+import { prettyMessageTime, fullMessageTime } from "../../utils/messageTime";
 import "./guestConversation.css";
 
 const GET_BOOKING_REQUEST_BY_TOKEN = gql`
@@ -179,6 +180,9 @@ const GuestConversation = () => {
               }
             >
               <div className="guestMessageBubble">{msg.message}</div>
+              <div className="guestMessageTime" title={fullMessageTime(msg.createdAt)}>
+                {prettyMessageTime(msg.createdAt)}
+              </div>
             </div>
           ))}
         </div>
