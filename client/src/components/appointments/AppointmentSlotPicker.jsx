@@ -1,3 +1,8 @@
+// React imported explicitly: under Vitest, @vitejs/plugin-react compiles JSX with the CLASSIC
+// runtime, so a component rendered by a test needs React in scope or it throws "React is not
+// defined" - in that test's file, not this one. See vite.config.js and
+// scripts/check-react-in-tested-components.mjs.
+import React from "react";
 import IBDateTimePicker from "../inputs/IBDateTimePicker";
 import DurationPicker from "./DurationPicker";
 import DaySchedule from "./DaySchedule";
