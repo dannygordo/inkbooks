@@ -28,8 +28,13 @@ const Month = ({ month }) => {
 				spacing={{ xs: 1, md: 1 }}
 				columns={{ xs: 7, sm: 7, md: 7 }}
 			>
+				{/* Keyed by the row INDEX, not Date.now() + index. A key containing the current time is
+				    a new value on every render, so React discarded and rebuilt the entire month grid each
+				    time - throwing away the DOM for 35 day cells to redraw the same 35 day cells. Silent,
+				    warning-free, and it looks like care. See IBCardWrapper.jsx for what it costs when an
+				    input is inside the rebuilt subtree. */}
 				{month.map((row, index) => (
-					<React.Fragment key={Date.now() + index}>
+					<React.Fragment key={index}>
 						{/* MUI 6+'s Grid replaced the old item+xs/sm/md breakpoint props with a single
 						    size prop - every non-container Grid is implicitly an "item" now. */}
 						{row.map((day, idx) => (

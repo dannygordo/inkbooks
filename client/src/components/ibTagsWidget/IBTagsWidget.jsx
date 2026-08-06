@@ -36,7 +36,10 @@ const IBTagsWidget = ({ tags, onDelete }) => {
 		>
 			{tags.map((tag) => {
 				return (
-					<ListItem key={`${tag}${Date.now()}`}>
+					// The tag itself, not `${tag}${Date.now()}`. Tags are unique within a project, so the
+					// tag IS the stable identity; appending the clock made every key new on every render
+					// and rebuilt the whole list each time. See IBCardWrapper.jsx.
+					<ListItem key={tag}>
 						<Chip label={tag} onDelete={(e) => {handleDelete(e, tag)}} />
 					</ListItem>
 				);

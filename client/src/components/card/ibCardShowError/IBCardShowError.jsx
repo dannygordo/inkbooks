@@ -15,7 +15,6 @@ const IBCardShowError = (props) => {
         <div className="ibCardShowErrorContainer">
             <div
                 className="ibCardShowErrorCard"
-                key={Date.now()}
                 onClick={(e) =>
                     navigate(-1)
                 }

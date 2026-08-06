@@ -10,7 +10,6 @@ const IBRouteNotFound = (props) => {
         <div className="ibRouteNotFoundContainer">
             <div
                 className="ibRouteNotFoundCard"
-                key={Date.now()}
                 onClick={(e) =>
                     navigate(-1)
                 }

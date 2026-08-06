@@ -114,8 +114,9 @@ const SmallCalendar = () => {
 								</Item>
 							</Grid>
 						))}
+						{/* Row index, not Date.now() + index - see the matching note in Month.jsx. */}
 						{currentMonth.map((row, index) => (
-							<React.Fragment key={Date.now() + index}>
+							<React.Fragment key={index}>
 								{row.map((day, idx) => (
 									<Grid size={1} key={idx}>
 										<Item
