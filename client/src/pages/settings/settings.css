@@ -85,3 +85,53 @@
 	color: #999;
 	font-size: 14px;
 }
+
+/* --- Account panel (photo, password, calendar colour) ------------------------------------- */
+/* Moved here from profile.css along with the page. Kept as its own block rather than merged into
+   the rules above so it is obvious what arrived with the merge and what was always here. */
+
+.settingsPanelHelp {
+    margin: 0 0 15px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #bbb;
+    max-width: 56ch;
+}
+
+.settingsAvatar {
+    display: flex;
+    justify-content: flex-start;
+    margin-bottom: 16px;
+}
+
+.settingsTagColors {
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: center;
+    flex-wrap: wrap;
+    max-width: 350px;
+}
+
+/* A real <button>, not a styled div. The swatches were divs with onClick - unreachable by keyboard
+   and invisible to a screen reader, which for a control that sets your own identity colour is not a
+   detail. The reset below is what keeps them looking identical to the old circles. */
+.settingsTagColor {
+    border: none;
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    padding: 5px;
+    margin: 5px;
+    color: #fff;
+    font: inherit;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+}
+
+.settingsTagColor:focus-visible {
+    outline: 2px solid #1775ee;
+    outline-offset: 2px;
+}

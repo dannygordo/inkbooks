@@ -12,6 +12,7 @@ import ShopService from "../../services/ShopService";
 import { ALERT_CONSTANTS, APP_SETTINGS_CONSTANTS } from "../../constants";
 import BookingSlugField from "../../components/artist/BookingSlugField";
 import NotificationSettingsPanel from "../../components/notifications/NotificationSettingsPanel";
+import AccountPanel from "../../components/settings/AccountPanel";
 import { bookingUrl } from "../../utils/bookingSlug";
 
 // New top-level settings section - see PRODUCTION_ROADMAP.md's "Rates & settings" entry for why
@@ -309,11 +310,22 @@ const Settings = () => {
 			});
 	};
 
+	// A non-artist - shop staff - still gets the account panel.
+	//
+	// This used to say "Nothing to configure here yet for this account type" and stop, which was
+	// true only while their photo and password lived on a separate /profile page. With that page
+	// merged in, returning early here would have quietly removed the only way for staff to change
+	// their own password.
 	if (!isArtist) {
 		return (
 			<div className="settings">
-				<h1 className="settingsTitle">Settings</h1>
-				<p>Nothing to configure here yet for this account type.</p>
+				<div className="settingsTitleContainer">
+					<h1 className="settingsTitle">Settings</h1>
+				</div>
+				<div className="settingsContainer">
+					<AccountPanel />
+					<NotificationSettingsPanel />
+				</div>
 			</div>
 		);
 	}
@@ -396,6 +408,9 @@ const Settings = () => {
 				</div>
 			)}
 			<div className="settingsContainer">
+				{/* Photo, password and calendar colour - was its own /profile page. First, because it is
+				    the most-changed thing here and because "who am I" reads before "how do I charge". */}
+				<AccountPanel />
 				<IBCardWrapper>
 					<div>
 						<h1>Shop</h1>

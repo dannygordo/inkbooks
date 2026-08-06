@@ -4,7 +4,6 @@ import Box from "@mui/material/Box";
 import Toolbar from "@mui/material/Toolbar";
 import "./App.css";
 import Sidebar from "./components/sidebar/Sidebar";
-import Topbar from "./components/topbar/Topbar";
 import Home from "./pages/home/Home";
 import Login from "./pages/login/Login";
 import Register from "./pages/register/Register";
@@ -32,7 +31,6 @@ import EditShop from "./components/shop/edit/EditShop";
 import IBDisplayPageAlert from "./components/ibAlert/IBDisplayPageAlert";
 import Messenger from "./pages/messenger/Messenger";
 import { SocketProvider } from "./context/SocketProvider";
-import Profile from "./pages/profile/Profile";
 import ResetPassword from "./pages/resetPassword/ResetPassword";
 import SetPassword from "./pages/setPassword/SetPassword";
 import { CalendarProvider } from "./context/calendar";
@@ -292,14 +290,12 @@ function App() {
 								</AuthRoute>
 							}
 						/>
-						<Route
-							path="/profile"
-							element={
-								<AuthRoute>
-									<Profile />
-								</AuthRoute>
-							}
-						/>
+						{/* /profile is gone, along with the page behind it. Avatar, password and
+						    calendar colour were settings by any definition, and two destinations for
+						    "things about me I can change" meant finding either was a guess - nothing
+						    distinguished a profile setting from a settings setting except which got
+						    built first. They are panels on /settings (and /my-settings for a client)
+						    now; see components/settings/AccountPanel.jsx. */}
 						{/* Two settings routes, not one page with six sections hidden behind role
 						    checks. /settings is dense with things a client has no business seeing -
 						    shop connection, rates, booking link - and conditionally hiding most of

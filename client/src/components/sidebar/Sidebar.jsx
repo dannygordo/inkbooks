@@ -236,8 +236,12 @@ export default function Sidebar() {
 		setAnchorEl(null);
 	};
 
-	const handleProfileClick = () => {
-		navigate(ROUTE_CONSTANTS.PROFILE);
+	// Was handleProfileClick, pointing at ROUTE_CONSTANTS.PROFILE. That route and its page are
+	// gone - everything on them is a panel on Settings now. A client's settings live at a different
+	// path (see App.jsx's note on why there are two settings routes rather than one page with half
+	// of it hidden), so the menu has to send them to the one that exists for them.
+	const handleSettingsClick = () => {
+		navigate(isClient ? ROUTE_CONSTANTS.CLIENT_SETTINGS : ROUTE_CONSTANTS.SETTINGS);
 	};
 
 	const handleLogout = (e) => {
@@ -326,7 +330,9 @@ export default function Sidebar() {
 				>
 					<AccountCircle />
 				</IconButton>
-				<p>Profile</p>
+				{/* "Account", not "Profile". The menu it opens no longer leads to a Profile page -
+				    there isn't one - it shows who is signed in and offers Settings and Log out. */}
+				<p>Account</p>
 			</MenuItem>
 		</Menu>
 	);
@@ -458,23 +464,36 @@ export default function Sidebar() {
 							vertical: "bottom",
 						}}
 					>
-						<MenuItem onClick={handleProfileClick}>
+						{/* WHO YOU ARE, not a link. The avatar and name used to be the "Profile" menu
+						    item, and /profile is gone - its avatar, password and calendar colour are
+						    panels on Settings now. Left in place as a plain label because a signed-in
+						    header that never says whose session it is makes it possible to work in the
+						    wrong account without noticing, which this app has already produced once.
+						    disabled so it reads as a heading rather than a dead button. */}
+						<MenuItem disabled sx={{ opacity: "1 !important" }}>
 							<IBAvatar
 								size={50}
-								cursor="pointer"
 								imgUrl={user.avatar}
 								label={`${user.firstName} ${user.lastName}`}
 							/>{" "}
-							Profile
+							{`${user.firstName} ${user.lastName}`}
 						</MenuItem>
 						<Divider />
-						{/* "My account"/"Add another account"/"Settings" removed - unmodified MUI
-						    template boilerplate with no onClick handler and no matching route, left
-						    over from scaffolding. "My account" also rendered a blank, unpopulated
-						    <Avatar /> right next to the correctly-working Profile item above -
-						    exactly the kind of inconsistency worth cutting rather than leaving as
-						    dead, confusing UI. Profile/Logout are the only two menu items that
-						    actually do anything. */}
+						{/* THE MENU STAYS, deliberately, rather than being removed along with the page
+						    it used to lead to. It is where a person expects to find who they are
+						    signed in as and how to sign out; burying log out inside a settings page is
+						    a worse outcome than the duplication that was removed. The fix was to stop
+						    this being a second navigation surface, not to delete it.
+
+						    Not padded out with invented items either. A menu earns its place by being
+						    where log out always is, not by item count - the last round of cleanup here
+						    removed three MUI template entries that had no handler and no route. */}
+						<MenuItem onClick={handleSettingsClick}>
+							<ListItemIcon>
+								<SettingsIcon fontSize="small" />
+							</ListItemIcon>
+							Settings
+						</MenuItem>
 						<MenuItem onClick={handleLogout}>
 							<ListItemIcon>
 								<Logout fontSize="small" />

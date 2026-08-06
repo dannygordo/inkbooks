@@ -1,5 +1,6 @@
 import React from "react";
 import NotificationSettingsPanel from "../../components/notifications/NotificationSettingsPanel";
+import AccountPanel from "../../components/settings/AccountPanel";
 import "./settings.css";
 
 /**
@@ -18,6 +19,11 @@ import "./settings.css";
 const ClientSettings = () => (
 	<div className="settings">
 		<div className="settingsContainer">
+			{/* Photo and password, which used to live on the separate /profile page. A client has no
+			    calendar to be coloured on, so AccountPanel leaves that section out for them. Without
+			    this, removing /profile would have taken away a client's only way to change their own
+			    password. */}
+			<AccountPanel />
 			<NotificationSettingsPanel />
 		</div>
 	</div>
