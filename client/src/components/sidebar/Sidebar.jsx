@@ -45,7 +45,7 @@ import Tooltip from "@mui/material/Tooltip";
 import Logout from "@mui/icons-material/Logout";
 
 import SearchIcon from "@mui/icons-material/Search";
-import { Badge, Fab } from "@mui/material";
+import { Badge } from "@mui/material";
 import NotificationsIcon from "@mui/icons-material/Notifications";
 
 const Search = styled("div")(({ theme }) => ({
@@ -131,6 +131,15 @@ const AppBar = styled(MuiAppBar, {
 	shouldForwardProp: (prop) => prop !== "open",
 })(({ theme, open }) => ({
 	zIndex: theme.zIndex.drawer + 1,
+	// MUI's AppBar ships with elevation 4, which is a box-shadow. Replaced with a single hairline
+	// rule so the app bar and the drawer read as one surface rather than as a panel floating over
+	// the page.
+	boxShadow: "none",
+	// theme.palette.divider, NOT a hex value copied off the <Divider /> under the logo. They are
+	// meant to be the same line continuing across the header, and two hardcoded colours that agree
+	// today are the thing this codebase keeps getting burned by - MUI's default divider is an alpha
+	// colour, so a hex guess would also be subtly wrong over any non-white background.
+	borderBottom: `1px solid ${theme.palette.divider}`,
 	transition: theme.transitions.create(["width", "margin"], {
 		easing: theme.transitions.easing.sharp,
 		duration: theme.transitions.duration.leavingScreen,
@@ -368,26 +377,12 @@ export default function Sidebar() {
 						)}
 						<Box sx={{ flexGrow: 1 }} />
 						<Box sx={{ display: { xs: "none", md: "flex" } }}>
-							<Fab
-								size="medium"
-								aria-label="show 4 new mails"
-								sx={{
-									backgroundColor: "#ddd",
-									color: "#333",
-									"&:hover": {
-										color: "#ddd",
-										backgroundColor: "#333",
-									},
-								}}
-							>
-								<Badge badgeContent={4} color="error">
-									<MailIcon />
-								</Badge>
-							</Fab>
-							{/* Was a Fab hardcoded to badgeContent={17} - a placeholder that looked
-							    exactly like a working feature, which is its own small version of the
-							    problem this whole system is about: a number on screen that nobody
-							    can act on and nobody can trust. This is the real one. */}
+							{/* The mail Fab that used to sit here is gone. It was hardcoded to
+							    badgeContent={4} and wired to nothing - a number on screen that
+							    nobody could act on and nobody could trust, which is the same
+							    problem the notification work exists to solve. Real unread counts
+							    live on the Messenger and Booking Requests items in the nav below,
+							    where the thing they refer to is one click away. */}
 							<NotificationBell />
 						</Box>
 						<Tooltip title="Account settings">
