@@ -66,6 +66,27 @@ const REGISTER_ACCOUNT = gql`
 `;
 
 /**
+ * Error keys that a control on the account step renders itself, as its own helperText.
+ *
+ * The summary box below the fields must NOT repeat these. It did, and the same sentence appeared
+ * twice on screen - once under the email field and once in the red box - which reads as two
+ * separate problems and makes the box look like it is listing something the fields missed.
+ *
+ * Everything NOT in this set still goes to the summary, so a key no field owns ('general', or
+ * anything a future server change starts returning) is still shown rather than swallowed. That
+ * direction matters: a duplicated error is untidy, an invisible one is a dead button.
+ */
+const FIELD_OWNED_ERRORS = new Set([
+	"shopName",
+	"firstName",
+	"lastName",
+	"email",
+	"password",
+	"confirmPassword",
+	"bookingSlug",
+]);
+
+/**
  * A titled block with its own explanation. The unit every step is built from.
  *
  * A REAL <label htmlFor>, not a styled div. The visible label sits above the explanation, which
@@ -596,6 +617,10 @@ const Register = () => {
 		}
 	};
 
+	const unownedErrors = Object.entries(errors)
+		.filter(([key]) => !FIELD_OWNED_ERRORS.has(key))
+		.map(([, message]) => message);
+
 	const action = primaryAction();
 	const busy = saving || registering;
 	// Skippable once the account exists and before the last screen. Deliberately not offered on the
@@ -625,10 +650,11 @@ const Register = () => {
 
 					<div className="onboardFields">{renderStep()}</div>
 
-					{Object.keys(errors).length > 0 && (
+					{/* Only what no field is already showing - see FIELD_OWNED_ERRORS. */}
+					{unownedErrors.length > 0 && (
 						<div className="onboardErrors">
 							<ul>
-								{Object.values(errors).map((message) => (
+								{unownedErrors.map((message) => (
 									<li key={message}>{message}</li>
 								))}
 							</ul>

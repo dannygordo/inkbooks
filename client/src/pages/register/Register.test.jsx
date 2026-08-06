@@ -221,8 +221,32 @@ describe("Register wizard", () => {
 		await fillAccountStep(user);
 		await user.click(screen.getByText("Create account"));
 
-		expect(
-			await screen.findByText("An account already exists for that email address."),
-		).toBeInTheDocument();
+		// ONCE, not twice. The message is the email field's helperText; the summary box below the
+		// fields must not repeat it. It did, and the same sentence appearing in two places reads as
+		// two separate problems - which is also how this test caught it.
+		const shown = await screen.findAllByText(
+			"An account already exists for that email address.",
+		);
+		expect(shown).toHaveLength(1);
+	});
+
+	it("still surfaces an error that belongs to no field", async () => {
+		// The other half of the same rule. Suppressing duplicates must not suppress a message the
+		// fields aren't showing - an invisible error is a dead button, which is strictly worse than
+		// an untidy one.
+		const user = userEvent.setup();
+		const mocks = [
+			{
+				request: artistSignupMock().request,
+				result: { errors: [new Error("Something went wrong upstream")] },
+			},
+		];
+		renderRegister({ mocks });
+
+		await chooseArtist(user);
+		await fillAccountStep(user);
+		await user.click(screen.getByText("Create account"));
+
+		expect(await screen.findByText(/something went wrong upstream/i)).toBeInTheDocument();
 	});
 });
