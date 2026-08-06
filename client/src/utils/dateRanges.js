@@ -98,18 +98,6 @@ export function buildScheduleRanges() {
 	const now = moment();
 	return [
 		{
-			key: RANGE_KEYS.THIS_WEEK,
-			label: "This week",
-			start: now.clone().startOf("isoWeek").toDate(),
-			end: now.clone().startOf("isoWeek").add(1, "week").toDate(),
-		},
-		{
-			key: RANGE_KEYS.NEXT_WEEK,
-			label: "Next week",
-			start: now.clone().startOf("isoWeek").add(1, "week").toDate(),
-			end: now.clone().startOf("isoWeek").add(2, "weeks").toDate(),
-		},
-		{
 			key: RANGE_KEYS.THIS_MONTH,
 			label: "This month",
 			start: now.clone().startOf("month").toDate(),
@@ -121,6 +109,18 @@ export function buildScheduleRanges() {
 			start: now.clone().add(1, "month").startOf("month").toDate(),
 			end: now.clone().add(2, "months").startOf("month").toDate(),
 		},
+		{
+			key: RANGE_KEYS.THIS_WEEK,
+			label: "This week",
+			start: now.clone().startOf("isoWeek").toDate(),
+			end: now.clone().startOf("isoWeek").add(1, "week").toDate(),
+		},
+		{
+			key: RANGE_KEYS.NEXT_WEEK,
+			label: "Next week",
+			start: now.clone().startOf("isoWeek").add(1, "week").toDate(),
+			end: now.clone().startOf("isoWeek").add(2, "weeks").toDate(),
+		}
 	];
 }
 

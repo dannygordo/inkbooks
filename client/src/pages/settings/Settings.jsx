@@ -414,11 +414,11 @@ const Settings = () => {
 				<IBCardWrapper>
 					<div>
 						<h1>Shop</h1>
-						<h6 style={{ color: "#bbb", marginBottom: 15 }}>
+						<p className="settingsPanelHelp">
 							{shopId
 								? "You're connected to this shop - your calendar, rate settings, and shop-cut ledger are all scoped to it."
 								: "You're not currently connected to a shop - you're set up as an independent artist."}
-						</h6>
+						</p>
 					</div>
 					{shopId ? (
 						<div>
@@ -456,10 +456,10 @@ const Settings = () => {
 							</div>
 							{showMoveForm && (
 								<div style={{ marginTop: 20 }}>
-									<h6 style={{ color: "#bbb", marginBottom: 15 }}>
+									<p className="settingsPanelHelp">
 										Connecting to a different shop ends your connection to{" "}
 										{user.userInfo?.shop?.name || "your current shop"}.
-									</h6>
+									</p>
 									{connectForm("Move to This Shop")}
 								</div>
 							)}
@@ -478,10 +478,10 @@ const Settings = () => {
 				<IBCardWrapper>
 					<div>
 						<h1>Booking link</h1>
-						<h6 style={{ color: "#bbb", marginBottom: 15 }}>
+						<p className="settingsPanelHelp">
 							Share this with clients so they can send you booking requests. It shows
 							your name and photo, and nothing else about your account.
-						</h6>
+						</p>
 						<BookingSlugField
 							value={slugValue}
 							setValue={setEditedSlug}
@@ -512,10 +512,10 @@ const Settings = () => {
 				<IBCardWrapper>
 					<div>
 						<h1>Rates</h1>
-						<h6 style={{ color: "#bbb", marginBottom: 15 }}>
+						<p className="settingsPanelHelp">
 							Used to auto-compute a session's total from time worked - can always be
 							edited by hand on the session itself.
-						</h6>
+						</p>
 					</div>
 					<form onSubmit={handleSaveRates}>
 						<IBSelect
@@ -556,10 +556,10 @@ const Settings = () => {
 					<IBCardWrapper>
 						<div>
 							<h1>Which Rate Applies</h1>
-							<h6 style={{ color: "#bbb", marginBottom: 15 }}>
+							<p className="settingsPanelHelp">
 								At your connected shop, sessions can bill against the shop's rate or
 								your own.
-							</h6>
+							</p>
 						</div>
 						<div className="settingsRadioGroup">
 							<label>

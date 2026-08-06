@@ -236,14 +236,6 @@ export default function Sidebar() {
 		setAnchorEl(null);
 	};
 
-	// Was handleProfileClick, pointing at ROUTE_CONSTANTS.PROFILE. That route and its page are
-	// gone - everything on them is a panel on Settings now. A client's settings live at a different
-	// path (see App.jsx's note on why there are two settings routes rather than one page with half
-	// of it hidden), so the menu has to send them to the one that exists for them.
-	const handleSettingsClick = () => {
-		navigate(isClient ? ROUTE_CONSTANTS.CLIENT_SETTINGS : ROUTE_CONSTANTS.SETTINGS);
-	};
-
 	const handleLogout = (e) => {
 		logout();
 		navigate(ROUTE_CONSTANTS.HOME);
@@ -479,21 +471,15 @@ export default function Sidebar() {
 							{`${user.firstName} ${user.lastName}`}
 						</MenuItem>
 						<Divider />
-						{/* THE MENU STAYS, deliberately, rather than being removed along with the page
-						    it used to lead to. It is where a person expects to find who they are
-						    signed in as and how to sign out; burying log out inside a settings page is
-						    a worse outcome than the duplication that was removed. The fix was to stop
-						    this being a second navigation surface, not to delete it.
+						{/* WHO YOU ARE, AND HOW TO LEAVE. Nothing else.
 
-						    Not padded out with invented items either. A menu earns its place by being
-						    where log out always is, not by item count - the last round of cleanup here
-						    removed three MUI template entries that had no handler and no route. */}
-						<MenuItem onClick={handleSettingsClick}>
-							<ListItemIcon>
-								<SettingsIcon fontSize="small" />
-							</ListItemIcon>
-							Settings
-						</MenuItem>
+						    A Settings item was here briefly and is gone: the sidebar already has one,
+						    and the same destination reachable two ways is the duplication that folding
+						    the profile page in was meant to remove, reintroduced one level up.
+
+						    The menu still earns its place - it is where a person expects to find their
+						    own identity and the way out, and log out has nowhere better to live. It
+						    just isn't a navigation surface. */}
 						<MenuItem onClick={handleLogout}>
 							<ListItemIcon>
 								<Logout fontSize="small" />

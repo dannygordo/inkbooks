@@ -33,11 +33,7 @@ export const ROUTE_CONSTANTS = {
 	// panels on Settings now - see components/settings/AccountPanel.jsx. It was also written
 	// 'profile', with no leading slash, unlike every other absolute route here: navigate('profile')
 	// resolves RELATIVE to wherever you already are, so it only ever landed correctly from the root.
-	SETTINGS: '/settings',
-	// A client's settings live at their own path rather than behind half a hidden page - see
-	// App.jsx's note on why there are two settings routes. Was a bare '/my-settings' string in
-	// App.jsx and nowhere else; named here now that the account menu has to choose between them.
-	CLIENT_SETTINGS: '/my-settings'
+	SETTINGS: '/settings'
 };
 
 export const APP_SETTINGS_CONSTANTS = {

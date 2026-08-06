@@ -104,10 +104,10 @@ const NotificationSettingsPanel = () => {
 		<IBCardWrapper>
 			<div>
 				<h1>Notifications</h1>
-				<h6 style={{ color: "#bbb", marginBottom: 15 }}>
+				<p className="settingsPanelHelp">
 					These control email only. Everything still appears in your notifications here,
 					because that list is also the record of what happened.
-				</h6>
+				</p>
 
 				{CATEGORIES.map((category) => (
 					<div key={category.key} className="notificationPrefRow">
