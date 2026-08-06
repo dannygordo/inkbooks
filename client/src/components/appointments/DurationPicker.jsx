@@ -1,38 +1,29 @@
 import { MenuItem, TextField } from "@mui/material";
+import "./durationPicker.css";
 
 /**
- * How long an appointment runs.
+ * How long an appointment runs: an HOURS field and a MINUTES field.
  *
- * A SELECT OF REALISTIC LENGTHS, not a free number field. Two reasons:
+ * This was a single select of preset lengths. The presets were labelled in hours ("4 hr", "1 hr
+ * 30") so nobody was doing arithmetic - but a fixed list is a guess at every length a shop will
+ * ever book, and being wrong about that means an artist cannot enter the appointment they actually
+ * have. Two fields cost one extra control and remove the ceiling entirely.
  *
- * People do not think in minutes, they think in "an hour" or "the afternoon", and a bare number
- * input asks them to convert - which is exactly where someone types 3 meaning three hours and books
- * a three-minute session. The options carry their own units and that mistake becomes unavailable.
+ * WHY NOT A FROM/TO PAIR. It was the other option on the table, and it loses something: an end
+ * time silently changes meaning when the start moves. Drag a booking an hour later and a stored
+ * end makes it an hour shorter, while a duration survives intact. A duration is also what people
+ * decide first - "this is a four hour sitting" is true before the day is picked. The model stores
+ * minutes for the same reason (see server/models/Appointment.js) and the end is derived.
  *
- * It also keeps the values coarse on purpose. A tattoo booking is not accurate to the minute, and
- * offering that precision invites false precision in the conflict checker downstream - "these
- * overlap by four minutes" is not a real problem anyone has.
- *
- * "Other" is deliberately absent for now. If a shop genuinely needs 7 hours 20, that is worth
- * hearing about rather than guessing at, and the field accepts any integer server-side
- * (validation.js) so nothing here is a hard ceiling on the data.
+ * MINUTES ARE THE STORAGE UNIT, HOURS AND MINUTES ARE THE INTERFACE. The split happens here and
+ * nowhere else, so no caller ever has to do the multiplication - which is exactly where a 4.5-hour
+ * sitting becomes a 4-minute one.
  */
 
-// Fifteen-minute steps up to two hours, then half-hours. Follows how the lengths actually cluster:
-// consults vary in quarters of an hour, sittings in halves, and nobody books six hours and fifteen.
-export const DURATION_OPTIONS = [
-  { minutes: 15, label: "15 min" },
-  { minutes: 30, label: "30 min" },
-  { minutes: 45, label: "45 min" },
-  { minutes: 60, label: "1 hr" },
-  { minutes: 90, label: "1 hr 30" },
-  { minutes: 120, label: "2 hr" },
-  { minutes: 180, label: "3 hr" },
-  { minutes: 240, label: "4 hr" },
-  { minutes: 300, label: "5 hr" },
-  { minutes: 360, label: "6 hr" },
-  { minutes: 480, label: "8 hr" },
-];
+// Quarter hours. A tattoo booking is not accurate to the minute, and offering that precision
+// invites false precision downstream - "these overlap by four minutes" is not a problem anyone
+// has. The hours field is a free number, so any total is still reachable.
+const MINUTE_STEPS = [0, 15, 30, 45];
 
 // Mirrors server/models/Appointment.js's DEFAULT_DURATION_MINUTES. Duplicated across the boundary
 // rather than fetched, because a form needs a value before it can talk to anything - but the SERVER
@@ -41,12 +32,8 @@ export const DURATION_OPTIONS = [
 export const CONSULT_DEFAULT_MINUTES = 45;
 export const SESSION_DEFAULT_MINUTES = 180;
 
-/** A human label for a stored minute count, falling back gracefully to a raw value. */
+/** A human label for a stored minute count - "4 hr 30", "45 min". */
 export function describeDuration(minutes) {
-  const known = DURATION_OPTIONS.find((o) => o.minutes === minutes);
-  if (known) {
-    return known.label;
-  }
   if (!minutes) {
     return "";
   }
@@ -58,31 +45,56 @@ export function describeDuration(minutes) {
   return rest ? `${hours} hr ${rest}` : `${hours} hr`;
 }
 
-const DurationPicker = ({ value, onChange, label = "Length", size = "small" }) => {
-  // A stored value outside the list - set by a script, a seed, or a future free-text field - gets
-  // its own option rather than silently rendering as blank, which would read as "no length set"
-  // and invite someone to overwrite a deliberate value.
-  const options = DURATION_OPTIONS.some((o) => o.minutes === value)
-    ? DURATION_OPTIONS
-    : [...DURATION_OPTIONS, { minutes: value, label: describeDuration(value) }].sort(
-        (a, b) => a.minutes - b.minutes
-      );
+const DurationPicker = ({ value, onChange, size = "small" }) => {
+  const totalMinutes = value || 0;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  // Both halves recombine here, so a caller only ever sees a total. Guarded against NaN because an
+  // emptied number input reports "" - Number("") is 0, but Number("abc") is NaN, and a NaN total
+  // would sail through as a real value and land in the database.
+  const emit = (nextHours, nextMinutes) => {
+    const h = Number.isFinite(nextHours) ? Math.max(0, nextHours) : 0;
+    const m = Number.isFinite(nextMinutes) ? Math.max(0, nextMinutes) : 0;
+    onChange(h * 60 + m);
+  };
+
+  // A stored value off the quarter-hour - a seed, a script, a shop that used to allow anything -
+  // gets its own option rather than rendering blank, which would read as "no length set" and
+  // invite someone to overwrite a deliberate value.
+  const minuteOptions = MINUTE_STEPS.includes(minutes)
+    ? MINUTE_STEPS
+    : [...MINUTE_STEPS, minutes].sort((a, b) => a - b);
 
   return (
-    <TextField
-      select
-      size={size}
-      label={label}
-      value={value || ""}
-      onChange={(e) => onChange(Number(e.target.value))}
-      sx={{ minWidth: 120 }}
-    >
-      {options.map((option) => (
-        <MenuItem key={option.minutes} value={option.minutes}>
-          {option.label}
-        </MenuItem>
-      ))}
-    </TextField>
+    <div className="durationPicker">
+      <TextField
+        type="number"
+        size={size}
+        label="Hours"
+        value={hours}
+        onChange={(e) => emit(parseInt(e.target.value, 10), minutes)}
+        // No upper bound in the UI beyond the server's own 24-hour ceiling (validation.js) - a
+        // long sitting is a real thing and this should not be the component that decides how long
+        // is too long.
+        inputProps={{ min: 0, max: 23, step: 1 }}
+        sx={{ width: 86 }}
+      />
+      <TextField
+        select
+        size={size}
+        label="Minutes"
+        value={minutes}
+        onChange={(e) => emit(hours, Number(e.target.value))}
+        sx={{ width: 96 }}
+      >
+        {minuteOptions.map((option) => (
+          <MenuItem key={option} value={option}>
+            {option}
+          </MenuItem>
+        ))}
+      </TextField>
+    </div>
   );
 };
 

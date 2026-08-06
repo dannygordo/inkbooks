@@ -7,6 +7,7 @@ import { AppointmentService } from "../../services/AppointmentService";
 import DateRangePicker from "../analytics/DateRangePicker";
 import AppointmentTypeChip from "./AppointmentTypeChip";
 import Pager from "../pagination/Pager";
+import CreateEventButton from "../ibCalendar/CreateEventButton";
 import { getDefaultRange } from "../../utils/dateRanges";
 import { ROUTE_CONSTANTS } from "../../constants";
 import "./appointmentsList.css";
@@ -117,6 +118,11 @@ const AppointmentsList = () => {
 		<div className="appointmentsList">
 			<div className="appointmentsListControls">
 				<DateRangePicker value={range} onChange={setRangeAndReset} />
+				{/* Booking has to be reachable from whichever view you happen to be in. Sending
+				    someone back to the calendar to make an appointment turns a view preference into
+				    a workflow detour. Defaults to TODAY rather than to the calendar's last-clicked
+				    day - see CreateEventButton. */}
+				<CreateEventButton day={moment()} />
 			</div>
 
 			{loading && (

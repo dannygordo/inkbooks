@@ -20,11 +20,43 @@ const IBChatBox = ({ widget, conversation, setActiveMessages, messages, isInputD
 	const [arrivalMessage, setArrivalMessage] = useState(null);
 	const [onlineUsers, setOnlineUsers] = useState([]);
 
-	const scrollRef = useCallback((node) => {
-		if(node) {
-			node.scrollIntoView({smooth: true, block: "nearest", inline: "nearest"});
+	// A sentinel at the BOTTOM of the thread, scrolled to whenever the message list changes.
+	//
+	// This replaces a ref callback attached to every single message, which had three problems and
+	// only looked like it worked:
+	//
+	//   1. `{smooth: true}` is not a scrollIntoView option. The real key is `behavior: "smooth"`,
+	//      so the value was silently ignored - an invalid key in an options object throws nothing
+	//      and does nothing.
+	//   2. `block: "nearest"` means "scroll the minimum needed", so a new message peeking into
+	//      view at the bottom edge counted as already visible and produced no scroll at all.
+	//   3. A ref callback fires on MOUNT, so it only ever ran for messages being added - not when
+	//      an existing thread was opened, which is the moment you most want to be at the bottom.
+	//
+	// An effect keyed on the message count fires in all three cases: opening a thread, sending,
+	// and receiving over the socket.
+	const bottomRef = useRef(null);
+	// Whether this conversation has been scrolled to the bottom at least once, so the FIRST jump
+	// can be instant and later ones can animate. Reset per conversation below.
+	const hasScrolledOnce = useRef(false);
+
+	useEffect(() => {
+		hasScrolledOnce.current = false;
+	}, [conversation?.id]);
+
+	useEffect(() => {
+		if (!bottomRef.current) {
+			return;
 		}
-	},[])
+		// "auto" on the first paint of a thread, "smooth" afterwards. Animating through a long
+		// history on open is a second of scrolling before the app is usable; the smooth version is
+		// only worth it for a message arriving while you are looking at the thread.
+		bottomRef.current.scrollIntoView({
+			behavior: hasScrolledOnce.current ? "smooth" : "auto",
+			block: "end",
+		});
+		hasScrolledOnce.current = true;
+	}, [messages.length, conversation?.id]);
 
 	const [addNewMessage] = useMutation(
 		MessengerService.CREATE_MESSAGE_MUTATION
@@ -219,24 +251,19 @@ const IBChatBox = ({ widget, conversation, setActiveMessages, messages, isInputD
 						{loadingMessages && messages.length === 0 && (
 							<div className="ibChatBoxLoading">Loading conversation...</div>
 						)}
-						{messages.map((message, index) => {
-							if (user.id === message.senderId) {
-								return (
-									<div ref={scrollRef} key={message.id}>
-										<IBMessage
-											messageData={message}
-											own={true}
-										/>
-									</div>
-								);
-							} else {
-								return (
-									<div ref={scrollRef} key={message.id}>
-										<IBMessage messageData={message} />
-									</div>
-								);
-							}
-						})}
+						{messages.map((message) => (
+							<div key={message.id}>
+								<IBMessage
+									messageData={message}
+									own={user.id === message.senderId}
+								/>
+							</div>
+						))}
+						{/* The scroll target. A zero-height element after the last message, rather
+						    than the last message itself - a message can be taller than the visible
+						    area, and scrolling it into view would land on its TOP, leaving the
+						    newest text off screen. */}
+						<div ref={bottomRef} />
 					</div>
 					<div className="ibChatBoxBottom">
 						<IBMultilineInput
