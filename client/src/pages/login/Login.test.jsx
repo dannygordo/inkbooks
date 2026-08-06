@@ -11,61 +11,14 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { MockedProvider } from "@apollo/client/testing";
-import { gql } from "@apollo/client";
-import Login from "./Login";
+import Login, { LOGIN_USER } from "./Login";
 import { AuthContext } from "../../context/auth";
 
-// Mirrors Login.jsx's own LOGIN_USER document closely enough for MockedProvider's request
-// matching (Apollo matches on query + variables, not the exact gql template identity) - only the
-// fields this test actually asserts on need to be present in the mock's result.
-const LOGIN_USER = gql`
-	mutation login($email: String!, $password: String!) {
-		login(email: $email, password: $password) {
-			id
-			email
-			firstName
-			lastName
-			avatar
-			role
-			accessToken
-			firebaseToken
-			userType
-			tagColor
-			userInfo {
-				... on Artist {
-					avatar
-					id
-					firstName
-					lastName
-					hourlyRate
-					shop {
-						id
-						name
-						website
-					}
-				}
-				... on Client {
-					avatar
-					id
-					firstName
-					lastName
-				}
-				... on Staff {
-					avatar
-					id
-					firstName
-					lastName
-					title
-					shop {
-						id
-						name
-						website
-					}
-				}
-			}
-		}
-	}
-`;
+// THE REAL DOCUMENT, imported - not a copy. This file used to declare its own, with a note saying
+// it mirrored Login.jsx's "closely enough". MockedProvider pairs request with result by comparing
+// the printed document, so "closely enough" is exactly wrong: one field of drift and every mock
+// here stops matching, and the tests fail with a network error that looks like a component bug
+// rather than a stale copy. Importing it means the mocks cannot go stale.
 
 function renderLogin({ mocks, contextOverrides = {} } = {}) {
 	const contextValue = {

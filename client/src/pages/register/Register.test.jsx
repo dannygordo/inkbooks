@@ -15,42 +15,66 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { MockedProvider } from "@apollo/client/testing";
-import { gql } from "@apollo/client";
-import Register from "./Register";
+import Register, { REGISTER_ACCOUNT } from "./Register";
+import { GET_CURRENT_USER } from "../../services/UserService";
 import { AuthContext } from "../../context/auth";
 
-// Must match Register.jsx's document exactly, or MockedProvider won't pair request with result.
-const REGISTER_ACCOUNT = gql`
-	mutation RegisterAccount($input: RegisterAccountInput!) {
-		registerAccount(input: $input) {
-			id
-			email
-			firstName
-			lastName
-			role
-			userType
-			accessToken
-			firebaseToken
-			tagColor
-		}
-	}
-`;
+// THE REAL DOCUMENTS, imported rather than copied. This file used to declare its own
+// REGISTER_ACCOUNT with a note that it "must match Register.jsx's exactly" - a requirement nothing
+// enforced. MockedProvider pairs a request with a result by comparing the printed document, so the
+// day the component's selection set changed, every mock here would have stopped matching and the
+// tests would have failed with a network error rather than pointing at the copy.
 
+// A signed-up ARTIST, with the profile record attached.
+//
+// userInfo is the field this whole shape exists to carry. The mutation used not to select it, and
+// nothing failed: it is nullable, so the server returned a valid User with no profile and the
+// wizard cached that as the session. Settings then decided the account wasn't an artist and
+// offered "Nothing to configure here yet for this account type" to somebody who had signed up as
+// one, until they logged out and back in.
 const RETURNED_USER = {
 	__typename: "User",
 	id: "u2",
 	email: "jon@example.com",
 	firstName: "Jon",
 	lastName: "Snow",
+	avatar: null,
 	role: 20,
 	userType: "artist",
 	accessToken: "real-jwt",
 	firebaseToken: null,
 	tagColor: "#8E24AA",
+	userInfo: {
+		__typename: "Artist",
+		id: "a2",
+		firstName: "Jon",
+		lastName: "Snow",
+		avatar: null,
+		// Null on purpose. A brand new artist has not set a rate yet, and the server used to infer
+		// "this is an Artist" from this very field being truthy - so null here is the case that
+		// used to resolve as a Client and make the fragment above match nothing.
+		hourlyRate: null,
+		shop: null,
+	},
 };
 
+// What finish() reads back before leaving. Same user, with whatever the later steps changed - here
+// the rate, which is the visible proof the refetch happened rather than the cached copy surviving.
+const REFRESHED_USER = {
+	...RETURNED_USER,
+	userInfo: { ...RETURNED_USER.userInfo, hourlyRate: 150 },
+};
+// getUser returns the stored document; the tokens live only on the login/signup response.
+delete REFRESHED_USER.accessToken;
+delete REFRESHED_USER.firebaseToken;
+
+const refreshMock = () => ({
+	request: { query: GET_CURRENT_USER, variables: { userId: "u2" } },
+	result: { data: { getUser: REFRESHED_USER } },
+});
+
 function renderRegister({ mocks = [] } = {}) {
-	const contextValue = { login: vi.fn(), user: null };
+	const contextValue = { login: vi.fn(), updateCurrentUser: vi.fn(), user: null };
 	render(
 		<MemoryRouter>
 			<MockedProvider mocks={mocks}>
@@ -142,6 +166,59 @@ describe("Register wizard", () => {
 		await waitFor(() => expect(contextValue.login).toHaveBeenCalledWith(RETURNED_USER));
 		// And the wizard keeps going rather than navigating away.
 		expect(await screen.findByText(/how should we reach you/i)).toBeInTheDocument();
+	});
+
+	it("puts the profile record into the session, not just the login scalars", async () => {
+		// THE bug this pair of tests exists for. Signup returned a User with no userInfo - valid,
+		// nullable, silent - so the account that reached the dashboard looked to Settings like one
+		// with no artist profile, and the only cure was logging out and back in, because login was
+		// the one document that asked for the field.
+		//
+		// Asserted on what goes INTO auth context rather than on anything rendered, because the
+		// cached session is the thing that was wrong: every screen that reads user.userInfo was
+		// affected, and asserting through one of them would only cover that screen.
+		const user = userEvent.setup();
+		const contextValue = renderRegister({ mocks: [artistSignupMock()] });
+
+		await chooseArtist(user);
+		await fillAccountStep(user);
+		await user.click(screen.getByText("Create account"));
+
+		await waitFor(() => expect(contextValue.login).toHaveBeenCalled());
+		const session = contextValue.login.mock.calls[0][0];
+		expect(session.userInfo).toBeTruthy();
+		expect(session.userInfo.id).toBe("a2");
+	});
+
+	it("re-reads the account before leaving, and keeps the token when it does", async () => {
+		// Steps three to five change the account after step two cached it. Without a refresh the
+		// dashboard runs on a copy of the user from before any of those settings existed, which is
+		// the "log out and back in and it's fine" class of bug in general.
+		//
+		// The token assertion is the half that is easy to get wrong and impossible to notice in
+		// review: getUser returns the stored User document, where accessToken is null. Spreading
+		// the refetched user over the cached one without carrying the credential across blanks it
+		// and signs somebody out at the moment they finish signing up.
+		const user = userEvent.setup();
+		const contextValue = renderRegister({
+			mocks: [artistSignupMock(), refreshMock()],
+		});
+
+		await chooseArtist(user);
+		await fillAccountStep(user);
+		await user.click(screen.getByText("Create account"));
+		await screen.findByText(/how should we reach you/i);
+		await user.click(screen.getByText("Skip for now"));
+		await screen.findByText(/your rates/i);
+		await user.click(screen.getByText("Skip for now"));
+		await screen.findByText(/you're set up/i);
+
+		await user.click(screen.getByText("Go to my dashboard"));
+
+		await waitFor(() => expect(contextValue.updateCurrentUser).toHaveBeenCalled());
+		const refreshed = contextValue.updateCurrentUser.mock.calls[0][0];
+		expect(refreshed.userInfo.hourlyRate).toBe(150);
+		expect(refreshed.accessToken).toBe("real-jwt");
 	});
 
 	it("stays on the wizard after signing in, instead of bouncing to the dashboard", async () => {

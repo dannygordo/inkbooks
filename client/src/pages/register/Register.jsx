@@ -4,10 +4,11 @@
 import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CircularProgress, MenuItem, TextField } from "@mui/material";
-import { gql, useMutation } from "@apollo/client";
+import { gql, useApolloClient, useMutation } from "@apollo/client";
 import { ROUTE_CONSTANTS } from "../../constants";
 import { AuthContext } from "../../context/auth";
 import BookingSlugField from "../../components/artist/BookingSlugField";
+import { CURRENT_USER_FIELDS, GET_CURRENT_USER } from "../../services/UserService";
 import NotificationService from "../../services/NotificationService";
 import { ArtistService } from "../../services/ArtistService";
 import ShopService from "../../services/ShopService";
@@ -49,18 +50,27 @@ import "./register.css";
  * stalls is being asked for a number they haven't decided yet.
  */
 
-const REGISTER_ACCOUNT = gql`
+/**
+ * THE SAME SELECTION LOGIN MAKES, via the shared fragment - and exported so the test uses this
+ * document rather than a copy of it.
+ *
+ * It didn't used to. This mutation hand-listed a handful of scalars and no `userInfo` at all,
+ * which is a difference nothing complains about: the field is nullable, so the server returned a
+ * perfectly valid User with no profile attached and the wizard cached it as the session. The
+ * dashboard mostly worked, but Settings gates on `user.userInfo && user.userType === "artist"` and
+ * showed "Nothing to configure here yet for this account type" to somebody who had just signed up
+ * as an artist. Logging out and back in fixed it, because Login's document asked for the field.
+ *
+ * Two documents producing the same thing, only one of which was complete. Both spread
+ * CurrentUserFields now, so there is nothing left to keep in sync by hand.
+ */
+export const REGISTER_ACCOUNT = gql`
+	${CURRENT_USER_FIELDS}
 	mutation RegisterAccount($input: RegisterAccountInput!) {
 		registerAccount(input: $input) {
-			id
-			email
-			firstName
-			lastName
-			role
-			userType
+			...CurrentUserFields
 			accessToken
 			firebaseToken
-			tagColor
 		}
 	}
 `;
@@ -162,6 +172,7 @@ const Register = () => {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
+	const apollo = useApolloClient();
 	const [registerAccount, { loading: registering }] = useMutation(REGISTER_ACCOUNT);
 	const [updateNotificationSettings] = useMutation(NotificationService.UPDATE_SETTINGS);
 	const [updateArtistRateSettings] = useMutation(
@@ -303,7 +314,53 @@ const Register = () => {
 			});
 		});
 
-	const finish = () => navigate(ROUTE_CONSTANTS.HOME);
+	/**
+	 * Leaves the wizard with a session that matches what was just configured.
+	 *
+	 * WHY A REFETCH RATHER THAN "IT'S ALREADY RIGHT". The account is cached at step two and then
+	 * steps three to five change it - a rate, a timezone, a shop cut. Those go through the same
+	 * authenticated mutations Settings uses, so the SERVER is correct either way, but the copy of
+	 * the user sitting in auth context is whatever step two returned. Reading it back once, here,
+	 * is what makes "finished the wizard" and "logged in fresh" produce the same app, which is the
+	 * only version of this anybody can reason about.
+	 *
+	 * THE TOKENS ARE CARRIED OVER EXPLICITLY. getUser returns the stored User document, where
+	 * accessToken and firebaseToken are null - they exist only on the response to logging in.
+	 * Spreading the refetched user over the cached one without putting them back would blank the
+	 * credential and sign somebody out at the exact moment they finished signing up. (This is also
+	 * why CurrentUserFields doesn't select them - see UserService.)
+	 *
+	 * A FAILED REFRESH STILL LEAVES. The account exists and the session is valid; refusing to
+	 * navigate because a refetch failed would trap somebody inside onboarding over something a
+	 * page reload fixes.
+	 */
+	const finish = async () => {
+		const current = account || context.user;
+		const userId = current?.id;
+		if (userId) {
+			setSaving(true);
+			try {
+				const { data } = await apollo.query({
+					query: GET_CURRENT_USER,
+					variables: { userId },
+					fetchPolicy: "network-only",
+				});
+				if (data?.getUser) {
+					context.updateCurrentUser({
+						...current,
+						...data.getUser,
+						accessToken: current.accessToken,
+						firebaseToken: current.firebaseToken,
+					});
+				}
+			} catch {
+				// Deliberately swallowed - see above.
+			} finally {
+				setSaving(false);
+			}
+		}
+		navigate(ROUTE_CONSTANTS.HOME);
+	};
 
 	// Built as data so the progress indicator and the navigation don't have to know which step is
 	// which - and so the shop-only step simply isn't in the list for an artist, rather than being

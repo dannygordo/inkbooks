@@ -1,5 +1,5 @@
 import React, { useContext } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Box from "@mui/material/Box";
 import Toolbar from "@mui/material/Toolbar";
 import "./App.css";
@@ -14,6 +14,7 @@ import { AuthProvider, AuthContext, useAuth } from "./context/auth";
 import AuthRoute from "./utils/AuthRoute";
 import RoleRoute from "./utils/RoleRoute";
 import { ROLES } from "./constants/auth";
+import { shouldShowChrome } from "./utils/appChrome";
 import Projects from "./pages/projects/Projects";
 import Shops from "./pages/shops/Shops";
 import Staff from "./pages/staff/Staff";
@@ -55,6 +56,13 @@ const isOwnArtistPage = (user, params) =>
 
 function App() {
 	const { user } = useAuth();
+	const { pathname } = useLocation();
+	// Both pieces of chrome, one condition. The <Toolbar /> below isn't navigation - it is the
+	// spacer that compensates for Sidebar's fixed AppBar (see the comment where it is rendered), so
+	// showing one without the other either overlaps the page or leaves a blank band at the top.
+	// The rule itself lives in utils/appChrome.js, where it can be tested without mounting all of
+	// this.
+	const showChrome = shouldShowChrome(user, pathname);
 	return (
 		<SocketProvider id={ user?.id }>
 			<div className="App">
@@ -62,7 +70,7 @@ function App() {
 				<IBModal />
 				{/* <Topbar /> */}
 				<div className="container">
-					{user && <Sidebar />}
+					{showChrome && <Sidebar />}
 					{/* Sidebar.jsx renders its own MUI AppBar with position="fixed" (see that file) - a
 					fixed element is taken out of normal document flow entirely, so nothing below it
 					gets pushed down automatically. Sidebar's Drawer compensates for this internally
@@ -81,7 +89,7 @@ function App() {
 					    scrollbar or a mobile browser's bottom chrome. One rule on the shared main
 					    element covers every route, including ones that don't exist yet. */}
 					<Box component="main" sx={{ flexGrow: 1, minWidth: 0, pb: "50px" }}>
-						{user && <Toolbar />}
+						{showChrome && <Toolbar />}
 						<Routes>
 						<Route
 							path="/"

@@ -11,61 +11,34 @@ import { gql, useMutation } from "@apollo/client";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "../../context/auth";
 import { DialogContentText, CircularProgress } from "@mui/material";
+import { CURRENT_USER_FIELDS } from "../../services/UserService";
+
+// EXPORTED, and defined at module scope rather than inside the component.
+//
+// Login.test.jsx used to declare its own copy with a note that it "mirrors Login.jsx's own
+// document closely enough" - which was only ever true by hand. MockedProvider pairs a request with
+// a result by comparing the PRINTED document, so a copy that drifts by one field silently stops
+// matching and the test sees a network error instead of the mock. Importing the real one makes
+// that impossible, and is why this moved out of the component body.
+//
+// The session shape itself lives in one place - see UserService's CurrentUserFields. The tokens
+// are selected here rather than in the fragment because they exist only on the act of logging in.
+export const LOGIN_USER = gql`
+	${CURRENT_USER_FIELDS}
+	mutation login($email: String!, $password: String!) {
+		login(email: $email, password: $password) {
+			...CurrentUserFields
+			accessToken
+			firebaseToken
+		}
+	}
+`;
 
 const Login = () => {
 	const context = useContext(AuthContext);
 	const email = useRef();
 	const password = useRef();
 	const navigate = useNavigate();
-
-	const LOGIN_USER = gql`
-		mutation login($email: String!, $password: String!) {
-			login(email: $email, password: $password) {
-				id
-				email
-				firstName
-				lastName
-				avatar
-				role
-				accessToken
-				firebaseToken
-				userType
-				tagColor
-				userInfo {
-					... on Artist {
-						avatar
-						id
-						firstName
-						lastName
-						hourlyRate
-						shop {
-							id
-							name
-							website
-						}
-					}
-					... on Client {
-						avatar
-						id
-						firstName
-						lastName
-					}
-					... on Staff {
-						avatar
-						id
-						firstName
-						lastName
-						title
-						shop {
-							id
-							name
-							website
-						}
-					}
-				}
-			}
-		}
-	`;
 
 	const [loginUser, { data, loading, error }] = useMutation(LOGIN_USER, {
 		update(_, { data: { login: userData } }) {

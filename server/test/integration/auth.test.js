@@ -95,6 +95,93 @@ function baseRegisterInput(overrides = {}) {
 	};
 }
 
+// Selects the field the app actually runs on. REGISTER_MUTATION above deliberately doesn't - it
+// covers the scalars and the records written to the database - so this is the document for the
+// tests about the SESSION rather than about the writes.
+const REGISTER_WITH_USERINFO = `
+	mutation RegisterAccount($input: RegisterAccountInput!) {
+		registerAccount(input: $input) {
+			id
+			userType
+			userInfo {
+				... on Artist {
+					id
+					hourlyRate
+					shop {
+						id
+						name
+					}
+				}
+				... on Staff {
+					id
+					title
+				}
+				... on Client {
+					id
+				}
+			}
+		}
+	}
+`;
+
+describe('registerAccount mutation: the session it hands back', () => {
+	// THE REPORTED BUG. Signing up as an artist and then opening Settings showed "Nothing to
+	// configure here yet for this account type" until you logged out and logged back in.
+	//
+	// Two independent causes, one symptom, and neither produced an error anywhere:
+	//
+	//   1. registerAccount returned `{ ...newUser._doc, id, accessToken, firebaseToken }` with no
+	//      userInfo. login() built userInfo by hand, so the rule lived in login() and this mutation
+	//      never knew about it. userInfo is nullable, so GraphQL returned null and nothing objected.
+	//   2. UserInfo.__resolveType decided "Artist" by asking whether hourlyRate was truthy, and a
+	//      brand new artist has no rate - so even once the record WAS returned, it came back typed
+	//      as a Client and every `... on Artist` fragment matched nothing.
+	//
+	// Fix one alone would still have failed. Both are asserted here, separately, so a regression in
+	// either names itself.
+
+	it('returns the artist profile, with no rate set', async () => {
+		const server = createTestServer();
+		const response = await server.executeOperation(
+			{ query: REGISTER_WITH_USERINFO, variables: { input: baseRegisterInput() } },
+			{ contextValue: contextWithToken() },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		const { userInfo } = data.registerAccount;
+		// Not null - cause 1.
+		expect(userInfo).toBeTruthy();
+		// And typed as an Artist despite hourlyRate being unset - cause 2. `hourlyRate: null` in the
+		// response is only visible at all if the Artist fragment matched, which makes this assertion
+		// do double duty.
+		expect(userInfo.hourlyRate).toBeNull();
+		// The Artist document's id, not the User's - that distinction is load-bearing across the
+		// client (App.jsx's isOwnArtistPage compares against exactly this).
+		const artist = await Artist.findOne({ userId: data.registerAccount.id });
+		expect(String(userInfo.id)).toBe(String(artist._id));
+	});
+
+	it('resolves the shop for an owner who signed up as a shop', async () => {
+		// The wizard's shop-cut step reads `account.userInfo.shop.id` to know what to save against,
+		// and silently returned early when it couldn't find one - so that step saved nothing at all
+		// while appearing to work.
+		const server = createTestServer();
+		const response = await server.executeOperation(
+			{
+				query: REGISTER_WITH_USERINFO,
+				variables: { input: baseRegisterInput({ accountType: 'shop', shopName: 'Iron Wolf' }) },
+			},
+			{ contextValue: contextWithToken() },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.registerAccount.userInfo.shop).toBeTruthy();
+		expect(data.registerAccount.userInfo.shop.name).toBe('Iron Wolf');
+	});
+});
+
 describe('registerAccount mutation', () => {
 	it('creates an independent artist', async () => {
 		const server = createTestServer();

@@ -28,6 +28,7 @@ const accountMutations = require('../mutations/accounts');
 const depositMutations = require('../mutations/deposits');
 const artistShopConnectionMutations = require('../mutations/artistShopConnections');
 const shopCutPaymentMutations = require('../mutations/shopCutPayments');
+const { Constants } = require('../../utils/constants');
 const Artist = require('../../models/Artist');
 const Client = require('../../models/Client');
 const { DateResolver, DateTimeResolver } = require('graphql-scalars');
@@ -352,38 +353,18 @@ module.exports = {
     // deleted after the message was sent) - all three would have crashed the whole
     // getProject/getConversationsByMemberId query, not just this one field, since a thrown field
     // resolver error propagates up through GraphQL's response.
-    user: async(message, args, context, info) => {
-      const usr = await User.findById(message.senderId);
-      if (!usr) {
-        return null;
-      }
-      let userInfo = null;
-      switch (usr.userType) {
-        case 'artist':
-          userInfo = await Artist.findOne({ userId: usr.id }).select('-user');
-          break;
-        case 'client':
-          userInfo = await Client.findOne({ userId: usr.id }).select('-user');
-          break;
-        case 'staff':
-          userInfo = await Staff.findOne({ userId: usr.id }).select('-user');
-          break;
-      }
-      if (userInfo) {
-        userInfo.id = userInfo._id;
-      }
-      // Spreading usr._doc (the raw Mongoose internal document) loses Mongoose's `id` virtual -
-      // the copy only has `_id`, not `id`. User.id is `ID!` (non-null) in the schema, so any
-      // query that selects `message.user.id` (not previously exercised by any existing client
-      // query, but a completely reasonable one to add) would fail with "Cannot return null for
-      // non-nullable field User.id". Setting it explicitly from the real document's `id` virtual
-      // fixes this without changing anything else about the returned shape.
-      return {
-        ...usr._doc,
-        id: usr.id,
-        userInfo,
-      };
-    }
+    // THE PROFILE LOOKUP THAT USED TO LIVE HERE IS GONE. This was the third hand-written copy of
+    // "which record is this user's userInfo" - a three-branch switch identical in intent to the one
+    // in login() and to the one registerAccount forgot to write, which is how that bug happened.
+    // User.userInfo is a field resolver now (below), so returning the document is enough, and the
+    // lookup only runs when the field is actually selected rather than on every message in a
+    // thread.
+    //
+    // The Mongoose document is returned directly rather than spread. The old version spread
+    // `usr._doc` and then had to put `id` back by hand, because spreading loses Mongoose's `id`
+    // virtual and User.id is `ID!` - a copy that drops a non-nullable field is a strange shape to
+    // hand to GraphQL when the original is right there.
+    user: async (message) => User.findById(message.senderId)
   },
   User: {
     // Every artist must have a real tag color, and "they'll get one next time they log in" (the
@@ -401,18 +382,80 @@ module.exports = {
     // user rather than recomputing forever. server/scripts/backfill-tag-colors.js does the same
     // thing in bulk for anyone who never happens to be rendered.
     tagColor: async (user) => ensureTagColor(user),
+
+    /**
+     * The Artist / Staff / Client record behind this account.
+     *
+     * A FIELD RESOLVER, not something each mutation assembles for itself. login() used to build
+     * this by hand and put it on its return object, which meant the rule "a User's userInfo is the
+     * profile row matching its userType" lived inside one resolver. registerAccount then returned
+     * `{ ...newUser._doc, id, accessToken, firebaseToken }` with no userInfo at all - and nothing
+     * failed. GraphQL happily returned null for a nullable field, so a freshly signed-up account
+     * reached the dashboard with userInfo undefined, Settings decided it wasn't an artist
+     * ("Nothing to configure here yet for this account type") and the only fix was logging out and
+     * back in, because logging in was the one code path that knew how to fill it. Every future
+     * mutation that returns a User would have had the same hole available to it.
+     *
+     * Defined once, here, it is now impossible to return a User that can't produce its own
+     * userInfo, whatever created it.
+     *
+     * `parent` may be a Mongoose document (getUser) or a plain object spread from one (login,
+     * registerAccount), so the id is read from either shape.
+     *
+     * NULL IS A LEGITIMATE ANSWER. The seeded `platformadmin` is userType STAFF with deliberately
+     * no Staff row; an earlier version crashed on exactly that, so the absence is returned rather
+     * than thrown. Callers already optional-chain (user.userInfo?.shop?.id appears throughout the
+     * client).
+     */
+    userInfo: async (parent) => {
+      const profileModelByType = {
+        [Constants.USER_TYPE.ARTIST]: Artist,
+        [Constants.USER_TYPE.CLIENT]: Client,
+        [Constants.USER_TYPE.STAFF]: Staff,
+      };
+      const ProfileModel = profileModelByType[parent.userType];
+      if (!ProfileModel) {
+        return null;
+      }
+      const userId = parent._id || parent.id;
+      if (!userId) {
+        return null;
+      }
+      return ProfileModel.findOne({ userId }).select('-user');
+    },
   },
   UserInfo: {
-    __resolveType(user, context, info) {
-      if(user.hourlyRate) {
-        return 'Artist';
+    /**
+     * Which of the three profile types this record is.
+     *
+     * KEYED OFF THE COLLECTION IT CAME FROM, not off whether a field happens to be filled in. The
+     * previous version returned 'Artist' only when `hourlyRate` was truthy - and Artist.hourlyRate
+     * has no default (see models/Artist.js), so a brand new artist who hasn't set a rate yet fell
+     * through to the `!hourlyRate && !title` branch and was reported as a Client. Every
+     * `... on Artist { shop { id } }` fragment then matched nothing, so the shop id the wizard and
+     * the client read off userInfo was silently absent. An artist who charges a flat rate rather
+     * than an hourly one hit the same thing permanently.
+     *
+     * That is the general failure mode of shape-sniffing: it makes an OPTIONAL field load-bearing
+     * for identity, so leaving it blank changes what you are. Mongoose documents already carry the
+     * answer on `constructor.modelName`, which is not optional and cannot be blank.
+     *
+     * The old heuristic is kept only as a fallback for plain objects (test fixtures and anything
+     * hand-built), and `title` is checked before `hourlyRate` there so a rate-less Staff row still
+     * resolves correctly.
+     */
+    __resolveType(userInfo) {
+      const modelName = userInfo?.constructor?.modelName;
+      if (modelName === 'Artist' || modelName === 'Staff' || modelName === 'Client') {
+        return modelName;
       }
-      if(user.title) {
+      if (userInfo?.title) {
         return 'Staff';
       }
-      if(!user.hourlyRate && !user.title){
-        return 'Client';
+      if (userInfo?.hourlyRate || userInfo?.bookingSlug || userInfo?.billingType) {
+        return 'Artist';
       }
+      return 'Client';
     }
   }
 };

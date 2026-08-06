@@ -8,7 +8,6 @@ const { UserInputError, AuthenticationError, rethrow } = require('../../utils/er
 const SECRET_KEY = process.env.SECRET_KEY;
 const User = require('../../models/User');
 const Artist = require('../../models/Artist');
-const Client = require('../../models/Client');
 const Staff = require('../../models/Staff');
 const Shop = require('../../models/Shop');
 const ArtistShopConnection = require('../../models/ArtistShopConnection');
@@ -104,39 +103,17 @@ module.exports = {
         role: user.role,
         userType: user.userType,
       });
-      // Resolves the profile record that matches this user's type. Three near-identical branches
-      // collapsed into one lookup - the only thing that differed between them was which model to
-      // query.
+      // NO userInfo ASSEMBLED HERE ANY MORE. It is a field resolver on User (see
+      // resolvers/index.js), so it is filled in for anything that returns a User rather than for
+      // whichever resolvers remembered to do it.
       //
-      // The profile can legitimately be MISSING, and the previous version crashed when it was:
-      // each branch did `userInfo.id = userInfo._id` on the result of a findOne with no null
-      // check, so a User whose profile row doesn't exist got
-      // "Cannot read properties of null" and could not log in at all. That isn't hypothetical -
-      // the seeded `platformadmin` account is a User with userType STAFF and deliberately no
-      // Staff record ("no Staff/Shop tie", see scripts/seed.js), so logging in as the platform
-      // admin failed outright. Found by auth.test.js the first time the suite was run.
-      //
-      // Returning null userInfo is the honest answer: the account exists and its credentials are
-      // valid, it just has no shop-side profile attached. Callers already optional-chain this
-      // (user.userInfo?.shop?.id appears throughout the client).
-      const profileModelByType = {
-        [Constants.USER_TYPE.ARTIST]: Artist,
-        [Constants.USER_TYPE.CLIENT]: Client,
-        [Constants.USER_TYPE.STAFF]: Staff,
-      };
-      const ProfileModel = profileModelByType[user.userType];
-      let userInfo = null;
-      if (ProfileModel) {
-        userInfo = await ProfileModel.findOne({ userId: user.id }).select('-user');
-        if (userInfo) {
-          // `id` is a Mongoose virtual, so it survives neither .lean() nor the spread the client
-          // does on this object - set explicitly, as the original branches did.
-          userInfo.id = userInfo._id;
-        }
-      }
+      // This function used to look the profile up itself and hang it on the returned object, which
+      // read as harmless until registerAccount was added and didn't - a brand new account arrived
+      // at the dashboard with userInfo null, and the only way to get one was to log in, because
+      // logging in was the single place that knew how. Nothing failed loudly; the field is
+      // nullable, so GraphQL returned null and the client rendered the empty state.
       return {
         ...user._doc,
-        userInfo,
         id: user._id,
         role: user.role,
         accessToken: token,
