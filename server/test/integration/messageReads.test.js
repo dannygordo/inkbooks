@@ -177,6 +177,70 @@ describe('unread counting', () => {
 	});
 });
 
+describe('conversation ordering', () => {
+	it('returns the most recently active thread first', async () => {
+		// This sorted ASCENDING - stalest first. Every conversation was present and every unread
+		// count was right, so nothing looked broken; the list was just in the order nobody wants,
+		// and Messenger.jsx opens conversations[0], so the app landed on the thread you had least
+		// recently touched while a new client message sat at the bottom.
+		//
+		// Worth a test rather than a careful read, because a sort direction is one character and
+		// produces no error when it's wrong.
+		const { artist, client, conversation: stale } = await twoPersonConversation();
+		const now = new Date();
+		// Timestamps set explicitly rather than by sending messages in sequence. Two createMessage
+		// calls against in-memory Mongo can land in the same millisecond, which would make the
+		// assertion depend on how fast the machine is.
+		await Conversation.updateOne(
+			{ _id: stale._id },
+			{ $set: { updatedAt: new Date(now.getTime() - 60 * 60 * 1000) } },
+		);
+		const active = await new Conversation({
+			members: [String(artist.id), String(client.id)],
+			createdAt: new Date(now.getTime() - 24 * 60 * 60 * 1000),
+			updatedAt: now,
+		}).save();
+		const server = createTestServer();
+
+		const list = await server.executeOperation(
+			{ query: MY_CONVERSATIONS, variables: { memberId: String(artist.id) } },
+			asUser(artist),
+		);
+		const ids = list.body.singleResult.data.getConversationsByMemberId.map((c) => c.id);
+		// The OLDER thread by creation sorts first, because it has the newer activity. Creation
+		// order and activity order deliberately disagree here - if this sorted on createdAt it
+		// would pass by accident with `updatedAt` spelled either way.
+		expect(ids[0]).toBe(String(active._id));
+		expect(ids[1]).toBe(String(stale._id));
+	});
+
+	it('moves a thread to the top when a message arrives in it', async () => {
+		const { artist, client, conversation: quiet } = await twoPersonConversation();
+		const now = new Date();
+		const busy = await new Conversation({
+			members: [String(artist.id), String(client.id)],
+			createdAt: now,
+			updatedAt: now,
+		}).save();
+		// The quiet one starts stale, so the bump is unambiguous rather than a sub-millisecond race.
+		await Conversation.updateOne(
+			{ _id: quiet._id },
+			{ $set: { updatedAt: new Date(now.getTime() - 60 * 60 * 1000) } },
+		);
+		const server = createTestServer();
+
+		await say(server, client, quiet.id, 'are you still there?');
+
+		const list = await server.executeOperation(
+			{ query: MY_CONVERSATIONS, variables: { memberId: String(artist.id) } },
+			asUser(artist),
+		);
+		const ids = list.body.singleResult.data.getConversationsByMemberId.map((c) => c.id);
+		expect(ids[0]).toBe(String(quiet._id));
+		expect(ids[1]).toBe(String(busy._id));
+	});
+});
+
 describe('marking read', () => {
 	it('clears the count', async () => {
 		const { artist, client, conversation } = await twoPersonConversation();

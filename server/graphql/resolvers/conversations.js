@@ -36,11 +36,20 @@ module.exports = {
         throw new AuthenticationError('Action not allowed');
       }
       try {
+        // Newest activity FIRST. This was `{ updatedAt: 1 }` - ascending - so the list came back
+        // stalest-first, and since Messenger.jsx opens `conversations[0]` by default, the app
+        // opened on the thread you had least recently touched while a client's new message sat at
+        // the bottom of the list. An off-by-one-character bug with no error and no wrong data,
+        // which is why it survived: every conversation was present and correct, just in the order
+        // nobody wants.
+        //
+        // updatedAt is bumped on every new message (see mutations/messages.js), so this is real
+        // activity order rather than creation order.
         const conversation = await Conversation.find({
             members: {
                 $in:[memberId]
             }
-        }).sort({ updatedAt: 1 });
+        }).sort({ updatedAt: -1 });
         return conversation;
       } catch (err) {
         console.log(err);
