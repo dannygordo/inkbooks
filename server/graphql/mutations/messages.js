@@ -4,7 +4,7 @@ const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 const { UserInputError, AuthenticationError, rethrow } = require('../../utils/errors');
 const { updateMessageInputSchema, createMessageInputSchema, validate } = require('../../utils/validation');
-const { notifyNewMessage } = require('../../utils/message-notifications');
+const { notifyNewMessage, logNotifyOutcomes } = require('../../utils/message-notifications');
 const { canAccessConversation } = require('../../utils/shop-membership');
 
 module.exports = {
@@ -72,14 +72,9 @@ module.exports = {
       // Still never throws - the message is what the person asked for and an email problem must
       // not lose it - but the outcome is now a value rather than a log line, so callers and tests
       // can see what actually happened.
-      const notifications = await notifyNewMessage({ conversationId, senderId });
-      const failed = notifications.filter((n) => n.outcome === 'failed');
-      if (failed.length > 0) {
-        console.warn(
-          '[messages] Notification failed for:',
-          failed.map((f) => `${f.userId} (${f.error})`).join(', '),
-        );
-      }
+      // Every outcome, not just failures - see logNotifyOutcomes on why logging only 'failed'
+      // hid the two outcomes people actually report.
+      logNotifyOutcomes('messages', conversationId, await notifyNewMessage({ conversationId, senderId }));
 
       return msg;
     }),

@@ -30,7 +30,7 @@ const {
   sendBookingRequestReceivedEmail,
   sendNewBookingRequestNotificationToArtist,
 } = require('../../utils/email');
-const { notifyNewMessage } = require('../../utils/message-notifications');
+const { notifyNewMessage, logNotifyOutcomes } = require('../../utils/message-notifications');
 const { notifySafely } = require('../../utils/notifications');
 const { scheduleAudienceForArtist } = require('../../utils/notification-audience');
 const { actorName } = require('../../utils/notification-copy');
@@ -77,6 +77,11 @@ module.exports = {
       throw new UserInputError('Errors', { errors: { artistId: 'Artist not found' } });
     }
 
+    // A logged-in caller is the actor; an anonymous submission means the client is. Resolved here,
+    // once, because both the artist's email and the artist's notification hang off it.
+    const callerIsTheArtist =
+      !!authenticatedCaller && String(authenticatedCaller.id) === String(artist._id);
+
     const { user: clientUser, client } = await findOrCreateGuestClient({
       firstName: data.firstName,
       lastName: data.lastName,
@@ -84,9 +89,12 @@ module.exports = {
       phone: data.phone,
     });
     // Somebody who submits the public intake form for one of a shop's artists is that shop's
-    // client from this moment, before any project exists. Unauthenticated call, so this is keyed
-    // off the ARTIST being booked, not off a caller.
+    // client from this moment, before any project exists. Keyed off the ARTIST being booked rather
+    // than off the caller, because the caller may be nobody at all - the public form is anonymous,
+    // and the artist is the only party guaranteed to be present in every path through here.
     await linkClientToUsersShops(client._id, data.artistId);
+
+    const actorUserId = authenticatedCaller ? authenticatedCaller.id : clientUser._id;
 
     const now = new Date();
     const conversation = await new Conversation({
@@ -128,17 +136,32 @@ module.exports = {
       artistName: artist.firstName,
       guestToken,
     });
-    await sendNewBookingRequestNotificationToArtist({
-      to: artist.email,
-      artistFirstName: artist.firstName,
-      clientName: `${clientUser.firstName} ${clientUser.lastName}`,
-    });
+    // Not when the artist made it themselves. An artist scheduling a walk-in through the
+    // appointment wizard hits this same mutation, and mailing them "you have a new booking
+    // request" about the thing they are currently looking at is noise of the worst kind: it makes
+    // every OTHER email from this system slightly less worth opening.
+    if (!callerIsTheArtist) {
+      await sendNewBookingRequestNotificationToArtist({
+        to: artist.email,
+        artistFirstName: artist.firstName,
+        clientName: `${clientUser.firstName} ${clientUser.lastName}`,
+      });
+    }
 
-    // The actor is the CLIENT who submitted the form, not the artist and not nobody. This mutation
-    // is public, so there is no logged-in caller to reach for - which is exactly the case where
-    // passing null is tempting and wrong. The client caused it; the artist hears about it.
+    // WHO CAUSED THIS, not who the form is about.
+    //
+    // This was hardcoded to the client, on the reasoning that a public intake form has no logged-in
+    // caller. True for the public form - and wrong for the other caller, because the appointment
+    // wizard reaches this same mutation with the artist logged in. The artist was then the actor of
+    // record for an event they themselves caused, so notify()'s actor filter had nothing to catch
+    // and dutifully told them about their own consult.
+    //
+    // Deriving the actor from the request rather than assuming it means the artist filters
+    // themselves out, and a shop admin booking a walk-in on an artist's behalf still notifies the
+    // artist - which is correct, and which a `source === 'artist_created'` check would have got
+    // wrong, since the wizard sends that flag no matter who is driving it.
     await notifySafely({
-      actorId: clientUser._id,
+      actorId: actorUserId,
       recipientIds: [artist._id],
       type: 'booking_request_received',
       category: 'schedule',
@@ -199,10 +222,14 @@ module.exports = {
       { _id: bookingRequest.conversationId },
       { $set: { updatedAt: now } },
     );
-    await notifyNewMessage({
-      conversationId: bookingRequest.conversationId,
-      senderId: user.id,
-    });
+    logNotifyOutcomes(
+      'guest-message',
+      bookingRequest.conversationId,
+      await notifyNewMessage({
+        conversationId: bookingRequest.conversationId,
+        senderId: user.id,
+      }),
+    );
 
     return newMessage;
   },

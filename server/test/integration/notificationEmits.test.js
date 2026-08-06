@@ -234,6 +234,94 @@ describe('a notification failure never fails the action', () => {
 	});
 });
 
+describe('booking requests', () => {
+	// createBookingRequest has TWO callers and they differ in who is standing there. The public
+	// intake form is anonymous and the client is the actor. The appointment wizard is the artist
+	// scheduling a walk-in, logged in, and the artist is the actor - a fact the resolver originally
+	// hardcoded away by always naming the client, so notify()'s actor filter had nothing to catch
+	// and told the artist about the consult they were in the middle of booking.
+	//
+	// Deriving the actor from the request is what makes the third case below work as well, and it
+	// is why this isn't a `source === 'artist_created'` check: the wizard sends that flag no matter
+	// who is driving it.
+	function bookingInput(artistId, overrides = {}) {
+		return {
+			artistId,
+			firstName: 'Arya',
+			lastName: 'Stark',
+			email: `guest${Date.now()}${Math.floor(Math.random() * 100000)}@example.com`,
+			description: 'A small needle-and-thread tattoo, black and grey.',
+			...overrides,
+		};
+	}
+
+	const CREATE_BOOKING_REQUEST = `
+		mutation CreateBookingRequest($bookingRequestInput: BookingRequestInput!) {
+			createBookingRequest(bookingRequestInput: $bookingRequestInput) {
+				id
+			}
+		}
+	`;
+
+	async function submit(server, artistId, auth, overrides) {
+		const res = await server.executeOperation(
+			{
+				query: CREATE_BOOKING_REQUEST,
+				variables: { bookingRequestInput: bookingInput(artistId, overrides) },
+			},
+			auth,
+		);
+		expect(res.body.singleResult.errors).toBeUndefined();
+		return res.body.singleResult.data.createBookingRequest;
+	}
+
+	it('tells the artist when a stranger submits the public form', async () => {
+		const { user: artist } = await createArtistUser();
+		const server = createTestServer();
+
+		await submit(server, artist.id, { contextValue: contextWithToken() });
+
+		const forArtist = await Notification.find({
+			userId: artist.id,
+			type: 'booking_request_received',
+		});
+		expect(forArtist).toHaveLength(1);
+		expect(forArtist[0].title).toContain('Arya Stark');
+	});
+
+	it('says nothing when the artist books it themselves', async () => {
+		// The reported bug. An artist creating a consult through the appointment wizard was told
+		// they had a new booking request - about the thing they were looking at.
+		const { user: artist } = await createArtistUser();
+		const server = createTestServer();
+
+		await submit(server, artist.id, asUser(artist), { source: 'artist_created' });
+
+		expect(await Notification.countDocuments({ type: 'booking_request_received' })).toBe(0);
+	});
+
+	it('still tells the artist when the front desk books it for them', async () => {
+		// The case a `source === 'artist_created'` check would have broken. Somebody else scheduled
+		// this on the artist's behalf, so the artist genuinely does need to hear about it - and the
+		// wizard sends 'artist_created' here too, because the flag describes the form, not the
+		// person filling it in.
+		const { shop } = await shopWithTeam();
+		const { user: staff } = await createStaffUser(shop._id);
+		const { user: artist } = await createArtistUser();
+		await connectArtistToShop(artist._id, shop._id);
+		const server = createTestServer();
+
+		await submit(server, artist.id, asUser(staff), { source: 'artist_created' });
+
+		expect(
+			await Notification.countDocuments({
+				userId: artist.id,
+				type: 'booking_request_received',
+			}),
+		).toBe(1);
+	});
+});
+
 describe('roster events reach both directions', () => {
 	it('tells the shop admin when an artist connects themselves', async () => {
 		const { user: admin, shop } = await createShopAdminUser();
