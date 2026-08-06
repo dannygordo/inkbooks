@@ -69,3 +69,66 @@
     text-align: center;
     color: #1775ee;
 }
+/* --- Account-type step ------------------------------------------------------------------- */
+
+.registerStepTitle {
+    margin: 0 0 4px;
+    font-size: 18px;
+    font-weight: 600;
+    color: #333;
+}
+
+/* A card, not a radio button. The choice carries real consequences - one creates a shop with a
+   roster and books, the other creates a single artist - so each option gets room to say what it
+   does. A radio label has room for two words, which is how people pick the wrong one. */
+.registerTypeCard {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    width: 100%;
+    padding: 14px 16px;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    background-color: #fff;
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.registerTypeCard:hover {
+    border-color: #1775ee;
+    background-color: #f7faff;
+}
+
+.registerTypeTitle {
+    font-size: 15px;
+    font-weight: 600;
+    color: #222;
+}
+
+.registerTypeBlurb {
+    font-size: 13px;
+    color: #666;
+    line-height: 1.4;
+}
+
+.registerChosenType {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 13px;
+    color: #666;
+}
+
+.registerLinkButton {
+    border: none;
+    background: none;
+    padding: 0;
+    color: #1775ee;
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    text-decoration: underline;
+}

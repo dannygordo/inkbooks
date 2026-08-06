@@ -48,6 +48,15 @@ module.exports.Constants = {
         CLIENT: 'client',
         STAFF: 'staff'
     },
+    // What somebody can sign themselves up as. Deliberately NOT the same list as USER_TYPE:
+    // 'client' is absent because clients already get accounts from the booking flow and a client
+    // signing up cold lands on an empty dashboard, and 'staff' is absent because a receptionist
+    // is added BY a shop - letting one self-register would let anyone create a staff account
+    // pointing at a shop they have nothing to do with.
+    SIGNUP_TYPE: {
+        SHOP: 'shop',
+        ARTIST: 'artist'
+    },
     ERRORS: {
         AUTHENTICATION_ERROR: 'You are not authorized to perform this action'
     },

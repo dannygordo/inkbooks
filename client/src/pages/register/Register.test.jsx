@@ -1,14 +1,16 @@
-// Register.jsx tests. Same AuthContext.Provider-injection approach as Login.test.jsx. Also
-// covers the client-side password-mismatch guard (setCustomValidity) and the important regression
-// note from Register.jsx's own comment: role/userType are sent in the mutation variables purely
-// for GraphQL schema completeness - the server (resolvers/users.js's register()) hardcodes both
-// server-side regardless of what's sent, which is the actual security boundary (see
-// server/test/integration/auth.test.js's matching regression test). This test only confirms the
-// client still sends role: 30 / userType: 'client' as before, not that this is what makes the app
-// secure.
-// Explicit React import - the app itself relies on @vitejs/plugin-react's automatic JSX runtime,
-// but Vitest's transform for *test* files falls back to the classic runtime (React.createElement
-// in scope, not auto-imported) without this - see the matching note in context/auth.test.jsx.
+// Register.jsx tests - public signup as a shop or an independent artist.
+//
+// This file used to test a client-signup form that sent `role: 30` and `userType: 'client'` in its
+// variables, with a long comment explaining that the server ignored both. That whole arrangement is
+// gone: clients aren't self-registerable (they get an account the moment they submit a booking
+// request), and RegisterAccountInput has no role or userType fields at all - so the guarantee is
+// structural now rather than something a test has to describe in prose.
+//
+// What's worth testing here is the SHAPE of the form: the choice comes first, the two paths ask for
+// different things, and neither sends anything about permissions.
+//
+// Explicit React import - under Vitest, @vitejs/plugin-react compiles JSX with the classic runtime.
+// See scripts/check-react-in-tested-components.mjs.
 import React from "react";
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
@@ -19,38 +21,18 @@ import { gql } from "@apollo/client";
 import Register from "./Register";
 import { AuthContext } from "../../context/auth";
 
-const REGISTER_USER = gql`
-	mutation register(
-		$email: String!
-		$firstName: String!
-		$lastName: String!
-		$avatar: String
-		$password: String!
-		$confirmPassword: String!
-		$role: Int!
-		$userType: String!
-	) {
-		register(
-			registerInput: {
-				email: $email
-				firstName: $firstName
-				lastName: $lastName
-				avatar: $avatar
-				password: $password
-				confirmPassword: $confirmPassword
-				role: $role
-				userType: $userType
-			}
-		) {
+// Must match Register.jsx's document exactly, or MockedProvider won't pair a request with a result.
+const REGISTER_ACCOUNT = gql`
+	mutation RegisterAccount($input: RegisterAccountInput!) {
+		registerAccount(input: $input) {
 			id
 			email
 			firstName
 			lastName
-			avatar
 			role
+			userType
 			accessToken
 			firebaseToken
-			userType
 			tagColor
 		}
 	}
@@ -70,126 +52,152 @@ function renderRegister({ mocks = [] } = {}) {
 	return contextValue;
 }
 
-async function fillForm(user, overrides = {}) {
+async function chooseArtist(user) {
+	await user.click(screen.getByText("I'm an independent artist"));
+}
+
+async function chooseShop(user) {
+	await user.click(screen.getByText("I run a shop"));
+}
+
+async function fillCommonFields(user, overrides = {}) {
 	const values = {
 		firstName: "Jon",
 		lastName: "Snow",
-		avatar: "",
 		email: "jon@example.com",
 		password: "longenoughpassword",
 		confirmPassword: "longenoughpassword",
 		...overrides,
 	};
-	if (values.firstName) await user.type(screen.getByPlaceholderText("First Name"), values.firstName);
-	if (values.lastName) await user.type(screen.getByPlaceholderText("Last Name"), values.lastName);
-	if (values.avatar) await user.type(screen.getByPlaceholderText("Avatar"), values.avatar);
-	if (values.email) await user.type(screen.getByPlaceholderText("Email"), values.email);
-	if (values.password) await user.type(screen.getByPlaceholderText("Password"), values.password);
-	if (values.confirmPassword) {
-		await user.type(screen.getByPlaceholderText("Confirm Password"), values.confirmPassword);
-	}
+	await user.type(screen.getByPlaceholderText("First name"), values.firstName);
+	await user.type(screen.getByPlaceholderText("Last name"), values.lastName);
+	await user.type(screen.getByPlaceholderText("Email"), values.email);
+	await user.type(screen.getByPlaceholderText("Password"), values.password);
+	await user.type(screen.getByPlaceholderText("Confirm password"), values.confirmPassword);
+	return values;
 }
 
+const RETURNED_USER = {
+	__typename: "User",
+	id: "u2",
+	email: "jon@example.com",
+	firstName: "Jon",
+	lastName: "Snow",
+	role: 20,
+	userType: "artist",
+	accessToken: "real-jwt",
+	firebaseToken: null,
+	tagColor: "#8E24AA",
+};
+
 describe("Register", () => {
-	it("renders all the expected inputs", () => {
+	it("asks what kind of account first, before any fields", () => {
 		renderRegister();
-		[
-			"First Name",
-			"Last Name",
-			"Avatar",
-			"Email",
-			"Password",
-			"Confirm Password",
-		].forEach((placeholder) => {
-			expect(screen.getByPlaceholderText(placeholder)).toBeInTheDocument();
-		});
 
-		// Email is the identity - there is no username field to fill in. Asserted explicitly
-		// rather than just dropped from the list above, because a deletion from a list is invisible
-		// the next time someone reads this file.
-		expect(screen.queryByPlaceholderText("Username")).not.toBeInTheDocument();
+		expect(screen.getByText("I run a shop")).toBeInTheDocument();
+		expect(screen.getByText("I'm an independent artist")).toBeInTheDocument();
+		// No form yet. Showing the fields and the choice together invites someone to fill the
+		// fields in and then discover the choice changes what is being asked of them.
+		expect(screen.queryByPlaceholderText("Email")).not.toBeInTheDocument();
 	});
 
-	it("blocks submission client-side when confirmPassword does not match password", async () => {
+	it("asks a shop for its name, and an artist not to bother", async () => {
+		// The reason the choice comes first: the two paths genuinely differ. Also covers Change,
+		// because picking the wrong card shouldn't mean reloading the page.
 		const user = userEvent.setup();
-		const contextValue = renderRegister({ mocks: [] });
+		renderRegister();
 
-		await fillForm(user, { password: "longenoughpassword", confirmPassword: "somethingElse" });
-		await user.click(screen.getByText("Sign Up"));
+		await chooseShop(user);
+		expect(screen.getByPlaceholderText("Shop name")).toBeInTheDocument();
 
-		// No matching mock exists for this scenario - if the mismatch guard failed to stop
-		// submission, MockedProvider would throw on an unmatched request and this test would fail
-		// for that reason instead. The more direct assertion: context.login should never fire.
-		expect(contextValue.login).not.toHaveBeenCalled();
-		expect(screen.getByPlaceholderText("Confirm Password")).toBeInvalid();
+		await user.click(screen.getByText("Change"));
+		await chooseArtist(user);
+		expect(screen.queryByPlaceholderText("Shop name")).not.toBeInTheDocument();
 	});
 
-	it("on successful registration: sends role 30/userType client and calls context.login()", async () => {
+	it("sends accountType artist and no shopName at all", async () => {
 		const user = userEvent.setup();
-		// __typename required on the mock's result object now that MockedProvider's default
-		// addTypename: true is in effect - it has to match the actual GraphQL type register()
-		// resolves to (User, per server/graphql/typeDefs.js) or Apollo's cache normalization won't
-		// recognize this as a match for the query.
-		const returnedUser = {
-			__typename: "User",
-			id: "u2",
-			email: "jon@example.com",
-			firstName: "Jon",
-			lastName: "Snow",
-			avatar: "",
-			role: 30,
-			accessToken: "real-jwt",
-			firebaseToken: null,
-			userType: "client",
-			// Was "#fff" - register() now always assigns a real default itself (purple, since a
-			// self-registered account has no shop) rather than echoing back whatever the client
-			// sent (see resolvers/users.js's register() and utils/tag-color.js). The client no
-			// longer sends a tagColor at all - see the mutation variables below.
-			tagColor: "#8E24AA",
-		};
 		const mocks = [
 			{
 				request: {
-					query: REGISTER_USER,
+					query: REGISTER_ACCOUNT,
 					variables: {
-						email: "jon@example.com",
-						firstName: "Jon",
-						lastName: "Snow",
-						avatar: "",
-						password: "longenoughpassword",
-						confirmPassword: "longenoughpassword",
-						role: 30,
-						userType: "client",
+						input: {
+							accountType: "artist",
+							firstName: "Jon",
+							lastName: "Snow",
+							email: "jon@example.com",
+							password: "longenoughpassword",
+							confirmPassword: "longenoughpassword",
+							// No shopName key. MockedProvider matches variables deeply, so this is a
+							// real assertion: sending `shopName: ""` would fail to match.
+						},
 					},
 				},
-				result: { data: { register: returnedUser } },
+				result: { data: { registerAccount: RETURNED_USER } },
 			},
 		];
 		const contextValue = renderRegister({ mocks });
 
-		await fillForm(user);
-		await user.click(screen.getByText("Sign Up"));
+		await chooseArtist(user);
+		await fillCommonFields(user);
+		await user.click(screen.getByText("Create account"));
 
-		await waitFor(() => expect(contextValue.login).toHaveBeenCalledWith(returnedUser));
+		await waitFor(() => expect(contextValue.login).toHaveBeenCalledWith(RETURNED_USER));
 	});
 
-	it("on a validation error from the server: renders the field errors returned in extensions.errors", async () => {
+	it("sends accountType shop with the shop name", async () => {
 		const user = userEvent.setup();
-		const graphQLError = new Error("Errors");
-		graphQLError.extensions = { errors: { password: "Password must be at least 8 characters" } };
+		const shopUser = { ...RETURNED_USER, role: 10 };
 		const mocks = [
 			{
 				request: {
-					query: REGISTER_USER,
+					query: REGISTER_ACCOUNT,
 					variables: {
-						email: "jon@example.com",
-						firstName: "Jon",
-						lastName: "Snow",
-						avatar: "",
-						password: "short1",
-						confirmPassword: "short1",
-						role: 30,
-						userType: "client",
+						input: {
+							accountType: "shop",
+							firstName: "Jon",
+							lastName: "Snow",
+							email: "jon@example.com",
+							password: "longenoughpassword",
+							confirmPassword: "longenoughpassword",
+							shopName: "Copper Wolf",
+						},
+					},
+				},
+				result: { data: { registerAccount: shopUser } },
+			},
+		];
+		const contextValue = renderRegister({ mocks });
+
+		await chooseShop(user);
+		await user.type(screen.getByPlaceholderText("Shop name"), "Copper Wolf");
+		await fillCommonFields(user);
+		await user.click(screen.getByText("Create account"));
+
+		await waitFor(() => expect(contextValue.login).toHaveBeenCalledWith(shopUser));
+	});
+
+	it("renders the field errors the server returns, rather than failing silently", async () => {
+		// A failed signup that renders nothing is indistinguishable from a dead button.
+		const user = userEvent.setup();
+		const graphQLError = new Error("Email is already taken");
+		graphQLError.extensions = {
+			errors: { email: "An account already exists for that email address." },
+		};
+		const mocks = [
+			{
+				request: {
+					query: REGISTER_ACCOUNT,
+					variables: {
+						input: {
+							accountType: "artist",
+							firstName: "Jon",
+							lastName: "Snow",
+							email: "taken@example.com",
+							password: "longenoughpassword",
+							confirmPassword: "longenoughpassword",
+						},
 					},
 				},
 				result: { errors: [graphQLError] },
@@ -197,11 +205,14 @@ describe("Register", () => {
 		];
 		renderRegister({ mocks });
 
-		await fillForm(user, { password: "short1", confirmPassword: "short1" });
-		await user.click(screen.getByText("Sign Up"));
+		await chooseArtist(user);
+		await fillCommonFields(user, { email: "taken@example.com" });
+		await user.click(screen.getByText("Create account"));
 
 		await waitFor(() =>
-			expect(screen.getByText("Password must be at least 8 characters")).toBeInTheDocument(),
+			expect(
+				screen.getByText("An account already exists for that email address."),
+			).toBeInTheDocument(),
 		);
 	});
 });

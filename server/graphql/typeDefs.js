@@ -520,16 +520,21 @@ module.exports = gql`
     tags: [String]
     status: String!
   }
-  input RegisterInput {
+  # Public signup. RegisterInput is gone with it - it carried role and userType as REQUIRED
+  # fields, which the resolver had to pointedly ignore. A public input type that asks for a
+  # permission level is a trap even when the server refuses to read it, because the next person to
+  # touch the resolver sees a field sitting there looking usable.
+  input RegisterAccountInput {
+    # 'shop' or 'artist'. The only thing a caller says about who they are; role and userType are
+    # derived from it server-side. Validated against the enum in utils/validation.js.
+    accountType: String!
     email: String!
     firstName: String!
     lastName: String!
-    avatar: String
     password: String!
     confirmPassword: String!
-    role: Int!
-    userType: String!
-    tagColor: String
+    # Required when accountType is 'shop', meaningless otherwise.
+    shopName: String
   }
   input AppointmentInput {
     id: ID
@@ -1078,7 +1083,10 @@ module.exports = gql`
 
     ######### Users ###########
 
-    register(registerInput: RegisterInput): User!
+    # Public. Creates a shop (Shop + admin + artist profile + connection) or an independent
+    # artist. Clients are NOT self-registerable: they already get accounts from the booking flow,
+    # and a client signing up cold lands on a dashboard with nothing on it.
+    registerAccount(input: RegisterAccountInput!): User!
     login(email: String!, password: String!): User!
     updateUser(user: UserUpdateInput): User!
     # Renamed from forgotPassword: this now requires an authenticated session and the caller's

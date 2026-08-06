@@ -40,6 +40,41 @@ const registerInputSchema = z
     path: ['confirmPassword'],
   });
 
+/**
+ * Public signup: a shop, or an independent artist.
+ *
+ * accountType is validated against the enum here rather than trusted, and it is the ONLY thing the
+ * caller gets to say about who they are. Role and userType are derived from it server-side - see
+ * registerAccount in resolvers/users.js. A public form that let the caller name their own role is
+ * the escalation bug this codebase already fixed once.
+ */
+const registerAccountInputSchema = z
+  .object({
+    accountType: z.enum(['shop', 'artist'], {
+      errorMap: () => ({ message: 'Choose whether you are signing up as a shop or an artist.' }),
+    }),
+    email: z
+      .string()
+      .trim()
+      .min(1, 'Email must not be empty.')
+      .email('Email must be a valid email address, e.g. jonsnow@kingofthenorth.com'),
+    firstName: z.string().trim().min(1, 'First name must not be empty'),
+    lastName: z.string().trim().min(1, 'Last name must not be empty'),
+    password: z.string().min(8, 'Password must be at least 8 characters'),
+    confirmPassword: z.string().min(1, 'Please confirm your password'),
+    // Only meaningful for a shop. Checked by the refine below rather than made required outright,
+    // so an artist isn't asked for a shop name they don't have.
+    shopName: z.string().trim().optional(),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: 'Passwords must match',
+    path: ['confirmPassword'],
+  })
+  .refine((data) => data.accountType !== 'shop' || Boolean(data.shopName), {
+    message: 'Your shop needs a name.',
+    path: ['shopName'],
+  });
+
 const changePasswordInputSchema = z.object({
   currentPassword: z.string().min(1, 'Current password must not be empty'),
   newPassword: z.string().min(8, 'New password must be at least 8 characters'),
@@ -365,6 +400,7 @@ const processSquarePaymentInputSchema = z.object({
 module.exports = {
   loginInputSchema,
   registerInputSchema,
+  registerAccountInputSchema,
   changePasswordInputSchema,
   updateProjectInputSchema,
   updateAppointmentInputSchema,

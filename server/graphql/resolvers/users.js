@@ -10,9 +10,11 @@ const User = require('../../models/User');
 const Artist = require('../../models/Artist');
 const Client = require('../../models/Client');
 const Staff = require('../../models/Staff');
+const Shop = require('../../models/Shop');
+const ArtistShopConnection = require('../../models/ArtistShopConnection');
 const {
   loginInputSchema,
-  registerInputSchema,
+  registerAccountInputSchema,
   changePasswordInputSchema,
   validate,
 } = require('../../utils/validation');
@@ -141,94 +143,128 @@ module.exports = {
         userType: user.userType,
       };
     },
-    async register(
-      _,
-      {
-        registerInput: {
-          password, email, firstName, lastName, avatar, confirmPassword
-          // NOTE: role and userType are intentionally NOT destructured from client input here.
-          // Public self-registration must never let the caller choose their own role - see
-          // PRODUCTION_ROADMAP.md Phase 1, item 3. Every self-registered account is a Client.
-          // tagColor is intentionally not destructured either any more - see the comment on
-          // newUser below for why the client's value is never used.
-        },
-      },
-    ) {
-      const role = Constants.ROLES.CLIENT;
-      const userType = Constants.USER_TYPE.CLIENT;
-
-      const { valid, errors } = validate(registerInputSchema, {
-        email, firstName, lastName, avatar, password, confirmPassword,
-      });
+    /**
+     * Public signup. A SHOP, or an INDEPENDENT ARTIST.
+     *
+     * WHAT THE CALLER GETS TO DECIDE, AND WHAT THEY DON'T.
+     *
+     * They pick accountType and nothing else about who they are. role and userType are derived
+     * from it here - never read from the input, not even optionally. That is the same rule the old
+     * register() enforced (see PRODUCTION_ROADMAP.md Phase 1, item 3, where a client-supplied role
+     * was a real escalation bug), restated for a form that now has a legitimate choice on it. The
+     * choice is between two SHAPES of account, not between two permission levels.
+     *
+     * WHY A SHOP OWNER ALSO GETS AN ARTIST PROFILE.
+     *
+     * The overwhelmingly common signup is one person who owns a studio and tattoos in it. Giving
+     * them only a SHOP_ADMIN account leaves them with no calendar of their own and no way to be
+     * booked - they'd have to notice, and then add themselves as an artist. So a shop signup
+     * creates all four records: the Shop, the User, a Staff row and an Artist row with an active
+     * connection. A shop whose owner doesn't tattoo can archive that artist profile; that is a much
+     * easier thing to discover than an absence.
+     *
+     * userType is ARTIST and role is SHOP_ADMIN, which is not a contradiction: role is what you may
+     * DO, userType is which profile record `userInfo` resolves to. Artist.shop resolves through the
+     * connection (see resolvers/index.js), so the shop id the client reads off userInfo is correct
+     * either way - and the Staff row is what makes them findable as a shop admin for notifications
+     * (see utils/notification-audience.js, which looks for admins through Staff).
+     *
+     * NO EMAIL VERIFICATION YET. An account works immediately, which means anyone can create a shop
+     * with any address. That is a deliberate, temporary position while this is in development and
+     * it should be revisited before launch.
+     */
+    async registerAccount(_, { input }) {
+      const { valid, errors, data } = validate(registerAccountInputSchema, input);
       if (!valid) {
         throw new UserInputError('Errors', { errors });
       }
+
       // Normalised before the uniqueness check, not just on write. Checking the raw value would
       // let Maya@shop.com past a lookup for maya@shop.com and then collide on the unique index at
       // save time, surfacing as a duplicate-key crash instead of "that address is taken".
-      const normalizedEmail = String(email).trim().toLowerCase();
-      const existing = await User.findOne({ email: normalizedEmail });
-      if (existing) {
-        // The error is on `email` now. It used to be reported under `username` - so the register
-        // form highlighted the wrong field for a taken address.
+      const normalizedEmail = String(data.email).trim().toLowerCase();
+      if (await User.findOne({ email: normalizedEmail })) {
         throw new UserInputError('Email is already taken', {
-          errors: {
-            email: 'An account already exists for that email address.',
-          },
+          errors: { email: 'An account already exists for that email address.' },
         });
       }
-      // hash password
-      const hashedPassword = await bcrypt.hash(password, 12);
 
-      const newUser = new User({
+      const isShop = data.accountType === Constants.SIGNUP_TYPE.SHOP;
+      const hashedPassword = await bcrypt.hash(data.password, 12);
+
+      // The Shop first, so its id is available for the tag colour and the connection below. Its
+      // contact email starts as the owner's - a solo studio has one address, and it is editable in
+      // shop settings. Shop.email is uniquely indexed, so a second shop on the same address fails
+      // with a clear message rather than silently sharing one.
+      let shop = null;
+      if (isShop) {
+        if (await Shop.findOne({ email: normalizedEmail })) {
+          throw new UserInputError('Errors', {
+            errors: { email: 'A shop already exists for that email address.' },
+          });
+        }
+        shop = await new Shop({ name: data.shopName, email: normalizedEmail }).save();
+      }
+
+      const newUser = await new User({
         email: normalizedEmail,
-        firstName,
-        lastName,
-        avatar,
+        firstName: data.firstName,
+        lastName: data.lastName,
         password: hashedPassword,
-        role,
-        userType,
-        // Was the client-supplied value - Register.jsx always hardcoded the literal string '#fff'
-        // (see that file), so every self-registered account's calendar label rendered invisibly
-        // (white on white) until the artist happened to open Profile and pick a real color
-        // themselves. Every self-registered account is a Client with no shop (see the note above),
-        // so there's no "unique among shop-mates" computation needed here - always the fixed
-        // purple default. See utils/tag-color.js.
-        tagColor: DEFAULT_NO_SHOP_TAG_COLOR,
-      });
-
-      // save new user to database and return user object
-      const res = await newUser.save();
-
-      // Was missing entirely - every self-registered account is Constants.USER_TYPE.CLIENT (see
-      // the note above), and login()'s own switch statement unconditionally does
-      // `Client.findOne({ userId: user.id })` then dereferences the result for CLIENT-type users
-      // (`userInfo.id = userInfo._id`) with no null check. Without this, a self-registered user's
-      // *first* session worked (this resolver's own return value stands in for it), but the
-      // moment they tried to log in again for real - a new device, a cleared cache, the next day -
-      // login() crashed with "Cannot read properties of null (reading '_id')" and they could never
-      // get back into their own account. Found while writing a real end-to-end register-then-login
-      // integration test (see test/integration/auth.test.js) - nothing previously exercised both
-      // mutations back to back with a real (non-factory-seeded) Client record.
-      await new Client({
-        firstName,
-        lastName,
-        email,
-        avatar,
-        userId: res._id,
+        // DERIVED, never taken from input. A shop's first account is its admin; an independent
+        // artist is an artist.
+        role: isShop ? Constants.ROLES.SHOP_ADMIN : Constants.ROLES.ARTIST,
+        // ARTIST either way - see the header. A shop owner tattoos until they say otherwise.
+        userType: Constants.USER_TYPE.ARTIST,
+        // Unique within the shop where there is one, so two artists never share a calendar colour.
+        // A lone artist gets the fixed no-shop default rather than an unreadable client-supplied
+        // value - the old register() accepted one and every self-registered account ended up white
+        // on white. See utils/tag-color.js.
+        tagColor: shop ? await pickDefaultTagColor(shop._id, null) : DEFAULT_NO_SHOP_TAG_COLOR,
+        hasSetPassword: true,
       }).save();
 
-      const token = generateToken(res);
-      const firebaseToken = await mintFirebaseToken(res.id, {
-        role: res.role,
-        userType: res.userType,
+      // The profile record. Without one, login() resolves userInfo to null and the whole app
+      // renders as though this person has no identity - which is exactly the bug the old register()
+      // had before it started creating a Client row.
+      await new Artist({
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: normalizedEmail,
+        userId: newUser._id,
+        status: Constants.ARTIST_STATUS.ACTIVE,
+        startDate: new Date(),
+      }).save();
+
+      if (shop) {
+        // Both records, deliberately. The connection is what makes them visible on the shop's
+        // calendar and in its analytics; the Staff row is what makes them findable as an ADMIN of
+        // it. Neither substitutes for the other - see utils/notification-audience.js.
+        await new ArtistShopConnection({
+          artistId: newUser._id,
+          shopId: shop._id,
+          status: 'active',
+        }).save();
+        await new Staff({
+          firstName: data.firstName,
+          lastName: data.lastName,
+          email: normalizedEmail,
+          userId: newUser._id,
+          shopId: shop._id,
+          status: Constants.STAFF_STATUS.ACTIVE,
+        }).save();
+      }
+
+      const token = generateToken(newUser);
+      const firebaseToken = await mintFirebaseToken(newUser.id, {
+        role: newUser.role,
+        userType: newUser.userType,
       });
-      // change _id to id and add access token to the user object the return to caller
       return {
-        ...res._doc,
-        id: res._id,
+        ...newUser._doc,
+        id: newUser._id,
         accessToken: token,
-        firebaseToken: firebaseToken,
+        firebaseToken,
       };
     },
     updateUser: withAuth(async (_, args, context, info, user) => {

@@ -1,108 +1,117 @@
-// Explicit React import - the real `vite build`/`vite dev` pipeline uses @vitejs/plugin-react's
-// automatic JSX runtime and never needed this, but Vitest renders this component via a transform
-// path that doesn't pick up the automatic runtime the same way (confirmed: an esbuild.jsx config
-// override in vite.config.js had no effect, since plugin-react transforms JSX via Babel, not
-// esbuild), throwing "React is not defined" without this import. See Register.test.jsx.
-import { useRef, useState, useContext } from "react";
-import React from "react";
-import "./register.css";
+// Explicit React import - see scripts/check-react-in-tested-components.mjs. Under Vitest,
+// @vitejs/plugin-react compiles JSX with the classic runtime, so anything a test renders needs
+// React in scope.
+import React, { useContext, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {CircularProgress} from "@mui/material";
-import { ROUTE_CONSTANTS } from '../../constants';
+import { CircularProgress } from "@mui/material";
 import { gql, useMutation } from "@apollo/client";
+import { ROUTE_CONSTANTS } from "../../constants";
 import { AuthContext } from "../../context/auth";
+import "./register.css";
+
+/**
+ * Public signup: a shop, or an independent artist.
+ *
+ * WHAT THIS PAGE NO LONGER DOES. It used to create Clients, and it sent `role: 30` and
+ * `userType: 'client'` in the mutation variables - fields the server pointedly ignored. Clients
+ * aren't self-registerable now: they already get an account the moment they submit a booking
+ * request, and can claim it through password reset. A client signing up cold arrived at a
+ * dashboard with no artist, no project and nothing to do.
+ *
+ * WHY THE CHOICE COMES FIRST, BEFORE ANY FIELDS. The two paths ask for different things - a shop
+ * needs a name, an artist doesn't - and a form that grows a field after you have started filling it
+ * in reads as a glitch. Asking the one question that shapes the rest, first, also means everything
+ * after it can be labelled for the person actually reading it.
+ *
+ * The account type is the ONLY thing this form says about identity. role and userType are derived
+ * from it server-side, and this page never sends either - see registerAccount in
+ * server/graphql/resolvers/users.js.
+ */
+
+const REGISTER_ACCOUNT = gql`
+	mutation RegisterAccount($input: RegisterAccountInput!) {
+		registerAccount(input: $input) {
+			id
+			email
+			firstName
+			lastName
+			role
+			userType
+			accessToken
+			firebaseToken
+			tagColor
+		}
+	}
+`;
+
+const ACCOUNT_TYPES = [
+	{
+		value: "shop",
+		title: "I run a shop",
+		// Describes what the account LETS YOU DO, not what it is called. "Shop account" tells
+		// somebody nothing about whether it is the right one for them; the second sentence answers
+		// the question a solo studio owner is actually asking.
+		blurb: "Manage artists, the shop calendar and the books. You can take bookings yourself too.",
+	},
+	{
+		value: "artist",
+		title: "I'm an independent artist",
+		blurb: "Your own calendar, clients and projects. Join a shop later if you want to.",
+	},
+];
 
 const Register = () => {
-  const context = useContext(AuthContext);
-	const email = useRef();
-	const password = useRef();
-	const confirmPassword = useRef();
-  const firstName = useRef();
-  const lastName = useRef();
-  const avatar = useRef();
+	const context = useContext(AuthContext);
 	const navigate = useNavigate();
-  const [errors, setErrors] = useState({});
 
-  const REGISTER_USER = gql`
-    mutation register(
-      $email: String!
-      $firstName: String!
-      $lastName: String!
-      $avatar: String
-      $password: String!
-      $confirmPassword: String!
-      $role: Int!
-      $userType: String!
-    ) {
-      register(
-        registerInput: {
-          email: $email
-          firstName: $firstName
-          lastName: $lastName
-          avatar: $avatar
-          password: $password
-          confirmPassword: $confirmPassword
-          role: $role
-          userType: $userType
-        }
-      ){
-        id
-        email
-        firstName
-        lastName
-        avatar
-        role
-        accessToken
-        firebaseToken
-        userType
-        tagColor
-      }
-    }
-  `;
+	const [accountType, setAccountType] = useState(null);
+	const [values, setValues] = useState({
+		firstName: "",
+		lastName: "",
+		email: "",
+		password: "",
+		confirmPassword: "",
+		shopName: "",
+	});
+	const [errors, setErrors] = useState({});
 
-const [registerUser, {data, loading, error}] = useMutation(REGISTER_USER, {
-  update(_, {data: {register: userData } }) {
-    console.log(userData);
-    context.login(userData);
-    navigate(ROUTE_CONSTANTS.HOME);
-  },
-  onError(err) {
-    console.log(err.graphQLErrors[0].extensions);
-    setErrors(err.graphQLErrors[0].extensions.errors);
-  }
-});
+	const [registerAccount, { loading }] = useMutation(REGISTER_ACCOUNT, {
+		update(_, { data: { registerAccount: userData } }) {
+			context.login(userData);
+			navigate(ROUTE_CONSTANTS.HOME);
+		},
+		onError(err) {
+			// The server returns per-field errors under extensions.errors. Anything else becomes one
+			// general message rather than an empty error box - a failed signup rendering as nothing
+			// at all is indistinguishable from a dead button.
+			const fieldErrors = err.graphQLErrors?.[0]?.extensions?.errors;
+			setErrors(fieldErrors || { general: err.message });
+		},
+	});
 
-const handleClick =  (e) => {
-  e.preventDefault();
-  if (confirmPassword.current.value !== password.current.value) {
-    console.log(confirmPassword.current.value);
-    console.log(password.current.value);
-    confirmPassword.current.setCustomValidity("Passwords do not match!!");
-  } else {
-    // role/userType are sent here for schema completeness, but the server now hardcodes both
-    // to Client for public self-registration regardless of what's sent (see
-    // server/graphql/resolvers/users.js register()) - this was a real vulnerability (client-
-    // supplied role let anyone register as Admin) and is fixed server-side, not by this
-    // client-side value. Don't rely on this being the security boundary.
-    //
-    // tagColor is no longer sent at all - it used to be hardcoded to the literal '#fff' here,
-    // which is exactly why every self-registered account's calendar label rendered invisibly
-    // (white on white). register() now always assigns a real default itself (purple, since a
-    // self-registered account has no shop - see utils/tag-color.js) regardless of what's sent, so
-    // there's nothing useful for the client to contribute here either.
-    registerUser({variables: {
-      email: email.current.value,
-      firstName: firstName.current.value,
-      lastName: lastName.current.value,
-      avatar: avatar.current.value,
-      password: password.current.value,
-      confirmPassword: confirmPassword.current.value,
-      role: 30,
-      userType: 'client',
-    }
-  });
-  }
-};
+	const setField = (name) => (e) => {
+		setValues((prev) => ({ ...prev, [name]: e.target.value }));
+	};
+
+	const handleSubmit = (e) => {
+		e.preventDefault();
+		setErrors({});
+		registerAccount({
+			variables: {
+				input: {
+					accountType,
+					firstName: values.firstName,
+					lastName: values.lastName,
+					email: values.email,
+					password: values.password,
+					confirmPassword: values.confirmPassword,
+					// Omitted entirely for an artist rather than sent blank. The server only requires
+					// it for a shop, and an empty string would read as an answer that was given.
+					...(accountType === "shop" ? { shopName: values.shopName } : {}),
+				},
+			},
+		});
+	};
 
 	return (
 		<div className="register">
@@ -110,65 +119,108 @@ const handleClick =  (e) => {
 				<div className="registerLeft">
 					<h3 className="registerLogo">Inkbooks</h3>
 					<span className="registerDesc">
-            The #1 way to manage your tattoo schedule, clients, and projects
-          </span>
+						The #1 way to manage your tattoo schedule, clients, and projects
+					</span>
 				</div>
 				<div className="registerRight">
-					<form className="registerBox" onSubmit={handleClick}>
-            <input
-							placeholder="First Name"
-							ref={firstName}
-							className="registerInput"
-						/>
-            <input
-							placeholder="Last Name"
-							ref={lastName}
-							className="registerInput"
-						/>
-            <input
-							placeholder="Avatar"
-							ref={avatar}
-							className="registerInput"
-						/>
-						<input
-							placeholder="Email"
-							ref={email}
-							className="registerInput"
-							type="email"
-						/>
-						<input
-							placeholder="Password"
-							ref={password}
-							className="registerInput"
-							type="password"
-							minLength="6"
-						/>
-						<input
-							placeholder="Confirm Password"
-							ref={confirmPassword}
-							className="registerInput"
-							type="password"
-						/>
-						<button
-							className="registerButton"
-							type="submit"
-						>
-							{ loading ? <CircularProgress color="inherit" size="20px"/> : 'Sign Up'}
-						</button>
-					</form>
-          {/* TODO extract this functionality out into a component */}
-          { Object.keys(errors).length > 0 && (
-            <div className="errors">
-             <ul className="list">
-              {Object.values(errors).map((value) => (
-                  <li key={value}>{value}</li>
-                ))}
-             </ul>
-            </div>
-          )}
+					{!accountType ? (
+						<div className="registerBox">
+							<h4 className="registerStepTitle">What are you signing up as?</h4>
+							{ACCOUNT_TYPES.map((option) => (
+								<button
+									key={option.value}
+									type="button"
+									className="registerTypeCard"
+									onClick={() => setAccountType(option.value)}
+								>
+									<span className="registerTypeTitle">{option.title}</span>
+									<span className="registerTypeBlurb">{option.blurb}</span>
+								</button>
+							))}
+						</div>
+					) : (
+						<form className="registerBox" onSubmit={handleSubmit}>
+							<div className="registerChosenType">
+								<span>
+									{accountType === "shop"
+										? "Setting up a shop"
+										: "Setting up as an independent artist"}
+								</span>
+								{/* Reversible. Picking the wrong one on the first screen should not
+								    mean reloading the page. */}
+								<button
+									type="button"
+									className="registerLinkButton"
+									onClick={() => setAccountType(null)}
+								>
+									Change
+								</button>
+							</div>
+
+							{accountType === "shop" && (
+								<input
+									placeholder="Shop name"
+									className="registerInput"
+									value={values.shopName}
+									onChange={setField("shopName")}
+								/>
+							)}
+							<input
+								placeholder="First name"
+								className="registerInput"
+								value={values.firstName}
+								onChange={setField("firstName")}
+							/>
+							<input
+								placeholder="Last name"
+								className="registerInput"
+								value={values.lastName}
+								onChange={setField("lastName")}
+							/>
+							<input
+								placeholder="Email"
+								className="registerInput"
+								type="email"
+								value={values.email}
+								onChange={setField("email")}
+							/>
+							<input
+								placeholder="Password"
+								className="registerInput"
+								type="password"
+								value={values.password}
+								onChange={setField("password")}
+							/>
+							<input
+								placeholder="Confirm password"
+								className="registerInput"
+								type="password"
+								value={values.confirmPassword}
+								onChange={setField("confirmPassword")}
+							/>
+							<button className="registerButton" type="submit" disabled={loading}>
+								{loading ? (
+									<CircularProgress color="inherit" size="20px" />
+								) : (
+									"Create account"
+								)}
+							</button>
+						</form>
+					)}
+
+					{Object.keys(errors).length > 0 && (
+						<div className="errors">
+							<ul className="list">
+								{Object.values(errors).map((value) => (
+									<li key={value}>{value}</li>
+								))}
+							</ul>
+						</div>
+					)}
 				</div>
 			</div>
 		</div>
 	);
 };
+
 export default Register;

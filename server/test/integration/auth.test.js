@@ -17,10 +17,14 @@ const {
 const { Constants } = require('../../utils/constants');
 const { DEFAULT_NO_SHOP_TAG_COLOR } = require('../../utils/tag-color');
 const User = require('../../models/User');
+const Artist = require('../../models/Artist');
+const Staff = require('../../models/Staff');
+const Shop = require('../../models/Shop');
+const ArtistShopConnection = require('../../models/ArtistShopConnection');
 
 const REGISTER_MUTATION = `
-	mutation Register($registerInput: RegisterInput!) {
-		register(registerInput: $registerInput) {
+	mutation RegisterAccount($input: RegisterAccountInput!) {
+		registerAccount(input: $input) {
 			id
 			email
 			role
@@ -81,88 +85,143 @@ function baseRegisterInput(overrides = {}) {
 		lastName: 'Snow',
 		password: 'longenoughpassword',
 		confirmPassword: 'longenoughpassword',
-		// RegisterInput requires these at the GraphQL schema level (role: Int!, userType: String!)
-		// even though resolvers/users.js's register() deliberately never reads them (see the
-		// "ignores a caller-supplied role/userType" test below) - without these, every request
-		// here would fail GraphQL variable coercion before the resolver ever runs. The values
-		// themselves are arbitrary noise from the resolver's point of view.
-		role: 999,
-		userType: 'whatever-the-caller-wants',
+		// Defaults to the artist path - the simpler of the two, and the one most of these tests are
+		// not actually about. RegisterAccountInput no longer carries role or userType at all: they
+		// were required Int!/String! fields the resolver pointedly ignored, which meant every test
+		// had to send noise to get past variable coercion. A public input type that asks for a
+		// permission level is a trap even when nothing reads it.
+		accountType: 'artist',
 		...overrides,
 	};
 }
 
-describe('register mutation', () => {
-	it('registers a new user with the default Client role/userType', async () => {
+describe('registerAccount mutation', () => {
+	it('creates an independent artist', async () => {
 		const server = createTestServer();
 		const response = await server.executeOperation(
-			{ query: REGISTER_MUTATION, variables: { registerInput: baseRegisterInput() } },
+			{ query: REGISTER_MUTATION, variables: { input: baseRegisterInput() } },
 			{ contextValue: contextWithToken() },
 		);
 
 		expect(response.body.kind).toBe('single');
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeUndefined();
-		expect(data.register.role).toBe(Constants.ROLES.CLIENT);
-		expect(data.register.userType).toBe(Constants.USER_TYPE.CLIENT);
-		expect(data.register.accessToken).toEqual(expect.any(String));
+		expect(data.registerAccount.role).toBe(Constants.ROLES.ARTIST);
+		expect(data.registerAccount.userType).toBe(Constants.USER_TYPE.ARTIST);
+		expect(data.registerAccount.accessToken).toEqual(expect.any(String));
+
+		// The profile record, not just the User. Without it login() resolves userInfo to null and
+		// the app renders as though this person has no identity - the exact bug the old register()
+		// had before it started creating a Client row.
+		// The resolver returns the normalised address, so this is the stored one.
+		const created = await User.findOne({ email: data.registerAccount.email });
+		expect(await Artist.findOne({ userId: created._id })).toBeTruthy();
+		// Independent: no shop, and therefore no connection.
+		expect(await ArtistShopConnection.findOne({ artistId: created._id })).toBeNull();
+		expect(data.registerAccount.tagColor).toBe(DEFAULT_NO_SHOP_TAG_COLOR);
 	});
 
-	// Locks in the Phase 1 fix for the register() role-escalation bug (PRODUCTION_ROADMAP.md
-	// Phase 1, item 3): resolvers/users.js deliberately never destructures role/userType from
-	// registerInput. A caller passing them through the GraphQL variables must have no effect at
-	// all - the created account is always a Client, regardless of what's sent on the wire.
-	it('ignores a caller-supplied role/userType and always creates a Client', async () => {
+	it('creates a shop, its admin, and an artist profile for the owner', async () => {
+		// The founding case: one person who owns a studio and tattoos in it. All four records, or
+		// they sign up and find they have no calendar and cannot be booked.
 		const server = createTestServer();
-		const registerInput = baseRegisterInput({ role: Constants.ROLES.ADMIN, userType: Constants.USER_TYPE.ARTIST });
+		const input = baseRegisterInput({ accountType: 'shop', shopName: 'Copper Wolf Tattoo' });
 		const response = await server.executeOperation(
-			{ query: REGISTER_MUTATION, variables: { registerInput } },
+			{ query: REGISTER_MUTATION, variables: { input } },
 			{ contextValue: contextWithToken() },
 		);
 
 		const { errors, data } = response.body.singleResult;
 		expect(errors).toBeUndefined();
-		expect(data.register.role).toBe(Constants.ROLES.CLIENT);
-		expect(data.register.userType).toBe(Constants.USER_TYPE.CLIENT);
+		// SHOP_ADMIN for what they may do; ARTIST for which profile userInfo resolves to. Those are
+		// different questions and this account legitimately answers them differently.
+		expect(data.registerAccount.role).toBe(Constants.ROLES.SHOP_ADMIN);
+		expect(data.registerAccount.userType).toBe(Constants.USER_TYPE.ARTIST);
 
-		// Also confirm it stuck in the actual DB record, not just the mutation's return value.
-		const stored = await User.findOne({ email: registerInput.email });
-		expect(stored.role).toBe(Constants.ROLES.CLIENT);
-		expect(stored.userType).toBe(Constants.USER_TYPE.CLIENT);
+		const created = await User.findOne({ email: input.email.toLowerCase() });
+		const shop = await Shop.findOne({ name: 'Copper Wolf Tattoo' });
+		expect(shop).toBeTruthy();
+
+		// The connection makes them visible on the shop's own calendar and in its analytics.
+		const connection = await ArtistShopConnection.findOne({ artistId: created._id });
+		expect(connection).toBeTruthy();
+		expect(String(connection.shopId)).toBe(String(shop._id));
+
+		// The Staff row is what makes them findable as an ADMIN of it - utils/notification-audience
+		// looks for admins through Staff, so without this they'd never receive a money notification
+		// about their own shop.
+		const staff = await Staff.findOne({ userId: created._id });
+		expect(staff).toBeTruthy();
+		expect(String(staff.shopId)).toBe(String(shop._id));
+
+		expect(await Artist.findOne({ userId: created._id })).toBeTruthy();
 	});
 
-	// Regression test: Register.jsx used to hardcode tagColor: '#fff' on the client, and the
-	// resolver just echoed back whatever it was sent - so every self-registered account's calendar
-	// label rendered invisibly (white on white). register() now always assigns a real default
-	// itself (see utils/tag-color.js), ignoring any tagColor the caller sends - a self-registered
-	// account is always a Client with no shop, so there's nothing to be "unique among shop-mates"
-	// against, always the fixed purple default.
-	it('assigns the fixed purple "no shop" default tagColor, ignoring anything the caller sends', async () => {
+	it('will not let a caller name their own role', async () => {
+		// This used to be "ignores a caller-supplied role", because RegisterInput REQUIRED role and
+		// userType and the resolver had to deliberately not read them. They are gone from the input
+		// type entirely now, so the guarantee is structural rather than behavioural: the request
+		// fails GraphQL validation before any resolver runs.
+		//
+		// Stronger than the old test, and worth keeping as a test rather than trusting the schema,
+		// because re-adding a convenient-looking `role` field is exactly the change that would
+		// silently reopen it.
 		const server = createTestServer();
-		const registerInput = baseRegisterInput({ tagColor: '#123456' });
 		const response = await server.executeOperation(
-			{ query: REGISTER_MUTATION, variables: { registerInput } },
+			{
+				query: `
+					mutation Escalate($input: RegisterAccountInput!) {
+						registerAccount(input: $input) { id role }
+					}
+				`,
+				variables: { input: { ...baseRegisterInput(), role: Constants.ROLES.ADMIN } },
+			},
+			{ contextValue: contextWithToken() },
+		);
+
+		const { errors } = response.body.singleResult;
+		expect(errors).toBeDefined();
+		expect(errors[0].message).toMatch(/role/i);
+	});
+
+	it('refuses a shop with no name', async () => {
+		// A Shop row requires a name, so this would otherwise fail at save time as a Mongoose
+		// validation error rather than as a message pointing at the field somebody left blank.
+		const server = createTestServer();
+		const response = await server.executeOperation(
+			{ query: REGISTER_MUTATION, variables: { input: baseRegisterInput({ accountType: 'shop' }) } },
 			{ contextValue: contextWithToken() },
 		);
 
 		const { errors, data } = response.body.singleResult;
-		expect(errors).toBeUndefined();
-		expect(data.register.tagColor).toBe(DEFAULT_NO_SHOP_TAG_COLOR);
+		expect(errors).toBeDefined();
+		expect(data).toBeNull();
+	});
 
-		// Also confirm it stuck in the actual DB record, not just the mutation's return value.
-		const stored = await User.findOne({ email: registerInput.email });
-		expect(stored.tagColor).toBe(DEFAULT_NO_SHOP_TAG_COLOR);
+	it('refuses an account type that is not shop or artist', async () => {
+		// 'staff' is the tempting one: a receptionist is added BY a shop, and self-registering as
+		// one would mean anyone could create a staff account pointing at a shop they have nothing
+		// to do with.
+		const server = createTestServer();
+		const response = await server.executeOperation(
+			{ query: REGISTER_MUTATION, variables: { input: baseRegisterInput({ accountType: 'staff' }) } },
+			{ contextValue: contextWithToken() },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeDefined();
+		expect(data).toBeNull();
 	});
 
 	it('rejects a password under 8 characters', async () => {
 		const server = createTestServer();
 		const registerInput = baseRegisterInput({ password: 'short1', confirmPassword: 'short1' });
 		const response = await server.executeOperation(
-			{ query: REGISTER_MUTATION, variables: { registerInput } },
+			{ query: REGISTER_MUTATION, variables: { input: registerInput } },
 			{ contextValue: contextWithToken() },
 		);
 
-		// register(...): User! is non-null in the schema - when its resolver throws, GraphQL's
+		// registerAccount(...): User! is non-null in the schema - when its resolver throws, GraphQL's
 		// null-propagation rule bubbles the null past the field and up to `data` itself (the
 		// nearest nullable ancestor), not just `data.register`. See the same pattern below on
 		// login (also User!) and on several mutations in crud.test.js/projects.test.js.
@@ -175,11 +234,11 @@ describe('register mutation', () => {
 		const server = createTestServer();
 		const registerInput = baseRegisterInput({ confirmPassword: 'somethingElseEntirely' });
 		const response = await server.executeOperation(
-			{ query: REGISTER_MUTATION, variables: { registerInput } },
+			{ query: REGISTER_MUTATION, variables: { input: registerInput } },
 			{ contextValue: contextWithToken() },
 		);
 
-		// register(...): User! is non-null in the schema - when its resolver throws, GraphQL's
+		// registerAccount(...): User! is non-null in the schema - when its resolver throws, GraphQL's
 		// null-propagation rule bubbles the null past the field and up to `data` itself (the
 		// nearest nullable ancestor), not just `data.register`. See the same pattern below on
 		// login (also User!) and on several mutations in crud.test.js/projects.test.js.
@@ -192,17 +251,17 @@ describe('register mutation', () => {
 		const server = createTestServer();
 		const first = baseRegisterInput();
 		await server.executeOperation(
-			{ query: REGISTER_MUTATION, variables: { registerInput: first } },
+			{ query: REGISTER_MUTATION, variables: { input: first } },
 			{ contextValue: contextWithToken() },
 		);
 
 		const dupe = baseRegisterInput({ email: first.email });
 		const response = await server.executeOperation(
-			{ query: REGISTER_MUTATION, variables: { registerInput: dupe } },
+			{ query: REGISTER_MUTATION, variables: { input: dupe } },
 			{ contextValue: contextWithToken() },
 		);
 
-		// register(...): User! is non-null in the schema - when its resolver throws, GraphQL's
+		// registerAccount(...): User! is non-null in the schema - when its resolver throws, GraphQL's
 		// null-propagation rule bubbles the null past the field and up to `data` itself (the
 		// nearest nullable ancestor), not just `data.register`. See the same pattern below on
 		// login (also User!) and on several mutations in crud.test.js/projects.test.js.
@@ -218,13 +277,13 @@ describe('register mutation', () => {
 		const server = createTestServer();
 		const first = baseRegisterInput();
 		await server.executeOperation(
-			{ query: REGISTER_MUTATION, variables: { registerInput: first } },
+			{ query: REGISTER_MUTATION, variables: { input: first } },
 			{ contextValue: contextWithToken() },
 		);
 
 		const dupe = baseRegisterInput({ email: first.email.toUpperCase() });
 		const response = await server.executeOperation(
-			{ query: REGISTER_MUTATION, variables: { registerInput: dupe } },
+			{ query: REGISTER_MUTATION, variables: { input: dupe } },
 			{ contextValue: contextWithToken() },
 		);
 
@@ -240,7 +299,7 @@ describe('login mutation', () => {
 	async function registerRealUser(server, overrides = {}) {
 		const registerInput = baseRegisterInput(overrides);
 		await server.executeOperation(
-			{ query: REGISTER_MUTATION, variables: { registerInput } },
+			{ query: REGISTER_MUTATION, variables: { input: registerInput } },
 			{ contextValue: contextWithToken() },
 		);
 		return registerInput;
@@ -260,7 +319,7 @@ describe('login mutation', () => {
 		expect(data.login.email).toBe(email);
 		const decoded = jwt.verify(data.login.accessToken, process.env.SECRET_KEY, { algorithms: ['HS256'] });
 		expect(decoded.email).toBe(email);
-		expect(decoded.role).toBe(Constants.ROLES.CLIENT);
+		expect(decoded.role).toBe(Constants.ROLES.ARTIST);
 	});
 
 	it('logs in with a differently-cased address', async () => {
