@@ -204,6 +204,37 @@ describe('when we stay quiet', () => {
 		expect(sendToGuest.calls.every((c) => !!c.guestToken)).toBe(true);
 	});
 
+	it('emails a client every time even when they have a real password', async () => {
+		// The reported bug, and the reason the rule is now "is this a client" rather than "does
+		// this person have a magic link".
+		//
+		// findOrCreateGuestClient REUSES an existing User when the intake email matches one, so a
+		// client whose address already has an account arrives with hasSetPassword: true. That
+		// dropped them into the app-link branch AND into the throttle - so the first message
+		// emailed and everything after it went silent, which is exactly what was observed.
+		const { user: artist } = await createArtistUser();
+		const { user: client } = await createClientUser({ hasSetPassword: true });
+		const now = new Date();
+		const conversation = await new Conversation({
+			members: [String(artist.id), String(client.id)],
+			createdAt: now,
+			updatedAt: now,
+		}).save();
+		const { sendToGuest, sendToArtist } = senders();
+		const args = { conversationId: conversation._id, senderId: artist.id, sendToGuest, sendToArtist };
+
+		const first = await notifyNewMessage(args);
+		const second = await notifyNewMessage(args);
+		const third = await notifyNewMessage(args);
+
+		expect([first[0].outcome, second[0].outcome, third[0].outcome]).toEqual([
+			'sent',
+			'sent',
+			'sent',
+		]);
+		expect(sendToArtist.calls).toHaveLength(3);
+	});
+
 	it('does throttle a burst at someone who has the app', async () => {
 		// The other half of the asymmetry. An artist who misses an email still has a bell, a nav
 		// badge and a per-thread count, so suppressing the fourth email in ten minutes costs them
@@ -287,6 +318,48 @@ describe('when we stay quiet', () => {
 });
 
 describe('when sending fails', () => {
+	it('does not report a provider rejection as sent', async () => {
+		// THE diagnostic bug. sendEmail() returns null rather than throwing when Resend rejects a
+		// message, so nothing threw, so the outcome said 'sent' - and the server log claimed a
+		// notification had gone out for an email that never left the building. An hour was spent
+		// reading code that was doing exactly what it said, because what it said was wrong.
+		const { artist, conversation } = await guestThread();
+		const rejects = async () => null;
+
+		const results = await notifyNewMessage({
+			conversationId: conversation._id,
+			senderId: artist.id,
+			sendToGuest: rejects,
+			sendToArtist: rejects,
+		});
+
+		expect(results[0].outcome).toBe('provider-rejected');
+		expect(results[0].via).toBe('guest-link');
+	});
+
+	it('does not start the throttle on a rejected send', async () => {
+		// Same reasoning as the throwing case below. A rejection that marked the recipient notified
+		// would buy fifteen minutes of deliberate silence on the strength of a message nobody got.
+		const { artist, client, conversation } = await accountThread();
+		const rejects = async () => null;
+		const { sendToGuest, sendToArtist } = senders();
+
+		await notifyNewMessage({
+			conversationId: conversation._id,
+			senderId: client.id,
+			sendToGuest: rejects,
+			sendToArtist: rejects,
+		});
+		const retry = await notifyNewMessage({
+			conversationId: conversation._id,
+			senderId: client.id,
+			sendToGuest,
+			sendToArtist,
+		});
+
+		expect(retry[0].outcome).toBe('sent');
+	});
+
 	it('reports the failure instead of claiming success', async () => {
 		const { artist, conversation } = await guestThread();
 		const boom = async () => {

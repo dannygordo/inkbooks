@@ -45,12 +45,22 @@ async function sendEmail({ to, subject, htmlBody, textBody }) {
       text: textBody,
     });
     if (error) {
-      console.warn('[email] Failed to send email:', error.message || error);
+      // Recipient and subject included deliberately. "Failed to send email: <reason>" on its own
+      // is nearly useless in a log next to a line claiming a notification was sent - you cannot
+      // tell whether the two are about the same message. Resend also puts the useful part in
+      // `name`/`statusCode` rather than always in `message` (an unverified sending domain reports
+      // as `validation_error`), so all three are printed.
+      console.warn(
+        `[email] REJECTED by provider - "${subject}" to ${to}:`,
+        error.name || '',
+        error.statusCode || '',
+        error.message || error,
+      );
       return null;
     }
     return data;
   } catch (err) {
-    console.warn('[email] Failed to send email:', err.message);
+    console.warn(`[email] FAILED to send "${subject}" to ${to}:`, err.message);
     return null;
   }
 }

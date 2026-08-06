@@ -57,7 +57,14 @@ function shouldNotify(conversation, recipientId, now = new Date()) {
  * Notifies every member of a conversation except the sender.
  *
  * Returns a summary of what happened per recipient - { userId, outcome } where outcome is one of
- * 'sent' | 'throttled' | 'no-email' | 'failed'. Returned rather than logged because "we didn't
+ * 'sent' | 'throttled' | 'no-email' | 'provider-rejected' | 'failed' | 'no-conversation'.
+ *
+ * 'sent' and 'provider-rejected' are the pair worth being careful about: the mail layer signals a
+ * rejection by RETURNING NULL rather than throwing, so a version of this that only caught
+ * exceptions reported a rejected message as sent. That is not a small inaccuracy - it is a log
+ * line that actively argues against the thing the person in front of the app is telling you.
+ *
+ * Returned rather than logged because "we didn't
  * notify anyone" and "we tried and it failed" are different facts, and the previous code made them
  * identical: every failure was a console.warn inside a catch, so a broken notification path looked
  * exactly like a working one from anywhere except the server's stdout.
@@ -112,61 +119,75 @@ async function notifyNewMessage({
       // link is the only door. Keyed off hasSetPassword rather than off role or userType, because
       // the question is literally "can they get in", and utils/guest-auth.js revokes the magic
       // link on exactly that field.
+      // Looked up UNCONDITIONALLY now, not just for people without a password.
+      //
+      // It used to be inside `if (!recipient.hasSetPassword)`, which quietly made the whole
+      // behaviour depend on a field that is true more often than it looks. findOrCreateGuestClient
+      // REUSES an existing User when the intake email matches one - so a client whose address
+      // already has an account (the overwhelmingly likely case when testing with your own inbox)
+      // arrives here with hasSetPassword: true, gets the "log in to InkBooks" email instead of
+      // their magic link, and gets throttled after the first one.
+      const clientRecord = await Client.findOne({ userId: recipient._id }).select('_id');
+
       let guestToken = null;
-      if (!recipient.hasSetPassword) {
-        const client = await Client.findOne({ userId: recipient._id }).select('_id');
-        const bookingRequest = client
-          ? await BookingRequest.findOne({ conversationId, clientId: client._id }).select(
-              'guestToken',
-            )
-          : null;
+      if (!recipient.hasSetPassword && clientRecord) {
+        const bookingRequest = await BookingRequest.findOne({
+          conversationId,
+          clientId: clientRecord._id,
+        }).select('guestToken');
         guestToken = bookingRequest ? bookingRequest.guestToken : null;
       }
 
-      // THE THROTTLE APPLIES ONLY TO PEOPLE WHO HAVE ANOTHER WAY TO FIND OUT.
+      // NEVER THROTTLE A CLIENT.
       //
-      // This check used to come first, and applied to everyone. That was wrong for the person it
-      // mattered most for. An artist who misses an email still has the app: a bell, a nav badge,
-      // a per-thread count, an inbox. Suppressing their fourth email in ten minutes costs them
-      // nothing. A guest client has NONE of that. Email is not a notification about the
-      // conversation, it IS the conversation - the magic link is the only door they have. A
-      // suppressed email is a message they may simply never learn exists.
+      // Keyed off being a client rather than off having a magic link, because those came apart in
+      // exactly the case above. The principle is the same one that picks which email to send - what
+      // does this person actually have besides the email - but stated in terms that survive a
+      // client who happens to also hold an account.
       //
-      // So it is keyed off the same reachability question that already decides WHICH email to
-      // send, rather than being a second, independent policy that could disagree with it. Same
-      // principle as the branch below: what someone can reach, not what role they hold.
-      if (!guestToken && !shouldNotify(conversation, recipientId, now)) {
+      // An artist or staff member who misses one email still has a bell, a nav badge, a per-thread
+      // count and an inbox; suppressing their fourth email in ten minutes costs them nothing. A
+      // client is not living in this app. For them a suppressed email is not a suppressed
+      // notification about a message, it is a suppressed message.
+      const isClient = !!clientRecord;
+      if (!isClient && !shouldNotify(conversation, recipientId, now)) {
         results.push({ userId: String(recipientId), outcome: 'throttled' });
         continue;
       }
 
-      if (guestToken) {
-        await sendToGuest({
-          to: recipient.email,
-          firstName: recipient.firstName,
-          artistName: senderName,
-          guestToken,
-        });
-      } else {
-        await sendToArtist({
-          to: recipient.email,
-          artistFirstName: recipient.firstName,
-          clientName: senderName,
-          conversationId: String(conversationId),
-        });
+      const via = guestToken ? 'guest-link' : 'app-link';
+      const delivery = guestToken
+        ? await sendToGuest({
+            to: recipient.email,
+            firstName: recipient.firstName,
+            artistName: senderName,
+            guestToken,
+          })
+        : await sendToArtist({
+            to: recipient.email,
+            artistFirstName: recipient.firstName,
+            clientName: senderName,
+            conversationId: String(conversationId),
+          });
+
+      // sendEmail() returns null rather than throwing when the provider rejects the message or
+      // isn't configured (see utils/email.js) - the same convention notification-jobs.js and
+      // digest.js already check for. Not checking it here is why 'sent' could appear in the log
+      // for a message that never left the building: the outcome recorded that nothing had THROWN,
+      // which is not the same claim at all and is the weaker one by a mile.
+      if (!delivery) {
+        results.push({ userId: String(recipientId), outcome: 'provider-rejected', via });
+        // Deliberately NOT marked notified. Recording a failed send as a notification would start
+        // the throttle on the strength of it and buy fifteen minutes of silence for a message
+        // nobody received.
+        continue;
       }
 
       await markConversationNotified(conversationId, recipientId, now);
-      // 'sent' means "handed to the mail layer without throwing", NOT "delivered", and not even
-      // "accepted by Resend" - sendEmail() swallows a provider error into a console.warn and
-      // returns null. Worth being precise about, because the throttle is written on the strength of
-      // this outcome: a provider rejection currently marks the recipient notified and then stays
-      // quiet for fifteen minutes.
-      results.push({
-        userId: String(recipientId),
-        outcome: 'sent',
-        via: guestToken ? 'guest-link' : 'app-link',
-      });
+      // 'sent' now means the provider accepted it. Still not "delivered" - nothing this side of a
+      // webhook can promise that - but it is a claim about the mail layer rather than about our
+      // own control flow.
+      results.push({ userId: String(recipientId), outcome: 'sent', via });
     } catch (err) {
       // Recorded per recipient rather than aborting the loop: in a two-person conversation this
       // is academic, but a failure to reach one member is not a reason to skip the others.
@@ -197,8 +218,17 @@ function logNotifyOutcomes(scope, conversationId, results) {
     console.warn(`[${scope}] conversation ${conversationId}: notified nobody (no other members)`);
     return;
   }
+  // `via` is in here because its absence cost a debugging round trip. "sent" alone cannot
+  // distinguish the guest magic link from the "log in to InkBooks" email, and those two going to
+  // the same person mean completely different things - one of them is a door a guest can open and
+  // the other is a dead end.
   const summary = results
-    .map((r) => `${r.userId || '-'}=${r.outcome}${r.error ? ` (${r.error})` : ''}`)
+    .map(
+      (r) =>
+        `${r.userId || '-'}=${r.outcome}` +
+        `${r.via ? `[${r.via}]` : ''}` +
+        `${r.error ? ` (${r.error})` : ''}`,
+    )
     .join(', ');
   const notified = results.some((r) => r.outcome === 'sent');
   // warn rather than log when nobody was reached, so it survives a log level that hides chatter.
