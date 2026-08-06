@@ -4,6 +4,7 @@ const withAuth = require('../../utils/with-auth');
 const { AuthenticationError, UserInputError, rethrow } = require('../../utils/errors');
 const { updateAppointmentInputSchema, createAppointmentInputSchema, appointmentIdInputSchema, validate } = require('../../utils/validation');
 const { applyShopCut } = require('../../utils/shop-cut');
+const { queueProjectScheduleEmail } = require('../../utils/client-booking-emails');
 const { canManageArtist, assertCanManageArtist } = require('../../utils/shop-membership');
 
 // Same ownership shape as updateAppointment/deleteAppointment below - Admin/SHOP_ADMIN-or-better,
@@ -101,6 +102,24 @@ module.exports = {
       // percentage.
       await applyShopCut(newAppointment);
       const appt = await newAppointment.save();
+
+      // THE SITTINGS AFTER THE FIRST COME THROUGH HERE, and this is the trigger that is easy to
+      // miss. convertBookingRequest books sitting one and creates the Project; every additional
+      // date on that project - BookSessionDatesForm's second, third and fourth, and the appointment
+      // wizard adding to an existing project later - is an ordinary createAppointment.
+      //
+      // Wiring only the conversion would have produced a confirmation listing ONE session out of
+      // four, sent three minutes after the first was entered, which is worse than sending nothing:
+      // it is a schedule the client would act on.
+      //
+      // Queueing here is also what makes the deadline restart, since queueProjectScheduleEmail
+      // pushes the existing pending row forward rather than adding a second one.
+      //
+      // Consults are excluded: they are announced immediately at the point of booking and have no
+      // project to coalesce on.
+      if (appt.appointmentType === 'session' && appt.projectId) {
+        await queueProjectScheduleEmail(appt.projectId);
+      }
       return appt;
     }),
     /**

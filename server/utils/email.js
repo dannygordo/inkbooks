@@ -310,6 +310,10 @@ module.exports = {
   sendAccountInviteEmail,
   sendPasswordResetEmail,
   buildSetPasswordLink,
+  // Exported for utils/client-booking-emails.js, which puts the same guest link on a booking
+  // confirmation. Building a second copy of that URL is how two links to the same thing end up
+  // disagreeing after an environment change.
+  buildGuestConversationLink,
   sendBookingRequestReceivedEmail,
   sendNewMessageNotificationToGuest,
   sendNewBookingRequestNotificationToArtist,

@@ -2,6 +2,7 @@ const Notification = require('../models/Notification');
 const User = require('../models/User');
 const { sendEmail } = require('./email');
 const { sendDailyDigests } = require('./digest');
+const { sendDueClientScheduleEmails } = require('./client-booking-emails');
 
 /**
  * The scheduled half of the notification system.
@@ -160,6 +161,23 @@ function notificationJobs({ onReport = console.warn } = {}) {
       everyMs: 5 * 60 * 1000,
       run: async () => {
         const result = await sendDueEmails();
+        return `sent=${result.sent} skipped=${result.skipped} failed=${result.failed}`;
+      },
+    },
+    {
+      // A CLIENT'S booking confirmation, coalesced per project - see utils/client-booking-emails.js.
+      //
+      // Every minute, which is finer than any other job here and deliberately so. This one is not
+      // enforcing a policy delay the way the notification grace does; it is waiting for an artist to
+      // finish entering sittings, and then the client is owed the email. A five-minute sweep on a
+      // three-minute debounce means an artist can book somebody in and watch nothing happen for
+      // eight minutes, which reads as broken and generates the "did that send?" question the email
+      // exists to prevent. The scheduler's lock makes the extra attempts free - that is the reason
+      // it exists.
+      name: 'client-schedule-emails',
+      everyMs: 60 * 1000,
+      run: async () => {
+        const result = await sendDueClientScheduleEmails();
         return `sent=${result.sent} skipped=${result.skipped} failed=${result.failed}`;
       },
     },

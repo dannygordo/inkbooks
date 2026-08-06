@@ -34,6 +34,10 @@ const { notifyNewMessage, logNotifyOutcomes } = require('../../utils/message-not
 const { notifySafely } = require('../../utils/notifications');
 const { scheduleAudienceForArtist } = require('../../utils/notification-audience');
 const { actorName } = require('../../utils/notification-copy');
+const {
+  queueProjectScheduleEmail,
+  sendConsultBookedEmail,
+} = require('../../utils/client-booking-emails');
 
 module.exports = {
   // Public and unauthenticated by design - this is the intake form, submitted before any
@@ -520,6 +524,32 @@ module.exports = {
             : `${await actorName(user.id)} booked a consult — ${derivedTitle}`,
         body: `For ${clientForAppointment.firstName} ${clientForAppointment.lastName}.`,
       });
+    }
+
+    // AND THE CLIENT, who is not in the audience above.
+    //
+    // scheduleAudienceForArtist answers "who at the shop needs to know", which is a different
+    // question from "who is this appointment FOR". The client has no account to log into in the
+    // general case and no notification preferences - they get an email, and it is the only thing
+    // that tells them what they just agreed to.
+    //
+    // The two outcomes are timed differently on purpose. A consult goes NOW: there is one
+    // appointment, nothing else is coming, and the client is usually still at the counter. A
+    // session is QUEUED, because an artist booking a course of work enters several sittings in a
+    // row and the client should get one schedule rather than four emails, three of them already
+    // out of date. See utils/client-booking-emails.js.
+    if (data.outcome === 'consult_booked') {
+      await sendConsultBookedEmail({
+        appointment,
+        clientUserId: clientForAppointment.userId,
+        artistUserId: bookingRequest.artistId,
+        bookingRequestId: bookingRequest._id,
+      });
+    } else if (data.outcome === 'session_booked') {
+      // Only the project id, because that is all createAppointment can offer when it books the
+      // second, third and fourth sittings - and both callers have to queue the same way or the
+      // debounce would coalesce on two different keys.
+      await queueProjectScheduleEmail(newProjectId);
     }
 
     return bookingRequest;

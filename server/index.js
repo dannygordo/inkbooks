@@ -198,7 +198,12 @@ async function start() {
   // both tick, both try to claim the same period, exactly one wins. Without it, scaling past a
   // single instance would send every email twice - and that failure is invisible in development,
   // where there is only ever one instance.
-  startScheduler(notificationJobs());
+  // A ONE-MINUTE TICK, down from five. The finest cadence any job asks for is now one minute
+  // (client-schedule-emails), and a tick coarser than that silently turns its three-minute debounce
+  // into up to eight. Every job still declares its own period and the lock decides what actually
+  // runs, so the extra ticks cost one indexed upsert each - which is the trade the lock was built
+  // to make (see utils/scheduler.js).
+  startScheduler(notificationJobs(), { tickMs: 60 * 1000 });
   console.log('Scheduler started');
 
   const PORT = process.env.PORT || 5500;
