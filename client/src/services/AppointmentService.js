@@ -41,6 +41,8 @@ export const AppointmentService = (() => {
                 description
                 appointmentType
                 appointmentDate
+                durationMinutes
+                appointmentEnd
                 shopCutStatus
                 shopCutCents
                 shopCutPaymentMethod
@@ -83,6 +85,8 @@ export const AppointmentService = (() => {
                 id
                 title
                 appointmentDate
+                durationMinutes
+                appointmentEnd
                 appointmentType
                 appointmentStatus
                 subtotalCents
@@ -156,6 +160,8 @@ export const AppointmentService = (() => {
                 id
                 title
                 appointmentDate
+                durationMinutes
+                appointmentEnd
                 appointmentStatus
                 totalCents
                 subtotalCents
@@ -229,6 +235,8 @@ export const AppointmentService = (() => {
                 description
                 appointmentType
                 appointmentDate
+                durationMinutes
+                appointmentEnd
                 shopCutStatus
                 shopCutCents
                 shopCutPaymentMethod
@@ -268,6 +276,8 @@ export const AppointmentService = (() => {
                 appointmentType
                 id
                 appointmentDate
+                durationMinutes
+                appointmentEnd
                 shopCutStatus
                 shopCutCents
             }
@@ -295,6 +305,8 @@ export const AppointmentService = (() => {
                 appointmentType
                 id
                 appointmentDate
+                durationMinutes
+                appointmentEnd
                 shopCutStatus
                 shopCutCents
                 shopCutPaymentMethod
@@ -369,6 +381,8 @@ export const AppointmentService = (() => {
             getPendingShopCutConfirmations(shopId: $shopId) {
                 id
                 appointmentDate
+                durationMinutes
+                appointmentEnd
                 title
                 shopCutCents
                 shopCutMarkedPaidAt
@@ -406,6 +420,8 @@ export const AppointmentService = (() => {
                 description
                 appointmentType
                 appointmentDate
+                durationMinutes
+                appointmentEnd
                 appointmentStatus
                 subtotalCents
                 taxCents
@@ -450,6 +466,8 @@ export const AppointmentService = (() => {
                 description
                 appointmentType
                 appointmentDate
+                durationMinutes
+                appointmentEnd
                 appointmentStatus
                 projectId
                 bookingRequestId
@@ -529,6 +547,8 @@ export const AppointmentService = (() => {
             updateAppointment(appointmentInput: $appointmentInput) {
                 id
                 appointmentDate
+                durationMinutes
+                appointmentEnd
                 subtotalCents
                 tipCents
                 totalCents

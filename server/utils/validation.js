@@ -146,6 +146,12 @@ const createProjectInputSchema = updateProjectInputSchema.omit({ id: true });
 
 const createAppointmentInputSchema = z.object({
   appointmentDate: dateLikeSchema,
+  // Nullish so the model's type-aware default applies when a caller doesn't care - a consult and a
+  // session get different sensible lengths (see models/Appointment.js). Bounded at both ends when
+  // it IS given: `.int().positive()` because a zero-length or fractional-minute appointment is not
+  // a thing, and a day's ceiling because a duration in the thousands is a typo (someone entering
+  // minutes where they meant hours), and the conflict checker would then mark a whole week busy.
+  durationMinutes: z.number().int().positive().max(24 * 60).nullish(),
   projectId: objectIdSchema.nullish(),
   userId: objectIdSchema.nullish(),
   shopId: objectIdSchema.nullish(),

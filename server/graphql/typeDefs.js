@@ -534,6 +534,10 @@ module.exports = gql`
   input AppointmentInput {
     id: ID
     appointmentDate: DateTime!
+    # How long this runs, in minutes. Omit it and the server picks by type - 45 for a consult, 180
+    # for a session (see models/Appointment.js). Minutes rather than an end time, because a
+    # duration survives the start being moved and an end time silently doesn't.
+    durationMinutes: Int
     projectId: ID
     userId: ID
     shopId: ID
@@ -569,6 +573,11 @@ module.exports = gql`
   type Appointment {
     id: ID!
     appointmentDate: DateTime!
+    durationMinutes: Int!
+    # Start plus duration, computed on read and never stored. A stored end date would be a second
+    # copy of the same fact, free to disagree the moment the start is moved - see the virtual in
+    # models/Appointment.js.
+    appointmentEnd: DateTime!
     projectId: ID
     project: Project
     # Set only when this Appointment came from convertBookingRequest (consult or session) - see

@@ -1,7 +1,52 @@
 const mongoose = require('mongoose');
 
+// How long an appointment is expected to take, by type, when nobody says otherwise.
+//
+// Defaults by TYPE rather than one number for everything, because the two are not remotely the
+// same job: a consult is a conversation about a piece, a session is the piece. A single default
+// would be wrong for one of them every time, and a wrong duration is worse than a missing one -
+// it makes the conflict checker confidently incorrect.
+//
+// These are starting points a shop can override per appointment, not policy. They're here rather
+// than in the resolver so the model can fall back on its own when a record is written by a script,
+// a seed, or a caller that predates the field.
+const DEFAULT_DURATION_MINUTES = {
+	consult: 45,
+	session: 180,
+};
+const FALLBACK_DURATION_MINUTES = 60;
+
+function defaultDurationFor(appointmentType) {
+	return DEFAULT_DURATION_MINUTES[appointmentType] || FALLBACK_DURATION_MINUTES;
+}
+
 const AppointmentSchema = new mongoose.Schema({
 	appointmentDate: {type: Date, required: true},
+	// How long this appointment runs, in minutes.
+	//
+	// WHY THIS EXISTS: without it, an appointment is a point in time, and "does this clash with
+	// that" is not answerable. The booking form could show an artist what else was on that day but
+	// could only say "close to this" with a hand-picked window, because a 3-hour session and a
+	// 20-minute touch-up occupy the same single instant in the data. Any overlap check was a guess
+	// at a length nobody had entered.
+	//
+	// MINUTES, not an end date. A duration is the thing people actually decide ("book three hours")
+	// and it survives the start time being moved, which an endDate does not - drag an appointment
+	// an hour later with an endDate and you have silently made it an hour shorter. The end is
+	// derived on read, which means it cannot disagree with the start.
+	//
+	// Required with a default rather than optional: an appointment with no duration re-creates
+	// exactly the ambiguity this field removes, and "unknown length" is not a state any part of
+	// this app has a sensible answer for. Existing records predate it - the dev database is
+	// re-seeded rather than migrated (see scripts/seed.js).
+	durationMinutes: {
+		type: Number,
+		required: true,
+		min: 1,
+		default: function () {
+			return defaultDurationFor(this.appointmentType);
+		},
+	},
 	projectId: {type: mongoose.Schema.Types.ObjectId},
 	shopId: {type: mongoose.Schema.Types.ObjectId},
 	userId: {type: mongoose.Schema.Types.ObjectId},
@@ -172,4 +217,21 @@ const AppointmentSchema = new mongoose.Schema({
 	sessionNotes: {type: String}
 
 });
-module.exports = mongoose.model('Appointment', AppointmentSchema);
+// Derived, never stored. The end of an appointment is a fact about its start and its length, and
+// storing it as well would be a second copy free to disagree the moment either one is edited - the
+// pattern that has cost this codebase repeatedly (Artist.shopId, Project.depositAmount, the Square
+// app id).
+AppointmentSchema.virtual('appointmentEnd').get(function () {
+	if (!this.appointmentDate) {
+		return null;
+	}
+	const minutes = this.durationMinutes || defaultDurationFor(this.appointmentType);
+	return new Date(this.appointmentDate.getTime() + minutes * 60 * 1000);
+});
+
+const Appointment = mongoose.model('Appointment', AppointmentSchema);
+
+Appointment.DEFAULT_DURATION_MINUTES = DEFAULT_DURATION_MINUTES;
+Appointment.defaultDurationFor = defaultDurationFor;
+
+module.exports = Appointment;

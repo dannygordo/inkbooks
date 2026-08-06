@@ -10,6 +10,7 @@ import { AppointmentService } from "../../services/AppointmentService";
 import DepositService from "../../services/DepositService";
 import IBSquarePaymentForm from "../IBSquarePayments/IBSquarePaymentForm";
 import DaySchedule from "../appointments/DaySchedule";
+import DurationPicker, { SESSION_DEFAULT_MINUTES } from "../appointments/DurationPicker";
 import { useAuth } from "../../context/auth";
 import { dollarsToCents, formatCents } from "../../utils/money";
 import "./bookSessionDatesForm.css";
@@ -47,7 +48,14 @@ const BookSessionDatesForm = ({
 }) => {
 	const { user } = useAuth();
 	const shopId = user.userInfo?.shop?.id;
-	const [sessionDates, setSessionDates] = useState([initialDate || moment()]);
+	// Each sitting carries its own length. A back piece is often a long first sitting and shorter
+	// follow-ups, so one duration for the whole set would be wrong for most of them - and a wrong
+	// duration is worse than none, because the conflict check then confidently blocks or clears the
+	// wrong slot. SESSION_DEFAULT_MINUTES mirrors the server's default for a session
+	// (models/Appointment.js); the server still decides when nothing is sent.
+	const [sessionDates, setSessionDates] = useState([
+		{ date: initialDate || moment(), durationMinutes: SESSION_DEFAULT_MINUTES },
+	]);
 	const [projectTitle, setProjectTitle] = useState("");
 	// A deposit is taken when the consult actually happens and the work is agreed - which is this
 	// moment, not when the consult was booked. A consult sitting in the calendar for next Tuesday
@@ -108,14 +116,30 @@ const BookSessionDatesForm = ({
 	};
 
 	const updateDate = (index, val) => {
-		setSessionDates((prev) => prev.map((d, i) => (i === index ? val : d)));
+		setSessionDates((prev) =>
+			prev.map((s, i) => (i === index ? { ...s, date: val } : s))
+		);
+	};
+
+	const updateDuration = (index, minutes) => {
+		setSessionDates((prev) =>
+			prev.map((s, i) => (i === index ? { ...s, durationMinutes: minutes } : s))
+		);
 	};
 
 	const addDate = () => {
 		// Defaults the next session a week after the last one entered - a common real cadence for
 		// multi-sitting work, and easy to adjust from there rather than starting from "now" again.
+		// Carries the previous sitting's LENGTH forward too, for the same reason: whatever the
+		// artist just decided is a far better guess for the next one than a constant.
 		const last = sessionDates[sessionDates.length - 1];
-		setSessionDates((prev) => [...prev, moment(last).add(1, "week")]);
+		setSessionDates((prev) => [
+			...prev,
+			{
+				date: moment(last.date).add(1, "week"),
+				durationMinutes: last.durationMinutes,
+			},
+		]);
 	};
 
 	const removeDate = (index) => {
@@ -128,20 +152,25 @@ const BookSessionDatesForm = ({
 			setError("Give the project a title first.");
 			return;
 		}
-		if (sessionDates.some((d) => !d || !moment(d).isValid())) {
+		if (sessionDates.some((s) => !s.date || !moment(s.date).isValid())) {
 			setError("Pick a valid date and time for every session.");
+			return;
+		}
+		if (sessionDates.some((s) => !(s.durationMinutes > 0))) {
+			setError("Give every session a length.");
 			return;
 		}
 		setSubmitting(true);
 		setError(null);
 		try {
-			const [firstDate, ...restDates] = sessionDates;
+			const [firstSitting, ...restSittings] = sessionDates;
 			const { data } = await convertBookingRequest({
 				variables: {
 					bookingRequestId,
 					outcome: "session_booked",
 					appointmentInput: {
-						appointmentDate: moment(firstDate).toISOString(),
+						appointmentDate: moment(firstSitting.date).toISOString(),
+						durationMinutes: firstSitting.durationMinutes,
 						shopCutStatus: "unpaid",
 						appointmentStatus: "scheduled",
 					},
@@ -151,7 +180,7 @@ const BookSessionDatesForm = ({
 			const projectId = data.convertBookingRequest.resultingAppointment?.projectId;
 			// Every additional date is just another session Appointment against the same,
 			// already-real Project - same shape as the wizard's existing-project session path.
-			for (const date of restDates) {
+			for (const sitting of restSittings) {
 				const now = new Date().toISOString();
 				await createAppointment({
 					variables: {
@@ -165,7 +194,8 @@ const BookSessionDatesForm = ({
 							appointmentStatus: "scheduled",
 							createdAt: now,
 							updatedAt: now,
-							appointmentDate: moment(date).toISOString(),
+							appointmentDate: moment(sitting.date).toISOString(),
+							durationMinutes: sitting.durationMinutes,
 						},
 					},
 				});
@@ -278,15 +308,19 @@ const BookSessionDatesForm = ({
 				required
 			/>
 			<div className="bookSessionDatesList">
-				{sessionDates.map((date, index) => (
-					// Fragment keyed on the index so the schedule hint stays attached to its own
-					// row - it belongs to that date, not to the group.
+				{sessionDates.map((sitting, index) => (
+					// Keyed on the index so the schedule hint stays attached to its own row - it
+					// belongs to that sitting, not to the group.
 					<div className="bookSessionDateGroup" key={index}>
 						<div className="bookSessionDateRow">
 							<IBDateTimePicker
 								label={`Session ${index + 1}`}
-								val={date}
+								val={sitting.date}
 								setVal={(val) => updateDate(index, val)}
+							/>
+							<DurationPicker
+								value={sitting.durationMinutes}
+								onChange={(minutes) => updateDuration(index, minutes)}
 							/>
 							{sessionDates.length > 1 && (
 								<IconButton
@@ -298,11 +332,16 @@ const BookSessionDatesForm = ({
 								</IconButton>
 							)}
 						</div>
-						{/* What's already on the books that day. Renders nothing when the day is
-						    clear, so a clean schedule stays silent instead of printing an empty
-						    panel under every row. Without this the artist had to leave the project,
-						    open their calendar, and come back - or guess. */}
-						<DaySchedule artistUserId={user.id} date={date} />
+						{/* What's already on the books that day, and whether any of it actually
+						    overlaps this sitting. Renders nothing when the day is clear, so a clean
+						    schedule stays silent rather than printing an empty panel under every
+						    row. Without this the artist had to leave the project, open their
+						    calendar, and come back - or guess. */}
+						<DaySchedule
+							artistUserId={user.id}
+							date={sitting.date}
+							durationMinutes={sitting.durationMinutes}
+						/>
 					</div>
 				))}
 			</div>

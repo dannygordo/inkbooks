@@ -45,19 +45,30 @@
     white-space: nowrap;
 }
 
-/* Amber, not red. This is "worth a look", not "you have made a mistake" - the data cannot support
-   the stronger claim (there is no duration on an appointment), and a red warning that turns out to
-   be fine teaches people to dismiss the next one. */
-.dayScheduleItemNearby {
-    color: #8a5a00;
+/* Red is earned now. Appointments carry a duration, so "overlaps" is a computed fact about two
+   intervals rather than the old proximity guess - and a warning that is reliably right is one
+   people keep reading. The amber "close to this" it replaced deliberately understated itself
+   because the data could not support more. */
+.dayScheduleClashing {
+    border-left-color: #d32f2f;
+    background-color: #fdf5f5;
+}
+
+.dayScheduleItemClash {
+    color: #b3261e;
     font-weight: 500;
 }
 
-.dayScheduleNearby {
+.dayScheduleClash {
     font-size: 11px;
-    color: #8a5a00;
-    background-color: #fdf0d5;
+    color: #b3261e;
+    background-color: #fce8e6;
     border-radius: 999px;
     padding: 1px 8px;
     white-space: nowrap;
+}
+
+.dayScheduleClashSummary {
+    margin-left: 8px;
+    color: #b3261e;
 }

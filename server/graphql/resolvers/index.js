@@ -199,6 +199,20 @@ module.exports = {
     }
   },
   Appointment: {
+    // Resolved rather than read straight off the document, because both fields are non-null in the
+    // schema and a record written BEFORE durationMinutes existed has no value for it. A Mongoose
+    // default applies on save, not on read - so an old appointment would come back undefined and
+    // GraphQL would null out the whole query rather than that one field. The dev database gets
+    // re-seeded, but "every historical row is fine" is not a thing worth betting a page on.
+    durationMinutes: (appointment) =>
+      appointment.durationMinutes || Appointment.defaultDurationFor(appointment.appointmentType),
+    // Derived from start + duration. Computed here as well as in the model's virtual so it survives
+    // a .lean() query, which drops virtuals silently.
+    appointmentEnd: (appointment) => {
+      const minutes =
+        appointment.durationMinutes || Appointment.defaultDurationFor(appointment.appointmentType);
+      return new Date(new Date(appointment.appointmentDate).getTime() + minutes * 60 * 1000);
+    },
     shop: async(appointment, args, context, info) => {
       return (await Shop.findById(appointment.shopId));
     },

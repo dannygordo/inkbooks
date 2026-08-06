@@ -20,23 +20,31 @@ import "./daySchedule.css";
  * silence is the correct output for the common case, and a panel that renders "0 appointments"
  * every time is noise the eye learns to skip.
  *
- * WHAT IT DELIBERATELY DOES NOT CLAIM.
+ * WHAT IT CLAIMS, AND WHY IT CAN NOW.
  *
- * Appointment has an appointmentDate and no duration (see server/models/Appointment.js), so a real
- * overlap - "this 3-hour session runs into that one" - IS NOT COMPUTABLE from the data we hold.
- * Anything claiming to detect one would be guessing at a length nobody entered.
+ * This used to say "close to this" against a hand-picked two-hour window, because Appointment held
+ * only a point in time - a 3-hour session and a 20-minute touch-up were the same instant, so a real
+ * overlap was not computable and anything stronger would have been a guess at a length nobody
+ * entered.
  *
- * So the flag below says "close to this", with an explicit window, rather than "conflicts". That is
- * the honest strength of the claim, and it leaves the judgement with the artist, who knows how long
- * their own work takes. The real fix is a duration on Appointment; until that exists, this must not
- * pretend otherwise.
+ * Appointment now carries durationMinutes, so "overlaps" is a fact: two half-open intervals
+ * [start, start+duration) either intersect or they don't. The word on screen changed because the
+ * data changed, not because the wording got braver.
  */
 
-// Two hours either side. Long enough to catch the realistic collision - a session booked at 1pm
-// against another at 2pm - without flagging a morning consult when the evening is being booked.
-const NEARBY_MS = 2 * 60 * 60 * 1000;
+/**
+ * Do two half-open intervals intersect?
+ *
+ * Half-open on purpose: an appointment ending at 3:00 and another starting at 3:00 do NOT overlap.
+ * Treating the boundary as a clash would flag every back-to-back booking, which is the normal way
+ * a working day is filled, and a warning that fires on the correct behaviour is one people learn
+ * to click past.
+ */
+function overlaps(startA, endA, startB, endB) {
+  return startA < endB && startB < endA;
+}
 
-const DaySchedule = ({ artistUserId, date }) => {
+const DaySchedule = ({ artistUserId, date, durationMinutes }) => {
   // Half-open [startOfDay, nextDay), the same convention the calendar and the server's analytics
   // use. Memoised on the DAY, not on the moment: the picker fires on every keystroke of the time
   // field, and keying the range on the raw value would refetch on each one.
@@ -70,34 +78,57 @@ const DaySchedule = ({ artistUserId, date }) => {
     return null;
   }
 
-  const chosen = moment(date);
+  const chosenStart = moment(date).valueOf();
+  const chosenEnd = chosenStart + (durationMinutes || 0) * 60 * 1000;
+
+  const rows = appointments.map((appt) => {
+    const start = moment(appt.appointmentDate);
+    const end = moment(appt.appointmentEnd || appt.appointmentDate);
+    return {
+      appt,
+      start,
+      end,
+      // Only meaningful once we know how long the NEW appointment is. Without a duration for it
+      // there is no interval to intersect, so this shows the day and claims nothing.
+      clashes:
+        durationMinutes > 0 &&
+        overlaps(chosenStart, chosenEnd, start.valueOf(), end.valueOf()),
+    };
+  });
+  const clashCount = rows.filter((r) => r.clashes).length;
+
   return (
-    <div className="daySchedule">
+    <div className={clashCount > 0 ? "daySchedule dayScheduleClashing" : "daySchedule"}>
       <div className="dayScheduleHeader">
-        {chosen.format("ddd D MMM")} — {appointments.length} already booked
+        {moment(date).format("ddd D MMM")} — {appointments.length} already booked
+        {clashCount > 0 && (
+          <span className="dayScheduleClashSummary">
+            {clashCount} {clashCount === 1 ? "conflict" : "conflicts"}
+          </span>
+        )}
       </div>
       <ul className="dayScheduleList">
-        {appointments.map((appt) => {
-          const at = moment(appt.appointmentDate);
-          const nearby = Math.abs(at.diff(chosen)) <= NEARBY_MS;
-          return (
-            <li
-              key={appt.id}
-              className={nearby ? "dayScheduleItem dayScheduleItemNearby" : "dayScheduleItem"}
-            >
-              <span className="dayScheduleTime">{at.format("h:mm A")}</span>
-              <AppointmentTypeChip type={appt.appointmentType} size="small" />
-              <span className="dayScheduleTitle">
-                {appt.project?.title || appt.title || "(untitled)"}
+        {rows.map(({ appt, start, end, clashes }) => (
+          <li
+            key={appt.id}
+            className={clashes ? "dayScheduleItem dayScheduleItemClash" : "dayScheduleItem"}
+          >
+            {/* Both ends now, not just the start. The start alone was never enough to judge a
+                clash by eye, which is most of why this needed a duration at all. */}
+            <span className="dayScheduleTime">
+              {start.format("h:mm A")} – {end.format("h:mm A")}
+            </span>
+            <AppointmentTypeChip type={appt.appointmentType} size="small" />
+            <span className="dayScheduleTitle">
+              {appt.project?.title || appt.title || "(untitled)"}
+            </span>
+            {clashes && (
+              <span className="dayScheduleClash" title="Overlaps the session you are booking">
+                overlaps
               </span>
-              {nearby && (
-                <span className="dayScheduleNearby" title="Within two hours of the time you picked">
-                  close to this
-                </span>
-              )}
-            </li>
-          );
-        })}
+            )}
+          </li>
+        ))}
       </ul>
     </div>
   );
