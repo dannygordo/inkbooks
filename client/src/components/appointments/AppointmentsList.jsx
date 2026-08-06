@@ -8,9 +8,53 @@ import DateRangePicker from "../analytics/DateRangePicker";
 import AppointmentTypeChip from "./AppointmentTypeChip";
 import Pager from "../pagination/Pager";
 import CreateEventButton from "../ibCalendar/CreateEventButton";
-import { getDefaultRange } from "../../utils/dateRanges";
+import { buildScheduleRanges, getDefaultScheduleRange } from "../../utils/dateRanges";
+import { tagColorRowStyle } from "../../utils/tagColor";
 import { ROUTE_CONSTANTS } from "../../constants";
 import "./appointmentsList.css";
+
+/**
+ * One row, with its own hover state.
+ *
+ * Extracted purely because the tint has a hover variant and hover has to be per-row state - the
+ * same shape ArtistPerformancePanel's row uses, for the same reason. Keeping it in the parent would
+ * mean one hovered id threaded through the map, which is the same thing written worse.
+ */
+const AppointmentRow = ({ appointment, tinted, showArtist, onOpen }) => {
+	const [hovered, setHovered] = useState(false);
+	return (
+		<div
+			className="appointmentsListRow"
+			style={tinted ? tagColorRowStyle(appointment.user?.tagColor, hovered) : undefined}
+			onMouseEnter={() => setHovered(true)}
+			onMouseLeave={() => setHovered(false)}
+			onClick={() => onOpen(appointment)}
+			role="button"
+			tabIndex={0}
+			onKeyDown={(e) => {
+				if (e.key === "Enter" || e.key === " ") {
+					e.preventDefault();
+					onOpen(appointment);
+				}
+			}}
+		>
+			<span className="appointmentsListTime">
+				{moment(appointment.appointmentDate).format("h:mm A")}
+			</span>
+			<AppointmentTypeChip type={appointment.appointmentType} size="small" />
+			<span className="appointmentsListTitle">
+				{appointment.project?.title || appointment.title || "(untitled appointment)"}
+			</span>
+			{/* Only meaningful on a shop calendar, where rows belong to different artists. An
+			    independent artist's list would repeat their own name on every line. */}
+			{showArtist && appointment.user && (
+				<span className="appointmentsListArtist">
+					{appointment.user.firstName} {appointment.user.lastName}
+				</span>
+			)}
+		</div>
+	);
+};
 
 /**
  * The appointments page as a list, over a date range.
@@ -34,7 +78,9 @@ import "./appointmentsList.css";
 const AppointmentsList = () => {
 	const { user } = useAuth();
 	const navigate = useNavigate();
-	const [range, setRange] = useState(getDefaultRange);
+	// Opens on THIS WEEK, not this month. A schedule is read forward and at working-week
+	// resolution; a month of appointments is a scroll, not an answer.
+	const [range, setRange] = useState(getDefaultScheduleRange);
 
 	// The picker's range carries display metadata; the server filter wants only the bounds. The end
 	// is already exclusive (see utils/dateRanges.js), which matches the server's half-open
@@ -117,7 +163,11 @@ const AppointmentsList = () => {
 	return (
 		<div className="appointmentsList">
 			<div className="appointmentsListControls">
-				<DateRangePicker value={range} onChange={setRangeAndReset} />
+				<DateRangePicker
+					value={range}
+					onChange={setRangeAndReset}
+					presets={buildScheduleRanges()}
+				/>
 				{/* Booking has to be reachable from whichever view you happen to be in. Sending
 				    someone back to the calendar to make an appointment turns a view preference into
 				    a workflow detour. Defaults to TODAY rather than to the calendar's last-clicked
@@ -150,35 +200,13 @@ const AppointmentsList = () => {
 							</span>
 						</div>
 						{dayAppointments.map((appt) => (
-							<div
-								className="appointmentsListRow"
+							<AppointmentRow
 								key={appt.id}
-								onClick={() => openAppointment(appt)}
-								role="button"
-								tabIndex={0}
-								onKeyDown={(e) => {
-									if (e.key === "Enter" || e.key === " ") {
-										e.preventDefault();
-										openAppointment(appt);
-									}
-								}}
-							>
-								<span className="appointmentsListTime">
-									{moment(appt.appointmentDate).format("h:mm A")}
-								</span>
-								<AppointmentTypeChip type={appt.appointmentType} size="small" />
-								<span className="appointmentsListTitle">
-									{appt.project?.title || appt.title || "(untitled appointment)"}
-								</span>
-								{/* Only meaningful on a shop calendar, where rows belong to
-								    different artists. An independent artist's list would repeat
-								    their own name on every line. */}
-								{shopId && appt.user && (
-									<span className="appointmentsListArtist">
-										{appt.user.firstName} {appt.user.lastName}
-									</span>
-								)}
-							</div>
+								appointment={appt}
+								tinted={Boolean(shopId)}
+								showArtist={Boolean(shopId)}
+								onOpen={openAppointment}
+							/>
 						))}
 					</div>
 				))}

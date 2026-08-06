@@ -21,8 +21,11 @@ import "./dateRangePicker.css";
  * - value: the current {key, label, start, end}
  * - onChange(range): called with a new range object
  */
-const DateRangePicker = ({ value, onChange }) => {
-	const presets = buildPresetRanges();
+const DateRangePicker = ({ value, onChange, presets: presetsProp }) => {
+	// Defaults to the analytics ranges, so every existing caller is unchanged. The appointments
+	// list passes buildScheduleRanges() instead - see utils/dateRanges.js for why looking at a
+	// schedule and looking at performance want different windows.
+	const presets = presetsProp || buildPresetRanges();
 	const [showCustom, setShowCustom] = useState(value?.key === RANGE_KEYS.CUSTOM);
 	// Held as strings because that's what a native date input gives back; only converted to a
 	// range once both sides parse. Seeded from the current range so opening the custom form

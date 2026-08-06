@@ -20,6 +20,10 @@ export const RANGE_KEYS = {
 	THIS_QUARTER: "this_quarter",
 	YEAR_TO_DATE: "year_to_date",
 	LAST_12_MONTHS: "last_12_months",
+	// Scheduling ranges - see buildScheduleRanges below for why these are separate.
+	THIS_WEEK: "this_week",
+	NEXT_WEEK: "next_week",
+	NEXT_MONTH: "next_month",
 	CUSTOM: "custom",
 };
 
@@ -72,6 +76,57 @@ export function buildPresetRanges() {
 
 export function getDefaultRange() {
 	return buildPresetRanges()[0];
+}
+
+/**
+ * Ranges for looking at a SCHEDULE, as opposed to looking at performance.
+ *
+ * A separate set from buildPresetRanges above, and deliberately so. Those ranges look BACKWARD -
+ * last month, this quarter, year to date - because the question a dashboard answers is "how did I
+ * do". A schedule is read FORWARD: what's on this week, what's coming next week. Offering "year to
+ * date" on an appointments list is offering to show somebody a year of appointments they have
+ * already worked, which is not a thing anyone opens that screen for.
+ *
+ * Sharing one list would mean the dashboards grow scheduling ranges nobody wants there, or the
+ * appointments list carries analytics ranges nobody wants here. Two lists, one picker.
+ *
+ * Weeks start on Monday, via moment's own locale-aware startOf('isoWeek'). A tattoo shop's week is
+ * a working week; `startOf('week')` would put Sunday at the head of it under the default locale,
+ * which splits a normal weekend across two ranges.
+ */
+export function buildScheduleRanges() {
+	const now = moment();
+	return [
+		{
+			key: RANGE_KEYS.THIS_WEEK,
+			label: "This week",
+			start: now.clone().startOf("isoWeek").toDate(),
+			end: now.clone().startOf("isoWeek").add(1, "week").toDate(),
+		},
+		{
+			key: RANGE_KEYS.NEXT_WEEK,
+			label: "Next week",
+			start: now.clone().startOf("isoWeek").add(1, "week").toDate(),
+			end: now.clone().startOf("isoWeek").add(2, "weeks").toDate(),
+		},
+		{
+			key: RANGE_KEYS.THIS_MONTH,
+			label: "This month",
+			start: now.clone().startOf("month").toDate(),
+			end: now.clone().add(1, "month").startOf("month").toDate(),
+		},
+		{
+			key: RANGE_KEYS.NEXT_MONTH,
+			label: "Next month",
+			start: now.clone().add(1, "month").startOf("month").toDate(),
+			end: now.clone().add(2, "months").startOf("month").toDate(),
+		},
+	];
+}
+
+/** What an appointments list opens on. This week - the one you are actually working. */
+export function getDefaultScheduleRange() {
+	return buildScheduleRanges()[0];
 }
 
 /**

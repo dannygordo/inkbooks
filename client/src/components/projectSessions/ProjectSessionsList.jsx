@@ -6,7 +6,8 @@ import { Add } from "@mui/icons-material";
 import { AppointmentService } from "../../services/AppointmentService";
 import ArtistShopConnectionService from "../../services/ArtistShopConnectionService";
 import { useAuth } from "../../context/auth";
-import IBDateTimePicker from "../inputs/IBDateTimePicker";
+import AppointmentSlotPicker from "../appointments/AppointmentSlotPicker";
+import { SESSION_DEFAULT_MINUTES } from "../appointments/DurationPicker";
 import SessionDetail from "./SessionDetail";
 import { formatCents } from "../../utils/money";
 import { ALERT_CONSTANTS } from "../../constants";
@@ -36,6 +37,7 @@ const ProjectSessionsList = ({ project }) => {
 
 	const [showAddForm, setShowAddForm] = useState(false);
 	const [newSessionDate, setNewSessionDate] = useState(moment());
+	const [durationMinutes, setDurationMinutes] = useState(SESSION_DEFAULT_MINUTES);
 	const [addError, setAddError] = useState(null);
 	const [createAppointment, { loading: adding }] = useMutation(AppointmentService.CREATE_APPOINTMENT);
 
@@ -86,6 +88,7 @@ const ProjectSessionsList = ({ project }) => {
 						createdAt: now,
 						updatedAt: now,
 						appointmentDate: moment(newSessionDate).toISOString(),
+						durationMinutes,
 					},
 				},
 			});
@@ -143,7 +146,17 @@ const ProjectSessionsList = ({ project }) => {
 
 			{showAddForm ? (
 				<form className="projectSessionAddForm" onSubmit={handleAddSession}>
-					<IBDateTimePicker label="Session date & time" val={newSessionDate} setVal={setNewSessionDate} />
+					{/* Keyed to the PROJECT'S artist, not the viewer - a shop admin adding a session to
+					    someone else's project needs to see THAT artist's day, which is the same reason
+					    userId below comes from the project. */}
+					<AppointmentSlotPicker
+						label="Session date & time"
+						date={newSessionDate}
+						onDateChange={setNewSessionDate}
+						durationMinutes={durationMinutes}
+						onDurationChange={setDurationMinutes}
+						artistUserId={project.artistId}
+					/>
 					{addError && <div className="bookingRequestError">{addError}</div>}
 					<div className="projectSessionAddFormButtons">
 						<Button type="submit" variant="contained" disabled={adding}>

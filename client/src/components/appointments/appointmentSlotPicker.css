@@ -1,0 +1,11 @@
+.appointmentSlotPicker {
+    display: flex;
+    flex-direction: column;
+}
+
+.appointmentSlotPickerRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}

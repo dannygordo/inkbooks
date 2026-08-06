@@ -77,7 +77,11 @@
     cursor: pointer;
 }
 
-.appointmentsListRow:hover {
+/* Only for untinted rows. A tinted row carries an inline background (the artist's colour), and an
+   inline style beats a stylesheet rule - so this would silently do nothing there. The tinted rows
+   get their hover from tagColorRowStyle's own hovered variant instead, which deepens the artist's
+   colour rather than replacing it with a grey that loses the information. */
+.appointmentsListRow:not([style]):hover {
     background-color: #f7f9fc;
 }
 

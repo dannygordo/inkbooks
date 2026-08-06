@@ -4,7 +4,11 @@ import moment from "moment";
 import { useMutation } from "@apollo/client";
 import { useAuth } from "../../context/auth";
 import { ALERT_CONSTANTS } from "../../constants";
-import IBDateTimePicker from "../inputs/IBDateTimePicker";
+import AppointmentSlotPicker from "../appointments/AppointmentSlotPicker";
+import {
+	CONSULT_DEFAULT_MINUTES,
+	SESSION_DEFAULT_MINUTES,
+} from "../appointments/DurationPicker";
 import IBInput from "../inputs/IBInput";
 import IBMultilineInput from "../inputs/IBMultilineInput";
 import IBProjectsByArtistSelect from "../inputs/IBProjectsByArtistSelect";
@@ -57,6 +61,12 @@ const AppointmentWizard = ({ selectedDay }) => {
 	const [type, setType] = useState(null); // 'consult' | 'session' | 'other' | null
 	const [step, setStep] = useState("type");
 	const [startDateTime, setStartDateTime] = useState(moment.utc(selectedDay));
+	// One duration for whichever appointment this wizard ends up creating. Seeded per TYPE the
+	// moment the type is chosen (see setTypeAndDefaultDuration below) rather than left at a single
+	// constant, because a consult and a session are wildly different lengths and a default that is
+	// wrong half the time is a default people learn to overwrite without reading - which is how a
+	// three-hour session gets booked as forty-five minutes.
+	const [durationMinutes, setDurationMinutes] = useState(CONSULT_DEFAULT_MINUTES);
 	const [submitting, setSubmitting] = useState(false);
 	const [error, setError] = useState(null);
 
@@ -165,6 +175,12 @@ const AppointmentWizard = ({ selectedDay }) => {
 	const handleTypeSelect = (selectedType) => {
 		setType(selectedType);
 		setError(null);
+		// Seed the length from the type, since that is the only thing known at this point and it is
+		// a much better guess than a constant. "other" keeps the consult default - a blocked-out
+		// hour is the common case, and it is the one type with no useful pattern to infer from.
+		setDurationMinutes(
+			selectedType === "session" ? SESSION_DEFAULT_MINUTES : CONSULT_DEFAULT_MINUTES
+		);
 		if (selectedType === "other") {
 			setStep("other-form");
 		} else if (selectedType === "consult") {
@@ -197,6 +213,7 @@ const AppointmentWizard = ({ selectedDay }) => {
 						createdAt: now,
 						updatedAt: now,
 						appointmentDate: UtilsService.formatDateToISO(startDateTime),
+						durationMinutes,
 					},
 				},
 				refetchQueries: appointmentsRefetch,
@@ -248,6 +265,7 @@ const AppointmentWizard = ({ selectedDay }) => {
 					projectTitle: type === "session" ? projectTitle : undefined,
 					appointmentInput: {
 						appointmentDate: UtilsService.formatDateToISO(startDateTime),
+						durationMinutes,
 						shopCutStatus: "unpaid",
 						appointmentStatus: "scheduled",
 					},
@@ -298,6 +316,7 @@ const AppointmentWizard = ({ selectedDay }) => {
 						createdAt: now,
 						updatedAt: now,
 						appointmentDate: UtilsService.formatDateToISO(startDateTime),
+						durationMinutes,
 					},
 				},
 				refetchQueries: appointmentsRefetch,
@@ -336,7 +355,14 @@ const AppointmentWizard = ({ selectedDay }) => {
 		return (
 			<form onSubmit={handleSubmitOther}>
 				<DialogContent dividers className="appointmentWizardDialogContent">
-					<IBDateTimePicker label="Select Date" val={startDateTime} setVal={setStartDateTime} />
+					<AppointmentSlotPicker
+						label="Select Date"
+						date={startDateTime}
+						onDateChange={setStartDateTime}
+						durationMinutes={durationMinutes}
+						onDurationChange={setDurationMinutes}
+						artistUserId={user.id}
+					/>
 					<IBInput
 						helperText="Title"
 						placeholder="e.g. Out of office"
@@ -514,7 +540,14 @@ const AppointmentWizard = ({ selectedDay }) => {
 		return (
 			<form onSubmit={handleSubmitIntake}>
 				<DialogContent dividers className="appointmentWizardDialogContent">
-					<IBDateTimePicker label="Select Date" val={startDateTime} setVal={setStartDateTime} />
+					<AppointmentSlotPicker
+						label="Select Date"
+						date={startDateTime}
+						onDateChange={setStartDateTime}
+						durationMinutes={durationMinutes}
+						onDurationChange={setDurationMinutes}
+						artistUserId={user.id}
+					/>
 					{error && <div className="bookingRequestError">{error}</div>}
 				</DialogContent>
 				<DialogActions className="appointmentWizardDialogActions">
@@ -594,7 +627,14 @@ const AppointmentWizard = ({ selectedDay }) => {
 		return (
 			<form onSubmit={handleSubmitExistingProjectSession}>
 				<DialogContent dividers className="appointmentWizardDialogContent">
-					<IBDateTimePicker label="Select Date" val={startDateTime} setVal={setStartDateTime} />
+					<AppointmentSlotPicker
+						label="Select Date"
+						date={startDateTime}
+						onDateChange={setStartDateTime}
+						durationMinutes={durationMinutes}
+						onDurationChange={setDurationMinutes}
+						artistUserId={user.id}
+					/>
 					{error && <div className="bookingRequestError">{error}</div>}
 				</DialogContent>
 				<DialogActions className="appointmentWizardDialogActions">

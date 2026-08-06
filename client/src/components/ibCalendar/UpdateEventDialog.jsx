@@ -4,7 +4,11 @@ import moment from "moment";
 import React, { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ALERT_CONSTANTS, APP_SETTINGS_CONSTANTS, ROUTE_CONSTANTS } from "../../constants";
-import IBDateTimePicker from "../inputs/IBDateTimePicker";
+import AppointmentSlotPicker from "../appointments/AppointmentSlotPicker";
+import {
+	CONSULT_DEFAULT_MINUTES,
+	SESSION_DEFAULT_MINUTES,
+} from "../appointments/DurationPicker";
 import IBInput from "../inputs/IBInput";
 import IBMultilineInput from "../inputs/IBMultilineInput";
 import BookSessionDatesForm from "../booking/BookSessionDatesForm";
@@ -39,6 +43,12 @@ const UpdateEventDialog = ({ selectedDay, event }) => {
 	const titleRef = useRef(event.title);
 	const descriptionRef = useRef(event.description);
 	const [startDateTime, setStartDateTime] = useState(moment.utc(event.appointmentDate));
+	// Seeded from the stored value, falling back for records written before durationMinutes
+	// existed - the server resolver has the same fallback, so this only matters until a re-seed.
+	const [durationMinutes, setDurationMinutes] = useState(
+		event.durationMinutes ||
+			(event.appointmentType === "session" ? SESSION_DEFAULT_MINUTES : CONSULT_DEFAULT_MINUTES)
+	);
 	const [showConvertForm, setShowConvertForm] = useState(false);
     const [updateAppointment] = useMutation(AppointmentService.UPDATE_APPOINTMENT);
     const [deleteAppointment] = useMutation(AppointmentService.DELETE_APPOINTMENT);
@@ -99,7 +109,8 @@ const UpdateEventDialog = ({ selectedDay, event }) => {
             appointmentType: event.appointmentType,
             createdAt: event.createdAt,
             updatedAt: UtilsService.formatDateToISO(Date.now()),
-            appointmentDate: UtilsService.formatDateToISO(startDateTime)
+            appointmentDate: UtilsService.formatDateToISO(startDateTime),
+            durationMinutes
         };
         updateAppointment({
 			variables: {
@@ -244,10 +255,18 @@ const UpdateEventDialog = ({ selectedDay, event }) => {
 							}}
 						>
 							<div style={{ marginRight: 5 }}>
-								<IBDateTimePicker
+								{/* Editing an appointment is exactly when a conflict matters most -
+								    moving one on top of another is the whole risk of a drag. The
+								    appointment itself is excluded, or it would flag as overlapping
+								    the thing being moved. */}
+								<AppointmentSlotPicker
 									label="Select Date"
-									val={moment.utc(startDateTime)}
-									setVal={setStartDateTime}
+									date={moment.utc(startDateTime)}
+									onDateChange={setStartDateTime}
+									durationMinutes={durationMinutes}
+									onDurationChange={setDurationMinutes}
+									artistUserId={event.userId}
+									excludeAppointmentId={event.id}
 								/>
 							</div>
 						</div>

@@ -44,7 +44,7 @@ function overlaps(startA, endA, startB, endB) {
   return startA < endB && startB < endA;
 }
 
-const DaySchedule = ({ artistUserId, date, durationMinutes }) => {
+const DaySchedule = ({ artistUserId, date, durationMinutes, excludeAppointmentId }) => {
   // Half-open [startOfDay, nextDay), the same convention the calendar and the server's analytics
   // use. Memoised on the DAY, not on the moment: the picker fires on every keystroke of the time
   // field, and keying the range on the raw value would refetch on each one.
@@ -67,10 +67,14 @@ const DaySchedule = ({ artistUserId, date, durationMinutes }) => {
 
   const appointments = useMemo(() => {
     const items = data?.getAppointmentsByArtist?.items || [];
-    return [...items].sort(
-      (a, b) => new Date(a.appointmentDate) - new Date(b.appointmentDate)
-    );
-  }, [data]);
+    return items
+      // When EDITING, the appointment being moved is on this day too - and it overlaps itself
+      // perfectly. Without this, every edit opens showing a conflict against the thing you are
+      // editing, which is both useless and the fastest way to teach someone to ignore the warning.
+      .filter((appt) => !excludeAppointmentId || String(appt.id) !== String(excludeAppointmentId))
+      .slice()
+      .sort((a, b) => new Date(a.appointmentDate) - new Date(b.appointmentDate));
+  }, [data, excludeAppointmentId]);
 
   if (!dayKey || loading || appointments.length === 0) {
     // Nothing for a clear day. See the header - an empty state here would be printed under every
