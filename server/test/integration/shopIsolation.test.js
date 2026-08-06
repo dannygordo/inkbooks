@@ -350,7 +350,11 @@ describe('work and schedule are not visible across shops', () => {
 
 		const response = await server.executeOperation(
 			{
-				query: `query A($artistId: ID!) { getBookingRequests(artistId: $artistId) { id description } }`,
+				// Paged now - see resolvers/bookingRequests.js. Selecting id/description at the top
+				// level fails schema VALIDATION before the resolver ever runs, so the test would
+				// pass or fail on the wrong thing: a query that never reaches the ownership check
+				// cannot demonstrate the ownership check works.
+				query: `query A($artistId: ID!) { getBookingRequests(artistId: $artistId) { items { id description } } }`,
 				variables: { artistId: artistA.id },
 			},
 			asOutsideAdmin(adminB),

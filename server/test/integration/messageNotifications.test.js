@@ -411,29 +411,83 @@ describe('when sending fails', () => {
 describe('the resolver actually calls it', () => {
 	it('notifies the other side when a message goes through createMessage', async () => {
 		// The unit tests above all call notifyNewMessage directly, which proves the function works
-		// and proves nothing about whether anything invokes it. This asserts the wiring, via the
-		// lastNotifiedAt it leaves behind - the one observable effect that doesn't need the mail
-		// layer. A resolver that stopped calling notify would pass every other test in this file.
+		// and proves nothing about whether anything invokes it. A resolver that quietly stopped
+		// calling notify would pass every other test in this file.
+		//
+		// This asserted lastNotifiedAt, which WAS the right observable until the provider-rejection
+		// fix. The real sendEmail returns null when RESEND_API_KEY isn't set - which is every test
+		// run - and a rejected send deliberately does NOT mark the recipient notified, because
+		// starting the throttle on a message nobody received buys fifteen minutes of silence for
+		// nothing. So the old assertion was testing "did an email go out", which in this
+		// environment is always no.
+		//
+		// The log line is the observable that survives, and it is a better one anyway: it is what
+		// a person debugging this actually reads, so a test on it fails when the diagnostic breaks
+		// rather than only when the behaviour does.
 		const { artist, guest, conversation } = await guestThread();
 		const server = createTestServer();
+		// warn, not log: logNotifyOutcomes uses warn when nobody was successfully notified, which
+		// is the case here precisely because mail isn't configured.
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-		const res = await server.executeOperation(
-			{
-				query: CREATE_MESSAGE,
-				variables: {
-					conversationId: String(conversation._id),
-					senderId: String(artist.id),
-					message: 'Got your request - when are you free?',
+		try {
+			const res = await server.executeOperation(
+				{
+					query: CREATE_MESSAGE,
+					variables: {
+						conversationId: String(conversation._id),
+						senderId: String(artist.id),
+						message: 'Got your request - when are you free?',
+					},
 				},
-			},
-			asUser(artist),
-		);
-		expect(res.body.singleResult.errors).toBeUndefined();
+				asUser(artist),
+			);
+			expect(res.body.singleResult.errors).toBeUndefined();
+
+			const line = warn.mock.calls
+				.map((args) => args.join(' '))
+				.find((text) => text.includes('[messages]'));
+
+			expect(line).toBeDefined();
+			// The GUEST, by id - the wiring reached the right recipient, not merely something.
+			expect(line).toContain(String(guest.id));
+			// And it went down the magic-link branch, which is the one a guest can actually open.
+			expect(line).toContain('guest-link');
+			// Never the sender.
+			expect(line).not.toContain(String(artist.id));
+		} finally {
+			// Restored in a finally so a failed assertion doesn't leave console.warn stubbed for
+			// every test after this one in the file.
+			warn.mockRestore();
+		}
+	});
+
+	it('does not mark a recipient notified when the mail provider refused', async () => {
+		// The other half of the same change, stated directly rather than left implicit in the test
+		// above. A failed send must not start the throttle - otherwise one provider hiccup buys
+		// fifteen minutes of deliberate silence on top of a message that never arrived.
+		const { artist, guest, conversation } = await guestThread();
+		const server = createTestServer();
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+		try {
+			await server.executeOperation(
+				{
+					query: CREATE_MESSAGE,
+					variables: {
+						conversationId: String(conversation._id),
+						senderId: String(artist.id),
+						message: 'anyone there?',
+					},
+				},
+				asUser(artist),
+			);
+		} finally {
+			warn.mockRestore();
+		}
 
 		const stored = await Conversation.findById(conversation._id);
-		expect(readRowFor(stored, guest.id).lastNotifiedAt).toBeTruthy();
-		// And not for the sender, who needs no telling.
-		const senderRow = readRowFor(stored, artist.id);
-		expect(senderRow === null || !senderRow.lastNotifiedAt).toBe(true);
+		const row = readRowFor(stored, guest.id);
+		expect(row === null || !row.lastNotifiedAt).toBe(true);
 	});
 });
