@@ -37,7 +37,14 @@ const IBChatBox = ({ widget, conversation, setActiveMessages, messages, isInputD
 	const apollo = useApolloClient();
 	const refetchUnread = useCallback(() => {
 		apollo.refetchQueries({
-			include: ["GetUnreadMessageCount", "GetConversationsByMemberId"],
+			// Both section badges, because a message can land in either and this component is
+			// mounted in both the messenger and the project widget. Refetching only the messages
+			// count would leave the booking-request badge stale.
+			include: [
+				"GetUnreadMessageCount",
+				"GetUnreadBookingRequestCount",
+				"GetConversationsByMemberId",
+			],
 		});
 	}, [apollo]);
 

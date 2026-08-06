@@ -20,7 +20,12 @@ import "./artistBookingRequests.css";
 // exactly one place (the resolver). A list here would be a second copy, free to drift the first
 // time a status is added.
 const STATUS_FILTERS = {
-  open: { label: "Open", statuses: undefined },
+  pending: { label: "Pending", statuses: undefined },
+  // Booked requests live in Messenger now - their conversation graduated there the moment the work
+  // was scheduled. They stay listed here behind a filter because this page is also the funnel
+  // history, and consult_booked in particular is a live state: the consult happened, the session
+  // is still owed.
+  booked: { label: "Booked", statuses: ["consult_booked", "session_booked"] },
   closed: { label: "Declined & not booked", statuses: ["declined", "not_booked"] },
   all: {
     label: "All",
@@ -57,6 +62,10 @@ const GET_BOOKING_REQUESTS = gql`
       # ends the string - the same trap documented at the top of server/graphql/typeDefs.js.)
       conversation {
         id
+        # Cheap (one memoised summary for the whole list, see utils/loaders.js) and it makes the
+        # nav badge actionable: a count of 3 with no indication of WHICH three is a number that
+        # tells you to go hunting.
+        unreadCount
       }
     }
   }
@@ -136,7 +145,7 @@ const ArtistBookingRequests = () => {
   const [showReassignPicker, setShowReassignPicker] = useState(false);
   // The open request's messages, loaded on selection rather than arriving with the list.
   const [threadMessages, setThreadMessages] = useState([]);
-  const [statusFilter, setStatusFilter] = useState("open");
+  const [statusFilter, setStatusFilter] = useState("pending");
   const messageInput = useRef();
 
   const shopId = user.userInfo?.shop?.id;
@@ -165,6 +174,14 @@ const ArtistBookingRequests = () => {
   const [loadThread, { loading: loadingThread }] =
     MessengerService.fetchMessagesByConversationId();
 
+  // Opening a request reads its thread, exactly as opening a conversation does in the messenger.
+  // Without this the Booking Requests badge would count messages the artist is looking at and
+  // never come down - a badge that cannot be cleared is one people learn to ignore, which defeats
+  // the whole point of adding it.
+  const [markConversationRead] = useMutation(MessengerService.MARK_CONVERSATION_READ, {
+    refetchQueries: ["GetUnreadBookingRequestCount", "GetUnreadMessageCount"],
+  });
+
   const refreshThread = useCallback(() => {
     if (!selectedConversationId) {
       setThreadMessages([]);
@@ -187,6 +204,13 @@ const ArtistBookingRequests = () => {
         // to arrive is not necessarily the one on screen.
         if (!cancelled) {
           setThreadMessages(res?.data?.getMessagesByConversationId || []);
+          markConversationRead({
+            variables: { conversationId: selectedConversationId },
+          }).catch(() => {
+            // Swallowed on purpose, same as the messenger's: a failure here leaves a badge up,
+            // which is a wrong number rather than lost data, and an error over a notification
+            // count would be louder than the problem.
+          });
         }
       })
       .catch(() => {
@@ -197,7 +221,7 @@ const ArtistBookingRequests = () => {
     return () => {
       cancelled = true;
     };
-  }, [selectedConversationId, loadThread]);
+  }, [selectedConversationId, loadThread, markConversationRead]);
 
   const [createMessage, { loading: sending }] = useMutation(CREATE_MESSAGE, {
     onCompleted() {
@@ -367,9 +391,19 @@ const ArtistBookingRequests = () => {
         </select>
         {requests.length === 0 && (
           <div className="bookingRequestsEmpty">
-            {statusFilter === "open"
-              ? "No open booking requests."
-              : "Nothing here."}
+            {statusFilter === "pending" ? (
+              <>
+                Nothing waiting on you.
+                {/* An empty default list is SUCCESS, not an error, and it will be the normal state
+                    for a caught-up artist. Saying where the booked ones went stops it reading as
+                    "your requests disappeared". */}
+                <div className="bookingRequestsEmptyHint">
+                  Booked requests move to Messenger. Use the filter above to see them.
+                </div>
+              </>
+            ) : (
+              "Nothing here."
+            )}
           </div>
         )}
         {requests.map((req) => (
@@ -389,6 +423,12 @@ const ArtistBookingRequests = () => {
           >
             <div className="bookingRequestsListItemHeader">
               <span className="bookingRequestsListItemName">
+                {req.conversation?.unreadCount > 0 && (
+                  <span
+                    className="bookingRequestsUnreadDot"
+                    title={`${req.conversation.unreadCount} unread`}
+                  />
+                )}
                 {req.client?.firstName} {req.client?.lastName}
               </span>
               <span className="bookingRequestsListItemStatus">

@@ -10,6 +10,8 @@ const {
   canAccessConversation,
 } = require('../../utils/shop-membership');
 const { findOrCreateConversationForMembers } = require('../../utils/conversations');
+const { bookingInboxConversationIds } = require('../../utils/conversation-routing');
+const { toObjectIds } = require('../../utils/object-id');
 
 module.exports = {
   Query: {
@@ -17,7 +19,18 @@ module.exports = {
     // no id to tamper with and no ownership check to get wrong. Contrast getConversationsByMemberId
     // below, which takes a memberId and therefore needs a guard.
     getUnreadMessageCount: withAuth(async (_, args, context, info, user) => {
-      const summary = await context.loaders.unread.summaryFor(user.id);
+      // Scoped to what Messages actually shows. Counting every conversation here while the list
+      // below hides the booking-inbox ones would put a badge over an empty screen - the specific
+      // failure utils/conversation-routing.js exists to prevent.
+      const summary = await context.loaders.unread.summaryFor(user.id, 'messages');
+      return summary.total;
+    }),
+    // The same question for the other section, so a client replying to a request nobody has
+    // decided on yet still produces a visible signal somewhere. Without this, moving those threads
+    // out of Messages would make them silent, which is a strictly worse outcome than showing them
+    // in two places.
+    getUnreadBookingRequestCount: withAuth(async (_, args, context, info, user) => {
+      const summary = await context.loaders.unread.summaryFor(user.id, 'bookingInbox');
       return summary.total;
     }),
     // getConversations (every private thread on the platform) was deleted - see the note on
@@ -45,10 +58,17 @@ module.exports = {
         //
         // updatedAt is bumped on every new message (see mutations/messages.js), so this is real
         // activity order rather than creation order.
+        // Threads sitting in this caller's Booking Requests inbox are withheld here, so a
+        // conversation has one home rather than appearing in both places with only one of them
+        // able to act on it. Only for the artist whose inbox it is - the client has no Booking
+        // Requests page, and hiding it from them would strand the conversation entirely. See
+        // utils/conversation-routing.js.
+        const hidden = await bookingInboxConversationIds(memberId);
         const conversation = await Conversation.find({
             members: {
                 $in:[memberId]
-            }
+            },
+            ...(hidden.length > 0 ? { _id: { $nin: toObjectIds(hidden) } } : {}),
         }).sort({ updatedAt: -1 });
         return conversation;
       } catch (err) {

@@ -193,6 +193,22 @@ const MessengerService = (() => {
 			pollInterval: 60000,
 		});
 
+	// The other half of the split. Messages deliberately hides threads on booking requests nobody
+	// has booked yet, so without this badge a client replying to a pending request would produce no
+	// visible signal anywhere in the app - a regression on the duplication it replaced.
+	const _GET_UNREAD_BOOKING_REQUEST_COUNT = gql`
+		query GetUnreadBookingRequestCount {
+			getUnreadBookingRequestCount
+		}
+	`;
+	const _useUnreadBookingRequestCount = () =>
+		useQuery(_GET_UNREAD_BOOKING_REQUEST_COUNT, {
+			// Same reasoning as the messages count above: it moves because of something somebody
+			// else did, so there is nothing local to refetch off.
+			fetchPolicy: "cache-and-network",
+			pollInterval: 60000,
+		});
+
 	const _MARK_CONVERSATION_READ = gql`
 		mutation MarkConversationRead($conversationId: ID!) {
 			markConversationRead(conversationId: $conversationId) {
@@ -205,6 +221,8 @@ const MessengerService = (() => {
 	return {
 		GET_UNREAD_MESSAGE_COUNT: _GET_UNREAD_MESSAGE_COUNT,
 		useUnreadMessageCount: _useUnreadMessageCount,
+		GET_UNREAD_BOOKING_REQUEST_COUNT: _GET_UNREAD_BOOKING_REQUEST_COUNT,
+		useUnreadBookingRequestCount: _useUnreadBookingRequestCount,
 		MARK_CONVERSATION_READ: _MARK_CONVERSATION_READ,
 		fetchProjectConversation: _fetchProjectConversation,
 		fetchProjectConversationQuery: FETCH_PROJECT_CONVERSATION_QUERY,

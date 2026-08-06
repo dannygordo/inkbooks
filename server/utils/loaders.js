@@ -110,12 +110,44 @@ function createArtistShopIdLoader() {
  */
 function createUnreadLoader() {
   const { unreadSummaryForUser } = require('./conversation-reads');
+  const { bookingInboxConversationIds } = require('./conversation-routing');
   const cache = new Map();
+
+  // Resolved once per request and shared by both scoped summaries, so asking for the Messages
+  // badge and the Booking Requests badge in the same query costs one routing lookup, not two.
+  let routingPromise = null;
+  function bookingInboxIds(userId) {
+    if (!routingPromise) {
+      routingPromise = bookingInboxConversationIds(userId);
+    }
+    return routingPromise;
+  }
+
   return {
-    summaryFor(userId) {
-      const key = String(userId);
+    /**
+     * @param {string} userId
+     * @param {'messages'|'bookingInbox'|'all'} scope
+     *
+     * The scope is part of the CACHE KEY. It was previously keyed on userId alone, which was
+     * correct when there was one answer; with three it would hand whichever scope asked first to
+     * everyone after it, and the symptom would be a Booking Requests badge showing the Messages
+     * count. Silent, plausible, and wrong.
+     */
+    async summaryFor(userId, scope = 'all') {
+      const key = `${String(userId)}:${scope}`;
       if (!cache.has(key)) {
-        cache.set(key, unreadSummaryForUser(key));
+        cache.set(
+          key,
+          (async () => {
+            if (scope === 'all') {
+              return unreadSummaryForUser(userId);
+            }
+            const ids = await bookingInboxIds(userId);
+            return scope === 'bookingInbox'
+              ? unreadSummaryForUser(userId, { only: ids })
+              : unreadSummaryForUser(userId, { excluding: ids });
+          })(),
+        );
       }
       return cache.get(key);
     },

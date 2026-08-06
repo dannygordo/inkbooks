@@ -12,10 +12,35 @@ const BOOKING_REQUEST_STATUSES = [
   'not_booked',
 ];
 
-// The ones still live in the funnel. declined and not_booked are terminal - they never move again,
-// they accumulate forever, and loading them by default would grow the artist's inbox without bound.
-// They remain reachable by asking for them explicitly (see getBookingRequests).
-const OPEN_BOOKING_REQUEST_STATUSES = ['pending', 'consult_booked', 'session_booked'];
+// What the inbox loads by default: requests that have had no decision at all. Everything else is
+// reachable by asking for it, and nothing else belongs in a queue whose purpose is "these are
+// waiting on you".
+const INBOX_BOOKING_REQUEST_STATUSES = ['pending'];
+
+// Requests that turned into real work. THESE ARE THE ONES WHOSE CONVERSATION MOVES TO MESSAGES -
+// see utils/conversation-routing.js. A request that got booked is no longer a lead being triaged;
+// it's an ongoing client relationship, and it belongs where the rest of those live.
+//
+// WHY THESE ARE TWO STATUSES AND NOT ONE "booked":
+//
+// consult_booked is not a historical label, it is a LIVE STATE - "the consult is on the books and
+// a session is still owed". session_booked means the work itself is scheduled. Those are different
+// amounts of outstanding business, and collapsing them merges "you still have to close this" with
+// "this is closed".
+//
+// The transition guard says the same thing structurally: consult_booked is the only non-terminal
+// one of the pair (consult_booked -> session_booked | not_booked), and not_booked is only
+// meaningful after a consult actually happened. One shared value would make that guard
+// unexpressible.
+//
+// It also cannot be recovered later. resultingAppointmentId is overwritten when a consult converts
+// to a session (see convertBookingRequest), so the request stops pointing at the consult at all -
+// the status is the only surviving record that this one went through a consult first.
+const BOOKED_BOOKING_REQUEST_STATUSES = ['consult_booked', 'session_booked'];
+
+// Terminal, and different from each other on purpose: declined means turned away before a consult,
+// not_booked means the consult happened and the client went cold.
+const CLOSED_BOOKING_REQUEST_STATUSES = ['declined', 'not_booked'];
 
 // See PRODUCTION_ROADMAP.md's "Booking request & guest correspondence" section for the full
 // design this implements.
@@ -97,6 +122,8 @@ const BookingRequest = mongoose.model('BookingRequest', BookingRequestSchema);
 // Attached to the model rather than exported separately, so `require('../models/BookingRequest')`
 // keeps returning the model itself and every existing call site is untouched.
 BookingRequest.STATUSES = BOOKING_REQUEST_STATUSES;
-BookingRequest.OPEN_STATUSES = OPEN_BOOKING_REQUEST_STATUSES;
+BookingRequest.INBOX_STATUSES = INBOX_BOOKING_REQUEST_STATUSES;
+BookingRequest.BOOKED_STATUSES = BOOKED_BOOKING_REQUEST_STATUSES;
+BookingRequest.CLOSED_STATUSES = CLOSED_BOOKING_REQUEST_STATUSES;
 
 module.exports = BookingRequest;

@@ -764,19 +764,31 @@ describe('getBookingRequests', () => {
 			return response.body.singleResult;
 		}
 
-		it('leaves the closed ones out by default', async () => {
+		it('shows only pending by default', async () => {
+			// The inbox is a queue of things waiting on a decision, so anything decided - booked,
+			// declined or not booked - leaves it. A caught-up artist sees an empty list, and that
+			// is the intended resting state rather than a sign something is missing.
 			const { artistUser, server } = await artistWithOneOfEachStatus();
 			const { errors, data } = await fetch(server, artistUser);
 
 			expect(errors).toBeUndefined();
+			expect(data.getBookingRequests.map((r) => r.status)).toEqual(['pending']);
+		});
+
+		it('returns booked ones when asked, even though their threads moved to Messenger', async () => {
+			// The request stays listed here as funnel history; only its CONVERSATION graduates.
+			// Those are two different questions about the same record, which is why one is a
+			// status filter and the other is utils/conversation-routing.js.
+			const { artistUser, server } = await artistWithOneOfEachStatus();
+			const { data } = await fetch(server, artistUser, ['consult_booked', 'session_booked']);
+
 			expect(data.getBookingRequests.map((r) => r.status).sort()).toEqual([
 				'consult_booked',
-				'pending',
 				'session_booked',
 			]);
 		});
 
-		it('returns them when they are asked for by name', async () => {
+		it('returns the closed ones when they are asked for by name', async () => {
 			const { artistUser, server } = await artistWithOneOfEachStatus();
 			const { data } = await fetch(server, artistUser, ['declined', 'not_booked']);
 

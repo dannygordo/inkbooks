@@ -198,6 +198,11 @@ export default function Sidebar() {
 	// IBChatBox updates it immediately when the messenger itself is open.
 	const { data: unreadData } = MessengerService.useUnreadMessageCount();
 	const unreadMessageCount = unreadData?.getUnreadMessageCount || 0;
+	// Booking-request threads that Messenger deliberately doesn't show. These two counts are
+	// disjoint by construction - one query excludes exactly what the other includes - so together
+	// they still account for every unread message rather than double-counting any.
+	const { data: unreadBookingData } = MessengerService.useUnreadBookingRequestCount();
+	const unreadBookingRequestCount = unreadBookingData?.getUnreadBookingRequestCount || 0;
 
 	const [anchorEl, setAnchorEl] = useState(null);
 	const openProfile = Boolean(anchorEl);
@@ -801,7 +806,12 @@ export default function Sidebar() {
 									justifyContent: "center",
 								}}
 							>
-								<InboxIcon />
+								{/* On the icon, same as Messenger's - it has to survive the drawer
+								    collapsing, which is the moment the label disappears and the
+								    badge is the only thing left saying somebody is waiting. */}
+								<Badge badgeContent={unreadBookingRequestCount} color="error">
+									<InboxIcon />
+								</Badge>
 							</ListItemIcon>
 							<ListItemText
 								primary="Booking Requests"

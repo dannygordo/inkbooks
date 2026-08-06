@@ -320,7 +320,11 @@ module.exports = {
       if (!caller) {
         return 0;
       }
-      const summary = await context.loaders.unread.summaryFor(caller.id);
+      // Unscoped ('all') deliberately. This answers about ONE conversation that the caller has
+      // already been handed, so it must be right regardless of which section that conversation
+      // belongs to - the booking-request list needs a real count for its threads just as the
+      // messenger does. The section badges are the scoped ones; this is not a badge.
+      const summary = await context.loaders.unread.summaryFor(caller.id, 'all');
       return summary.byConversationId.get(String(conversation._id)) || 0;
     },
   },

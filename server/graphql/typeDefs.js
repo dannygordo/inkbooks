@@ -940,6 +940,10 @@ module.exports = gql`
     getInbox(includeRead: Boolean): InboxSummary!
     getNotificationSettings: NotificationSettings!
     getUnreadMessageCount: Int!
+    # Unread messages on booking requests that have NOT been booked yet - the ones whose threads
+    # Messages deliberately doesn't show. Without this the split would make a client's reply on a
+    # pending request silent everywhere, which is worse than the duplication it replaced.
+    getUnreadBookingRequestCount: Int!
     getConversation(conversationId: ID!): Conversation
     getConversationsByShopId(shopId: ID!): [Conversation!]
     getProjectConversation(artistId: ID!, clientId: ID!): Conversation

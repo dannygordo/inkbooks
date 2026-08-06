@@ -90,7 +90,7 @@ module.exports = {
       return BookingRequest.find({
         artistId,
         source: 'public_form',
-        status: { $in: requested.length > 0 ? requested : BookingRequest.OPEN_STATUSES },
+        status: { $in: requested.length > 0 ? requested : BookingRequest.INBOX_STATUSES },
       }).sort({ createdAt: -1 });
     }),
     getBookingRequest: withAuth(async (_, { bookingRequestId }, context, info, user) => {

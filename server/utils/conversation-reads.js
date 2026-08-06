@@ -66,10 +66,23 @@ async function unreadCountForConversation(conversation, userId) {
  *
  * Returns { total, byConversationId: Map<string, number> }.
  */
-async function unreadSummaryForUser(userId) {
-  const conversations = await Conversation.find({ members: { $in: [String(userId)] } }).select(
+async function unreadSummaryForUser(userId, { only = null, excluding = null } = {}) {
+  let conversations = await Conversation.find({ members: { $in: [String(userId)] } }).select(
     '_id reads',
   );
+
+  // Scoped by the caller rather than by a rule written here, because "which conversations count"
+  // is a routing question and routing has exactly one definition (utils/conversation-routing.js).
+  // Encoding it here as well is how a badge ends up disagreeing with the list it labels.
+  if (only) {
+    const keep = new Set(only.map(String));
+    conversations = conversations.filter((c) => keep.has(String(c._id)));
+  }
+  if (excluding) {
+    const drop = new Set(excluding.map(String));
+    conversations = conversations.filter((c) => !drop.has(String(c._id)));
+  }
+
   if (conversations.length === 0) {
     return { total: 0, byConversationId: new Map() };
   }

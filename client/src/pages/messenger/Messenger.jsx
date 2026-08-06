@@ -41,7 +41,11 @@ const Messenger = () => {
 		// mutation, so it has to be told. By operation name - see the same reasoning in
 		// AppointmentService.CALENDAR_REFETCH_QUERIES, where naming variables instead is what made
 		// the calendar stop refreshing.
-		refetchQueries: ["GetUnreadMessageCount", "GetConversationsByMemberId"],
+		refetchQueries: [
+			"GetUnreadMessageCount",
+			"GetUnreadBookingRequestCount",
+			"GetConversationsByMemberId",
+		],
 	});
 
 	const conversations = useMemo(
