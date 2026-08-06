@@ -1,10 +1,11 @@
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { gql, useMutation, useQuery } from "@apollo/client";
 import { CircularProgress } from "@mui/material";
 import moment from "moment";
 import { useAuth } from "../../context/auth";
 import { ArtistService } from "../../services/ArtistService";
+import MessengerService from "../../services/MessengerService";
 import IBDateTimePicker from "../../components/inputs/IBDateTimePicker";
 import BookSessionDatesForm from "../../components/booking/BookSessionDatesForm";
 import { prettyMessageTime, fullMessageTime } from "../../utils/messageTime";
@@ -31,14 +32,15 @@ const GET_BOOKING_REQUESTS = gql`
         email
         phone
       }
+      # No messages field here, deliberately - see the matching note in MessengerService. Pulling
+      # every message of every request to render a list of names and one-line descriptions is the
+      # same over-fetch the messenger had, and this list refetches on every convert, reassign and
+      # reply. The open thread is fetched on its own below.
+      #
+      # (No backticks in this comment. It lives inside a JS template literal, where a backtick
+      # ends the string - the same trap documented at the top of server/graphql/typeDefs.js.)
       conversation {
         id
-        messages {
-          id
-          senderId
-          message
-          createdAt
-        }
       }
     }
   }
@@ -116,6 +118,8 @@ const ArtistBookingRequests = () => {
   // real date/time picker instead of a plain native input).
   const [consultDate, setConsultDate] = useState(moment());
   const [showReassignPicker, setShowReassignPicker] = useState(false);
+  // The open request's messages, loaded on selection rather than arriving with the list.
+  const [threadMessages, setThreadMessages] = useState([]);
   const messageInput = useRef();
 
   const shopId = user.userInfo?.shop?.id;
@@ -132,11 +136,60 @@ const ArtistBookingRequests = () => {
     (a) => String(a.user?.id) !== String(user.id)
   );
 
+  // Which request is open, resolved before any early return, because the thread-loading effect
+  // below is a hook and hooks cannot live after a conditional return.
+  const requests = data?.getBookingRequests || [];
+  const selected = requests.find((r) => r.id === selectedId) || requests[0];
+  const selectedConversationId = selected?.conversation?.id || null;
+
+  // The same query the messenger uses, rather than a second one shaped slightly differently.
+  // Two definitions of "fetch this thread" is how the two message-notification paths ended up
+  // with different email copy and different throttles.
+  const [loadThread, { loading: loadingThread }] =
+    MessengerService.fetchMessagesByConversationId();
+
+  const refreshThread = useCallback(() => {
+    if (!selectedConversationId) {
+      setThreadMessages([]);
+      return Promise.resolve();
+    }
+    return loadThread({ variables: { conversationId: selectedConversationId } })
+      .then((res) => setThreadMessages(res?.data?.getMessagesByConversationId || []))
+      .catch(() => setThreadMessages([]));
+  }, [loadThread, selectedConversationId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!selectedConversationId) {
+      setThreadMessages([]);
+      return undefined;
+    }
+    loadThread({ variables: { conversationId: selectedConversationId } })
+      .then((res) => {
+        // Clicking quickly through several requests can land responses out of order, and the last
+        // to arrive is not necessarily the one on screen.
+        if (!cancelled) {
+          setThreadMessages(res?.data?.getMessagesByConversationId || []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setThreadMessages([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedConversationId, loadThread]);
+
   const [createMessage, { loading: sending }] = useMutation(CREATE_MESSAGE, {
     onCompleted() {
       messageInput.current.value = "";
       setReplyError(null);
-      refetch();
+      // Reloads the THREAD, not the whole request list. The list has nothing on it that a new
+      // message changes, and refetching it was previously how the new message appeared at all -
+      // which is precisely why every reply used to re-download every thread the artist had.
+      refreshThread();
     },
     onError(err) {
       setReplyError(err.graphQLErrors?.[0]?.message || err.message);
@@ -183,9 +236,6 @@ const ArtistBookingRequests = () => {
       </div>
     );
   }
-
-  const requests = data?.getBookingRequests || [];
-  const selected = requests.find((r) => r.id === selectedId) || requests[0];
 
   const handleReply = (e) => {
     e.preventDefault();
@@ -461,7 +511,10 @@ const ArtistBookingRequests = () => {
             {convertError && <div className="bookingRequestError">{convertError}</div>}
 
             <div className="bookingRequestConversation">
-              {(selected.conversation?.messages || []).map((msg) => (
+              {loadingThread && threadMessages.length === 0 && (
+                <div className="bookingRequestThreadLoading">Loading conversation...</div>
+              )}
+              {threadMessages.map((msg) => (
                 <div
                   key={msg.id}
                   className={

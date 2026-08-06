@@ -53,11 +53,45 @@ function loadModule(spec) {
 	return moduleCache.get(spec);
 }
 
+// Does the file PARSE?
+//
+// Added after this script cheerfully reported "every import resolves" for a file that could not be
+// parsed at all. The cause was a backtick inside a GraphQL `#` comment within a gql`...` template
+// literal - a backtick ends the template, so everything after it was reinterpreted as JavaScript.
+// That is the sixth instance of this exact mistake in this repo, and the reason
+// server/graphql/typeDefs.js opens with a warning about it and the pre-commit hook parses it.
+//
+// The regex scan below is happy to read a syntactically broken file, which makes a green result
+// actively misleading: the one screen that would crash is the one this script just approved.
+//
+// @babel/parser rather than a new dependency - it arrives with @vitejs/plugin-react, and unlike
+// esbuild it is pure JavaScript, so it runs anywhere rather than needing the right platform binary.
+// Guarded anyway: a missing parser should weaken this script, not break it.
+let parseFile = null;
+try {
+	const { parse } = require("@babel/parser");
+	parseFile = (source) => {
+		parse(source, { sourceType: "module", plugins: ["jsx"] });
+	};
+} catch {
+	console.warn("[check-imports] @babel/parser unavailable - skipping the syntax pass.");
+}
+
 const failures = [];
 
 for (const file of walk(SRC)) {
 	const rel = file.replace(root + "/", "");
 	const src = readFileSync(file, "utf8");
+
+	if (parseFile) {
+		try {
+			parseFile(src, file);
+		} catch (err) {
+			failures.push(`${rel}: does not parse - ${err.message}`);
+			// No point scanning imports in a file the parser couldn't read.
+			continue;
+		}
+	}
 	// Import statements only - not dynamic import() and not require().
 	for (const m of src.matchAll(/^import\s+([^'"]*?)\s*from\s*["']([^"']+)["']/gm)) {
 		const [, clause, spec] = m;

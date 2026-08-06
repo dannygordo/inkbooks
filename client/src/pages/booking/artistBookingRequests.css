@@ -259,6 +259,12 @@
     padding: 0 4px;
 }
 
+.bookingRequestThreadLoading {
+    padding: 12px 4px;
+    color: #888;
+    font-size: 13px;
+}
+
 .guestMessageBubble {
     max-width: 75%;
     padding: 10px 14px;
