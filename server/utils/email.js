@@ -83,6 +83,56 @@ function buildGuestConversationLink(guestToken) {
   return `${Constants.URLS.INKBOOKS_WEBAPP}/booking/${guestToken}`;
 }
 
+// Subject lines get cut off around here in most mail clients. Past this the snippet is costing
+// space and showing nobody anything.
+const SUBJECT_SNIPPET_MAX = 60;
+
+/**
+ * Turns a message body into something safe and readable to put in a Subject header.
+ *
+ * TWO JOBS, AND THE SECOND ONE IS A SECURITY BOUNDARY.
+ *
+ * Readability: every message notification used the same fixed subject, so mail clients that thread
+ * by subject - Gmail among them - collapsed a whole back-and-forth into one conversation. The
+ * second and third emails looked to the recipient exactly like no email had arrived, which is
+ * precisely how this was reported.
+ *
+ * Safety: this text comes from whoever typed the message, and it is going into a MAIL HEADER. A
+ * newline in a header value ends that header and begins another, which is how a stranger writing
+ * "hi\nBcc: someone@else" gets to add recipients to your mail. Collapsing all whitespace kills
+ * that outright rather than relying on the provider to catch it - and it has to happen here, in
+ * the one function every subject goes through, not at each call site.
+ */
+/**
+ * The subject for a new-message notification: "Cass Brown: Tuesday at 2 works".
+ *
+ * Extracted so the composition is testable on its own. It was briefly inline in both send
+ * functions, which meant the only way to check it was to assert on a live send - and sendEmail()
+ * no-ops without mail credentials, so that test would have passed or failed based on the machine
+ * rather than the code.
+ */
+function subjectForNewMessage(senderName, messagePreview, fallback) {
+  const snippet = snippetForSubject(messagePreview);
+  return snippet ? `${senderName}: ${snippet}` : fallback;
+}
+
+function snippetForSubject(text, max = SUBJECT_SNIPPET_MAX) {
+  // \s covers \r, \n, tabs and unicode separators in one pass. Nothing user-supplied reaches a
+  // header with a line break in it.
+  const flat = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!flat) {
+    return '';
+  }
+  if (flat.length <= max) {
+    return flat;
+  }
+  const cut = flat.slice(0, max);
+  const lastSpace = cut.lastIndexOf(' ');
+  // Break on a word if one is reasonably near the end; otherwise a single long token would get
+  // chopped back to almost nothing.
+  return `${lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut}…`;
+}
+
 async function sendBookingRequestReceivedEmail({ to, firstName, artistName, guestToken }) {
   const link = buildGuestConversationLink(guestToken);
   return sendEmail({
@@ -99,11 +149,23 @@ async function sendBookingRequestReceivedEmail({ to, firstName, artistName, gues
   });
 }
 
-async function sendNewMessageNotificationToGuest({ to, firstName, artistName, guestToken }) {
+async function sendNewMessageNotificationToGuest({
+  to,
+  firstName,
+  artistName,
+  guestToken,
+  messagePreview,
+}) {
   const link = buildGuestConversationLink(guestToken);
   return sendEmail({
     to,
-    subject: `${artistName} replied to your request`,
+    // Falls back to the old fixed wording when there's no usable text - an image-only or
+    // whitespace message shouldn't produce a subject ending in a bare colon.
+    subject: subjectForNewMessage(
+      artistName,
+      messagePreview,
+      `${artistName} replied to your request`,
+    ),
     htmlBody:
       `<p>Hi ${firstName},</p><p>${artistName} sent you a new message. View it and reply here:</p>` +
       `<p><a href="${link}">${link}</a></p>`,
@@ -127,13 +189,19 @@ async function sendNewBookingRequestNotificationToArtist({ to, artistFirstName, 
 // conversationId is optional but should always be passed - it turns "log in to InkBooks and find
 // it" into a link that opens the actual thread. The Messenger reads ?conversation= (see
 // pages/messenger/Messenger.jsx); without one this still sends, it just lands on the message list.
-async function sendNewMessageNotificationToArtist({ to, artistFirstName, clientName, conversationId }) {
+async function sendNewMessageNotificationToArtist({
+  to,
+  artistFirstName,
+  clientName,
+  conversationId,
+  messagePreview,
+}) {
   const link = conversationId
     ? `${Constants.URLS.INKBOOKS_WEBAPP}/messenger?conversation=${conversationId}`
     : `${Constants.URLS.INKBOOKS_WEBAPP}/messenger`;
   return sendEmail({
     to,
-    subject: `New message from ${clientName}`,
+    subject: subjectForNewMessage(clientName, messagePreview, `New message from ${clientName}`),
     htmlBody:
       `<p>Hi ${artistFirstName},</p><p>${clientName} sent you a new message. Read it and reply here:</p>` +
       `<p><a href="${link}">${link}</a></p>`,
@@ -234,6 +302,11 @@ async function sendShopCutConfirmedNotificationToArtist({ to, artistFirstName, s
 }
 
 module.exports = {
+  // Exported for its own tests. It is a header-safety boundary as much as a formatting helper,
+  // and that is not something to verify only indirectly through whatever a send happens to produce.
+  snippetForSubject,
+  subjectForNewMessage,
+  SUBJECT_SNIPPET_MAX,
   sendAccountInviteEmail,
   sendPasswordResetEmail,
   buildSetPasswordLink,

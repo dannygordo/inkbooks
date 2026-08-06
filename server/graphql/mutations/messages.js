@@ -74,7 +74,11 @@ module.exports = {
       // can see what actually happened.
       // Every outcome, not just failures - see logNotifyOutcomes on why logging only 'failed'
       // hid the two outcomes people actually report.
-      logNotifyOutcomes('messages', conversationId, await notifyNewMessage({ conversationId, senderId }));
+      logNotifyOutcomes(
+        'messages',
+        conversationId,
+        await notifyNewMessage({ conversationId, senderId, messageText: message }),
+      );
 
       return msg;
     }),

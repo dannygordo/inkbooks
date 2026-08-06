@@ -76,6 +76,10 @@ function shouldNotify(conversation, recipientId, now = new Date()) {
 async function notifyNewMessage({
   conversationId,
   senderId,
+  // The message text, used only for the subject line. Optional - a caller that doesn't pass it
+  // gets the old fixed wording rather than an error, since a missing preview should degrade the
+  // email, not lose it.
+  messageText,
   // Injected so this can be tested at all.
   //
   // sendEmail() no-ops and returns null when RESEND_API_KEY isn't set, so a test asserting "the
@@ -162,12 +166,14 @@ async function notifyNewMessage({
             firstName: recipient.firstName,
             artistName: senderName,
             guestToken,
+            messagePreview: messageText,
           })
         : await sendToArtist({
             to: recipient.email,
             artistFirstName: recipient.firstName,
             clientName: senderName,
             conversationId: String(conversationId),
+            messagePreview: messageText,
           });
 
       // sendEmail() returns null rather than throwing when the provider rejects the message or

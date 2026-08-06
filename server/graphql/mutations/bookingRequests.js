@@ -228,6 +228,7 @@ module.exports = {
       await notifyNewMessage({
         conversationId: bookingRequest.conversationId,
         senderId: user.id,
+        messageText: message,
       }),
     );
 
