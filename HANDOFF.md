@@ -154,8 +154,14 @@ executable bit, git skips it with a hint on stderr rather than an error — whic
    leave that session active. The error comes from Square's own hosted page, so InkBooks never sees
    it and cannot explain it for you.
 
-   Confirmed reaching that point: the authorization URL, the application id, the scopes, the
-   redirect and the signed state all pass Square's own validation.
+   **Any account connected before 2026-08-11 must disconnect and reconnect.** `PAYMENTS_WRITE` was
+   added to the requested scopes only once client charges moved onto the artist's own connection —
+   before that the list was written for the Invoices-only flow. Scopes are granted at authorization
+   and a refresh returns the original set, so there is no way to gain one without reconnecting. A
+   charge on such a token fails with a message saying exactly that.
+
+   Confirmed reaching that point: the authorization URL, the application id, the redirect and the
+   signed state all pass Square's own validation.
 2. **Drop the old `Shop` Square fields.** Once the migration has run and a charge has worked, delete
    the seven now-unread `square*` fields from stored shop documents. Deliberately left in place for
    one deploy — see M9.

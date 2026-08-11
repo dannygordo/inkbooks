@@ -42,18 +42,33 @@ function getAppCredentials() {
   return { applicationId, applicationSecret };
 }
 
-// Minimum scopes for the Invoices-only flow this feature uses - deliberately does NOT include
-// PAYMENTS_WRITE_ADDITIONAL_RECIPIENTS, since InkBooks never touches the money here (see the
-// design discussion in PRODUCTION_ROADMAP.md - that permission is only needed for the automatic
-// app_fee_allocations split, which was decided against in favor of this ledger + Invoices model).
+// The scopes a connected seller has to grant.
+//
+// PAYMENTS_WRITE is what lets an artist's own account CHARGE A CARD. It was missing: this list was
+// written for the Invoices-only flow, back when the only thing an OAuth token did was raise a
+// shop-cut invoice and card charges went through a separate platform sandbox token. Once client
+// charges moved onto the artist's own connection (DECISIONS.md M9), the token needed a permission
+// nobody had asked the seller for, and Square refused at charge time with "The merchant has not
+// given your application sufficient permissions".
+//
+// Still deliberately absent: PAYMENTS_WRITE_ADDITIONAL_RECIPIENTS. That is a different permission,
+// needed only for Square's automatic app_fee_allocations split, which was decided against in favour
+// of the ledger + Invoices model (see PRODUCTION_ROADMAP.md). InkBooks never takes a share of a
+// payment as it passes through.
+//
+// ADDING A SCOPE DOES NOT UPGRADE AN EXISTING TOKEN. Scopes are granted by the seller at
+// authorization and a refresh returns the same set - so every account connected before this line
+// changed has to disconnect and reconnect. See getValidAccessToken's caller for the error that
+// says so.
 const OAUTH_SCOPES = [
+  'PAYMENTS_WRITE',
+  'PAYMENTS_READ',
   'INVOICES_WRITE',
   'INVOICES_READ',
   'ORDERS_WRITE',
   'ORDERS_READ',
   'CUSTOMERS_WRITE',
   'CUSTOMERS_READ',
-  'PAYMENTS_READ',
   'MERCHANT_PROFILE_READ',
 ];
 
@@ -420,6 +435,26 @@ const SQUARE_API_VERSION = '2026-07-15';
  *
  * Throws (with .status/.squareErrors set, same shape as squareFetch's errors) on failure.
  */
+/**
+ * Is this Square's "you were never granted that permission" refusal?
+ *
+ * Matched on the error CODE where Square gives one, with the message as a fallback - Square has
+ * used more than one shape for this over the years, and a scope failure that silently stops being
+ * recognised would put us back to showing the artist a message they cannot act on.
+ */
+function isInsufficientScopeError(status, data) {
+  if (status !== 401 && status !== 403) {
+    return false;
+  }
+  const errors = (data && data.errors) || [];
+  return errors.some(
+    (e) =>
+      e.code === 'INSUFFICIENT_SCOPES' ||
+      e.code === 'FORBIDDEN' ||
+      /sufficient permissions|scopes?/i.test(e.detail || ''),
+  );
+}
+
 async function createPaymentForAccount({ account, sourceId, amountCents, idempotencyKey, note }) {
   if (!account || !account.locationId) {
     throw new Error('This Square connection is missing a location id - reconnect Square.');
@@ -449,6 +484,22 @@ async function createPaymentForAccount({ account, sourceId, amountCents, idempot
     const message =
       (data && data.errors && data.errors.map((e) => e.detail).join('; ')) ||
       `Square Payments API request failed with status ${response.status}`;
+
+    // A CONNECTION THAT PREDATES PAYMENTS_WRITE. Square's own wording - "The merchant has not given
+    // your application sufficient permissions" - is accurate and gives the artist nothing to do:
+    // they authorized this connection themselves and nothing in InkBooks looks broken. The fix is
+    // non-obvious and one-time, because a refresh returns the scopes originally granted rather than
+    // the ones now requested, so the only way to gain one is to disconnect and connect again.
+    if (isInsufficientScopeError(response.status, data)) {
+      const error = new Error(
+        'This Square connection was authorized before card payments were supported. Disconnect ' +
+          'and reconnect Square in Settings to grant permission to take payments.',
+      );
+      error.squareErrors = data && data.errors;
+      error.status = 400;
+      throw error;
+    }
+
     const error = new Error(message);
     error.squareErrors = data && data.errors;
     error.status = response.status;

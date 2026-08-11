@@ -96,3 +96,68 @@ describe('verifyWebhookSignature', () => {
 		).toThrow(/SQUARE_WEBHOOK_SIGNATURE_KEY/);
 	});
 });
+
+/**
+ * The scopes the authorization URL asks a seller to grant.
+ *
+ * PAYMENTS_WRITE was missing, and its absence was invisible until a real seller was connected: the
+ * list was written for the Invoices-only flow, when card charges went through a separate platform
+ * token rather than the artist's own connection (DECISIONS.md M9). Square refused the first real
+ * charge with "The merchant has not given your application sufficient permissions".
+ *
+ * Asserted on the URL rather than on the exported constant, because the URL is what the seller
+ * actually consents to - a scope in the array that never reaches the query string grants nothing.
+ */
+describe('OAuth scopes', () => {
+	const SQUARE_ENV = {
+		SQUARE_APPLICATION_ID: 'test-square-application-id',
+		SQUARE_APPLICATION_SECRET: 'test-square-application-secret',
+		SQUARE_OAUTH_REDIRECT_URL: 'https://api.inkbooks.test/square/oauth/callback',
+	};
+	let saved;
+
+	beforeEach(() => {
+		saved = {};
+		for (const [key, value] of Object.entries(SQUARE_ENV)) {
+			saved[key] = process.env[key];
+			process.env[key] = value;
+		}
+	});
+
+	afterEach(() => {
+		for (const [key, value] of Object.entries(saved)) {
+			if (value === undefined) delete process.env[key];
+			else process.env[key] = value;
+		}
+	});
+
+	function requestedScopes() {
+		const url = new URL(square.buildAuthorizationUrl('state-token'));
+		return url.searchParams.get('scope').split(' ');
+	}
+
+	// THE ONE THAT WAS MISSING.
+	it('asks for PAYMENTS_WRITE, without which no card can be charged', () => {
+		expect(requestedScopes()).toContain('PAYMENTS_WRITE');
+	});
+
+	it('asks for the invoice and order scopes the shop-cut ledger needs', () => {
+		const scopes = requestedScopes();
+		expect(scopes).toContain('INVOICES_WRITE');
+		expect(scopes).toContain('ORDERS_WRITE');
+		expect(scopes).toContain('CUSTOMERS_WRITE');
+	});
+
+	// A different permission entirely, for Square's automatic app_fee_allocations split - decided
+	// against in favour of the ledger + Invoices model. InkBooks never takes a share of a payment
+	// as it passes through, and asking for the permission to would say otherwise on the consent
+	// screen the seller reads.
+	it('does NOT ask for PAYMENTS_WRITE_ADDITIONAL_RECIPIENTS', () => {
+		expect(requestedScopes()).not.toContain('PAYMENTS_WRITE_ADDITIONAL_RECIPIENTS');
+	});
+
+	it('carries the state token through unchanged', () => {
+		const url = new URL(square.buildAuthorizationUrl('state-token'));
+		expect(url.searchParams.get('state')).toBe('state-token');
+	});
+});
