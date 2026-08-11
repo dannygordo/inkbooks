@@ -228,18 +228,31 @@ describe('validation', () => {
 });
 
 describe('non-artists', () => {
-	// Shop staff have no Artist profile and no shop cut - there is nothing here for them to own.
-	it('refuses a staff account with no shop of its own to configure', async () => {
-		const { user: staffUser } = await createStaffUser();
+	/**
+	 * Shop staff - a receptionist - are SHOP_STAFF with no Artist profile and no
+	 * ArtistShopConnection. Worth being precise about HOW they are refused, because it is not a
+	 * role check: getActiveShopIdForArtist finds no membership, so they fall into the independent
+	 * branch, and the Artist lookup there finds nothing. "Are you an artist" is answered by
+	 * whether an Artist row exists, the same rule mutations/artists.js settled on after a token
+	 * field that was never on the token rejected every caller for months.
+	 */
+	it('refuses a staff account, which owns no pricing of its own', async () => {
+		const { shop } = await createShopAdminUser();
+		const { user: staffUser } = await createStaffUser(shop.id);
 
-		const { errors } = (
+		const { data, errors } = (
 			await run(UPDATE_PRICING, staffUser, {
 				taxRateBasisPoints: 940,
 				squareFeeOffsetCents: 600,
 			})
 		).body.singleResult;
 
+		expect(data).toBeNull();
 		expect(errors).toBeDefined();
+
+		// And nothing was written to the shop they work at.
+		const storedShop = await Shop.findById(shop._id);
+		expect(storedShop.taxRateBasisPoints || 0).toBe(0);
 	});
 });
 
