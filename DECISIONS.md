@@ -18,15 +18,18 @@ Anything marked **OPEN** has not been decided. Do not guess at it.
 
 A shop has different artists at different rates. The percentage resolves in this order:
 
-1. `ArtistShopConnection.shopCutPercent` for that artist at that shop
-2. `Shop.shopCutPercent` as the default
-3. `0` when the artist has no shop
+1. `ShopCutRate` — the newest row for this artist/shop with `effectiveFrom` at or before the date
+   the work happened (M7)
+2. `ArtistShopConnection.shopCutPercent` — the pre-history fallback, for connections that predate
+   dated rates
+3. `Shop.shopCutPercent` as the default
+4. `0` when the artist has no shop
 
 The override is checked with a null test, **not** a falsy test. `0` is a meaningful configured value
 ("this guest artist owes us nothing") and `||` would silently fall it through to the shop's rate.
 
-*Already implemented* in `server/utils/shop-cut.js`. The shop-level field is the default for new
-connections, not the authority.
+Implemented in `server/utils/shop-cut.js` as `resolveShopCutPercentAt`. The shop-level field is a
+default, not the authority.
 
 ### M2. The cut applies to the pre-tax session subtotal only
 
@@ -131,13 +134,17 @@ Two things follow, and the second is the one that bites:
 - The rate needs its own effective-dated history — `(artist, shop, effectiveFrom, percent)` —
   resolved by taking the latest `effectiveFrom` at or before the appointment date. Storing one
   current number per interval only handles a change that coincides with a reconnect.
-- `applyShopCut` recomputes on save. Today it reads the *currently active* connection, so editing a
-  past session's subtotal after a rate change would silently reprice the cut at the new rate.
-  Resolving by appointment date fixes this by construction: the appointment's date doesn't move, so
-  the rate it resolves can't either.
+- `applyShopCut` recomputes on save. It used to read the *currently active* connection, so editing a
+  past session's subtotal after a rate change would silently reprice the cut at the new rate. It now
+  passes `appointment.appointmentDate`, which fixes this by construction: the appointment's date
+  doesn't move, so the rate it resolves can't either.
 
-`Appointment.shopCutPercentApplied` already records what was actually used on each row, so existing
-payouts are safe today. What is missing is making the resolution itself date-aware.
+`ShopCutRate` rows are **append-only** — `setShopCutRate` never edits an existing one. That is what
+makes "forward only" a property of the data rather than a rule someone has to remember, since there
+is no code path that rewrites history.
+
+`Appointment.shopCutPercentApplied` still records what was actually used on each row, which is what
+made existing payouts safe before any of this.
 
 Rejected: freezing the cut permanently once written. That would also block legitimate recomputation
 — correcting a mistyped subtotal on work performed last week should re-derive the cut at *last
@@ -161,15 +168,21 @@ about who contributed.
 
 ### A2. Membership is an interval, not a flag
 
-`ArtistShopConnection` currently has a unique index on `{artistId, shopId}` and **reuses one document
-per pair across disconnect/reconnect cycles** — so a reconnect overwrites the previous period and
-there is no history. Any artist who has already disconnected and reconnected has lost that boundary;
-there is nothing to migrate.
+Implemented **on `ArtistShopConnection` itself** — `startedAt` / `endedAt`, one row per period —
+rather than as a new `ShopMembership` model. A parallel model would have been a second source of
+truth for the same fact, and every shop-scoped query already reads this one.
 
-The shop-cut rate is stored **on the interval**, so historical payouts stay accurate when the split
-changes on reconnect. `Appointment.shopCutPercentApplied` already records the rate used on each row,
-which is the record that matters for a payout; the interval adds auditability and correct
-computation for new work.
+It used to carry a unique index on `{artistId, shopId}` and **reuse one document per pair across
+disconnect/reconnect cycles**, so a reconnect overwrote the previous period. Any artist who has
+already disconnected and reconnected has lost that boundary; there is nothing to migrate. New
+intervals start from the change; current state becomes the open interval.
+
+That index is now partial, on open intervals only: never two *current* memberships, any number of
+closed ones. It cannot simply be dropped — "an artist works at one shop at a time" is a real rule,
+and without an index it survives only as long as nobody races it.
+
+The **rate** is not stored on the interval. See M7: a rate can change without a reconnect, so it
+needs its own history (`ShopCutRate`).
 
 ### A3. An unaffiliated artist sees no shop-cut UI at all
 

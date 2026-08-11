@@ -95,20 +95,42 @@ module.exports = {
       });
     }
 
-    // Confirmed (or nothing to leave). Ending the old connection first means there is never a
-    // moment where two are active, even if the second write fails.
+    // Confirmed (or nothing to leave). CLOSING the old interval first means there is never a moment
+    // where two are open, even if the second write fails - and the partial unique index on open
+    // intervals would reject the second write if there were.
+    const now = new Date();
     if (existingElsewhere.length > 0) {
       await ArtistShopConnection.updateMany(
-        { artistId: data.artistId, status: 'active', shopId: { $ne: data.shopId } },
-        { $set: { status: 'disconnected', disconnectedAt: new Date() } },
+        { artistId: data.artistId, endedAt: null, shopId: { $ne: data.shopId } },
+        { $set: { status: 'disconnected', endedAt: now, disconnectedAt: now } },
       );
     }
 
-    const connection = await ArtistShopConnection.findOneAndUpdate(
-      { artistId: data.artistId, shopId: data.shopId },
-      { artistId: data.artistId, shopId: data.shopId, status: 'active', disconnectedAt: null },
-      { new: true, upsert: true, setDefaultsOnInsert: true },
-    );
+    // A NEW ROW, not an upsert onto the old one.
+    //
+    // This used to findOneAndUpdate on { artistId, shopId } and flip the status back to 'active',
+    // which reused a single document across every disconnect/reconnect cycle and overwrote the
+    // previous period. An artist who left in March and came back in July had no record that the
+    // gap ever existed - so "was this artist here when that session happened" was unanswerable, and
+    // both the shop-cut rule (DECISIONS.md A1) and the visibility rule (S1) depend on that question.
+    //
+    // Guarded against double-connect: if an interval for this pair is already open, reuse it rather
+    // than opening a second. That is not the reconnect case - it is the same membership, and
+    // opening a second row would violate the partial unique index anyway.
+    let connection = await ArtistShopConnection.findOne({
+      artistId: data.artistId,
+      shopId: data.shopId,
+      endedAt: null,
+    });
+    if (!connection) {
+      connection = await new ArtistShopConnection({
+        artistId: data.artistId,
+        shopId: data.shopId,
+        status: 'active',
+        startedAt: now,
+        endedAt: null,
+      }).save();
+    }
 
     // First time this artist is actually affiliated with a shop, their tagColor may still be the
     // purple "no shop" default from registration (or, for an account that predates this fix, the
@@ -156,8 +178,12 @@ module.exports = {
         errors: { shopId: 'No connection exists between this artist and shop' },
       });
     }
+    // Closes the interval. endedAt is what every date-aware query reads; status and disconnectedAt
+    // are written alongside for the readers that predate the interval (see the model).
+    const disconnectedNow = new Date();
     connection.status = 'disconnected';
-    connection.disconnectedAt = new Date();
+    connection.endedAt = disconnectedNow;
+    connection.disconnectedAt = disconnectedNow;
     await connection.save();
 
     // The higher-stakes half of the pair. An artist leaving changes who is owed what, so the shop

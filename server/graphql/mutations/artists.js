@@ -94,11 +94,20 @@ module.exports = {
     // connections. createArtistAccount (mutations/accounts.js) already did this; this
     // lower-level mutation didn't, and used to rely on the stored shopId that nothing reads now.
     if (shopId && userId) {
-      await ArtistShopConnection.findOneAndUpdate(
-        { artistId: userId, shopId },
-        { artistId: userId, shopId, status: 'active', disconnectedAt: null },
-        { upsert: true, setDefaultsOnInsert: true },
-      );
+      // Opens an interval if none is open. NOT an upsert on { artistId, shopId } any more: that
+      // matched a CLOSED row and reopened it in place, wiping the period the artist had previously
+      // worked there - and it set disconnectedAt without clearing endedAt, leaving a row that
+      // claimed to be active while still carrying an end date. See models/ArtistShopConnection.js.
+      const open = await ArtistShopConnection.findOne({ artistId: userId, shopId, endedAt: null });
+      if (!open) {
+        await new ArtistShopConnection({
+          artistId: userId,
+          shopId,
+          status: 'active',
+          startedAt: new Date(),
+          endedAt: null,
+        }).save();
+      }
     }
     return artist;
   }, Constants.ROLES.SHOP_ADMIN),
