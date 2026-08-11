@@ -68,8 +68,30 @@ Square's refund API.
 Rejected: a `REFUNDED` appointment state and an in-app refund path. It would have been a second way
 to move money with no second set of eyes on it, for a case that is rare by policy.
 
-**OPEN:** adjustments are shop-admin only, and an independent artist has no shop admin. As written,
-an unaffiliated artist can never correct a mistaken charge.
+Adjustments are shop-admin only **where there is a shop**. An unaffiliated artist adjusts their own
+— see S2.
+
+### M7. A rate change applies forward only, never backward
+
+Changing an artist's percentage never alters work already performed. The rate that applied is the
+one in effect **on the appointment's own date**, not the one configured now.
+
+Two things follow, and the second is the one that bites:
+
+- The rate needs its own effective-dated history — `(artist, shop, effectiveFrom, percent)` —
+  resolved by taking the latest `effectiveFrom` at or before the appointment date. Storing one
+  current number per interval only handles a change that coincides with a reconnect.
+- `applyShopCut` recomputes on save. Today it reads the *currently active* connection, so editing a
+  past session's subtotal after a rate change would silently reprice the cut at the new rate.
+  Resolving by appointment date fixes this by construction: the appointment's date doesn't move, so
+  the rate it resolves can't either.
+
+`Appointment.shopCutPercentApplied` already records what was actually used on each row, so existing
+payouts are safe today. What is missing is making the resolution itself date-aware.
+
+Rejected: freezing the cut permanently once written. That would also block legitimate recomputation
+— correcting a mistyped subtotal on work performed last week should re-derive the cut at *last
+week's* rate, not refuse to move at all.
 
 ### M5. Square_Fee_Offset
 
@@ -198,6 +220,24 @@ All client and appointment data. On disconnect, the artist retains visibility of
 collected during the connected period. Data from the gap — other shops, independent work — stays
 invisible to the shop.
 
+### S2. An unaffiliated artist has full control of their own functionality
+
+An independent artist is their own admin. Anything gated on "shop admin" applies **only where a shop
+exists**; with no shop, the artist holds that authority over their own data — adjustments included.
+
+**This is not fully implemented, and the gap is uneven.** There are two gate styles in the codebase:
+
+- `canManageArtist` / `assertCanManageArtist` — checks `user.id === artistUserId` **first**, so an
+  artist always passes for themselves regardless of role. Already correct for independents.
+- `withAuth(fn, ROLES.SHOP_ADMIN)` — a bare role floor with no self or no-shop escape. An
+  independent artist has role `ARTIST`, so these refuse them outright. `archiveClient`,
+  `archiveArtist` and their siblings are in this group: an independent artist currently cannot
+  archive their own client.
+
+The fix is a shared helper in the shape of `assertCanManageArtist`, not a per-call-site edit — that
+is exactly how one of them ends up forgotten. It needs judgement about which gates are genuinely
+platform-level rather than shop-level, so it is deliberately not a blanket loosening.
+
 ---
 
 ## Sequencing
@@ -222,11 +262,17 @@ share → UI surfaces → dashboard fixes. Standalone fixes pulled forward.
 | Shop cut on the taxed total | Takes a percentage of the state's money |
 | `shopId` flag on the artist | Cannot express a reconnect, so history is destroyed |
 | Un-marking a no-show deleting the flag | Destroys the history the flag exists to keep |
+| Rate changes applying retroactively | Reprices work already performed and paid out |
+| Freezing a cut permanently once written | Blocks correcting a mistyped subtotal at the rate that applied |
 
 ---
 
 ## Open
 
-- **M4** — who adjusts a mistaken charge for an artist with no shop admin.
-- The reference-image upload 400. `express.json()` was on Express's 100kb default and is now 2mb,
-  but that is **not** confirmed as the cause. The payload was lost; diagnose when it recurs.
+Nothing is blocking. Two things are parked rather than undecided:
+
+- **The reference-image upload 400.** Parked at the user's direction until it recurs and a payload
+  exists. `express.json()` was on Express's 100kb default and is now 2mb, but that is **not**
+  confirmed as the cause and should not be recorded as the fix.
+- **S2's uneven gates** are known work, not an open question. The rule is decided; the
+  `withAuth(fn, SHOP_ADMIN)` call sites have not been moved onto it yet.
