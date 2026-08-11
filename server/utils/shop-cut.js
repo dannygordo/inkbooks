@@ -26,9 +26,14 @@ const { percentOfCents } = require('./money');
  *   Processing  - excluded. Square's fee already left the building; charging the artist a share
  *   fees          of a cost neither party keeps would mean the artist pays for it twice.
  *
- * The tax and fee exclusions are my reading of standard practice, not something that was
- * specified - they're worth confirming against how the shop actually operates before this goes
- * anywhere near real money. The tip exclusion was specified explicitly.
+ * All three exclusions are now CONFIRMED rather than assumed - see DECISIONS.md M2. The tax and fee
+ * ones used to carry a note here saying they were my reading of standard practice and wanted
+ * checking; they were checked. Worked example on the record: one hour at $180 with a 40% cut is
+ * $180 x 0.4 = $72 to the shop.
+ *
+ * The Square_Fee_Offset (DECISIONS.md M5) is deliberately NOT in the cuttable base either. It exists
+ * to recover a processing fee the artist pays, so the artist keeps it - folding it in would have the
+ * shop take 40% of the artist's fee reimbursement.
  *
  *   Deposits    a deposit credited to a session is DEDUCTED before the cut is computed, so the
  *               cut follows what the session actually charged. Specified explicitly: "if the
@@ -47,9 +52,18 @@ const { percentOfCents } = require('./money');
 /**
  * Resolves which percentage applies to a given artist at a given shop.
  *
+ * THE RATE IS PER ARTIST. A shop has different artists at different rates, so the connection's own
+ * percentage wins and the shop's is only a default for artists who have none. See DECISIONS.md M1 -
+ * the shop-level field is a default, not the authority.
+ *
  * The connection-level override is checked with a null test, not a falsy test, on purpose: 0 is a
  * meaningful configured value ("this guest artist owes us nothing") and must not fall through to
  * the shop's rate the way `||` would make it.
+ *
+ * KNOWN LIMIT, to be fixed with the membership intervals (DECISIONS.md A2): this reads the CURRENTLY
+ * active connection, so recomputing a cut after a rate change would apply the new rate to old work.
+ * Appointment.shopCutPercentApplied records the rate actually used on each row, so existing payouts
+ * are safe; what is missing is resolving by the appointment's own date.
  *
  * @returns {Promise<number>} percentage, e.g. 40 for 40%. 0 when nothing is configured.
  */
