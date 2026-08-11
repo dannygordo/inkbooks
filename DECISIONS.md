@@ -433,6 +433,34 @@ the work, not about money.
 
 ## Scope of a shop's visibility
 
+### S0. Every shop admin is an artist
+
+One shape of shop admin, not two. `role: SHOP_ADMIN` with `userType: ARTIST`, an `Artist` profile, a
+`Staff` row and an `ArtistShopConnection` — which is what `registerAccount` has always produced for
+a shop signup ("a shop owner tattoos until they say otherwise").
+
+There used to be a second shape. `scripts/seed.js` created a `STAFF`-typed admin with a `Staff` row
+and nothing else, and no creation path in the real app produced it. The difference was invisible
+until `userType` began gating real surfaces, and then it was severe: a `STAFF`-typed admin had no
+Settings page at all, and `getMySquareConnection` / `getMySquarePricingSettings` resolved them as an
+**independent artist** — because both resolve ownership through `ArtistShopConnection`, which they
+had none of. A shop admin who did not tattoo could not configure their own shop's tax rate, and was
+told the zeros they saw were their own.
+
+Migrated by `scripts/migrate-shop-admins-to-artists.js`; the seed now produces the same shape as
+signup.
+
+**What this costs, stated because it is a real trade.** An admin who does not tattoo now appears in
+the shop's artist directory, carries a calendar tag colour, and shows up in per-artist dashboards as
+an artist with no sessions. The mitigation is per-account rather than structural: set their
+`Artist.status` to `INACTIVE` or `ARCHIVED` and they drop out of the directory while keeping every
+record attached to them.
+
+Rejected: supporting both shapes and resolving viewer-facing gates on "do you administer a shop"
+instead of on `userType`. It models the real world more closely — plenty of studios are run by
+someone who does not tattoo — but it means every gate carries two questions forever, and the two
+answers drift. One shape means one signal.
+
 ### S1. While connected, the shop sees everything
 
 All client and appointment data. On disconnect, the artist retains visibility of everything
@@ -444,18 +472,37 @@ invisible to the shop.
 An independent artist is their own admin. Anything gated on "shop admin" applies **only where a shop
 exists**; with no shop, the artist holds that authority over their own data — adjustments included.
 
-**This is not fully implemented, and the gap is uneven.** There are two gate styles in the codebase:
+**Implemented.** The gap was that two gate styles existed and only one obeyed the rule:
 
 - `canManageArtist` / `assertCanManageArtist` — checks `user.id === artistUserId` **first**, so an
-  artist always passes for themselves regardless of role. Already correct for independents.
-- `withAuth(fn, ROLES.SHOP_ADMIN)` — a bare role floor with no self or no-shop escape. An
-  independent artist has role `ARTIST`, so these refuse them outright. `archiveClient`,
-  `archiveArtist` and their siblings are in this group: an independent artist currently cannot
-  archive their own client.
+  artist always passes for themselves regardless of role. Already correct.
+- `withAuth(fn, ROLES.SHOP_ADMIN)` — a bare role floor that runs **before the function body**. An
+  independent artist has role `ARTIST`, so these refused them outright no matter how correct the
+  ownership check inside was. `archiveClient` is the clearest case: its body already calls
+  `assertCanAccessClient`, which has an explicit "an ARTIST is their own shop for this purpose"
+  branch, and an independent artist never reached it.
 
-The fix is a shared helper in the shape of `assertCanManageArtist`, not a per-call-site edit — that
-is exactly how one of them ends up forgotten. It needs judgement about which gates are genuinely
-platform-level rather than shop-level, so it is deliberately not a blanket loosening.
+**Two different fixes, because the checks underneath differ.** This is the judgement the rule
+needed, and it is not uniform:
+
+- **`archiveArtist`, `unarchiveArtist`, `updateArtist` — floor simply removed.**
+  `assertCanManageArtist` already expresses the whole rule on its own: self passes, and anyone
+  else who is not `SHOP_ADMIN`-or-better sharing a shop fails on `user.role > minRole`. Nothing a
+  shop artist can do changed.
+- **`archiveClient`, `unarchiveClient`, `updateClient`, `redactClient` — floor moved inside**, as
+  `assertAdminAuthority`. Their ownership check, `assertCanAccessClient`, passes any artist sharing
+  a shop *or a project* with the client — so removing the floor outright would have let a plain
+  artist at a shop archive that shop's clients. At a shop this is an admin action. With no shop
+  there is no admin to be.
+
+`hasAdminAuthority` in `utils/shop-membership.js` is the helper: true at `SHOP_ADMIN`-or-better, and
+true for anyone with no shop at all. It asks the database rather than reading a role number, because
+independence is a fact about membership and a role cannot express it.
+
+**Left on the bare floor, deliberately.** `createStaffAccount`, `updateShop`, `disconnectShopSquare`,
+`confirmShopCutPaid` and their siblings are genuinely shop-level. An independent artist has no staff,
+no shop and nobody to confirm a payment against — loosening these would expose a mutation with no
+meaning rather than grant a permission.
 
 ---
 
@@ -488,6 +535,8 @@ share → UI surfaces → dashboard fixes. Standalone fixes pulled forward.
 | Client-supplied charge components | No schema makes a client entitled to assert what it is owed |
 | Cross-checking client figures against server ones | Two sources for one number, needing a rule for which wins |
 | Charging a deposit before recording it | Charged and recorded become two numbers that can differ |
+| Two shapes of shop admin | Every gate carries two questions forever, and the answers drift |
+| Dropping the role floor on the client gates | Would let any artist at a shop archive that shop's clients |
 
 ---
 

@@ -160,17 +160,44 @@ async function seed() {
   // If cross-shop support access is ever needed, the mechanism is a real Staff row at the shop
   // being helped: time-boxed, revocable, and visible to the shop owner. Not a role.
 
-  // --- Shop Admin (User + Staff) -------------------------------------------
+  // --- Shop Admin (User + Artist + Staff + connection) ----------------------
+  //
+  // ALL FOUR RECORDS, matching what registerAccount actually produces for a shop signup. This used
+  // to create a User with userType STAFF and a Staff row only, which was a second shape of shop
+  // admin that no creation path in the real app produces - and the difference was invisible until
+  // userType began gating real surfaces. A STAFF-typed admin had no Settings page, and the Square
+  // and pricing panels resolved them as an INDEPENDENT artist, so they could not configure their
+  // own shop's tax rate at all. A seed that produces a shape the app cannot is worse than no seed:
+  // it makes the bug reproducible only for people who used it.
+  //
+  // The Staff row stays alongside the Artist one. The connection is what puts them on the shop's
+  // calendar and in its analytics; the Staff row is what makes them findable as an ADMIN of it.
+  // Neither substitutes for the other - see registerAccount's own note.
   const shopAdminUser = await new User({
     email: 'shopadmin@copperwolf.dev',
     password: hashedPassword,
     role: Constants.ROLES.SHOP_ADMIN,
-    userType: Constants.USER_TYPE.STAFF,
+    userType: Constants.USER_TYPE.ARTIST,
     firstName: 'Dana',
     lastName: 'Wolfe',
     hasSetPassword: true,
     // Shop-unique among Copper Wolf's members - same picker the real login/calendar self-heal use.
     tagColor: await pickDefaultTagColor(shop._id),
+  }).save();
+  await new Artist({
+    firstName: 'Dana',
+    lastName: 'Wolfe',
+    email: shopAdminUser.email,
+    userId: shopAdminUser._id,
+    status: Constants.ARTIST_STATUS.ACTIVE,
+    startDate: new Date(),
+  }).save();
+  await new ArtistShopConnection({
+    artistId: shopAdminUser._id,
+    shopId: shop._id,
+    status: 'active',
+    startedAt: new Date(),
+    endedAt: null,
   }).save();
   await new Staff({
     firstName: 'Dana',

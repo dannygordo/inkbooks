@@ -119,6 +119,13 @@ module.exports = {
    * status and nothing else. Their completed sessions still count toward shop revenue, still
    * render on the calendar in their own colour, and their shop-cut ledger still reconciles.
    */
+  // NO ROLE FLOOR, deliberately - DECISIONS.md S2. assertCanManageArtist below already expresses
+  // the whole rule: it passes the artist themselves regardless of role, and refuses anyone else
+  // who is not SHOP_ADMIN-or-better sharing a shop with them. The `withAuth(fn, SHOP_ADMIN)` floor
+  // that used to sit here ran BEFORE the body, so an independent artist - role ARTIST, nobody above
+  // them to ask - was refused before that correct check was ever reached. Removing the floor does
+  // not loosen anything a shop artist can do: a plain ARTIST calling this on a coworker still
+  // fails the `user.role > minRole` branch inside.
   archiveArtist: withAuth(async (_, { artistId }, context, info, user) => {
     const artist = await Artist.findById(artistId);
     if (!artist) {
@@ -128,7 +135,7 @@ module.exports = {
     artist.status = Constants.ARTIST_STATUS.ARCHIVED;
     await artist.save();
     return artist;
-  }, Constants.ROLES.SHOP_ADMIN),
+  }),
   // Undo, for the archive-by-mistake case and for an artist who comes back. Deliberately restores
   // to ACTIVE rather than to whatever the status was before - remembering the prior value means
   // storing it, and "they're back and taking work" is the only reason to press this.
@@ -141,7 +148,7 @@ module.exports = {
     artist.status = Constants.ARTIST_STATUS.ACTIVE;
     await artist.save();
     return artist;
-  }, Constants.ROLES.SHOP_ADMIN),
+  }),
   updateArtist: withAuth(async (_, args, context, info, user) => {
     // Everything up to the write sits OUTSIDE the try. The catch below rewraps whatever it
     // catches as a plain Error, which flattens a UserInputError's extensions - so an
@@ -215,7 +222,7 @@ module.exports = {
         }
         rethrow(err);
     }
-  }, Constants.ROLES.SHOP_ADMIN),
+  }),
   // Self-service rate settings, deliberately separate from updateArtist above - updateArtist is
   // gated to SHOP_ADMIN-or-better (an admin editing an artist's full profile), which means a
   // plain ARTIST-role user has never been able to call it on their own record at all, including

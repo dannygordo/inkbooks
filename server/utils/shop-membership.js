@@ -122,6 +122,47 @@ async function assertCanManageArtist(user, artistUserId, minRole = Constants.ROL
 }
 
 /**
+ * "Does this caller hold shop-admin authority for the purposes of THIS action?" - the missing half
+ * of DECISIONS.md S2.
+ *
+ * ---------------------------------------------------------------------------------------------
+ * THE PROBLEM THIS SOLVES. S2 says an unaffiliated artist is their own admin: anything gated on
+ * "shop admin" applies only where a shop exists. Two gate styles existed and only one obeyed it.
+ * canManageArtist above checks self FIRST, so an artist always passes for their own data.
+ * `withAuth(fn, ROLES.SHOP_ADMIN)` is a bare role floor that runs BEFORE the function body, and an
+ * independent artist has role ARTIST - so those refused them outright, no matter how correct the
+ * ownership check inside was. archiveClient is the clearest case: its body already calls
+ * assertCanAccessClient, which has an explicit "an ARTIST is their own shop for this purpose"
+ * branch, and an independent artist never reached it.
+ *
+ * SO THE FLOOR MOVES INSIDE. A resolver using this drops the withAuth minRole argument and calls
+ * this first instead. The difference is that this one can ask a question a role number cannot:
+ * "is there a shop here at all?"
+ *
+ * NOT A BLANKET LOOSENING. This is only for authority over one's OWN data, and each call site
+ * still runs its own ownership check afterwards - this replaces the floor, not the check. Gates
+ * that are genuinely shop-level keep the bare floor and should: createStaffAccount, updateShop,
+ * disconnectShopSquare and confirmShopCutPaid have no meaning for someone with no shop, and
+ * loosening them would expose a mutation rather than grant a permission.
+ * ---------------------------------------------------------------------------------------------
+ */
+async function hasAdminAuthority(user) {
+  if (user.role <= Constants.ROLES.SHOP_ADMIN) {
+    return true;
+  }
+  // No shop, no admin above them. The lookup is the point: "independent" is a fact about the
+  // database, not something a role number or a token field can express.
+  const shopIds = await getShopIdsForUser(user.id);
+  return shopIds.length === 0;
+}
+
+async function assertAdminAuthority(user) {
+  if (!(await hasAdminAuthority(user))) {
+    throw new AuthenticationError('Action not allowed');
+  }
+}
+
+/**
  * "May this caller read this conversation?" A Conversation has no shopId of its own (see
  * models/Conversation.js) - members is the only field that says who's in it - so "at my shop"
  * means "at least one member works where I work".
@@ -235,6 +276,8 @@ module.exports = {
   assertCanAccessClient,
   canManageArtist,
   assertCanManageArtist,
+  hasAdminAuthority,
+  assertAdminAuthority,
   canAccessConversation,
   getShopIdsForUser,
   getArtistIdsForShops,

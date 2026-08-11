@@ -112,6 +112,11 @@ executable bit, git skips it with a hint on stderr rather than an error — whic
   `role <= SHOP_ADMIN`. A shop's first account is a SHOP_ADMIN whose `userType` is ARTIST
   (`registerAccount`: "a shop owner tattoos until they say otherwise"), so one person has both
   kinds of settings and they used to live on unrelated pages.
+- **S2 is implemented.** An independent artist can archive their own client and themselves.
+  `hasAdminAuthority` in `utils/shop-membership.js`; two different fixes for two different
+  underlying checks — see `DECISIONS.md` S2.
+- **Every shop admin is an artist.** One shape, from `registerAccount`, the seed and the migration
+  alike. See `DECISIONS.md` S0, including what it costs.
 - **An independent artist can connect Square, end to end.** `getMySquareConnection`,
   `getMySquareAuthorizationUrl` and `disconnectMySquare`, with a panel in
   `components/settings/SquarePanel.jsx`. It renders for shop artists too and tells them the shop
@@ -120,7 +125,9 @@ executable bit, git skips it with a hint on stderr rather than an error — whic
 
 ## Next
 
-0. **Run the client suite.** See the table above. Do this before anything else.
+0. **Run both suites, then the shop-admin migration.** `node scripts/migrate-shop-admins-to-artists.js
+   --dry-run` first. Until it runs, a `STAFF`-typed shop admin still has no Settings page — which is
+   how this was found. See `DECISIONS.md` S0 for what the migration costs.
 
 1. **Take one real payment end to end.** Nothing in the charge path has ever touched Square. It was
    built against their published REST docs, and `utils/square.js` has said so at the top since it
@@ -134,12 +141,8 @@ executable bit, git skips it with a hint on stderr rather than an error — whic
 3. Gift cards — model, balance, partial redemption, the payout sign convention in `DECISIONS.md` M6,
    and the offset at purchase. The ownership question they depended on is answered (M9), and the
    sale is priced by the same `computeChargeBreakdown` with tax zeroed.
-4. **Fix the S2 gate gap.** The `withAuth(fn, ROLES.SHOP_ADMIN)` call sites still refuse an
-   independent artist outright — they cannot archive their own client. Decided long ago, and the
-   codebase now half-agrees with S2: M9, M10 and the pricing settings all treat independent artists
-   as real owners while `archiveClient` does not.
-5. Adjustment records — shop-admin only, never calls Square.
-6. GraphQL surface for client flags. The automatic path works end to end; reading a client's flags
+4. Adjustment records — shop-admin only, never calls Square.
+5. GraphQL surface for client flags. The automatic path works end to end; reading a client's flags
    and raising a manual one exist only as functions.
 
 Last of all, deliberately: the UI standardisation pass onto the register-page aesthetic. It collides
