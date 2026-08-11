@@ -147,6 +147,32 @@ async function refreshAccessToken(refreshToken) {
   });
 }
 
+/**
+ * Reads a stored token, turning "we cannot read our own credentials" into something a person can
+ * act on.
+ *
+ * tokenCrypto.decrypt throws a developer-facing message on a malformed value or a key that no
+ * longer matches - and that reached the payment route as a bare 500 at the moment a card was being
+ * charged, which tells the person at the counter nothing and the shop owner less. The condition is
+ * real and not rare: a rotated TOKEN_ENCRYPTION_KEY, a restored backup, or a hand-edited row all
+ * produce it, and the fix is always the same - reconnect Square.
+ *
+ * `status` is set so the route surfaces it as a 400 rather than a server error. It IS a server-side
+ * problem, but it is one with an action attached, and 500 is the code that means "no idea".
+ */
+function decryptStoredToken(encrypted) {
+  try {
+    return tokenCrypto.decrypt(encrypted);
+  } catch (err) {
+    const error = new Error(
+      'Square credentials for this account could not be read - reconnect Square in Settings. ' +
+        `(${err.message})`,
+    );
+    error.status = 400;
+    throw error;
+  }
+}
+
 // Square tokens expire every 30 days; Square recommends refreshing every 7 days or less so a
 // token never goes stale from inactivity alone. Returns a valid, decrypted access token, mutating
 // and saving `account` in place if a refresh happened.
@@ -163,9 +189,9 @@ async function getValidAccessToken(account) {
   const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   const needsRefresh = !account.tokenExpiresAt || account.tokenExpiresAt < sevenDaysFromNow;
   if (!needsRefresh) {
-    return tokenCrypto.decrypt(account.accessTokenEncrypted);
+    return decryptStoredToken(account.accessTokenEncrypted);
   }
-  const refreshToken = tokenCrypto.decrypt(account.refreshTokenEncrypted);
+  const refreshToken = decryptStoredToken(account.refreshTokenEncrypted);
   const refreshed = await refreshAccessToken(refreshToken);
   account.accessTokenEncrypted = tokenCrypto.encrypt(refreshed.access_token);
   account.refreshTokenEncrypted = tokenCrypto.encrypt(refreshed.refresh_token);

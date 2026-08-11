@@ -62,6 +62,22 @@ describe("units at the boundary", () => {
 		expect(await screen.findByLabelText(/processing offset/)).toHaveValue(6);
 	});
 
+	// A decimal rate has to be TYPEABLE, which needs step on the underlying <input>. MUI v9 removed
+	// TextField's `inputProps`, so IBInput forwards it as slotProps.htmlInput - and when that was
+	// wrong the attribute fell through to the DOM, React warned, and type="number" kept its default
+	// step of 1. A browser then treats 9.4 as invalid and silently BLOCKS this form's submit.
+	it("puts a decimal step on the tax field, so 9.4 is submittable", async () => {
+		renderPanel({ settings: INDEPENDENT });
+
+		expect(await screen.findByLabelText(/Sales tax/)).toHaveAttribute("step", "0.01");
+	});
+
+	it("puts a decimal step on the offset field too", async () => {
+		renderPanel({ settings: INDEPENDENT });
+
+		expect(await screen.findByLabelText(/processing offset/)).toHaveAttribute("step", "0.01");
+	});
+
 	// The offset is PER HOUR and scales with the session, which a single figure does not convey.
 	it("works an example so the per-hour part is visible", async () => {
 		renderPanel({ settings: INDEPENDENT });

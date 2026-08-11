@@ -120,6 +120,11 @@ executable bit, git skips it with a hint on stderr rather than an error — whic
   rates, a membership that closed and reopened, no-show flags. Money computed by
   `computeChargeBreakdown` and `applyShopCut` rather than by the script, so it cannot drift from
   M2/M3/M5/M8/M11. `npm run seed` is still the small readable fixture.
+
+  **Square is seeded DISCONNECTED**, deliberately. No seed can produce working credentials, so a row
+  claiming a connection is one the app cannot tell from the real thing until money is supposed to
+  move. Taking a *new* payment needs a real Square sandbox seller connected through Settings first —
+  Next item 1. The seeded appointments still carry the money a real charge would have written.
 - **Every shop admin is an artist.** One shape, from `registerAccount`, the seed and the migration
   alike. See `DECISIONS.md` S0 — a shop owner is essentially always a tattoo artist, so a migrated
   admin appearing on the roster is correct rather than a compromise.

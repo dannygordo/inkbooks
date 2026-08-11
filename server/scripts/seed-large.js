@@ -185,19 +185,22 @@ async function main() {
     status: 1,
   }).save();
 
-  // Connected, so the Square panel and the charge path have something to resolve to. The token is
-  // obvious nonsense - nothing here calls Square, and a seed holding a plausible-looking credential
-  // is a seed somebody eventually tries to use.
+  // A SquareAccount row, DISCONNECTED.
+  //
+  // This used to seed connected: true with a placeholder token, and that was wrong in the way that
+  // costs somebody an afternoon. No seed can produce a working Square connection - the credentials
+  // come from a real OAuth handshake with a real seller - so a row claiming one is a row the app
+  // cannot tell apart from the genuine article until money is supposed to move, at which point it
+  // failed with a 500 while charging a client's card.
+  //
+  // Disconnected is the truth, and the truth is also the more useful fixture: the Square panel says
+  // "not connected", and a charge is refused up front with a message naming who has to fix it,
+  // instead of a server error at the till. Connect a real Square SANDBOX seller through Settings to
+  // exercise the charge path for real - HANDOFF's Next item 1.
   await new SquareAccount({
     ownerType: 'SHOP',
     ownerId: shop._id,
-    connected: true,
-    merchantId: 'MERCHANT_SEED_COPPERWOLF',
-    locationId: 'LOCATION_SEED_COPPERWOLF',
-    accessTokenEncrypted: 'seed-not-a-real-token',
-    refreshTokenEncrypted: 'seed-not-a-real-token',
-    tokenExpiresAt: new Date(Date.now() + 25 * 24 * 60 * 60 * 1000),
-    connectedAt: daysAgo(CONFIG.weeksOfHistory * 7),
+    connected: false,
   }).save();
 
   // --- Client flag types (C2) ------------------------------------------------------------------
@@ -366,17 +369,12 @@ async function main() {
     note: 'Moved to the front room.',
   });
 
-  // The independent artist's own Square account, so both owner types exist in the data (M9).
+  // The independent artist's own row, so both owner types exist in the data (M9). Disconnected for
+  // the same reason as the shop's - see the note above.
   await new SquareAccount({
     ownerType: 'ARTIST',
     ownerId: independent.user._id,
-    connected: true,
-    merchantId: 'MERCHANT_SEED_JUNE',
-    locationId: 'LOCATION_SEED_JUNE',
-    accessTokenEncrypted: 'seed-not-a-real-token',
-    refreshTokenEncrypted: 'seed-not-a-real-token',
-    tokenExpiresAt: new Date(Date.now() + 25 * 24 * 60 * 60 * 1000),
-    connectedAt: daysAgo(90),
+    connected: false,
   }).save();
 
   // --- Clients ---------------------------------------------------------------------------------
@@ -729,6 +727,11 @@ async function main() {
   for (const [k, v] of Object.entries(counts)) {
     console.log(`  ${k.padEnd(20)} ${v}`);
   }
+  console.log(
+    '\nSquare is NOT connected, for either owner - no seed can produce working credentials.' +
+      '\nThe seeded appointments carry the money a real charge would have written, but taking a' +
+      '\nNEW payment needs a real Square sandbox seller connected through Settings first.',
+  );
   console.log(`\nEvery account's password is: ${DEV_PASSWORD}`);
   console.log('  owner/admin  shopadmin@copperwolf.dev');
   console.log('  artist       mika@copperwolf.dev');

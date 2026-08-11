@@ -318,6 +318,36 @@ describe('auth, validation and rate limiting', () => {
 		expect(res.body.error).toBe('Card declined');
 	});
 
+	/**
+	 * Unreadable stored credentials are a 400 with an action, not a 500.
+	 *
+	 * This is a real state, not a hypothetical: a rotated TOKEN_ENCRYPTION_KEY, a restored backup
+	 * or a hand-edited row all produce it, and a seeded placeholder token produced it the first
+	 * time anyone tried to charge from seeded data. The failure landed as a bare 500 while a card
+	 * was being charged, which tells the person at the counter nothing.
+	 */
+	it('refuses readably when the stored token cannot be decrypted', async () => {
+		const { user, shop } = await artistAtConnectedShop();
+		await SquareAccount.updateOne(
+			{ ownerType: 'SHOP', ownerId: shop._id },
+			{ $set: { accessTokenEncrypted: 'not-a-real-ciphertext' } },
+		);
+		const appointment = await createAppointment(user.id, {
+			shopId: shop.id,
+			subtotalCents: 20000,
+		});
+		// The real square.js path, not the mock - the decryption happens before any HTTP call.
+		createPaymentSpy.mockRestore();
+
+		const res = await post(validBody(appointment.id), user);
+
+		expect(res.status).toBe(400);
+		expect(res.body.error).toMatch(/reconnect Square/i);
+
+		const stored = await Appointment.findById(appointment.id);
+		expect(stored.squarePaymentId).toBeUndefined();
+	});
+
 	// A declined charge must not leave the session looking settled.
 	it('records nothing when the charge fails', async () => {
 		const { user, shop } = await artistAtConnectedShop();
