@@ -71,21 +71,23 @@ const UtilsService = (() => {
 		return daysMatrix;
 	}
 
+	/**
+	 * The colours this person may choose: every unclaimed one, with their CURRENT colour first.
+	 *
+	 * The two conditions used to be two separate `if`s rather than a branch, so a tag that was both
+	 * the user's own colour AND unclaimed by anyone else was unshifted onto the front and then
+	 * pushed onto the back - the same colour twice, which React reported as "Encountered two
+	 * children with the same key". Whether it happened depended on whether the caller's own colour
+	 * came back in usedTags, so it looked intermittent.
+	 *
+	 * Kept as their own colour first rather than filtered out: it has to be in the list for the
+	 * picker to show which swatch is currently selected.
+	 */
 	const _showAvailableColorTags = (tags, usedTags, userColor) => {
-		let tagArr = usedTags.map(t => t.tagColor);
-		let result = [];
-		console.log(tags);
-		console.log(usedTags);
-		console.log(userColor);
-		tags.map((tag) => {
-			if(tag.value === userColor) {
-				result.unshift(tag);
-			}
-			if(!tagArr.includes(tag.value)) {
-				result.push(tag);
-			}
-		});
-		return result;
+		const taken = new Set((usedTags || []).map((t) => t.tagColor));
+		const mine = tags.filter((tag) => tag.value === userColor);
+		const available = tags.filter((tag) => tag.value !== userColor && !taken.has(tag.value));
+		return [...mine, ...available];
 	}
 
 	return {

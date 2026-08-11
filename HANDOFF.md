@@ -147,6 +147,15 @@ executable bit, git skips it with a hint on stderr rather than an error — whic
    seller through the OAuth flow, set a tax rate and offset in Settings, then charge a session and a
    deposit and confirm the figures in Square's dashboard match what InkBooks recorded. Everything
    below is built on arithmetic that has only ever been checked against itself.
+
+   **Launch the sandbox seller first.** Square's authorize page refuses with *"To start the OAuth
+   flow for a sandbox account, first launch the seller test account from the Developer Console"* —
+   open the test account from developer.squareup.com/apps → your app → Sandbox → Test accounts, and
+   leave that session active. The error comes from Square's own hosted page, so InkBooks never sees
+   it and cannot explain it for you.
+
+   Confirmed reaching that point: the authorization URL, the application id, the scopes, the
+   redirect and the signed state all pass Square's own validation.
 2. **Drop the old `Shop` Square fields.** Once the migration has run and a charge has worked, delete
    the seven now-unread `square*` fields from stored shop documents. Deliberately left in place for
    one deploy — see M9.
