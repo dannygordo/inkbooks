@@ -71,28 +71,6 @@ to move money with no second set of eyes on it, for a case that is rare by polic
 Adjustments are shop-admin only **where there is a shop**. An unaffiliated artist adjusts their own
 — see S2.
 
-### M7. A rate change applies forward only, never backward
-
-Changing an artist's percentage never alters work already performed. The rate that applied is the
-one in effect **on the appointment's own date**, not the one configured now.
-
-Two things follow, and the second is the one that bites:
-
-- The rate needs its own effective-dated history — `(artist, shop, effectiveFrom, percent)` —
-  resolved by taking the latest `effectiveFrom` at or before the appointment date. Storing one
-  current number per interval only handles a change that coincides with a reconnect.
-- `applyShopCut` recomputes on save. Today it reads the *currently active* connection, so editing a
-  past session's subtotal after a rate change would silently reprice the cut at the new rate.
-  Resolving by appointment date fixes this by construction: the appointment's date doesn't move, so
-  the rate it resolves can't either.
-
-`Appointment.shopCutPercentApplied` already records what was actually used on each row, so existing
-payouts are safe today. What is missing is making the resolution itself date-aware.
-
-Rejected: freezing the cut permanently once written. That would also block legitimate recomputation
-— correcting a mistyped subtotal on work performed last week should re-derive the cut at *last
-week's* rate, not refuse to move at all.
-
 ### M5. Square_Fee_Offset
 
 A flat amount configured in Settings → Square. At charge time:
@@ -142,6 +120,28 @@ Same session, $50 card: `80 − 50 = +30`, artist owes the shop $30.
 Gift card sales are a **liability, not revenue**, recognised at redemption. A report must show
 outstanding balance, card count and oldest issue date, because that portion of the bank balance is
 already spoken for.
+
+### M7. A rate change applies forward only, never backward
+
+Changing an artist's percentage never alters work already performed. The rate that applied is the
+one in effect **on the appointment's own date**, not the one configured now.
+
+Two things follow, and the second is the one that bites:
+
+- The rate needs its own effective-dated history — `(artist, shop, effectiveFrom, percent)` —
+  resolved by taking the latest `effectiveFrom` at or before the appointment date. Storing one
+  current number per interval only handles a change that coincides with a reconnect.
+- `applyShopCut` recomputes on save. Today it reads the *currently active* connection, so editing a
+  past session's subtotal after a rate change would silently reprice the cut at the new rate.
+  Resolving by appointment date fixes this by construction: the appointment's date doesn't move, so
+  the rate it resolves can't either.
+
+`Appointment.shopCutPercentApplied` already records what was actually used on each row, so existing
+payouts are safe today. What is missing is making the resolution itself date-aware.
+
+Rejected: freezing the cut permanently once written. That would also block legitimate recomputation
+— correcting a mistyped subtotal on work performed last week should re-derive the cut at *last
+week's* rate, not refuse to move at all.
 
 ---
 
