@@ -450,16 +450,22 @@ told the zeros they saw were their own.
 Migrated by `scripts/migrate-shop-admins-to-artists.js`; the seed now produces the same shape as
 signup.
 
-**What this costs, stated because it is a real trade.** An admin who does not tattoo now appears in
-the shop's artist directory, carries a calendar tag colour, and shows up in per-artist dashboards as
-an artist with no sessions. The mitigation is per-account rather than structural: set their
-`Artist.status` to `INACTIVE` or `ARCHIVED` and they drop out of the directory while keeping every
-record attached to them.
+**The domain fact this rests on:** a shop admin or owner is essentially always a tattoo artist too.
+Confirmed by the person running the shop this is built for, and it is the assumption `registerAccount`
+was already written on. The non-tattooing owner is the rare exception, not a second class of user to
+model for.
+
+That matters because it turns the apparent cost into a non-issue. A migrated admin does appear in the
+shop's artist directory, carry a calendar tag colour, and show up in per-artist dashboards — which
+would be wrong for someone who never tattoos, and is simply correct for someone who does. For the
+rare exception the mitigation is per-account rather than structural: set their `Artist.status` to
+`INACTIVE` or `ARCHIVED` and they drop out of the directory while keeping every record attached to
+them.
 
 Rejected: supporting both shapes and resolving viewer-facing gates on "do you administer a shop"
-instead of on `userType`. It models the real world more closely — plenty of studios are run by
-someone who does not tattoo — but it means every gate carries two questions forever, and the two
-answers drift. One shape means one signal.
+instead of on `userType`. It models the general case more closely, but it means every gate carries
+two questions forever and the two answers drift — a permanent structural cost to serve a case that
+barely occurs. One shape means one signal.
 
 ### S1. While connected, the shop sees everything
 

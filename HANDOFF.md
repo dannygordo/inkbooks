@@ -116,7 +116,8 @@ executable bit, git skips it with a hint on stderr rather than an error — whic
   `hasAdminAuthority` in `utils/shop-membership.js`; two different fixes for two different
   underlying checks — see `DECISIONS.md` S2.
 - **Every shop admin is an artist.** One shape, from `registerAccount`, the seed and the migration
-  alike. See `DECISIONS.md` S0, including what it costs.
+  alike. See `DECISIONS.md` S0 — a shop owner is essentially always a tattoo artist, so a migrated
+  admin appearing on the roster is correct rather than a compromise.
 - **An independent artist can connect Square, end to end.** `getMySquareConnection`,
   `getMySquareAuthorizationUrl` and `disconnectMySquare`, with a panel in
   `components/settings/SquarePanel.jsx`. It renders for shop artists too and tells them the shop
