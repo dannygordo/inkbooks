@@ -7,12 +7,16 @@ const tokenCrypto = require('./token-crypto');
 // specific slice of their API surface, plain `fetch` (Node 20+, already required by
 // package.json's engines field) keeps this self-contained with nothing new to `npm install`.
 //
-// IMPORTANT - not yet verified against a live Square account: everything here was built against
-// Square's published REST docs (OAuth, Invoices, Orders, Customers, webhook signature scheme -
-// see PRODUCTION_ROADMAP.md's "Shop-cut ledger" section for the exact pages), but this sandbox has
-// no real Square developer credentials to test against. Before this goes live: connect a real
-// Square sandbox account and walk through connect -> createShopCutInvoice -> pay the sandbox
-// invoice -> confirm the webhook fires and the Appointment flips to 'paid'.
+// VERIFIED AGAINST A REAL SQUARE SANDBOX SELLER, 2026-08-11, as far as the Payments call:
+// authorization URL -> consent -> token exchange -> encrypted storage -> decrypt -> POST /v2/payments
+// all work end to end against Square rather than against these docs. The charge itself was refused
+// for a missing scope (see OAUTH_SCOPES below), which is a permission granted at authorization -
+// so it proves the whole handshake ran and the stored token was genuinely usable.
+//
+// STILL UNVERIFIED: a payment that actually succeeds, and everything downstream of it -
+// createShopCutInvoice, publishing that invoice, and the webhook flipping an Appointment to 'paid'.
+// The rest of this file was built against Square's published REST docs (OAuth, Invoices, Orders,
+// Customers, webhook signature scheme - see PRODUCTION_ROADMAP.md's "Shop-cut ledger" section).
 
 function getEnvironment() {
   return process.env.SQUARE_ENVIRONMENT === 'production' ? 'production' : 'sandbox';
@@ -438,20 +442,23 @@ const SQUARE_API_VERSION = '2026-07-15';
 /**
  * Is this Square's "you were never granted that permission" refusal?
  *
- * Matched on the error CODE where Square gives one, with the message as a fallback - Square has
- * used more than one shape for this over the years, and a scope failure that silently stops being
- * recognised would put us back to showing the artist a message they cannot act on.
+ * Square's exact wording, observed against the sandbox: "The merchant has not given your
+ * application sufficient permissions to do that. The merchant must authorize your application for
+ * the following scopes: PAYMENTS_WRITE".
+ *
+ * Matched on the CODE where Square gives one and on that phrasing otherwise, and deliberately NOT
+ * gated on the HTTP status. The status for this is 403 today; gating on it would mean a future
+ * Square that returns 401 silently stops being recognised, and the cost of that is an artist
+ * staring at a message they cannot act on. The phrasing is specific enough to stand alone - no
+ * ordinary decline or validation failure talks about authorizing scopes.
  */
-function isInsufficientScopeError(status, data) {
-  if (status !== 401 && status !== 403) {
-    return false;
-  }
+function isInsufficientScopeError(data) {
   const errors = (data && data.errors) || [];
   return errors.some(
     (e) =>
       e.code === 'INSUFFICIENT_SCOPES' ||
-      e.code === 'FORBIDDEN' ||
-      /sufficient permissions|scopes?/i.test(e.detail || ''),
+      /sufficient permissions/i.test(e.detail || '') ||
+      /authorize your application for the following scopes/i.test(e.detail || ''),
   );
 }
 
@@ -490,7 +497,7 @@ async function createPaymentForAccount({ account, sourceId, amountCents, idempot
     // they authorized this connection themselves and nothing in InkBooks looks broken. The fix is
     // non-obvious and one-time, because a refresh returns the scopes originally granted rather than
     // the ones now requested, so the only way to gain one is to disconnect and connect again.
-    if (isInsufficientScopeError(response.status, data)) {
+    if (isInsufficientScopeError(data)) {
       const error = new Error(
         'This Square connection was authorized before card payments were supported. Disconnect ' +
           'and reconnect Square in Settings to grant permission to take payments.',

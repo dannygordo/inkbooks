@@ -160,8 +160,14 @@ executable bit, git skips it with a hint on stderr rather than an error — whic
    and a refresh returns the original set, so there is no way to gain one without reconnecting. A
    charge on such a token fails with a message saying exactly that.
 
-   Confirmed reaching that point: the authorization URL, the application id, the redirect and the
-   signed state all pass Square's own validation.
+   **Verified against a real sandbox seller on 2026-08-11, as far as the Payments call.**
+   Authorization URL → consent → token exchange → encrypted storage → decrypt → `POST /v2/payments`
+   all ran against Square rather than against its documentation. The charge was refused for the
+   missing scope — which is granted at authorization, so the refusal itself proves the handshake
+   completed and the stored token was genuinely usable.
+
+   **Still unverified:** a payment that succeeds, and everything downstream — `createShopCutInvoice`,
+   publishing it, and the webhook flipping an appointment to `paid`.
 2. **Drop the old `Shop` Square fields.** Once the migration has run and a charge has worked, delete
    the seven now-unread `square*` fields from stored shop documents. Deliberately left in place for
    one deploy — see M9.

@@ -161,3 +161,113 @@ describe('OAuth scopes', () => {
 		expect(url.searchParams.get('state')).toBe('state-token');
 	});
 });
+
+/**
+ * A CONNECTION AUTHORIZED BEFORE PAYMENTS_WRITE EXISTED.
+ *
+ * Square's own wording is accurate and useless to the artist: they authorized the connection
+ * themselves, nothing in InkBooks looks broken, and the fix is a disconnect/reconnect cycle nobody
+ * would guess. A refresh returns the scopes originally granted, so there is no way to gain one
+ * without a fresh consent.
+ *
+ * Tested here rather than through the payment route, because the detection lives inside
+ * createPaymentForAccount - a route test would have to mock that function and would prove nothing
+ * about it. global.fetch is mocked instead, so the real code path runs.
+ *
+ * The payload is what Square actually returned from the sandbox on 2026-08-11, so this keeps
+ * matching the shape that occurs rather than one inferred from documentation.
+ */
+describe('createPaymentForAccount: a missing scope', () => {
+	const tokenCrypto = require('../../utils/token-crypto');
+	let savedKey;
+	let account;
+
+	beforeEach(() => {
+		savedKey = process.env.TOKEN_ENCRYPTION_KEY;
+		// 32 bytes, base64 - see utils/token-crypto.js's getKey.
+		process.env.TOKEN_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64');
+		account = {
+			connected: true,
+			locationId: 'L_TEST',
+			accessTokenEncrypted: tokenCrypto.encrypt('seller-access-token'),
+			// Comfortably beyond the seven-day refresh window, so no refresh call is attempted.
+			tokenExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+			save: async () => {},
+		};
+	});
+
+	afterEach(() => {
+		if (savedKey === undefined) delete process.env.TOKEN_ENCRYPTION_KEY;
+		else process.env.TOKEN_ENCRYPTION_KEY = savedKey;
+		vi.restoreAllMocks();
+	});
+
+	function mockSquareScopeRefusal() {
+		global.fetch = vi.fn().mockResolvedValue({
+			ok: false,
+			status: 403,
+			json: async () => ({
+				errors: [
+					{
+						category: 'AUTHENTICATION_ERROR',
+						code: 'INSUFFICIENT_SCOPES',
+						detail:
+							'The merchant has not given your application sufficient permissions to do ' +
+							'that. The merchant must authorize your application for the following ' +
+							'scopes: PAYMENTS_WRITE',
+					},
+				],
+			}),
+		});
+	}
+
+	it('says to reconnect, rather than passing Square\'s wording through', async () => {
+		mockSquareScopeRefusal();
+
+		await expect(
+			square.createPaymentForAccount({
+				account,
+				sourceId: 'cnon:test',
+				amountCents: 20000,
+				idempotencyKey: 'idem-1',
+			}),
+		).rejects.toThrow(/Disconnect and reconnect Square/i);
+	});
+
+	// 400, so the route surfaces it as a refusal with an action rather than a server error.
+	it('carries a status the route can turn into a 400', async () => {
+		mockSquareScopeRefusal();
+
+		await square
+			.createPaymentForAccount({
+				account,
+				sourceId: 'cnon:test',
+				amountCents: 20000,
+				idempotencyKey: 'idem-1',
+			})
+			.catch((err) => {
+				expect(err.status).toBe(400);
+			});
+	});
+
+	// An ordinary decline must NOT be rewritten as a scope problem - "reconnect Square" is terrible
+	// advice for a card that was declined.
+	it('leaves a normal decline alone', async () => {
+		global.fetch = vi.fn().mockResolvedValue({
+			ok: false,
+			status: 402,
+			json: async () => ({
+				errors: [{ category: 'PAYMENT_METHOD_ERROR', code: 'CARD_DECLINED', detail: 'Card declined.' }],
+			}),
+		});
+
+		await expect(
+			square.createPaymentForAccount({
+				account,
+				sourceId: 'cnon:test',
+				amountCents: 20000,
+				idempotencyKey: 'idem-1',
+			}),
+		).rejects.toThrow(/Card declined/);
+	});
+});
