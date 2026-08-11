@@ -160,6 +160,38 @@ const ShopService = (() => {
 		return useLazyQuery(GET_MY_SQUARE_AUTHORIZATION_URL);
 	};
 
+	// The tax rate and offset every charge is computed from. In STORED units - basis points and
+	// cents - converted for display at the field, not here: a percentage held as a float is where
+	// 9.4 stops being representable, and the server keeps rates in integers for that reason.
+	const _MY_SQUARE_PRICING = gql`
+		query GetMySquarePricingSettings {
+			getMySquarePricingSettings {
+				source
+				ownerName
+				taxRateBasisPoints
+				squareFeeOffsetCents
+				canEdit
+			}
+		}
+	`;
+
+	const _fetchMySquarePricing = () => useQuery(_MY_SQUARE_PRICING);
+
+	const _UPDATE_SQUARE_PRICING = gql`
+		mutation UpdateSquarePricingSettings($taxRateBasisPoints: Int!, $squareFeeOffsetCents: Int!) {
+			updateSquarePricingSettings(
+				taxRateBasisPoints: $taxRateBasisPoints
+				squareFeeOffsetCents: $squareFeeOffsetCents
+			) {
+				source
+				ownerName
+				taxRateBasisPoints
+				squareFeeOffsetCents
+				canEdit
+			}
+		}
+	`;
+
 	const _DISCONNECT_MY_SQUARE = gql`
 		mutation DisconnectMySquare {
 			disconnectMySquare {
@@ -182,7 +214,10 @@ const ShopService = (() => {
         fetchMySquareConnection: _fetchMySquareConnection,
         MY_SQUARE_CONNECTION: _MY_SQUARE_CONNECTION,
         useMySquareAuthorizationUrl: _useMySquareAuthorizationUrl,
-        DISCONNECT_MY_SQUARE: _DISCONNECT_MY_SQUARE
+        DISCONNECT_MY_SQUARE: _DISCONNECT_MY_SQUARE,
+        fetchMySquarePricing: _fetchMySquarePricing,
+        MY_SQUARE_PRICING: _MY_SQUARE_PRICING,
+        UPDATE_SQUARE_PRICING: _UPDATE_SQUARE_PRICING
 	};
 })();
 

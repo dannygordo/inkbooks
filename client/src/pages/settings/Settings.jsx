@@ -14,6 +14,9 @@ import BookingSlugField from "../../components/artist/BookingSlugField";
 import NotificationSettingsPanel from "../../components/notifications/NotificationSettingsPanel";
 import AccountPanel from "../../components/settings/AccountPanel";
 import SquarePanel from "../../components/settings/SquarePanel";
+import SquarePricingPanel from "../../components/settings/SquarePricingPanel";
+import ShopPanel from "../../components/settings/ShopPanel";
+import { ROLES } from "../../constants/auth";
 import { bookingUrl } from "../../utils/bookingSlug";
 
 // New top-level settings section - see PRODUCTION_ROADMAP.md's "Rates & settings" entry for why
@@ -31,6 +34,9 @@ const Settings = () => {
 	// on this exact distinction, and resolvers/artistShopConnections.js's ownership check, which
 	// compares against user.id.
 	const shopId = user.userInfo?.shop?.id;
+	// The owner-artist case. Role, not userType: a shop admin's userType is ARTIST (see
+	// registerAccount), so userType cannot distinguish them from an artist at that shop.
+	const isShopAdmin = user.role <= ROLES.SHOP_ADMIN;
 
 	const { loading: artistLoading, data: artistData } = ArtistService.fetchArtist(artistUserInfoId);
 	const { loading: connectionsLoading, data: connectionsData } =
@@ -412,6 +418,15 @@ const Settings = () => {
 				{/* Photo, password and calendar colour - was its own /profile page. First, because it is
 				    the most-changed thing here and because "who am I" reads before "how do I charge". */}
 				<AccountPanel />
+
+				{/* A shop's first account is a SHOP_ADMIN whose userType is ARTIST (see
+				    registerAccount - "a shop owner tattoos until they say otherwise"), so the same
+				    person configures themselves and their shop. Those lived on unrelated pages,
+				    reached through a directory list of one shop. Sits high because for an owner the
+				    shop IS the business, and everything below is their own slice of it. */}
+				{isShopAdmin && shopId && (
+					<ShopPanel shopId={shopId} shopName={user.userInfo?.shop?.name} />
+				)}
 				<IBCardWrapper>
 					<div>
 						<h1>Shop</h1>
@@ -557,6 +572,12 @@ const Settings = () => {
 				    money actually go". Rendered for shop artists too, where it says the shop holds
 				    the connection rather than offering a button they cannot use. */}
 				<SquarePanel />
+
+				{/* Immediately after, because the two are one subject: where the money goes, and
+				    what gets added to it on the way. Both resolve to the same owner by the same
+				    rule, so splitting them across pages would make a shop artist hunt for the half
+				    they can read. Read-only for them - the panel says so itself. */}
+				<SquarePricingPanel />
 
 				{shopId && (
 					<IBCardWrapper>

@@ -238,3 +238,20 @@
     color: #a33;
     border: 1px solid #f3c1bb;
 }
+
+/* Tax & processing (components/settings/SquarePricingPanel.jsx). */
+.settingsPricingWarning {
+    background-color: #fdf3e0;
+    border: 1px solid #f0d9a8;
+    color: #7a5a12;
+    border-radius: 5px;
+    padding: 8px 12px;
+    margin: 0 0 12px;
+    font-size: 13px;
+}
+
+.settingsPricingSaved {
+    color: #1b8a3e;
+    font-size: 13px;
+    align-self: center;
+}

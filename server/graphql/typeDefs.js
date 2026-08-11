@@ -199,6 +199,22 @@ module.exports = gql`
     # artist reaches for a card, not after the charge fails.
     canCharge: Boolean!
   }
+  # The tax rate and fee offset every charge is computed from, and whose they are.
+  #
+  # In STORED units - basis points and cents - not percentages and dollars. The UI converts for
+  # display; a rate travelling as a float is where 9.4 stops being representable (M8).
+  type SquarePricingSettings {
+    # 'shop' or 'artist', resolved by the same owner rule as the tax rate itself (M8).
+    source: String!
+    # The shop's name when source is 'shop', so the panel can say whose these are. Null otherwise.
+    ownerName: String
+    taxRateBasisPoints: Int!
+    squareFeeOffsetCents: Int!
+    # False for a shop artist who is not an admin. They see the figures - these apply to every
+    # charge they take - but the rate belongs to the shop's location, and two artists in the same
+    # room must not bill different ones.
+    canEdit: Boolean!
+  }
   # The caller's own view of a Square connection. Deliberately exposes only non-secret fields -
   # the encrypted access/refresh tokens never leave the server, exactly as on Shop.
   type SquareConnection {
@@ -1000,6 +1016,9 @@ module.exports = gql`
     # the SHOP's account, so the source field is what the settings panel needs in order to say
     # something true rather than showing a connect button that would build a dead connection.
     getMySquareConnection: SquareConnection!
+    # The tax rate and offset in force for the caller, and whether they may change them. Read by
+    # the settings panel; the same values routes/squarePayments.js computes every charge from.
+    getMySquarePricingSettings: SquarePricingSettings!
     getPendingShopCutConfirmations(shopId: ID!): [Appointment]
 
     ######### Artists ###########
@@ -1285,6 +1304,13 @@ module.exports = gql`
     # The artist's own account, for an artist who owns one. Refuses when a shop holds the
     # connection - it is not theirs to disconnect. See DECISIONS.md M9.
     disconnectMySquare: SquareConnection!
+    # Writes to whichever owner M8 resolves - the shop when connected, the artist when not. The
+    # owner is not an argument: it already has one answer, and a supplied one could disagree with
+    # it. Values are in STORED units, basis points and cents.
+    updateSquarePricingSettings(
+      taxRateBasisPoints: Int!
+      squareFeeOffsetCents: Int!
+    ): SquarePricingSettings!
 
     ######### Shop-cut ledger ###########
     # See PRODUCTION_ROADMAP.md's "Shop-cut ledger" section for the full design: Square Invoices

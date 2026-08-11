@@ -4,6 +4,7 @@ const usersResolvers = require('./users');
 const artistsMutations = require('../mutations/artists');
 const shopResolvers = require('./shops');
 const shopMutations = require('../mutations/shops');
+const squarePricingMutations = require('../mutations/squarePricing');
 const staffMutations = require('../mutations/staff');
 const staffResolvers = require('./staff');
 const clientMutations = require('../mutations/clients');
@@ -85,6 +86,7 @@ module.exports = {
     ...usersResolvers.Mutation,
     ...artistsMutations,
     ...shopMutations,
+    ...squarePricingMutations,
     ...staffMutations,
     ...clientMutations,
     ...conversationMutations,

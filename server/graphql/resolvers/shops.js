@@ -6,6 +6,7 @@ const { signState } = require('../../routes/squareOAuth');
 const { getShopIdsForUser, assertCanAccessShop } = require('../../utils/shop-membership');
 const { getActiveShopIdForArtist } = require('../../utils/artist-shop');
 const { resolveSquareAccountFor } = require('../../utils/square-account');
+const { resolveSquareSettings } = require('../../utils/square-pricing');
 const SquareAccount = require('../../models/SquareAccount');
 const { UserInputError, rethrow } = require('../../utils/errors');
 
@@ -82,6 +83,26 @@ module.exports = {
             });
           }
           return square.buildAuthorizationUrl(signState('ARTIST', user.id));
+        }),
+        // The tax rate and offset in force for the caller. Reads through resolveSquareSettings -
+        // the same function every charge computes from - rather than looking the owner up again,
+        // so the panel cannot show a figure the charge would not use.
+        getMySquarePricingSettings: withAuth(async (_, args, context, info, user) => {
+          const settings = await resolveSquareSettings(user.id);
+          let ownerName = null;
+          if (settings.source === 'shop') {
+            const shop = await Shop.findById(settings.shopId).select('name');
+            ownerName = shop ? shop.name : null;
+          }
+          return {
+            source: settings.source,
+            ownerName,
+            taxRateBasisPoints: settings.taxRateBasisPoints,
+            squareFeeOffsetCents: settings.feeOffsetCents,
+            // An independent artist is their own admin (S2); at a shop, the rate belongs to the
+            // shop's location and only an admin sets it.
+            canEdit: settings.source === 'artist' || user.role <= Constants.ROLES.SHOP_ADMIN,
+          };
         }),
         // Where the caller's sessions actually charge, resolved through the same owner rule as
         // their tax rate. An artist at a shop gets source 'shop' and the shop's connection state,

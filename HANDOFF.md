@@ -14,9 +14,9 @@ Everything has been run and everything passes.
 
 | Suite | Files | Tests | Status |
 |---|---|---|---|
-| `client` | 23 | 118 | not re-run since the charge work |
+| `client` | 25 | ~138 | new panels green; rest **not re-run** |
 | `server/test/unit` | 9 | 107 | green |
-| `server/test/integration` | 46 | ~730 | 12 failures fixed, **not re-run** |
+| `server/test/integration` | 47 | ~747 | **not re-run** since the charge fixes |
 
 Green is the standing expectation now, not an achievement — treat a failure as a real regression
 rather than as a test nobody had ever run.
@@ -33,7 +33,10 @@ failures from two causes, both now addressed but neither observed passing:
   failed with statuses that read as assertion failures about payments.
 
 The client suite also has not been re-run since `SessionDetail` and `BookSessionDatesForm` changed
-shape, and `SessionDetail` now fires a query it did not before.
+shape, and `SessionDetail` now fires a query it did not before. `SquarePricingSettings.test.jsx` and
+`squarePricingSettings.test.js` are both new and only the client half has been observed.
+
+`IBInput` gained an `inputProps` passthrough, so it is worth watching the whole input suite.
 
 **No database has been migrated.** The code reads `SquareAccount`; every existing environment still
 has the connection on `Shop`, so a previously connected shop reads as *disconnected* until
@@ -105,6 +108,15 @@ executable bit, git skips it with a hint on stderr rather than an error — whic
   and they are load-bearing on each other — tax the deposit without deducting it from the base and
   the client pays tax twice on that portion; deduct without taxing and that portion is never taxed.
   A gift card is the opposite case and comes off the total, because it was sold untaxed (M6).
+- **Tax and the fee offset are configurable.** `updateSquarePricingSettings` writes to whichever
+  owner M8 resolves; `SquarePricingPanel` converts percentages and dollars at the boundary. These
+  fields had existed since M8 with no screen anywhere, so every charge collected $0.00 of tax and
+  nobody could fix it from the app — see the note under Known gaps about what that means for
+  existing data.
+- **A shop admin configures their shop from `/settings`.** `ShopPanel`, shown for
+  `role <= SHOP_ADMIN`. A shop's first account is a SHOP_ADMIN whose `userType` is ARTIST
+  (`registerAccount`: "a shop owner tattoos until they say otherwise"), so one person has both
+  kinds of settings and they used to live on unrelated pages.
 - **An independent artist can connect Square, end to end.** `getMySquareConnection`,
   `getMySquareAuthorizationUrl` and `disconnectMySquare`, with a panel in
   `components/settings/SquarePanel.jsx`. It renders for shop artists too and tells them the shop
@@ -132,6 +144,14 @@ Last of all, deliberately: the UI standardisation pass onto the register-page ae
 with everything else.
 
 ## Known gaps, not bugs
+
+- **Every existing shop and artist has a tax rate of 0.** Not a migration oversight — there was no
+  way to set one until now, so every row is genuinely unconfigured. Any charge taken before someone
+  visits Settings collects no sales tax, and the panel says so on screen rather than leaving it to
+  be noticed from a receipt. Worth setting for every real shop before the charge path goes live.
+- **The shop cut percentage has two editors** — `ShopPanel` on `/settings` and the autosave field on
+  `/shop/:shopId`. One stored field, so this is a UX duplication rather than a second source of
+  truth. Collapse it when the shop pages are next touched.
 
 - **Nothing writes a `ShopCutRate` row automatically.** Until an admin records one, every lookup
   falls through to the connection or shop value exactly as before. Behaviour is unchanged.

@@ -31,6 +31,11 @@ const IBInput = ({
 	disabled = false,
 	variant = 'standard',
 	helperText,
+	// Forwarded to the underlying <input>. Needed for step on a decimal money/percentage field:
+	// type="number" defaults to step=1, so a browser treats 9.4 as invalid and silently BLOCKS a
+	// real form submit. Nothing hit that before because every money field in this app saves from a
+	// button's onClick rather than a form's onSubmit, so native validation never ran.
+	inputProps,
 	onChange = () => {},
 	onKeyDown = () =>{},
 	onBlur = () => {},
@@ -51,6 +56,7 @@ const IBInput = ({
             error={error}
             placeholder={placeholder}
             disabled={disabled}
+			{...(inputProps ? { inputProps } : {})}
 			helperText={helperText}
             onChange={onChange}
 			onKeyDown={onKeyDown}
