@@ -189,6 +189,42 @@ describe('disconnectMySquare', () => {
 });
 
 describe('getMySquareAuthorizationUrl', () => {
+	/**
+	 * These are the first tests to reach buildAuthorizationUrl at all.
+	 *
+	 * The block they replaced asserted a REFUSAL - a shop artist being turned away - so it never
+	 * got as far as building a URL, and the Square app credentials were never needed. Now that
+	 * every artist is offered the handshake, they are, and globalSetup does not set them: they are
+	 * real secrets that belong in .env, not in a test harness.
+	 *
+	 * Set and restored per test rather than globally, so nothing else in the process inherits a
+	 * Square configuration it did not ask for.
+	 */
+	const SQUARE_ENV = {
+		SQUARE_APPLICATION_ID: 'test-square-application-id',
+		SQUARE_APPLICATION_SECRET: 'test-square-application-secret',
+		SQUARE_OAUTH_REDIRECT_URL: 'https://api.inkbooks.test/square/oauth/callback',
+	};
+	let saved;
+
+	beforeEach(() => {
+		saved = {};
+		for (const [key, value] of Object.entries(SQUARE_ENV)) {
+			saved[key] = process.env[key];
+			process.env[key] = value;
+		}
+	});
+
+	afterEach(() => {
+		for (const [key, value] of Object.entries(saved)) {
+			if (value === undefined) {
+				delete process.env[key];
+			} else {
+				process.env[key] = value;
+			}
+		}
+	});
+
 	// Every artist connects their own account. This used to refuse anyone at a shop, which is
 	// exactly backwards - a shop artist needs one as much as an independent artist does, because
 	// their clients pay them directly.
@@ -208,5 +244,21 @@ describe('getMySquareAuthorizationUrl', () => {
 		const { data, errors } = (await run(MY_SQUARE_AUTHORIZATION_URL, user)).body.singleResult;
 		expect(errors).toBeUndefined();
 		expect(data.getMySquareAuthorizationUrl).toMatch(/oauth2\/authorize/);
+	});
+
+	// The signed state is the only thing stopping someone attaching their own Square account to
+	// another owner (see routes/squareOAuth.js). Worth asserting now that a URL is actually built:
+	// nothing else in the suite exercises this.
+	it('carries a signed state token bound to the caller', async () => {
+		const { user } = await createArtistUser();
+
+		const { data } = (await run(MY_SQUARE_AUTHORIZATION_URL, user)).body.singleResult;
+		const state = new URL(data.getMySquareAuthorizationUrl).searchParams.get('state');
+		expect(state).toBeTruthy();
+
+		const jwt = require('jsonwebtoken');
+		const decoded = jwt.verify(state, process.env.SECRET_KEY);
+		expect(decoded.ownerType).toBe('ARTIST');
+		expect(decoded.ownerId).toBe(String(user.id));
 	});
 });
