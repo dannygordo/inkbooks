@@ -16,6 +16,7 @@ const express = require('express');
 const { createLoaders } = require('./utils/loaders');
 const { startScheduler } = require('./utils/scheduler');
 const { notificationJobs } = require('./utils/notification-jobs');
+const ClientFlagType = require('./models/ClientFlagType');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const { Server } = require('socket.io');
@@ -219,6 +220,12 @@ async function start() {
   // to make (see utils/scheduler.js).
   startScheduler(notificationJobs(), { tickMs: 60 * 1000 });
   console.log('Scheduler started');
+
+  // The flag types the app ships with. Idempotent and $setOnInsert-only, so re-running never
+  // overwrites a label somebody has since edited - and doing it on boot rather than in a migration
+  // means a fresh database is usable immediately instead of failing the first time a session is
+  // marked no-show. See models/ClientFlagType.js.
+  await ClientFlagType.ensureSeeded();
 
   const PORT = process.env.PORT || 5500;
   await new Promise((resolve) => httpServer.listen(PORT, resolve));

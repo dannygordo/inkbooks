@@ -39,6 +39,15 @@ const ClientSchema = new mongoose.Schema({
     // out of new-project pickers, and everything already attached to them - projects,
     // appointments, the money on those appointments - is untouched and still counts.
     status: {type: Number},
+    // Unresolved flag counts by type, e.g. { NO_SHOWED: 2 }.
+    //
+    // DENORMALISED ON PURPOSE. The question these answer - "has this person no-showed before" - is
+    // asked once per ROW when an appointment list renders, and a join per row to count flags is the
+    // difference between a list and a query storm. utils/client-flags.js is the only writer and
+    // RECOUNTS from the rows rather than incrementing, so any drift self-heals: a counter that
+    // disagrees with the flags it counts would put a no-show badge next to the name of somebody who
+    // has never missed a sitting, which is a false accusation rendered in the UI.
+    flagCounts: {type: Object, default: {}},
     // Notes about the client, as opposed to Project.notes (about one piece of work) or
     // Appointment.sessionNotes (about one sitting). Same embedded IBNote sub-document those two
     // already use - allergies, how they handle long sittings, healing history, anything that

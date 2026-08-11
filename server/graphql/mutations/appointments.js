@@ -5,6 +5,7 @@ const { AuthenticationError, UserInputError, rethrow } = require('../../utils/er
 const { updateAppointmentInputSchema, createAppointmentInputSchema, appointmentIdInputSchema, validate } = require('../../utils/validation');
 const { applyShopCut } = require('../../utils/shop-cut');
 const { queueProjectScheduleEmail } = require('../../utils/client-booking-emails');
+const { syncNoShowFlag } = require('../../utils/client-flags');
 const { canManageArtist, assertCanManageArtist } = require('../../utils/shop-membership');
 
 // Same ownership shape as updateAppointment/deleteAppointment below - Admin/SHOP_ADMIN-or-better,
@@ -223,7 +224,28 @@ module.exports = {
             await assertHasShopConnection(user.id, appointment.shopId);
           }
 
+          // Captured BEFORE the write - syncNoShowFlag needs to know what changed, and after
+          // findByIdAndUpdate the old status is gone.
+          const previousStatus = existingAppointment.appointmentStatus;
+
           const res = await Appointment.findByIdAndUpdate({_id: appointment.id}, appointment, {new: true});
+
+          // Marking a session no-show raises a NO_SHOWED flag on the client; moving it off no-show
+          // RESOLVES that flag rather than deleting it (DECISIONS.md C2). This is the only place
+          // the flag is raised, which is what makes it trustworthy as an automatic record - a flag
+          // that claims to be system-generated but could also be typed in says nothing about
+          // whether the client actually missed a sitting.
+          //
+          // Best-effort by contract: the appointment save has already happened and must not be
+          // undone because a flag could not be written. syncNoShowFlag returns its outcome rather
+          // than throwing, and warns on the way past.
+          if ('appointmentStatus' in appointment) {
+            await syncNoShowFlag({
+              appointment: res,
+              previousStatus,
+              actingUserId: user.id,
+            });
+          }
           // Recompute the shop cut whenever the figure it's derived from changes. Only on an
           // actual subtotalCents change - not on every save - because applyShopCut is a write to
           // a ledger field, and a notes-only or date-only save has no business touching what an
