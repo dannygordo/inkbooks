@@ -1,42 +1,42 @@
 const SquareAccount = require('../models/SquareAccount');
-const { getActiveShopIdForArtist } = require('./artist-shop');
 
 /**
- * Whose Square account applies, and whose it is. See DECISIONS.md M9.
+ * Which Square account applies, and for what. See DECISIONS.md M9.
  *
  * ---------------------------------------------------------------------------------------------
- * DELIBERATELY THE SAME SHAPE AS resolveSquareSettings in utils/square-pricing.js: active shop
- * first, artist only when independent, and a `source` on the way out so a UI can say whose these
- * are. That is not incidental symmetry. "Whose tax rate is this" and "whose Square account is this"
- * have to be the same question, or a shop artist ends up billing the shop's tax into the artist's
- * own Square account and the books disagree with themselves.
+ * THERE ARE TWO ACCOUNTS AND THEY ARE NEVER INTERCHANGEABLE.
  *
- * If one of these two resolvers ever changes, the other one changes with it.
+ *   - THE ARTIST'S OWN account takes money from CLIENTS. Always the artist's, whether they work at
+ *     a shop or not. A client pays the artist for the work.
+ *   - THE SHOP'S account receives SHOP-CUT INVOICES from its artists. The artist owes the shop a
+ *     percentage afterwards, and settles it - by Square invoice or by hand, exactly as they would
+ *     with cash.
+ *
+ * The money moves client -> artist -> shop, in two separate transactions, and the second one is
+ * what utils/square.js's createAndPublishShopCutInvoice does: "billed to the artist, payable
+ * directly into the shop's own connected Square account".
+ *
+ * THIS FILE PREVIOUSLY RESOLVED A CLIENT CHARGE TO THE SHOP when the artist was connected to one,
+ * on the reasoning that the tax rate resolves that way (M8). It does not follow, and the result was
+ * severe: the shop received the entire payment AND then invoiced the artist for their cut of it, so
+ * the shop was paid twice and the artist not at all. Tax is destination-based - a question about
+ * WHERE THE WORK HAPPENED. Which account is charged is a question about WHO IS OWED. Those have
+ * different answers and the same shop attached to one of them, which is what made the mistake easy.
  * ---------------------------------------------------------------------------------------------
  */
 
-/** The owner of the Square account for this artist, without loading the account itself. */
-async function resolveSquareOwnerFor(artistUserId) {
-  const shopId = await getActiveShopIdForArtist(artistUserId);
-  if (shopId) {
-    return { ownerType: 'SHOP', ownerId: shopId, source: 'shop' };
+/**
+ * The account a client's card is charged into: the artist's own, always.
+ *
+ * Returns null when they have not connected one. Null is a normal state - an artist who has not
+ * connected Square still has a working product, they simply cannot take a card through it - and it
+ * must NEVER fall back to the shop's account. That fallback is the bug this replaced.
+ */
+async function resolveArtistChargeAccount(artistUserId) {
+  if (!artistUserId) {
+    return null;
   }
-  return { ownerType: 'ARTIST', ownerId: artistUserId, source: 'artist' };
-}
-
-/**
- * The Square account this artist's charges run through, or null if that owner has never connected
- * one.
- *
- * Null is a normal state, not an error - an artist who has not connected Square still has a whole
- * working product, they just cannot take a card through it. Callers that need a usable connection
- * should say so themselves rather than have this throw, because the message differs: a shop artist
- * has to ask their admin to reconnect, an independent artist can fix it themselves.
- */
-async function resolveSquareAccountFor(artistUserId) {
-  const owner = await resolveSquareOwnerFor(artistUserId);
-  const account = await findAccountForOwner(owner.ownerType, owner.ownerId);
-  return { ...owner, account };
+  return SquareAccount.findOne({ ownerType: 'ARTIST', ownerId: artistUserId });
 }
 
 /** The account for an explicit owner. Used by the OAuth callback, which knows the owner already. */
@@ -63,8 +63,7 @@ async function getOrCreateAccountForOwner(ownerType, ownerId) {
 }
 
 module.exports = {
-  resolveSquareOwnerFor,
-  resolveSquareAccountFor,
+  resolveArtistChargeAccount,
   findAccountForOwner,
   getOrCreateAccountForOwner,
 };

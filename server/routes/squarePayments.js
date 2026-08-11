@@ -2,7 +2,7 @@ const express = require('express');
 const checkAuth = require('../utils/check-auth');
 const square = require('../utils/square');
 const SquareAccount = require('../models/SquareAccount');
-const { resolveSquareAccountFor } = require('../utils/square-account');
+const { resolveArtistChargeAccount } = require('../utils/square-account');
 const { quoteAppointmentCharge, quoteDepositCharge } = require('../utils/charge-quote');
 const { processSquarePaymentInputSchema, validate } = require('../utils/validation');
 const { checkRateLimit, getClientIp } = require('../utils/rate-limit');
@@ -148,13 +148,13 @@ router.post('/square/process-payment', express.json(), async (req, res) => {
     });
   }
 
-  const { account } = await resolveSquareAccountFor(appointment.userId);
+  // THE ARTIST'S OWN ACCOUNT, always - never the shop's, even for a shop artist (M9). The client
+  // is paying the artist for the work; what the artist owes the shop is settled separately,
+  // afterwards, through the shop-cut ledger.
+  const account = await resolveArtistChargeAccount(appointment.userId);
   if (!SquareAccount.isUsable(account)) {
     return res.status(400).json({
-      error:
-        quote.settings.source === 'shop'
-          ? 'This shop has not connected a Square account yet.'
-          : 'Connect Square in Settings before taking a card payment.',
+      error: 'Connect Square in Settings before taking a card payment.',
     });
   }
 

@@ -15,7 +15,7 @@ const {
 } = require('../../utils/shop-membership');
 const { paginate } = require('../../utils/pagination');
 const { quoteAppointmentCharge } = require('../../utils/charge-quote');
-const { resolveSquareAccountFor } = require('../../utils/square-account');
+const { resolveArtistChargeAccount } = require('../../utils/square-account');
 const SquareAccount = require('../../models/SquareAccount');
 
 // getAppointmentsByShop is called for real by Artist- and Staff-role users viewing their own
@@ -141,7 +141,7 @@ module.exports = {
           applyFeeOffset: Boolean(applyFeeOffset),
           tipCents: tipCents || 0,
         });
-        const { account } = await resolveSquareAccountFor(appointment.userId);
+        const account = await resolveArtistChargeAccount(appointment.userId);
 
         return {
           ...breakdown,

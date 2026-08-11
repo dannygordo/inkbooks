@@ -92,9 +92,10 @@ executable bit, git skips it with a hint on stderr rather than an error — whic
   Worth remembering the shape: the tested half was correct and the untested boundary was not.
 - **Client booking confirmations.** Consults email immediately; sessions coalesce per project on a
   three-minute debounce that restarts with each new sitting.
-- **A Square account belongs to an owner.** `SquareAccount` keyed `{ownerType, ownerId}`, resolved
-  by `resolveSquareAccountFor` in the same shape as `resolveSquareSettings`. The GraphQL `Shop`
-  fields are unchanged and derived. See `DECISIONS.md` M9.
+- **A client pays the artist; the shop is paid afterwards, by the artist.** Two `SquareAccount`s and
+  they are never interchangeable — the artist's own takes client money, the shop's receives cut
+  invoices. `resolveArtistChargeAccount` never falls back to the shop. See `DECISIONS.md` M9,
+  including the mistake it corrects.
 - **The server decides what a charge is.** `utils/charge-quote.js` computes every figure from
   stored state; the client sends which appointment, which transaction, the offset choice, the tip
   and an idempotency key. Charges settle into the owner's connected account. See `DECISIONS.md`
@@ -150,8 +151,10 @@ executable bit, git skips it with a hint on stderr rather than an error — whic
    the seven now-unread `square*` fields from stored shop documents. Deliberately left in place for
    one deploy — see M9.
 3. Gift cards — model, balance, partial redemption, the payout sign convention in `DECISIONS.md` M6,
-   and the offset at purchase. The ownership question they depended on is answered (M9), and the
-   sale is priced by the same `computeChargeBreakdown` with tax zeroed.
+   and the offset at purchase. **M6 has an OPEN item now**: it said the shop holds the liability when
+   the artist is connected, which was written assuming a client charge settles to the shop. It does
+   not (M9). Who holds an outstanding gift card's liability is a separate question from which account
+   the sale was charged into, and it is undecided. Settle that before building.
 4. Adjustment records — shop-admin only, never calls Square.
 5. GraphQL surface for client flags. The automatic path works end to end; reading a client's flags
    and raising a manual one exist only as functions.

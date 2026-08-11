@@ -391,13 +391,18 @@ function verifyWebhookSignature({ notificationUrl, rawBody, signatureHeader }) {
 const SQUARE_API_VERSION = '2026-07-15';
 
 /**
- * Charges a card into the OWNER'S OWN Square account.
+ * Charges a card into the ARTIST'S OWN Square account.
  *
  * ---------------------------------------------------------------------------------------------
- * THE MONEY LANDS WHERE THE WORK HAPPENED. `account` is a SquareAccount resolved through
- * resolveSquareAccountFor (DECISIONS.md M9) - the shop's when the artist is connected to one,
- * their own when independent - so the funds settle to that seller and InkBooks is never a party to
- * the movement.
+ * THE CLIENT IS PAYING THE ARTIST. `account` comes from resolveArtistChargeAccount and is always
+ * the artist's own, shop or no shop (DECISIONS.md M9). What the artist owes the shop is a separate
+ * transaction settled afterwards - see createAndPublishShopCutInvoice below, which bills the artist
+ * and is payable into the shop's account. Two transactions, in that order, exactly as it works with
+ * cash. InkBooks is never a party to either.
+ *
+ * It briefly resolved to the SHOP's account for a shop artist, by analogy with the tax rate (M8).
+ * The result was that the shop received the whole payment and then invoiced the artist for a cut of
+ * it - paid twice, with the artist paid nothing.
  *
  * This replaces createSandboxPayment, which charged every payment through ONE platform access
  * token (SQUARE_SANDBOX_ACCESS_TOKEN) into a hardcoded sandbox location. Every charge in the app

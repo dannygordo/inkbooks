@@ -3,7 +3,6 @@ const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 const { assertCanAccessShop } = require('../../utils/shop-membership');
 const { findAccountForOwner } = require('../../utils/square-account');
-const { getActiveShopIdForArtist } = require('../../utils/artist-shop');
 const { UserInputError, rethrow } = require('../../utils/errors');
 
 module.exports = {
@@ -90,18 +89,11 @@ module.exports = {
     // The artist's own counterpart. No id argument - like getMySquareAuthorizationUrl, it can only
     // ever act for the caller, so there is nothing to authorize beyond being signed in.
     //
-    // Refuses while a shop holds the connection. Not defensiveness: the account genuinely is not
-    // theirs, and silently succeeding by clearing an artist-owned row they don't use would report
-    // "Disconnected" while their sessions carried on charging into the shop's account.
+    // Works for every artist, shop or no shop. It used to refuse anyone at a shop, which followed
+    // from the account resolution being wrong: charges were routed to the shop, so a personal
+    // account looked like something the artist should not be managing. They own it - it is the
+    // account their clients pay into (M9).
     disconnectMySquare: withAuth(async (_, args, context, info, user) => {
-      const shopId = await getActiveShopIdForArtist(user.id);
-      if (shopId) {
-        throw new UserInputError('Errors', {
-          errors: {
-            square: 'Your shop holds the Square connection for your sessions - a shop admin manages it.',
-          },
-        });
-      }
       // Cleared, not deleted - same reasoning as disconnectShopSquare above.
       const account = await findAccountForOwner('ARTIST', user.id);
       if (account) {

@@ -1,10 +1,11 @@
 // The artist-facing half of the Square connection: getMySquareConnection,
 // getMySquareAuthorizationUrl and disconnectMySquare. See DECISIONS.md M9.
 //
-// These exist because M9 is only half-implemented without them. The extraction gave an
-// independent artist an account they could own; these are the operations that let them reach it,
-// and the thing most worth pinning is what happens to an artist who is NOT independent - every
-// one of the three has to refuse or redirect rather than quietly acting on the wrong owner.
+// The account these operate on is the artist's OWN, always - the one their clients pay into. The
+// thing most worth pinning is that a shop artist is treated no differently, because an earlier
+// version resolved their charges to the shop's account and this file asserted that behaviour.
+// The shop's account exists to RECEIVE their cut invoices afterwards, which is a separate
+// transaction and a separate account.
 //
 // describe/it/expect come from Vitest's `globals: true` config - see the comment in
 // test/integration/appointments.test.js for why there's no `require('vitest')` here.
@@ -85,42 +86,37 @@ describe('getMySquareConnection', () => {
 		expect(data.getMySquareConnection.locationId).toBe('L_TEST');
 	});
 
-	// The answer to "where does my money go" for a shop artist, which is the whole reason this
-	// query returns a source rather than just a boolean.
-	it('reports the SHOP as owner for a connected artist, and names it', async () => {
-		const { user } = await createArtistUser();
-		const { shop } = await createShopAdminUser();
-		await connectArtistToShop(user.id, shop.id);
-		await connectSquareFor('SHOP', shop._id);
-
-		const { data } = (await run(MY_SQUARE_CONNECTION, user)).body.singleResult;
-		expect(data.getMySquareConnection.source).toBe('shop');
-		expect(data.getMySquareConnection.connected).toBe(true);
-		expect(data.getMySquareConnection.ownerName).toBe(shop.name);
-	});
-
-	// The state where an artist would otherwise think it was theirs to fix.
-	it('reports the shop as owner even when the shop has not connected', async () => {
-		const { user } = await createArtistUser();
-		const { shop } = await createShopAdminUser();
-		await connectArtistToShop(user.id, shop.id);
-
-		const { data } = (await run(MY_SQUARE_CONNECTION, user)).body.singleResult;
-		expect(data.getMySquareConnection.source).toBe('shop');
-		expect(data.getMySquareConnection.connected).toBe(false);
-		expect(data.getMySquareConnection.ownerName).toBe(shop.name);
-	});
-
-	// An artist's personal account must not be reported while a shop owns their charges - it would
-	// read as "you are set up" while their sessions charge somewhere else entirely.
-	it('ignores the artist\'s own account while a shop owns their charges', async () => {
+	/**
+	 * THE CORRECTION. This block asserted the opposite - that a shop artist's connection resolves
+	 * to the SHOP and is reported with the shop's name. It followed from the charge routing being
+	 * wrong, and the consequence was that the shop received the whole payment and then invoiced the
+	 * artist for a cut of it.
+	 *
+	 * A client pays the artist. The shop's account is a different thing entirely: it is what
+	 * RECEIVES the cut invoices afterwards.
+	 */
+	it('reports the artist\'s OWN account even when they work at a shop', async () => {
 		const { user } = await createArtistUser();
 		const { shop } = await createShopAdminUser();
 		await connectArtistToShop(user.id, shop.id);
 		await connectSquareFor('ARTIST', user.id);
 
 		const { data } = (await run(MY_SQUARE_CONNECTION, user)).body.singleResult;
-		expect(data.getMySquareConnection.source).toBe('shop');
+		expect(data.getMySquareConnection.source).toBe('artist');
+		expect(data.getMySquareConnection.connected).toBe(true);
+		expect(data.getMySquareConnection.ownerName).toBeNull();
+	});
+
+	// A connected SHOP does not make a shop artist connected. They need their own, and until they
+	// have one the honest answer is that they cannot take a card.
+	it('does not report a shop connection as the artist\'s own', async () => {
+		const { user } = await createArtistUser();
+		const { shop } = await createShopAdminUser();
+		await connectArtistToShop(user.id, shop.id);
+		await connectSquareFor('SHOP', shop._id);
+
+		const { data } = (await run(MY_SQUARE_CONNECTION, user)).body.singleResult;
+		expect(data.getMySquareConnection.source).toBe('artist');
 		expect(data.getMySquareConnection.connected).toBe(false);
 	});
 
@@ -161,18 +157,23 @@ describe('disconnectMySquare', () => {
 		expect(await SquareAccount.countDocuments({ ownerType: 'ARTIST', ownerId: user.id })).toBe(1);
 	});
 
-	// Succeeding here would report "Disconnected" while their sessions carried on charging into
-	// the shop's account.
-	it('refuses an artist whose shop holds the connection', async () => {
+	// Used to be refused, back when a shop artist's charges resolved to the shop. It is their own
+	// account and always was.
+	it('clears the account of an artist who works at a shop', async () => {
 		const { user } = await createArtistUser();
 		const { shop } = await createShopAdminUser();
 		await connectArtistToShop(user.id, shop.id);
+		await connectSquareFor('ARTIST', user.id);
 		await connectSquareFor('SHOP', shop._id);
 
 		const { data, errors } = (await run(DISCONNECT_MY_SQUARE, user)).body.singleResult;
-		expect(data).toBeNull();
-		expect(errors[0].extensions.errors.square).toMatch(/shop admin/i);
+		expect(errors).toBeUndefined();
+		expect(data.disconnectMySquare.connected).toBe(false);
 
+		const own = await SquareAccount.findOne({ ownerType: 'ARTIST', ownerId: user.id });
+		expect(own.connected).toBe(false);
+
+		// And the SHOP's account - which receives their cut invoices - is untouched.
 		const shopAccount = await SquareAccount.findOne({ ownerType: 'SHOP', ownerId: shop._id });
 		expect(shopAccount.connected).toBe(true);
 		expect(shopAccount.accessTokenEncrypted).toBe('encrypted:token');
@@ -188,15 +189,24 @@ describe('disconnectMySquare', () => {
 });
 
 describe('getMySquareAuthorizationUrl', () => {
-	// A personal account for a shop artist would be a connection nothing routes to, sitting there
-	// looking like it works - so the refusal is the feature, not a missing capability.
-	it('refuses an artist who is currently at a shop', async () => {
+	// Every artist connects their own account. This used to refuse anyone at a shop, which is
+	// exactly backwards - a shop artist needs one as much as an independent artist does, because
+	// their clients pay them directly.
+	it('is offered to an artist who works at a shop', async () => {
 		const { user } = await createArtistUser();
 		const { shop } = await createShopAdminUser();
 		await connectArtistToShop(user.id, shop.id);
 
 		const { data, errors } = (await run(MY_SQUARE_AUTHORIZATION_URL, user)).body.singleResult;
-		expect(data).toBeNull();
-		expect(errors[0].extensions.errors.square).toMatch(/shop/i);
+		expect(errors).toBeUndefined();
+		expect(data.getMySquareAuthorizationUrl).toMatch(/oauth2\/authorize/);
+	});
+
+	it('is offered to an independent artist too', async () => {
+		const { user } = await createArtistUser();
+
+		const { data, errors } = (await run(MY_SQUARE_AUTHORIZATION_URL, user)).body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.getMySquareAuthorizationUrl).toMatch(/oauth2\/authorize/);
 	});
 });

@@ -122,8 +122,12 @@ because the fee applies to the grossed-up total.
   comes off the session's total. Both take the offset. See M8 for the ordering that falls out.
 - Full face value loaded as balance. Partial redemption supported. Spendable on deposits.
 - No expiry — Washington prohibits it. The liability never ages off.
-- Shop-level when the artist is connected, artist-level otherwise. **The shop holds the entire
-  amount.**
+- **OPEN, and now in tension with M9.** This said "shop-level when the artist is connected,
+  artist-level otherwise — the shop holds the entire amount", written when a client charge was
+  thought to settle to the shop. It does not (M9): a client pays the artist. Whether the LIABILITY
+  for an outstanding gift card sits with the shop or the artist is a separate question from which
+  Square account the sale was charged into, and it has not been decided. Decide it before building
+  gift cards.
 
 Payout on redemption:
 
@@ -216,70 +220,68 @@ owed". That reasoning holds for a gift card and fails for a deposit, because it 
 money was untaxed. This document said it for both, and the implementation followed — a $500 job with
 a $200 deposit would have collected 9.4% on $700 of base across the two transactions.
 
-### M9. A Square account belongs to an owner, not to a shop
+### M9. A client pays the artist. The shop is paid afterwards, by the artist
 
-Extracted into its own `SquareAccount` model keyed on `{ownerType: 'SHOP' | 'ARTIST', ownerId}`.
-The six connection fields move off `Shop`: `squareConnected`, `squareMerchantId`,
-`squareLocationId`, `squareAccessTokenEncrypted`, `squareRefreshTokenEncrypted`,
-`squareTokenExpiresAt`.
+**Two Square accounts, never interchangeable:**
 
-The forcing question was an independent artist, who under S2 is their own admin and under M8 already
-carries `taxRateBasisPoints` and `squareFeeOffsetCents` on `Artist` — pricing configuration with no
-account to charge against. They can set a tax rate and then cannot take a card.
+- **The artist's own** takes money from **clients** — sessions, deposits, everything a client is
+  charged. Always the artist's, whether they work at a shop or not.
+- **The shop's** receives **shop-cut invoices** from its artists. The artist owes a percentage
+  afterwards and settles it, by Square invoice or by hand.
 
-Resolution mirrors `resolveSquareSettings` in `utils/square-pricing.js` exactly: active shop first,
-artist when independent. One helper, `resolveSquareAccountFor(artistUserId)`, so the answer to "whose
-tax rate is this" and the answer to "whose Square account is this" are produced by the same rule
-rather than two that can drift apart.
+Money moves client → artist → shop, in two transactions, and the second one already existed:
+`createAndPublishShopCutInvoice` is *"billed to the artist, payable directly into the shop's own
+connected Square account"*. **It works exactly the way cash does** — the client hands the artist the
+money, and the artist squares up with the shop after.
 
-What this costs, stated plainly:
+Stored in a `SquareAccount` model keyed `{ownerType: 'SHOP' | 'ARTIST', ownerId}`, extracted from
+the six fields that used to sit inline on `Shop`. `ownerType`/`ownerId` rather than two nullable
+foreign keys: two nullable columns make "neither" and "both" representable, and every reader then
+has to handle states the writer never intended.
 
-- A migration lifting every connected `Shop` into a `SquareAccount` row with `ownerType: 'SHOP'`.
-- `routes/squareOAuth.js` signs a JWT state carrying `shopId`; it has to carry `ownerType` **and**
-  `ownerId`. That signature is the thing stopping someone attaching their own Square account to
-  another owner, so widening it needs the same care the original had.
-- `utils/square.js`'s `refreshAccessTokenIfNeeded` takes a `shop` and writes the refreshed token back
-  onto it. It takes a `SquareAccount` instead.
+`resolveArtistChargeAccount(artistUserId)` is what a charge uses. It returns the artist's own
+account or **null** — and null must never fall back to the shop's. That fallback is the bug below.
 
-The blast radius is smaller than it looks: the encrypted token is read in exactly one place
-(`utils/square.js:154`).
+#### The mistake, because it is worth not repeating
 
-**Built.** `models/SquareAccount.js`, `utils/square-account.js`, and
-`scripts/migrate-square-accounts.js`. Three things worth knowing before touching it:
+This originally resolved a client charge to the **shop** when the artist was connected to one, by
+analogy with the tax rate: M8 resolves the rate to the shop, so the account seemed to follow. It
+does not, and the result was severe — **the shop received the entire payment and then invoiced the
+artist for a cut of it.** Paid twice; the artist paid nothing.
 
-- **The GraphQL contract did not change.** `Shop.squareConnected`, `squareLocationId` and
-  `squareConnectedAt` are still there and are now *derived* by field resolvers reading
-  `SquareAccount`. The client already queries them by name; where the server keeps the row is not
-  something the schema should make the client care about.
-- **`isUsable`, not `connected`.** A half-failed OAuth callback leaves `connected: true` with no
+The two questions look alike and are not:
+
+| Question | Answer | Why |
+|---|---|---|
+| Whose **tax rate**? | The shop's | Destination-based — *where the work happened* |
+| Whose **account** is charged? | The artist's | *Who is owed* for the work |
+
+The same shop is attached to one of them, which is what made conflating them easy. An integration
+test now asserts the two resolve **differently** for the same artist.
+
+#### Built
+
+`models/SquareAccount.js`, `utils/square-account.js`, `scripts/migrate-square-accounts.js`. Worth
+knowing before touching it:
+
+- **Every artist connects their own account** through `getMySquareAuthorizationUrl`, which takes no
+  argument — it can only act for the caller. Shop artists included; they need one *most*, since
+  their clients pay them directly.
+- **The GraphQL contract on `Shop` did not change.** `squareConnected`, `squareLocationId` and
+  `squareConnectedAt` are still there, now derived by field resolvers. They describe the shop's
+  invoice-receiving account, not anything a client is charged into.
+- **`isUsable`, not `connected`.** A half-failed OAuth callback leaves the boolean true with no
   token. Every consumer checks `SquareAccount.isUsable(account)` so the refusal happens where there
-  is a message the user can act on, rather than inside `getValidAccessToken`.
+  is a message the user can act on.
 - **The old `Shop` fields still exist on stored documents.** The schema no longer declares them and
-  nothing reads them, but the migration deliberately does not `$unset`. Two copies of an opaque
-  ciphertext cannot produce the class of error two copies of a *number* can, and the cost of being
-  wrong is a shop that cannot take payment. Drop them in a follow-up once charges are confirmed.
+  nothing reads them; the migration deliberately does not `$unset` until charges are confirmed.
 
-An independent artist connects through `getMySquareAuthorizationUrl`, which takes no argument — it
-can only act for the caller. It refuses an artist who is currently at a shop: under M8 their tax
-rate and offset already resolve to the shop, so a personal account would be a connection nothing
-routes to, sitting there looking like it works. `disconnectMySquare` refuses the same case for the
-same reason — succeeding by clearing an artist-owned row they don't use would report "Disconnected"
-while their sessions carried on charging into the shop's account.
+Rejected: **copying the six fields onto `Artist`** and branching per consumer. Cheaper today, but it
+makes the owner rule exist twice in two shapes, and every field added afterwards has to be added to
+both or it silently works for one owner and not the other.
 
-`getMySquareConnection` returns a **source**, not just a boolean, and the settings panel renders for
-shop artists as well as independent ones. Their sessions charge into the shop's account, so what
-they need is to be told that — with the shop named, and no button. Hiding the panel would leave
-"where does my money go" unanswered anywhere in the product; offering a connect button would invite
-them to build the dead connection above.
-
-Rejected: **copying the six fields onto `Artist`** and branching on "has an active shop?" at each
-consumer. Cheaper today — one real branch — but it makes M8's owner rule exist twice in two shapes,
-and every Square field added afterwards has to be added in both places or it silently works for one
-owner and not the other. That failure is invisible until an independent artist hits it in
-production.
-
-Rejected: **shop-only, permanently**. It contradicts S2 and strands the two pricing fields already on
-`Artist` as configuration that can never be used.
+Rejected: **falling back to the shop's account** when an artist has not connected their own. It
+looks like a courtesy and is the exact failure above.
 
 ### M10. The server decides what a charge is. The client only says which button was pressed
 
@@ -538,6 +540,8 @@ share → UI surfaces → dashboard fixes. Standalone fixes pulled forward.
 | Freezing a cut permanently once written | Blocks correcting a mistyped subtotal at the rate that applied |
 | Square fields copied onto `Artist` | Two shapes of the same owner rule; new fields get added to one |
 | Square as a shop-only feature | Contradicts S2 and strands the pricing fields already on `Artist` |
+| Charging a client into the shop's account | Shop is paid in full AND invoices the artist for a cut |
+| Falling back to the shop when the artist has no account | Looks like a courtesy; is the same double-payment |
 | Client-supplied charge components | No schema makes a client entitled to assert what it is owed |
 | Cross-checking client figures against server ones | Two sources for one number, needing a rule for which wins |
 | Charging a deposit before recording it | Charged and recorded become two numbers that can differ |

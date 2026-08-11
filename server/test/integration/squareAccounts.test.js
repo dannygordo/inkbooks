@@ -6,8 +6,7 @@
 const mongoose = require('mongoose');
 const SquareAccount = require('../../models/SquareAccount');
 const {
-	resolveSquareOwnerFor,
-	resolveSquareAccountFor,
+	resolveArtistChargeAccount,
 	findAccountForOwner,
 	getOrCreateAccountForOwner,
 } = require('../../utils/square-account');
@@ -27,118 +26,34 @@ beforeAll(async () => {
 	await SquareAccount.init();
 });
 
-describe('owner resolution', () => {
-	// The rule M9 exists to enforce. An artist at a shop charges into the SHOP's account, so two
-	// artists in the same room cannot end up taking payment into two different Square accounts
-	// while billing the shop's tax rate.
-	it('resolves to the shop while the artist is connected to one', async () => {
+/**
+ * WHICH ACCOUNT A CLIENT'S CARD IS CHARGED INTO: the artist's own, always.
+ *
+ * These tests replace a block that asserted the opposite - that a shop artist's charges resolve to
+ * the SHOP's account, by analogy with the tax rate. That was wrong and the consequence was severe:
+ * the shop received the entire payment and then invoiced the artist for a cut of it, so the shop
+ * was paid twice and the artist not at all.
+ *
+ * A client pays the artist for the work. What the artist owes the shop is a second transaction,
+ * settled afterwards through the shop-cut ledger - exactly as it works with cash.
+ */
+describe('resolveArtistChargeAccount', () => {
+	it('returns the artist\'s own account when they are independent', async () => {
 		const { user } = await createArtistUser();
-		const { shop } = await createShopAdminUser();
-		await connectArtistToShop(user.id, shop.id);
-
-		const owner = await resolveSquareOwnerFor(user.id);
-		expect(owner.ownerType).toBe('SHOP');
-		expect(String(owner.ownerId)).toBe(String(shop._id));
-		expect(owner.source).toBe('shop');
-	});
-
-	// The case that forced the whole decision: an independent artist is an owner in their own
-	// right (S2), not an artist with a missing shop.
-	it('resolves to the artist themselves when they have no shop', async () => {
-		const { user } = await createArtistUser();
-
-		const owner = await resolveSquareOwnerFor(user.id);
-		expect(owner.ownerType).toBe('ARTIST');
-		expect(String(owner.ownerId)).toBe(String(user.id));
-		expect(owner.source).toBe('artist');
-	});
-
-	// A2: leaving a shop closes the interval. The account has to follow the artist out, or their
-	// next session charges into the account of a shop they no longer work at.
-	it('follows the artist back to themselves after they leave the shop', async () => {
-		const { user } = await createArtistUser();
-		const { shop } = await createShopAdminUser();
-		const connection = await connectArtistToShop(user.id, shop.id);
-
-		expect((await resolveSquareOwnerFor(user.id)).ownerType).toBe('SHOP');
-
-		const now = new Date();
-		connection.status = 'disconnected';
-		connection.endedAt = now;
-		connection.disconnectedAt = now;
-		await connection.save();
-
-		const after = await resolveSquareOwnerFor(user.id);
-		expect(after.ownerType).toBe('ARTIST');
-		expect(String(after.ownerId)).toBe(String(user.id));
-	});
-
-	it('follows a transfer to the new shop', async () => {
-		const { user } = await createArtistUser();
-		const { shop: first } = await createShopAdminUser();
-		const { shop: second } = await createShopAdminUser();
-		await connectArtistToShop(user.id, first.id);
-		await connectArtistToShop(user.id, second.id);
-
-		const owner = await resolveSquareOwnerFor(user.id);
-		expect(String(owner.ownerId)).toBe(String(second._id));
-	});
-
-	/**
-	 * THE INVARIANT M9 RESTS ON. resolveSquareSettings (whose tax rate and fee offset, M8) and
-	 * resolveSquareOwnerFor (whose Square account) must never disagree about the owner - a shop
-	 * artist billing the shop's tax into their own Square account is exactly the state the
-	 * extraction exists to prevent.
-	 */
-	it('agrees with resolveSquareSettings about who the owner is', async () => {
-		const { user: connected } = await createArtistUser();
-		const { shop } = await createShopAdminUser();
-		await connectArtistToShop(connected.id, shop.id);
-
-		const settings = await resolveSquareSettings(connected.id);
-		const owner = await resolveSquareOwnerFor(connected.id);
-		expect(owner.source).toBe(settings.source);
-		expect(String(owner.ownerId)).toBe(String(settings.shopId));
-
-		const { user: independent } = await createArtistUser();
-		const independentSettings = await resolveSquareSettings(independent.id);
-		const independentOwner = await resolveSquareOwnerFor(independent.id);
-		expect(independentOwner.source).toBe(independentSettings.source);
-		expect(independentSettings.shopId).toBeNull();
-		expect(String(independentOwner.ownerId)).toBe(String(independent.id));
-	});
-});
-
-describe('resolveSquareAccountFor', () => {
-	it('returns a null account when that owner has never connected Square', async () => {
-		const { user } = await createArtistUser();
-
-		const resolved = await resolveSquareAccountFor(user.id);
-		expect(resolved.ownerType).toBe('ARTIST');
-		expect(resolved.account).toBeNull();
-	});
-
-	it('returns the shop account for a connected artist', async () => {
-		const { user } = await createArtistUser();
-		const { shop } = await createShopAdminUser();
-		await connectArtistToShop(user.id, shop.id);
 		await new SquareAccount({
-			ownerType: 'SHOP',
-			ownerId: shop._id,
+			ownerType: 'ARTIST',
+			ownerId: user.id,
 			connected: true,
-			accessTokenEncrypted: 'encrypted:token',
+			accessTokenEncrypted: 'encrypted:own',
 		}).save();
 
-		const resolved = await resolveSquareAccountFor(user.id);
-		expect(resolved.account).not.toBeNull();
-		expect(String(resolved.account.ownerId)).toBe(String(shop._id));
-		expect(SquareAccount.isUsable(resolved.account)).toBe(true);
+		const account = await resolveArtistChargeAccount(user.id);
+		expect(account.ownerType).toBe('ARTIST');
+		expect(String(account.ownerId)).toBe(String(user.id));
 	});
 
-	// The account belongs to the OWNER, so an artist's own account must not be picked up while
-	// they are at a shop that has not connected one. Otherwise a shop's sessions would quietly
-	// charge into the artist's personal Square account.
-	it('does not fall back to the artist\'s own account while they are at a shop', async () => {
+	// THE CORRECTION, stated as directly as it can be.
+	it('returns the artist\'s own account when they work at a shop', async () => {
 		const { user } = await createArtistUser();
 		const { shop } = await createShopAdminUser();
 		await connectArtistToShop(user.id, shop.id);
@@ -146,12 +61,91 @@ describe('resolveSquareAccountFor', () => {
 			ownerType: 'ARTIST',
 			ownerId: user.id,
 			connected: true,
-			accessTokenEncrypted: 'encrypted:personal',
+			accessTokenEncrypted: 'encrypted:own',
 		}).save();
 
-		const resolved = await resolveSquareAccountFor(user.id);
-		expect(resolved.ownerType).toBe('SHOP');
-		expect(resolved.account).toBeNull();
+		const account = await resolveArtistChargeAccount(user.id);
+		expect(account.ownerType).toBe('ARTIST');
+		expect(String(account.ownerId)).toBe(String(user.id));
+	});
+
+	// The fallback that caused the bug. A shop with a connected account must NEVER stand in for an
+	// artist who has not connected one - the correct answer is "you cannot take a card yet".
+	it('never falls back to the shop, even when the shop is connected', async () => {
+		const { user } = await createArtistUser();
+		const { shop } = await createShopAdminUser();
+		await connectArtistToShop(user.id, shop.id);
+		await new SquareAccount({
+			ownerType: 'SHOP',
+			ownerId: shop._id,
+			connected: true,
+			accessTokenEncrypted: 'encrypted:shop',
+		}).save();
+
+		expect(await resolveArtistChargeAccount(user.id)).toBeNull();
+	});
+
+	it('returns null for an artist who has not connected one', async () => {
+		const { user } = await createArtistUser();
+
+		expect(await resolveArtistChargeAccount(user.id)).toBeNull();
+	});
+
+	// Leaving a shop changes nothing here, which is the point - it was never the shop's account.
+	it('is unchanged by joining or leaving a shop', async () => {
+		const { user } = await createArtistUser();
+		const { shop } = await createShopAdminUser();
+		await new SquareAccount({
+			ownerType: 'ARTIST',
+			ownerId: user.id,
+			connected: true,
+			accessTokenEncrypted: 'encrypted:own',
+		}).save();
+
+		const before = await resolveArtistChargeAccount(user.id);
+		const connection = await connectArtistToShop(user.id, shop.id);
+		const during = await resolveArtistChargeAccount(user.id);
+
+		const now = new Date();
+		connection.status = 'disconnected';
+		connection.endedAt = now;
+		connection.disconnectedAt = now;
+		await connection.save();
+		const after = await resolveArtistChargeAccount(user.id);
+
+		expect(String(during._id)).toBe(String(before._id));
+		expect(String(after._id)).toBe(String(before._id));
+	});
+});
+
+/**
+ * THE TWO QUESTIONS THAT LOOK ALIKE AND ARE NOT.
+ *
+ * "Whose tax rate applies" is about WHERE THE WORK HAPPENED - destination-based, so it resolves to
+ * the shop (M8). "Whose account is charged" is about WHO IS OWED - the artist, always (M9). The
+ * same shop is attached to one of them, which is what made conflating them easy, and an earlier
+ * version of this file asserted that the two must agree. They must not.
+ */
+describe('the tax rate and the charge account resolve differently', () => {
+	it('bills the shop\'s tax rate into the artist\'s own account', async () => {
+		const { user } = await createArtistUser();
+		const { shop } = await createShopAdminUser();
+		shop.taxRateBasisPoints = 940;
+		await shop.save();
+		await connectArtistToShop(user.id, shop.id);
+		await new SquareAccount({
+			ownerType: 'ARTIST',
+			ownerId: user.id,
+			connected: true,
+			accessTokenEncrypted: 'encrypted:own',
+		}).save();
+
+		const settings = await resolveSquareSettings(user.id);
+		const account = await resolveArtistChargeAccount(user.id);
+
+		expect(settings.source).toBe('shop');
+		expect(settings.taxRateBasisPoints).toBe(940);
+		expect(account.ownerType).toBe('ARTIST');
 	});
 });
 

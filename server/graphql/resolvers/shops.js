@@ -5,7 +5,7 @@ const square = require('../../utils/square');
 const { signState } = require('../../routes/squareOAuth');
 const { getShopIdsForUser, assertCanAccessShop } = require('../../utils/shop-membership');
 const { getActiveShopIdForArtist } = require('../../utils/artist-shop');
-const { resolveSquareAccountFor } = require('../../utils/square-account');
+const { resolveArtistChargeAccount } = require('../../utils/square-account');
 const { resolveSquareSettings } = require('../../utils/square-pricing');
 const SquareAccount = require('../../models/SquareAccount');
 const { UserInputError, rethrow } = require('../../utils/errors');
@@ -64,24 +64,18 @@ module.exports = {
           }
           return square.buildAuthorizationUrl(signState('SHOP', shopId));
         }, Constants.ROLES.SHOP_ADMIN),
-        // The independent artist's route to the same handshake (DECISIONS.md M9, S2). Separate
-        // from the shop one rather than a nullable shopId on it, because the two have genuinely
-        // different authorization: that one asks "may you act for this shop", this one only ever
-        // acts for the caller themselves, so there is no id to check and nothing to pass in.
+        // EVERY artist connects their own account, shop or no shop (DECISIONS.md M9). A client pays
+        // the artist for the work; what the artist owes the shop is settled afterwards through the
+        // shop-cut ledger, the same way it would be with cash.
         //
-        // Refuses an artist who is currently at a shop. Not a permission problem - under M8 their
-        // tax rate and fee offset already resolve to the shop, so a personal Square account would
-        // be a connection nothing routes to, sitting there looking like it works.
+        // This used to REFUSE an artist who was at a shop, on the reasoning that their charges
+        // resolved to the shop's account. They did, and that was the bug: the shop was paid the
+        // whole amount and then invoiced the artist for a cut of it.
+        //
+        // Separate from the shop's own handshake rather than a nullable shopId on it, because the
+        // two have genuinely different authorization: that one asks "may you act for this shop",
+        // this one only ever acts for the caller, so there is no id to check and nothing to pass in.
         getMySquareAuthorizationUrl: withAuth(async (_, args, context, info, user) => {
-          const shopId = await getActiveShopIdForArtist(user.id);
-          if (shopId) {
-            throw new UserInputError('Errors', {
-              errors: {
-                square:
-                  'Your shop holds the Square connection for your sessions - a shop admin connects it.',
-              },
-            });
-          }
           return square.buildAuthorizationUrl(signState('ARTIST', user.id));
         }),
         // The tax rate and offset in force for the caller. Reads through resolveSquareSettings -
@@ -104,24 +98,22 @@ module.exports = {
             canEdit: settings.source === 'artist' || user.role <= Constants.ROLES.SHOP_ADMIN,
           };
         }),
-        // Where the caller's sessions actually charge, resolved through the same owner rule as
-        // their tax rate. An artist at a shop gets source 'shop' and the shop's connection state,
-        // even though they have no control over it - because that is the true answer to "where
-        // does my money go", and a panel that showed them their own empty account instead would be
-        // inviting them to build a connection nothing routes to.
+        // THE CALLER'S OWN ACCOUNT, always. A client pays the artist for the work, so the account
+        // a card is charged into is the artist's whether or not they work at a shop (M9).
+        //
+        // `source` is therefore always 'artist' here. It is kept on the type rather than removed
+        // because the schema is shared with the pricing settings, where the shop/artist split is
+        // real - tax is destination-based and does belong to the shop. Two questions with the same
+        // shop attached to one of them is exactly what made this wrong the first time, so the
+        // answer is spelled out rather than inferred.
         getMySquareConnection: withAuth(async (_, args, context, info, user) => {
-          const { source, ownerType, ownerId, account } = await resolveSquareAccountFor(user.id);
-          let ownerName = null;
-          if (ownerType === 'SHOP') {
-            const shop = await Shop.findById(ownerId).select('name');
-            ownerName = shop ? shop.name : null;
-          }
+          const account = await resolveArtistChargeAccount(user.id);
           return {
-            source,
+            source: 'artist',
             connected: SquareAccount.isUsable(account),
             locationId: account ? account.locationId || null : null,
             connectedAt: account ? account.connectedAt || null : null,
-            ownerName,
+            ownerName: null,
           };
         }),
     }

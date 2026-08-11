@@ -1,6 +1,11 @@
-// SquarePanel.jsx tests. The panel's whole job is to say something DIFFERENT to an artist who
-// owns their Square connection and to one whose shop owns it (DECISIONS.md M9), so most of these
-// assert on which of those two things it said.
+// SquarePanel.jsx tests. The panel shows an artist their OWN Square connection - the account their
+// clients pay into - and it is the same for every artist, shop or no shop (DECISIONS.md M9).
+//
+// It briefly did something else: told a shop artist that their shop held the connection and offered
+// them no button. That followed from the server routing their charges into the shop's account,
+// which meant the shop was paid the whole amount and then invoiced the artist for a cut of it.
+// Several tests here asserted that behaviour and passed. They are rewritten rather than deleted,
+// because "a shop artist sees no difference" is the claim now worth pinning.
 //
 // Explicit React import - the app relies on @vitejs/plugin-react's automatic JSX runtime, but
 // Vitest's transform for *test* files falls back to the classic runtime without this. See the
@@ -39,20 +44,23 @@ const INDEPENDENT_CONNECTED = {
 	ownerName: null,
 };
 
-const SHOP_CONNECTED = {
-	source: "shop",
+// A shop artist's connection looks IDENTICAL to an independent artist's, because it is the same
+// thing: their own account, which their clients pay into. getMySquareConnection reports source
+// 'artist' for everyone - the shop/artist split is real for the TAX RATE (M8) and not for this.
+const SHOP_ARTIST_CONNECTED = {
+	source: "artist",
 	connected: true,
-	locationId: "L_SHOP",
+	locationId: "L_SHOP_ARTIST",
 	connectedAt: "2026-01-09T00:00:00.000Z",
-	ownerName: "Iron Anchor Tattoo",
+	ownerName: null,
 };
 
-const SHOP_DISCONNECTED = {
-	source: "shop",
+const SHOP_ARTIST_DISCONNECTED = {
+	source: "artist",
 	connected: false,
 	locationId: null,
 	connectedAt: null,
-	ownerName: "Iron Anchor Tattoo",
+	ownerName: null,
 };
 
 function renderPanel({ connection, route = "/settings", extraMocks = [] } = {}) {
@@ -88,40 +96,36 @@ describe("an independent artist", () => {
 	});
 });
 
-describe("an artist whose shop owns the connection", () => {
-	// The panel renders for them rather than hiding, because "where does my money go" is otherwise
-	// unanswered anywhere in the product.
-	it("names the shop instead of offering a button they cannot use", async () => {
-		renderPanel({ connection: SHOP_CONNECTED });
+describe("an artist who works at a shop", () => {
+	// THE CORRECTION. This block used to assert the opposite - that a shop artist is told their
+	// shop holds the connection and gets no button. That followed from the server routing their
+	// charges into the shop's account, which meant the shop was paid the whole amount and then
+	// invoiced the artist for a cut of it. Clients pay the artist; the shop's cut is settled
+	// afterwards through the ledger, the same way it works with cash.
+	it("gets the same connect button as anyone else", async () => {
+		renderPanel({ connection: SHOP_ARTIST_DISCONNECTED });
+
+		expect(
+			await screen.findByRole("button", { name: "Connect with Square" }),
+		).toBeInTheDocument();
+	});
+
+	it("can disconnect their own account", async () => {
+		renderPanel({ connection: SHOP_ARTIST_CONNECTED });
 
 		expect(await screen.findByText("Connected")).toBeInTheDocument();
-		expect(screen.getByText(/Iron Anchor Tattoo/)).toBeInTheDocument();
-		expect(
-			screen.queryByRole("button", { name: "Connect with Square" }),
-		).not.toBeInTheDocument();
+		expect(screen.getByRole("button", { name: "Disconnect Square" })).toBeInTheDocument();
 	});
 
-	// A button that always errors is worse than no button: the server refuses disconnectMySquare
-	// for a shop artist, so offering it would only ever produce a failure.
-	it("gets no disconnect button for an account that is not theirs", async () => {
-		renderPanel({ connection: SHOP_CONNECTED });
+	// The panel must not imply the shop is involved in taking the payment. It is involved in what
+	// happens NEXT, which the help text says plainly.
+	it("never names a shop as holding the connection", async () => {
+		renderPanel({ connection: SHOP_ARTIST_CONNECTED });
 
 		await screen.findByText("Connected");
-		expect(
-			screen.queryByRole("button", { name: "Disconnect Square" }),
-		).not.toBeInTheDocument();
-	});
-
-	// The state that would otherwise look like the artist's own problem to fix.
-	it("says the SHOP has not connected, and still offers no button", async () => {
-		renderPanel({ connection: SHOP_DISCONNECTED });
-
-		expect(
-			await screen.findByText("Your shop has not connected Square yet."),
-		).toBeInTheDocument();
-		expect(
-			screen.queryByRole("button", { name: "Connect with Square" }),
-		).not.toBeInTheDocument();
+		expect(screen.queryByText(/Only a shop admin/)).not.toBeInTheDocument();
+		expect(screen.queryByText(/Your shop has not connected/)).not.toBeInTheDocument();
+		expect(screen.getByText(/Clients pay you directly/)).toBeInTheDocument();
 	});
 });
 

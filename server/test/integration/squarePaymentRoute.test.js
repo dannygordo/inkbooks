@@ -66,7 +66,9 @@ afterEach(() => {
 	createPaymentSpy.mockRestore();
 });
 
-// $180/hr, 9.4% tax, $6/hr offset - the configuration DECISIONS.md M5 and M2 work through.
+// $180/hr, 9.4% tax, $6/hr offset - the configuration DECISIONS.md M5 and M2 work through. The
+// shop's own SquareAccount is connected too, because it is what receives the artist's cut invoices
+// afterwards - and because a connected shop is precisely what must NOT be charged for the work.
 async function connectedShopWithRates() {
 	const { shop } = await createShopAdminUser();
 	shop.hourlyRate = 180;
@@ -77,18 +79,33 @@ async function connectedShopWithRates() {
 		ownerType: 'SHOP',
 		ownerId: shop._id,
 		connected: true,
-		locationId: 'L_TEST',
-		merchantId: 'M_TEST',
-		accessTokenEncrypted: 'encrypted:token',
+		locationId: 'L_SHOP',
+		merchantId: 'M_SHOP',
+		accessTokenEncrypted: 'encrypted:shop-token',
 		tokenExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
 	}).save();
 	return shop;
 }
 
+async function connectSquareForArtist(userId) {
+	return new SquareAccount({
+		ownerType: 'ARTIST',
+		ownerId: userId,
+		connected: true,
+		locationId: 'L_ARTIST',
+		merchantId: 'M_ARTIST',
+		accessTokenEncrypted: 'encrypted:artist-token',
+		tokenExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+	}).save();
+}
+
+// An artist at a shop with BOTH accounts connected - the shape that exposes the bug this file's
+// settlement tests exist for.
 async function artistAtConnectedShop() {
 	const { user } = await createArtistUser();
 	const shop = await connectedShopWithRates();
 	await connectArtistToShop(user.id, shop.id);
+	await connectSquareForArtist(user.id);
 	return { user, shop };
 }
 
@@ -187,8 +204,16 @@ describe('the caller cannot set the amount', () => {
 	});
 });
 
+/**
+ * WHERE THE MONEY SETTLES - the artist's own account, always.
+ *
+ * These replace a block asserting the opposite. A client pays the ARTIST for the work; the shop is
+ * paid afterwards, by the artist, through the shop-cut ledger (M9). Routing the client's card into
+ * the shop's account meant the shop received the whole amount and then invoiced the artist for a
+ * cut of it - paid twice, artist paid nothing.
+ */
 describe('where the money settles', () => {
-	it('charges into the shop\'s connected account for a shop artist', async () => {
+	it('charges the artist\'s own account, not their shop\'s', async () => {
 		const { user, shop } = await artistAtConnectedShop();
 		const appointment = await createAppointment(user.id, {
 			shopId: shop.id,
@@ -198,21 +223,16 @@ describe('where the money settles', () => {
 		await post(validBody(appointment.id), user);
 
 		const account = createPaymentSpy.mock.calls[0][0].account;
-		expect(account.ownerType).toBe('SHOP');
-		expect(String(account.ownerId)).toBe(String(shop._id));
+		expect(account.ownerType).toBe('ARTIST');
+		expect(String(account.ownerId)).toBe(String(user.id));
+		expect(account.locationId).toBe('L_ARTIST');
 	});
 
-	it('charges into the artist\'s own account when they are independent', async () => {
+	it('charges an independent artist\'s own account', async () => {
 		const { user, artist } = await createArtistUser();
 		artist.hourlyRate = 150;
 		await artist.save();
-		await new SquareAccount({
-			ownerType: 'ARTIST',
-			ownerId: user.id,
-			connected: true,
-			locationId: 'L_OWN',
-			accessTokenEncrypted: 'encrypted:own',
-		}).save();
+		await connectSquareForArtist(user.id);
 		const appointment = await createAppointment(user.id, { subtotalCents: 20000 });
 
 		await post(validBody(appointment.id), user);
@@ -222,8 +242,25 @@ describe('where the money settles', () => {
 		expect(String(account.ownerId)).toBe(String(user.id));
 	});
 
-	// Refused before the card is reached for, with a message naming who has to fix it.
-	it('refuses when the owner has no usable connection, without calling Square', async () => {
+	// THE FALLBACK THAT CAUSED IT. A connected shop must not stand in for an artist who has not
+	// connected their own account - the honest answer is that they cannot take a card yet.
+	it('refuses rather than falling back to the shop\'s connected account', async () => {
+		const { user } = await createArtistUser();
+		const shop = await connectedShopWithRates();
+		await connectArtistToShop(user.id, shop.id);
+		const appointment = await createAppointment(user.id, {
+			shopId: shop.id,
+			subtotalCents: 20000,
+		});
+
+		const res = await post(validBody(appointment.id), user);
+
+		expect(res.status).toBe(400);
+		expect(res.body.error).toMatch(/Connect Square in Settings/);
+		expect(createPaymentSpy).not.toHaveBeenCalled();
+	});
+
+	it('refuses an independent artist with no connection, without calling Square', async () => {
 		const { user } = await createArtistUser();
 		const appointment = await createAppointment(user.id, { subtotalCents: 20000 });
 
