@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 
 // Encrypts Square OAuth access/refresh tokens before they're stored on the Shop document (see
-// models/Shop.js's squareAccessTokenEncrypted/squareRefreshTokenEncrypted). This isn't optional
+// models/SquareAccount.js's accessTokenEncrypted/refreshTokenEncrypted). This isn't optional
 // hardening - Square's own "Move OAuth to Production" requirements explicitly call for encrypting
 // tokens at rest with a key that isn't accessible to anyone who doesn't need it, since the token
 // this protects can perform any action on the connected shop's Square account.

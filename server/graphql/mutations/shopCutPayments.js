@@ -1,10 +1,12 @@
 const Appointment = require('../../models/Appointment');
 const Shop = require('../../models/Shop');
+const SquareAccount = require('../../models/SquareAccount');
 const User = require('../../models/User');
 const withAuth = require('../../utils/with-auth');
 const { AuthenticationError, UserInputError } = require('../../utils/errors');
 const { Constants } = require('../../utils/constants');
 const { assertCanAccessShop } = require('../../utils/shop-membership');
+const { findAccountForOwner } = require('../../utils/square-account');
 const { notifySafely } = require('../../utils/notifications');
 const { shopAdminUserIds } = require('../../utils/notification-audience');
 const { actorName } = require('../../utils/notification-copy');
@@ -60,8 +62,12 @@ module.exports = {
       throw new UserInputError('Errors', { errors: { appointmentId: 'This shop cut is already marked as paid, awaiting the shop\'s confirmation.' } });
     }
 
-    const shop = await Shop.findById(appointment.shopId);
-    if (!shop || !shop.squareConnected) {
+    // The shop's Square connection lives on SquareAccount now (DECISIONS.md M9). Checked with
+    // isUsable rather than on `connected` alone: a half-failed OAuth callback leaves the boolean
+    // true with no token, and refusing here with a message the shop admin can act on beats
+    // throwing from inside getValidAccessToken with one they cannot.
+    const account = await findAccountForOwner('SHOP', appointment.shopId);
+    if (!SquareAccount.isUsable(account)) {
       throw new UserInputError('Errors', { errors: { appointmentId: 'This shop has not connected a Square account yet.' } });
     }
 
@@ -78,7 +84,7 @@ module.exports = {
     const targetAmountCents = appointment.shopCutCents;
 
     const invoiceResult = await square.createAndPublishShopCutInvoice({
-      shop,
+      account,
       artistEmail: artist.email,
       artistFirstName: artist.firstName,
       artistLastName: artist.lastName,
@@ -162,8 +168,9 @@ module.exports = {
       });
     }
 
-    const shop = await Shop.findById(shopId);
-    if (!shop || !shop.squareConnected) {
+    // Same as the single-appointment path above - see its comment on isUsable.
+    const account = await findAccountForOwner('SHOP', shopId);
+    if (!SquareAccount.isUsable(account)) {
       throw new UserInputError('Errors', {
         errors: { appointmentIds: 'This shop has not connected a Square account yet.' },
       });
@@ -179,7 +186,7 @@ module.exports = {
     const targetAmountCents = appointments.reduce((sum, a) => sum + (a.shopCutCents || 0), 0);
 
     const invoiceResult = await square.createAndPublishShopCutInvoice({
-      shop,
+      account,
       artistEmail: artist.email,
       artistFirstName: artist.firstName,
       artistLastName: artist.lastName,

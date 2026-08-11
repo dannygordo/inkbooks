@@ -37,25 +37,22 @@ const ShopSchema = new mongoose.Schema({
 	billingType: {type: String, default: ""},
 	status: {type: Number},
 
-	// Square OAuth connection - lets InkBooks create/publish invoices on this shop's behalf
-	// (Invoices API) without InkBooks ever touching the money. Tokens are encrypted at rest
-	// (see utils/token-crypto.js) per Square's Move-OAuth-to-Production token-handling
-	// requirements - "guarded like passwords". squareMerchantId/squareLocationId are not
-	// secret and stored in plaintext; they're just identifiers, not credentials.
-	squareConnected: {type: Boolean, default: false},
-	squareMerchantId: {type: String},
-	squareLocationId: {type: String},
-	squareAccessTokenEncrypted: {type: String},
-	squareRefreshTokenEncrypted: {type: String},
-	// Square OAuth access tokens expire every 30 days - this is checked before each use (see
-	// utils/square.js's refreshAccessTokenIfNeeded) and proactively refreshed once within 7
-	// days of expiry, per Square's own recommendation.
-	squareTokenExpiresAt: {type: Date},
-	squareConnectedAt: {type: Date},
+	// THE SQUARE CONNECTION IS NOT HERE ANY MORE. It lives on models/SquareAccount.js, keyed
+	// {ownerType: 'SHOP', ownerId: this shop's _id} - see DECISIONS.md M9. It moved because a
+	// connection belongs to an OWNER, and an independent artist is an owner too: with these fields
+	// inline on Shop, "who can take a card" and "who is a shop" were the same question, which left
+	// an unaffiliated artist able to configure a tax rate and unable to charge anything.
+	//
+	// The seven old fields (squareConnected, squareMerchantId, squareLocationId, both encrypted
+	// tokens, squareTokenExpiresAt, squareConnectedAt) are deliberately still on existing DOCUMENTS
+	// until scripts/migrate-square-accounts.js has run everywhere and charges are confirmed
+	// working. Nothing reads them - not this schema, not the resolvers - only that script does.
+	// Drop them in a follow-up once the migration is settled.
 
 	// --- Square pricing configuration -----------------------------------------------------------
-	// Distinct from the connection fields above: these are BUSINESS settings, not credentials, and
-	// they are read on every charge whether or not Square is connected.
+	// These stay. They are BUSINESS settings, not credentials, and they are read on every charge
+	// whether or not Square is connected at all - which is exactly why they never belonged with the
+	// connection fields in the first place.
 
 	// Sales tax, in BASIS POINTS. 940 = 9.40%.
 	//

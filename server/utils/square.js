@@ -149,22 +149,28 @@ async function refreshAccessToken(refreshToken) {
 
 // Square tokens expire every 30 days; Square recommends refreshing every 7 days or less so a
 // token never goes stale from inactivity alone. Returns a valid, decrypted access token, mutating
-// and saving `shop` in place if a refresh happened.
-async function getValidAccessToken(shop) {
-  if (!shop.squareConnected || !shop.squareAccessTokenEncrypted) {
-    throw new Error('This shop has not connected a Square account yet.');
+// and saving `account` in place if a refresh happened.
+//
+// Takes a SquareAccount, not a Shop (DECISIONS.md M9). The connection belongs to an owner, which
+// may be a shop or an independent artist, and this function has no business knowing which - it
+// needs credentials and somewhere to write refreshed ones back to. The error message says "this
+// account" rather than "this shop" for the same reason: an independent artist reading "this shop
+// has not connected a Square account" would reasonably conclude the problem was somewhere else.
+async function getValidAccessToken(account) {
+  if (!account || !account.connected || !account.accessTokenEncrypted) {
+    throw new Error('This account has not connected Square yet.');
   }
   const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  const needsRefresh = !shop.squareTokenExpiresAt || shop.squareTokenExpiresAt < sevenDaysFromNow;
+  const needsRefresh = !account.tokenExpiresAt || account.tokenExpiresAt < sevenDaysFromNow;
   if (!needsRefresh) {
-    return tokenCrypto.decrypt(shop.squareAccessTokenEncrypted);
+    return tokenCrypto.decrypt(account.accessTokenEncrypted);
   }
-  const refreshToken = tokenCrypto.decrypt(shop.squareRefreshTokenEncrypted);
+  const refreshToken = tokenCrypto.decrypt(account.refreshTokenEncrypted);
   const refreshed = await refreshAccessToken(refreshToken);
-  shop.squareAccessTokenEncrypted = tokenCrypto.encrypt(refreshed.access_token);
-  shop.squareRefreshTokenEncrypted = tokenCrypto.encrypt(refreshed.refresh_token);
-  shop.squareTokenExpiresAt = new Date(refreshed.expires_at);
-  await shop.save();
+  account.accessTokenEncrypted = tokenCrypto.encrypt(refreshed.access_token);
+  account.refreshTokenEncrypted = tokenCrypto.encrypt(refreshed.refresh_token);
+  account.tokenExpiresAt = new Date(refreshed.expires_at);
+  await account.save();
   return refreshed.access_token;
 }
 
@@ -193,7 +199,11 @@ function computeGrossedUpAmountCents(targetAmountCents, paymentMethod) {
 
 // --- Invoices ---
 
-async function findOrCreateCustomer(shop, accessToken, { emailAddress, givenName, familyName }) {
+// The seller's own Square customer directory is scoped by the access token, so this needs nothing
+// else to identify whose directory to search. It used to take a `shop` first argument that no line
+// of the body referenced - removed rather than migrated to a SquareAccount, since passing an owner
+// it does not use would suggest the search is scoped by one.
+async function findOrCreateCustomer(accessToken, { emailAddress, givenName, familyName }) {
   const searchResult = await squareFetch('/v2/customers/search', {
     method: 'POST',
     accessToken,
@@ -213,8 +223,13 @@ async function findOrCreateCustomer(shop, accessToken, { emailAddress, givenName
 // Creates and publishes a Square invoice, billed to the artist, payable directly into the shop's
 // own connected Square account - InkBooks is never a party to the money movement (no
 // app_fee_money/app_fee_allocations anywhere in this call). Returns { invoiceId, publicUrl }.
+//
+// Takes the shop's SquareAccount (DECISIONS.md M9) rather than the Shop itself, because the only
+// things it ever needed from the shop were the location id and the credentials, and both now live
+// on the account. This remains a shop-shaped operation regardless: a shop cut is money an artist
+// owes a shop, so an independent artist has no shop cut to invoice and never reaches here.
 async function createAndPublishShopCutInvoice({
-  shop,
+  account,
   artistEmail,
   artistFirstName,
   artistLastName,
@@ -222,13 +237,13 @@ async function createAndPublishShopCutInvoice({
   description,
   paymentMethod = 'ach',
 }) {
-  if (!shop.squareLocationId) {
-    throw new Error('This shop is missing a Square location id - reconnect Square.');
+  if (!account || !account.locationId) {
+    throw new Error('This Square connection is missing a location id - reconnect Square.');
   }
-  const accessToken = await getValidAccessToken(shop);
+  const accessToken = await getValidAccessToken(account);
   const grossedUpAmountCents = computeGrossedUpAmountCents(targetAmountCents, paymentMethod);
 
-  const customer = await findOrCreateCustomer(shop, accessToken, {
+  const customer = await findOrCreateCustomer(accessToken, {
     emailAddress: artistEmail,
     givenName: artistFirstName,
     familyName: artistLastName,
@@ -240,7 +255,7 @@ async function createAndPublishShopCutInvoice({
     body: {
       idempotency_key: crypto.randomUUID(),
       order: {
-        location_id: shop.squareLocationId,
+        location_id: account.locationId,
         customer_id: customer.id,
         line_items: [
           {
@@ -259,7 +274,7 @@ async function createAndPublishShopCutInvoice({
     body: {
       idempotency_key: crypto.randomUUID(),
       invoice: {
-        location_id: shop.squareLocationId,
+        location_id: account.locationId,
         order_id: orderResult.order.id,
         primary_recipient: { customer_id: customer.id },
         payment_requests: [

@@ -44,6 +44,7 @@ const BookingRequest = require('../../models/BookingRequest');
 const { findOrCreateConversationForMembers } = require('../../utils/conversations');
 const { ensureTagColor } = require('../../utils/tag-color');
 const { getActiveShopIdForArtist } = require('../../utils/artist-shop');
+const { findAccountForOwner } = require('../../utils/square-account');
 
 // Both Artist.shop and Artist.shopId need the same answer, and a directory asks for it once per
 // row - so it goes through the request's loader, which turns N queries into one. Falls back to a
@@ -260,6 +261,26 @@ module.exports = {
       const user = await User.findById(artist.userId);
       return user ? user.avatar : artist.avatar;
     }
+  },
+  // The three Square fields on Shop are now DERIVED from SquareAccount (DECISIONS.md M9) rather
+  // than stored on the shop document. The GraphQL contract is deliberately unchanged - Shop.jsx
+  // and ShopService.js both already ask for these three by name, and breaking the schema to move a
+  // server-side storage detail would make the client pay for a decision it has no stake in.
+  //
+  // Only the non-secret fields, exactly as before: the encrypted tokens never leave the server.
+  Shop: {
+    squareConnected: async (shop) => {
+      const account = await findAccountForOwner('SHOP', shop._id);
+      return Boolean(account && account.connected);
+    },
+    squareLocationId: async (shop) => {
+      const account = await findAccountForOwner('SHOP', shop._id);
+      return account ? account.locationId || null : null;
+    },
+    squareConnectedAt: async (shop) => {
+      const account = await findAccountForOwner('SHOP', shop._id);
+      return account ? account.connectedAt || null : null;
+    },
   },
   Client: {
     user: async(client, args, context, info) => {

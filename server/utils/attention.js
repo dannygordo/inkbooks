@@ -1,7 +1,7 @@
 const Appointment = require('../models/Appointment');
 const BookingRequest = require('../models/BookingRequest');
 const PasswordToken = require('../models/PasswordToken');
-const Shop = require('../models/Shop');
+const SquareAccount = require('../models/SquareAccount');
 const User = require('../models/User');
 const Staff = require('../models/Staff');
 const Artist = require('../models/Artist');
@@ -225,24 +225,28 @@ async function unredeemedInvites(shopIds, { olderThanDays = 3 } = {}) {
  */
 async function squareHealth(shopIds) {
   if (shopIds.length === 0) return [];
-  const shops = await Shop.find({ _id: { $in: shopIds } }).select(
-    '_id name squareMerchantId squareTokenExpiresAt',
-  );
+  // Reads SquareAccount rather than the shop document (DECISIONS.md M9). One query for the whole
+  // set, not one per shop - this runs on every attention fetch, and a per-shop lookup here would
+  // put the dashboard's query count on the size of the admin's shop list.
+  const accounts = await SquareAccount.find({
+    ownerType: 'SHOP',
+    ownerId: { $in: shopIds },
+  }).select('ownerId merchantId tokenExpiresAt');
   const now = new Date();
 
-  return shops
-    .filter((shop) => shop.squareMerchantId && shop.squareTokenExpiresAt)
-    .filter((shop) => shop.squareTokenExpiresAt < now)
-    .map((shop) =>
+  return accounts
+    .filter((account) => account.merchantId && account.tokenExpiresAt)
+    .filter((account) => account.tokenExpiresAt < now)
+    .map((account) =>
       condition({
-        key: `square-expired:${shop._id}`,
+        key: `square-expired:${account.ownerId}`,
         type: 'square_token_expired',
         category: 'money',
         subjectType: 'shop',
-        subjectId: shop._id,
+        subjectId: account.ownerId,
         title: 'Square needs reconnecting',
         body: 'The connection has expired, so shop cut invoices are not being created. Nothing else will report this.',
-        since: shop.squareTokenExpiresAt,
+        since: account.tokenExpiresAt,
       }),
     );
 }

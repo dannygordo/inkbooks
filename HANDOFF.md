@@ -15,12 +15,18 @@ Everything has been run and everything passes.
 | Suite | Files | Tests | Status |
 |---|---|---|---|
 | `client` | 22 | 108 | green |
-| `server/test/unit` | 7 | 89 | green |
-| `server/test/integration` | 43 | 647 | green |
+| `server/test/unit` | 9 | 103 | green |
+| `server/test/integration` | 44 | ~665 | **M9 changes unverified** |
 
-844 tests, observed. This is the first time that sentence has been true, so the "written is not
-observed" caveat that used to head this file is retired — treat a failure from here on as a real
+The 844 that were green covered everything up to the M9 work. That run is what retired the "written
+is not observed" caveat this file used to open with — treat a failure from here on as a real
 regression rather than as a test nobody had ever run.
+
+**The `SquareAccount` extraction has not been through an integration run.** The unit suites pass
+(103, including the OAuth state-token tampering cases), and `check-graphql-documents` passes, but
+the touched resolvers — `shopCutPayments`, `disconnectShopSquare`, the derived `Shop` fields,
+`attention`'s `squareHealth` — are all integration-covered and none of that has executed. The new
+`test/integration/squareAccounts.test.js` has never run at all. Do this before building on it.
 
 Getting there took exactly one fix, and it was in a **fixture, not the code**:
 `connectArtistToShop` in `test/helpers/factories.js` still upserted on `{artistId, shopId}`, the
@@ -69,15 +75,19 @@ executable bit, git skips it with a hint on stderr rather than an error — whic
   so a disagreement between the two files is visible instead of silently ratified.
 - **Client booking confirmations.** Consults email immediately; sessions coalesce per project on a
   three-minute debounce that restarts with each new sitting.
+- **A Square account belongs to an owner.** `SquareAccount` keyed `{ownerType, ownerId}`, resolved
+  by `resolveSquareAccountFor` in the same shape as `resolveSquareSettings`. An independent artist
+  can now connect Square at all — `getMySquareAuthorizationUrl`, which takes no argument. The
+  GraphQL `Shop` fields are unchanged and derived. See `DECISIONS.md` M9.
 
 ## Next
 
-1. **The `SquareAccount` extraction — decided, not built.** See `DECISIONS.md` M9. The six
-   connection fields move off `Shop` onto a model keyed `{ownerType, ownerId}`, resolved by one
-   helper that mirrors `resolveSquareSettings`. Three pieces of work: the model plus a migration of
-   connected shops, widening the signed OAuth state in `routes/squareOAuth.js` from `shopId` to
-   `ownerType` + `ownerId`, and changing `refreshAccessTokenIfNeeded` in `utils/square.js` to take a
-   `SquareAccount`. The encrypted token is read in one place only (`utils/square.js:154`).
+1. **Run the migration, then drop the old `Shop` fields.** The `SquareAccount` extraction is built
+   (`DECISIONS.md` M9). What remains is operational, not code: run
+   `node scripts/migrate-square-accounts.js --dry-run`, read the output, run it for real, confirm a
+   shop-cut invoice still issues, then delete the seven now-unread `square*` fields from stored
+   shop documents in a follow-up. The script is idempotent and never overwrites an existing
+   account, so a re-run cannot clobber a token refreshed since the first pass.
 2. Gift cards — model, balance, partial redemption, the payout sign convention in `DECISIONS.md` M6.
 3. Adjustment records — shop-admin only, never calls Square.
 4. GraphQL surface for client flags. The automatic path works end to end; reading a client's flags

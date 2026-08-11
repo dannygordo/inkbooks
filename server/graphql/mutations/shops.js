@@ -2,6 +2,7 @@ const Shop = require('../../models/Shop');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 const { assertCanAccessShop } = require('../../utils/shop-membership');
+const { findAccountForOwner } = require('../../utils/square-account');
 const { UserInputError, rethrow } = require('../../utils/errors');
 
 module.exports = {
@@ -69,13 +70,20 @@ module.exports = {
       if (!shop) {
         throw new UserInputError('Errors', { errors: { shopId: 'Shop not found.' } });
       }
-      shop.squareConnected = false;
-      shop.squareMerchantId = undefined;
-      shop.squareLocationId = undefined;
-      shop.squareAccessTokenEncrypted = undefined;
-      shop.squareRefreshTokenEncrypted = undefined;
-      shop.squareTokenExpiresAt = undefined;
-      await shop.save();
+      // The connection lives on SquareAccount now (DECISIONS.md M9). CLEARED, not deleted: the row
+      // is one per owner and a reconnect writes back into it, so removing it would only mean the
+      // next connect has to recreate what we just threw away. Nothing here is a credential once
+      // these fields are unset.
+      const account = await findAccountForOwner('SHOP', shopId);
+      if (account) {
+        account.connected = false;
+        account.merchantId = undefined;
+        account.locationId = undefined;
+        account.accessTokenEncrypted = undefined;
+        account.refreshTokenEncrypted = undefined;
+        account.tokenExpiresAt = undefined;
+        await account.save();
+      }
       return shop;
     }, Constants.ROLES.SHOP_ADMIN),
   };

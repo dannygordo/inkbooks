@@ -207,6 +207,26 @@ What this costs, stated plainly:
 The blast radius is smaller than it looks: the encrypted token is read in exactly one place
 (`utils/square.js:154`).
 
+**Built.** `models/SquareAccount.js`, `utils/square-account.js`, and
+`scripts/migrate-square-accounts.js`. Three things worth knowing before touching it:
+
+- **The GraphQL contract did not change.** `Shop.squareConnected`, `squareLocationId` and
+  `squareConnectedAt` are still there and are now *derived* by field resolvers reading
+  `SquareAccount`. The client already queries them by name; where the server keeps the row is not
+  something the schema should make the client care about.
+- **`isUsable`, not `connected`.** A half-failed OAuth callback leaves `connected: true` with no
+  token. Every consumer checks `SquareAccount.isUsable(account)` so the refusal happens where there
+  is a message the user can act on, rather than inside `getValidAccessToken`.
+- **The old `Shop` fields still exist on stored documents.** The schema no longer declares them and
+  nothing reads them, but the migration deliberately does not `$unset`. Two copies of an opaque
+  ciphertext cannot produce the class of error two copies of a *number* can, and the cost of being
+  wrong is a shop that cannot take payment. Drop them in a follow-up once charges are confirmed.
+
+An independent artist connects through `getMySquareAuthorizationUrl`, which takes no argument — it
+can only act for the caller. It refuses an artist who is currently at a shop: under M8 their tax
+rate and offset already resolve to the shop, so a personal account would be a connection nothing
+routes to, sitting there looking like it works.
+
 Rejected: **copying the six fields onto `Artist`** and branching on "has an active shop?" at each
 consumer. Cheaper today — one real branch — but it makes M8's owner rule exist twice in two shapes,
 and every Square field added afterwards has to be added in both places or it silently works for one

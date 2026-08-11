@@ -158,7 +158,12 @@ module.exports = gql`
     billingType: String
     status: Int
     # Square connection status - deliberately exposes only non-secret fields. The encrypted
-    # access/refresh tokens (see models/Shop.js) never leave the server.
+    # access/refresh tokens never leave the server.
+    #
+    # DERIVED, not stored on Shop. The connection lives on SquareAccount keyed by owner (see
+    # DECISIONS.md M9 and the Shop field resolvers in resolvers/index.js). These three names are
+    # kept as-is on purpose: the client already queries them, and where the server keeps the row is
+    # not something the schema should make the client care about.
     squareConnected: Boolean
     squareLocationId: String
     squareConnectedAt: DateTime
@@ -938,6 +943,9 @@ module.exports = gql`
     # See PRODUCTION_ROADMAP.md's "Shop-cut ledger" section.
 
     getSquareAuthorizationUrl(shopId: ID!): String!
+    # The same handshake for an independent artist, who has no shop to connect one against.
+    # Takes no argument on purpose: it can only ever act for the caller. See DECISIONS.md M9.
+    getMySquareAuthorizationUrl: String!
     getPendingShopCutConfirmations(shopId: ID!): [Appointment]
 
     ######### Artists ###########

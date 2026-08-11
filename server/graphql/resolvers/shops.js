@@ -4,6 +4,7 @@ const { Constants } = require('../../utils/constants');
 const square = require('../../utils/square');
 const { signState } = require('../../routes/squareOAuth');
 const { getShopIdsForUser, assertCanAccessShop } = require('../../utils/shop-membership');
+const { getActiveShopIdForArtist } = require('../../utils/artist-shop');
 const { UserInputError, rethrow } = require('../../utils/errors');
 
 module.exports = {
@@ -58,7 +59,27 @@ module.exports = {
           if (!shop) {
             throw new UserInputError('Errors', { errors: { shopId: 'Shop not found.' } });
           }
-          return square.buildAuthorizationUrl(signState(shopId));
+          return square.buildAuthorizationUrl(signState('SHOP', shopId));
         }, Constants.ROLES.SHOP_ADMIN),
+        // The independent artist's route to the same handshake (DECISIONS.md M9, S2). Separate
+        // from the shop one rather than a nullable shopId on it, because the two have genuinely
+        // different authorization: that one asks "may you act for this shop", this one only ever
+        // acts for the caller themselves, so there is no id to check and nothing to pass in.
+        //
+        // Refuses an artist who is currently at a shop. Not a permission problem - under M8 their
+        // tax rate and fee offset already resolve to the shop, so a personal Square account would
+        // be a connection nothing routes to, sitting there looking like it works.
+        getMySquareAuthorizationUrl: withAuth(async (_, args, context, info, user) => {
+          const shopId = await getActiveShopIdForArtist(user.id);
+          if (shopId) {
+            throw new UserInputError('Errors', {
+              errors: {
+                square:
+                  'Your shop holds the Square connection for your sessions - a shop admin connects it.',
+              },
+            });
+          }
+          return square.buildAuthorizationUrl(signState('ARTIST', user.id));
+        }),
     }
 }

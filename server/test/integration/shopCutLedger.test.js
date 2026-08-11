@@ -11,6 +11,7 @@ const { createTestServer, contextWithToken } = require('../helpers/testServer');
 const { signTestToken } = require('../helpers/auth');
 const { createArtistUser, createShopAdminUser, createAppointment } = require('../helpers/factories');
 const Shop = require('../../models/Shop');
+const SquareAccount = require('../../models/SquareAccount');
 const Appointment = require('../../models/Appointment');
 
 const square = require('../../utils/square');
@@ -45,11 +46,21 @@ const CONFIRM_SHOP_CUT_PAID = `
 	}
 `;
 
+// The connection is a SquareAccount owned by the shop now, not fields on the shop document
+// (DECISIONS.md M9). accessTokenEncrypted is set because the resolvers check SquareAccount.isUsable
+// - `connected` alone is the half-failed-callback state, and a fixture that sets only the boolean
+// would be testing a shop that cannot actually authorize anything.
 async function connectedShop() {
 	const { shop } = await createShopAdminUser();
-	shop.squareConnected = true;
-	shop.squareLocationId = 'L_TEST_LOCATION';
-	await shop.save();
+	await new SquareAccount({
+		ownerType: 'SHOP',
+		ownerId: shop._id,
+		connected: true,
+		locationId: 'L_TEST_LOCATION',
+		merchantId: 'M_TEST_MERCHANT',
+		accessTokenEncrypted: 'encrypted:test-access-token',
+		tokenExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+	}).save();
 	return shop;
 }
 
