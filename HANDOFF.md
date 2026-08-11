@@ -10,50 +10,45 @@ Last updated: 2026-08-11.
 
 ## Test status
 
-Everything has been run and everything passes.
+The server suite is green. The client suite has not been run since the charge work.
 
 | Suite | Files | Tests | Status |
 |---|---|---|---|
-| `client` | 25 | ~138 | new panels green; rest **not re-run** |
-| `server/test/unit` | 9 | 107 | green |
-| `server/test/integration` | 47 | ~747 | **not re-run** since the charge fixes |
+| `server` (unit + integration) | 49 | 740 | green |
+| `client` | 24 | — | new panels green; **full suite not re-run** |
 
 Green is the standing expectation now, not an achievement — treat a failure as a real regression
 rather than as a test nobody had ever run.
 
-**The charge work's last fixes have not been re-run.** The first integration run of it produced 12
-failures from two causes, both now addressed but neither observed passing:
+**The client suite has not been run since the charge work.** `SessionDetail` and
+`BookSessionDatesForm` both changed shape, `SessionDetail` now fires a query it did not before, and
+`IBInput` gained an `inputProps` passthrough. `SquarePanel.test.jsx` and
+`SquarePricingPanel.test.jsx` pass on their own; the rest is unobserved.
 
-- `squarePayments.test.js` tested the *old* route contract — client-supplied `amountCents`, no
-  `appointmentId`, a platform sandbox token, `global.fetch` mocked at the Square boundary. Deleted;
-  the cases that still mean something were restated in `squarePaymentRoute.test.js`.
-- The rest were `429`s. `utils/rate-limit.js` is an in-memory singleton living for the whole test
-  **process**, and this route allows 10 attempts a minute, so every request in a file shares one
-  key unless it sets `X-Forwarded-For` and the app sets `trust proxy`. The eleventh test onwards
-  failed with statuses that read as assertion failures about payments.
+```
+cd client && npm test
+```
 
-The client suite also has not been re-run since `SessionDetail` and `BookSessionDatesForm` changed
-shape, and `SessionDetail` now fires a query it did not before. `SquarePricingSettings.test.jsx` and
-`squarePricingSettings.test.js` are both new and only the client half has been observed.
+### Every failure so far has been in a test, never in the code
 
-`IBInput` gained an `inputProps` passthrough, so it is worth watching the whole input suite.
+Worth knowing, because it should change how the next one is read. Across three integration runs:
+
+- **A fixture built a state the app cannot produce.** `connectArtistToShop` still upserted on
+  `{artistId, shopId}`, the row-reuse A2 removed, so a second connection left two open intervals.
+  The partial unique index did exactly the job A2 says it exists for.
+- **A suite tested a contract that had been deliberately removed** — `squarePayments.test.js`, on
+  client-supplied `amountCents` and a platform sandbox token. Deleted, its still-valid cases moved.
+- **The rate limiter leaked across tests.** `utils/rate-limit.js` is an in-memory singleton living
+  for the whole test *process*, and the payment route allows 10 attempts a minute, so every request
+  in a file shares one key unless it sets `X-Forwarded-For` and the app sets `trust proxy`. Failures
+  surface as statuses that read like assertions about payments. `bookingRequests.test.js` and
+  `squarePaymentRoute.test.js` both carry a `fakeIp()` helper for this.
+- **A fixture was called without a required argument** — `createStaffUser` takes a `shopId`.
 
 **No database has been migrated.** The code reads `SquareAccount`; every existing environment still
 has the connection on `Shop`, so a previously connected shop reads as *disconnected* until
 `scripts/migrate-square-accounts.js` runs there. That applies to a local dev database as much as to
 production — see Next item 1.
-
-Getting there took exactly one fix, and it was in a **fixture, not the code**:
-`connectArtistToShop` in `test/helpers/factories.js` still upserted on `{artistId, shopId}`, the
-row-reuse pattern A2 removed, so connecting one artist to a second shop left two open intervals and
-the partial unique index rejected the second. The helper now mirrors the production transfer
-sequence in `mutations/artistShopConnections.js`: close the open interval elsewhere, then
-reuse-or-create.
-
-Worth recording what that failure was *not*. The model, the index and the resolver were all
-correct — the partial unique index did exactly the job A2 says it exists for, and what it caught was
-a fixture building a state the application itself cannot produce. The interval migration landed
-clean.
 
 ### Running them
 
