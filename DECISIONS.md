@@ -107,6 +107,19 @@ because the fee applies to the grossed-up total.
   need the record anyway, and guessable inputs make codes enumerable.
 - Sold at face value **plus the offset**, **untaxed**. Selling a gift card is not a taxable event;
   nothing was delivered. Tax is collected once, at the session.
+
+  The offset is **offered at purchase**, the same choice on the same terms as anywhere else (M5) —
+  the card is being bought with a card, so there is a processing fee to pass on, and the artist
+  decides whether to. It is never applied silently.
+
+  So the sale is priced by `computeChargeBreakdown` with `taxRateBasisPoints: 0` — the same shape as
+  a deposit charge (M11) but with the tax deliberately zeroed rather than resolved. The offset is
+  recorded apart from the face value and **does not** load onto the balance: the client bought a
+  $200 card and holds $200 of credit, whatever the sale totalled.
+
+  This is the exact opposite of a deposit, and the pair is worth holding together: a deposit is
+  taxed at collection and comes off the session's taxable base; a gift card is untaxed at sale and
+  comes off the session's total. Both take the offset. See M8 for the ordering that falls out.
 - Full face value loaded as balance. Partial redemption supported. Spendable on deposits.
 - No expiry — Washington prohibits it. The liability never ages off.
 - Shop-level when the artist is connected, artist-level otherwise. **The shop holds the entire

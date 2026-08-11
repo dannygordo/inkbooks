@@ -29,8 +29,26 @@ const {
 
 function buildApp() {
 	const app = express();
+	// Mirrors index.js's app.set('trust proxy', 1) - without it X-Forwarded-For does not populate
+	// req.ip the way utils/rate-limit.js's getClientIp expects, and every request in the file
+	// shares one key.
+	app.set('trust proxy', 1);
 	app.use(squarePaymentsRouter);
 	return app;
+}
+
+// A fresh, never-used fake client IP per request. The rate limiter (utils/rate-limit.js) is an
+// in-memory singleton living for the whole test PROCESS - not reset between tests or files - and
+// this route allows 10 attempts a minute. Without this the eleventh test in the file starts
+// getting 429s that look like assertion failures about payments. Same helper, same reason, as
+// bookingRequests.test.js and the suite this one replaces.
+let ipCounter = 0;
+function fakeIp() {
+	ipCounter += 1;
+	const octet4 = ipCounter % 250;
+	const octet3 = Math.floor(ipCounter / 250) % 250;
+	const octet2 = Math.floor(ipCounter / (250 * 250)) % 250;
+	return `198.${octet2 + 1}.${octet3 + 1}.${octet4 + 1}`;
 }
 
 // vi.spyOn rather than vi.mock, for the reason spelled out at length in shopCutLedger.test.js:
@@ -74,11 +92,12 @@ async function artistAtConnectedShop() {
 	return { user, shop };
 }
 
-function post(body, user) {
-	return request(buildApp())
-		.post('/square/process-payment')
-		.set('Authorization', `Bearer ${signTestToken(user)}`)
-		.send(body);
+function post(body, user, ip = fakeIp()) {
+	const req = request(buildApp()).post('/square/process-payment').set('X-Forwarded-For', ip);
+	if (user) {
+		req.set('Authorization', `Bearer ${signTestToken(user)}`);
+	}
+	return req.send(body);
 }
 
 const validBody = (appointmentId, extra = {}) => ({
@@ -243,6 +262,106 @@ describe('charging twice', () => {
 
 		expect(res.status).toBe(409);
 		expect(createPaymentSpy).not.toHaveBeenCalled();
+	});
+});
+
+// Carried over from test/integration/squarePayments.test.js, which this file replaces. That suite
+// was written against the old contract - client-supplied amountCents, no appointmentId, a platform
+// sandbox token, global.fetch mocked at the Square boundary - and most of it asserted behaviour
+// that has deliberately gone. These are the cases that still mean something, restated against what
+// the route does now.
+describe('auth, validation and rate limiting', () => {
+	it('rejects a request with no Authorization header', async () => {
+		const res = await post({ sourceId: 'cnon:card-nonce-ok' }, null);
+
+		expect(res.status).toBe(401);
+		expect(createPaymentSpy).not.toHaveBeenCalled();
+	});
+
+	it('rejects a body missing sourceId', async () => {
+		const { user, shop } = await artistAtConnectedShop();
+		const appointment = await createAppointment(user.id, {
+			shopId: shop.id,
+			subtotalCents: 20000,
+		});
+
+		const res = await post({ idempotencyKey: 'k', appointmentId: appointment.id }, user);
+
+		expect(res.status).toBe(400);
+		expect(res.body.errors).toBeDefined();
+	});
+
+	it('rejects a body with no appointmentId at all', async () => {
+		const { user } = await artistAtConnectedShop();
+
+		const res = await post({ sourceId: 'cnon:x', idempotencyKey: 'k' }, user);
+
+		expect(res.status).toBe(400);
+		expect(createPaymentSpy).not.toHaveBeenCalled();
+	});
+
+	// Square's own failure surfaces with its status and message rather than being flattened into a
+	// generic 500 - a declined card is something the person at the counter can act on.
+	it('passes Square\'s status and message through on a decline', async () => {
+		const { user, shop } = await artistAtConnectedShop();
+		const appointment = await createAppointment(user.id, {
+			shopId: shop.id,
+			subtotalCents: 20000,
+		});
+		const declined = new Error('Card declined');
+		declined.status = 402;
+		createPaymentSpy.mockRejectedValueOnce(declined);
+
+		const res = await post(validBody(appointment.id), user);
+
+		expect(res.status).toBe(402);
+		expect(res.body.error).toBe('Card declined');
+	});
+
+	// A declined charge must not leave the session looking settled.
+	it('records nothing when the charge fails', async () => {
+		const { user, shop } = await artistAtConnectedShop();
+		const appointment = await createAppointment(user.id, {
+			shopId: shop.id,
+			subtotalCents: 20000,
+		});
+		createPaymentSpy.mockRejectedValueOnce(new Error('Card declined'));
+
+		await post(validBody(appointment.id), user);
+
+		const stored = await Appointment.findById(appointment.id);
+		expect(stored.squarePaymentId).toBeUndefined();
+	});
+
+	it('rate-limits at 10 attempts a minute per caller', async () => {
+		const { user, shop } = await artistAtConnectedShop();
+		const ip = fakeIp();
+
+		for (let i = 0; i < 10; i++) {
+			const appointment = await createAppointment(user.id, {
+				shopId: shop.id,
+				subtotalCents: 20000,
+			});
+			const res = await post(
+				validBody(appointment.id, { idempotencyKey: `idem-${i}` }),
+				user,
+				ip,
+			);
+			expect(res.status).toBe(200);
+		}
+
+		const appointment = await createAppointment(user.id, {
+			shopId: shop.id,
+			subtotalCents: 20000,
+		});
+		const eleventh = await post(
+			validBody(appointment.id, { idempotencyKey: 'idem-11' }),
+			user,
+			ip,
+		);
+
+		expect(eleventh.status).toBe(429);
+		expect(eleventh.body.error).toMatch(/Too many payment attempts/);
 	});
 });
 

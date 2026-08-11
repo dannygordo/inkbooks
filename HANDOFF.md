@@ -15,17 +15,25 @@ Everything has been run and everything passes.
 | Suite | Files | Tests | Status |
 |---|---|---|---|
 | `client` | 23 | 118 | not re-run since the charge work |
-| `server/test/unit` | 9 | 103 | green |
-| `server/test/integration` | 47 | ~712 | two new suites **never run** |
+| `server/test/unit` | 9 | 107 | green |
+| `server/test/integration` | 46 | ~730 | 12 failures fixed, **not re-run** |
 
 Green is the standing expectation now, not an achievement — treat a failure as a real regression
 rather than as a test nobody had ever run.
 
-**The Orders charge work has not been through an integration run.** `chargeQuote.test.js` and
-`squarePaymentRoute.test.js` have never executed, and the client suite has not been re-run since
-`SessionDetail` and `BookSessionDatesForm` changed. Unit suites and all seven pre-commit checks
-pass. Expect client fallout: both of those components changed shape, and `SessionDetail` now fires
-a query it did not before.
+**The charge work's last fixes have not been re-run.** The first integration run of it produced 12
+failures from two causes, both now addressed but neither observed passing:
+
+- `squarePayments.test.js` tested the *old* route contract — client-supplied `amountCents`, no
+  `appointmentId`, a platform sandbox token, `global.fetch` mocked at the Square boundary. Deleted;
+  the cases that still mean something were restated in `squarePaymentRoute.test.js`.
+- The rest were `429`s. `utils/rate-limit.js` is an in-memory singleton living for the whole test
+  **process**, and this route allows 10 attempts a minute, so every request in a file shares one
+  key unless it sets `X-Forwarded-For` and the app sets `trust proxy`. The eleventh test onwards
+  failed with statuses that read as assertion failures about payments.
+
+The client suite also has not been re-run since `SessionDetail` and `BookSessionDatesForm` changed
+shape, and `SessionDetail` now fires a query it did not before.
 
 **No database has been migrated.** The code reads `SquareAccount`; every existing environment still
 has the connection on `Shop`, so a previously connected shop reads as *disconnected* until
