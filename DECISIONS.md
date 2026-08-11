@@ -97,31 +97,6 @@ Rejected: a true percentage surcharge. Card network rules prohibit surcharging d
 cards, which would have required card-brand detection, and a flat pass-through under-recovers
 because the fee applies to the grossed-up total.
 
-### M8. Tax is stored in basis points, and credits are not taxed
-
-The rate lives on the **shop** when the artist is connected and on the **artist** when independent.
-Tax is destination-based — a client is taxed where the work happens — so two artists in the same
-room must not bill different rates. The fee offset follows the same owner: they are set together in
-one Square settings section, and splitting them would give a shop artist shop-tax with their own
-offset, which nobody can reason about at a counter.
-
-**Basis points, not a float percentage.** 9.4% is `940`. A float rate multiplied into a total is
-exactly where rounding stops being academic, and this codebase already keeps money in integer cents
-for the same reason.
-
-Order of operations is fixed, and two consequences follow from it:
-
-1. The offset joins the taxable base — it is part of the service price, not a separate fee, so it
-   **is** taxed.
-2. The deposit credit and any gift card come off the **total**, not off the taxable base. Tax on the
-   work was already owed; paying part of the bill with money taken earlier does not change what the
-   state is due.
-
-Tips sit outside both the taxable base and the shop cut, and are added to what the card is charged.
-
-Credits clamp at zero. A $100 deposit against an $80 final sitting bills $0 — never a negative that
-would read as owing the client money.
-
 ### M6. Gift cards
 
 - Random code plus a database record. **Not** a hash of the attributes — a hash is opaque, so you
@@ -174,6 +149,31 @@ made existing payouts safe before any of this.
 Rejected: freezing the cut permanently once written. That would also block legitimate recomputation
 — correcting a mistyped subtotal on work performed last week should re-derive the cut at *last
 week's* rate, not refuse to move at all.
+
+### M8. Tax is stored in basis points, and credits are not taxed
+
+The rate lives on the **shop** when the artist is connected and on the **artist** when independent.
+Tax is destination-based — a client is taxed where the work happens — so two artists in the same
+room must not bill different rates. The fee offset follows the same owner: they are set together in
+one Square settings section, and splitting them would give a shop artist shop-tax with their own
+offset, which nobody can reason about at a counter.
+
+**Basis points, not a float percentage.** 9.4% is `940`. A float rate multiplied into a total is
+exactly where rounding stops being academic, and this codebase already keeps money in integer cents
+for the same reason.
+
+Order of operations is fixed, and two consequences follow from it:
+
+1. The offset joins the taxable base — it is part of the service price, not a separate fee, so it
+   **is** taxed.
+2. The deposit credit and any gift card come off the **total**, not off the taxable base. Tax on the
+   work was already owed; paying part of the bill with money taken earlier does not change what the
+   state is due.
+
+Tips sit outside both the taxable base and the shop cut, and are added to what the card is charged.
+
+Credits clamp at zero. A $100 deposit against an $80 final sitting bills $0 — never a negative that
+would read as owing the client money.
 
 ---
 
