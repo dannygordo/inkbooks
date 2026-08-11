@@ -51,7 +51,28 @@ const ShopSchema = new mongoose.Schema({
 	// utils/square.js's refreshAccessTokenIfNeeded) and proactively refreshed once within 7
 	// days of expiry, per Square's own recommendation.
 	squareTokenExpiresAt: {type: Date},
-	squareConnectedAt: {type: Date}
+	squareConnectedAt: {type: Date},
+
+	// --- Square pricing configuration -----------------------------------------------------------
+	// Distinct from the connection fields above: these are BUSINESS settings, not credentials, and
+	// they are read on every charge whether or not Square is connected.
+
+	// Sales tax, in BASIS POINTS. 940 = 9.40%.
+	//
+	// Not a float percentage, for the same reason money is integer cents here: 9.4 cannot be
+	// represented exactly, and a rate multiplied into a total is precisely where that stops being
+	// academic. Basis points give hundredths of a percent, which is finer than any real rate.
+	//
+	// DESTINATION-BASED, so it belongs to the SHOP's location rather than the artist's - a client is
+	// taxed where the work happens. An independent artist carries their own on Artist.
+	taxRateBasisPoints: {type: Number, default: 0},
+
+	// Square_Fee_Offset, per hour, in cents. See DECISIONS.md M5.
+	//
+	// Added to the price to recover Square's processing fee. Offered as a CHOICE at charge time and
+	// never applied silently, and never on cash - it exists to recover a card fee, so charging it on
+	// cash would be taking money for a cost nobody incurred.
+	squareFeeOffsetCents: {type: Number, default: 0}
 
 }, {
 	timestamps: true

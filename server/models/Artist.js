@@ -16,6 +16,14 @@ const ArtistSchema = new mongoose.Schema(
     startDate: { type: Date },
     endDate: { type: Date },
     hourlyRate: { type: Number },
+
+    // --- Square pricing, for an INDEPENDENT artist ----------------------------------------------
+    // An artist connected to a shop uses the SHOP's values: tax is destination-based, so it belongs
+    // to where the work happens, and one artist billing a different tax rate than the chair next to
+    // them would be wrong twice over. These apply only when there is no shop.
+    // See utils/square-pricing.js, which is the one place that decides which set applies.
+    taxRateBasisPoints: { type: Number, default: 0 },
+    squareFeeOffsetCents: { type: Number, default: 0 },
     // Added alongside Shop.flatRate so an artist can express a flat-rate expectation for
     // sessions, not just hourly - see billingType below. Which one actually gets used to compute
     // a session's total, and whether the shop's rate is used instead when this artist is
