@@ -146,21 +146,22 @@ describe('quoteAppointmentCharge', () => {
 		expect(breakdown.amountDueCents).toBe(24692);
 	});
 
-	// M8: the credit comes off the total, not the taxable base.
-	it('subtracts a deposit credit from the total without reducing tax', async () => {
+	// M8: a deposit comes off the SUBTOTAL, before tax, because it was already taxed at collection
+	// (M11). The sitting taxes only the part of the work not yet paid for.
+	it('subtracts a deposit credit before tax, not after', async () => {
 		const { user } = await createArtistUser();
 		const shop = await shopWithRates();
 		await connectArtistToShop(user.id, shop.id);
 		const appointment = await createAppointment(user.id, {
 			shopId: shop.id,
-			subtotalCents: 20000,
-			depositCreditCents: 10000,
+			subtotalCents: 50000,
+			depositCreditCents: 20000,
 		});
 
 		const { breakdown } = await quoteAppointmentCharge(appointment);
-		expect(breakdown.taxCents).toBe(1880);
-		expect(breakdown.totalCents).toBe(21880);
-		expect(breakdown.amountDueCents).toBe(11880);
+		expect(breakdown.netSubtotalCents).toBe(30000);
+		expect(breakdown.taxCents).toBe(2820);
+		expect(breakdown.amountDueCents).toBe(32820);
 	});
 
 	// A session with no price is unfinished, not free. Charging tax and a tip on a zero subtotal
@@ -215,23 +216,49 @@ describe('quoteDepositCharge', () => {
 		return appointment;
 	}
 
-	// DERIVED FROM M8, NOT INVENTED: tax on the work is collected at the session, and the deposit
-	// credit comes off the total there precisely because "tax on the work was already owed".
-	// Taxing the deposit at collection as well would charge the client tax twice on the same money.
-	it('does not tax a deposit at collection', async () => {
+	// A deposit is its own transaction and carries its own tax (M11). $200 at 9.4% is $18.80.
+	it('taxes the deposit at collection', async () => {
 		const { user } = await createArtistUser();
 		const shop = await shopWithRates();
 		await connectArtistToShop(user.id, shop.id);
 		const appointment = await pendingDeposit(user, shop, 20000);
 
 		const { breakdown } = await quoteDepositCharge(appointment);
-		expect(breakdown.taxCents).toBe(0);
-		expect(breakdown.amountDueCents).toBe(20000);
+		expect(breakdown.taxCents).toBe(1880);
+		expect(breakdown.amountDueCents).toBe(21880);
+	});
+
+	/**
+	 * THE PROPERTY THE TWO HALVES EXIST TO GUARANTEE, asserted end to end against stored rates:
+	 * tax the deposit at collection AND deduct it from the session base, and the state receives
+	 * 9.4% of the job exactly once. Tax one without the other and the client is either
+	 * double-taxed or the state is short.
+	 */
+	it('taxes a $500 job exactly once across the deposit and the sitting', async () => {
+		const { user } = await createArtistUser();
+		const shop = await shopWithRates();
+		await connectArtistToShop(user.id, shop.id);
+
+		const consult = await pendingDeposit(user, shop, 20000);
+		const { breakdown: depositBreakdown } = await quoteDepositCharge(consult);
+
+		const session = await createAppointment(user.id, {
+			shopId: shop.id,
+			subtotalCents: 50000,
+			depositCreditCents: 20000,
+		});
+		const { breakdown: sessionBreakdown } = await quoteAppointmentCharge(session);
+
+		expect(depositBreakdown.taxCents).toBe(1880);
+		expect(sessionBreakdown.taxCents).toBe(2820);
+		// 9.4% of $500, and not a cent more.
+		expect(depositBreakdown.taxCents + sessionBreakdown.taxCents).toBe(4700);
 	});
 
 	// M5 is explicit that the offset works "identically for hourly and flat-priced sessions and
-	// for deposits". $200 at $180/hr implies 1.111 hours; 600 x that is 667.
-	it('still applies the offset, which M5 says covers deposits', async () => {
+	// for deposits". $200 at $180/hr implies 1.111 hours; 600 x that is 667. It joins the taxable
+	// base here the same way it does on a session, so tax is on 20667.
+	it('applies the offset, and taxes it with the deposit', async () => {
 		const { user } = await createArtistUser();
 		const shop = await shopWithRates();
 		await connectArtistToShop(user.id, shop.id);
@@ -239,8 +266,9 @@ describe('quoteDepositCharge', () => {
 
 		const { breakdown } = await quoteDepositCharge(appointment, { applyFeeOffset: true });
 		expect(breakdown.feeOffsetCents).toBe(667);
-		expect(breakdown.taxCents).toBe(0);
-		expect(breakdown.amountDueCents).toBe(20667);
+		expect(breakdown.taxableCents).toBe(20667);
+		expect(breakdown.taxCents).toBe(1943);
+		expect(breakdown.amountDueCents).toBe(22610);
 	});
 
 	it('takes the amount from the stored pending deposit', async () => {

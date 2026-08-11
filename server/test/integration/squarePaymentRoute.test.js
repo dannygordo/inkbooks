@@ -321,7 +321,8 @@ describe('charging a pending deposit', () => {
 		const res = await post(validBody(appointment.id, { chargeType: 'deposit' }), user);
 
 		expect(res.status).toBe(200);
-		expect(createPaymentSpy.mock.calls[0][0].amountCents).toBe(20000);
+		// $200 face value plus 9.4% tax (M11).
+		expect(createPaymentSpy.mock.calls[0][0].amountCents).toBe(21880);
 
 		const stored = await Appointment.findById(appointment.id);
 		expect(stored.depositStatus).toBe('available');
@@ -329,15 +330,19 @@ describe('charging a pending deposit', () => {
 		expect(stored.depositCollectedAt).toBeTruthy();
 	});
 
-	// Untaxed at collection, per M8 - tax on the work is collected at the session, and taxing here
-	// as well would charge the client twice on the same money.
-	it('does not tax the deposit', async () => {
+	// Taxed at collection - a deposit is its own transaction (M11). $200 at 9.4% is $18.80, and the
+	// tax is recorded separately from the deposit's face value so it never becomes spendable
+	// credit.
+	it('taxes the deposit and records the tax apart from the face value', async () => {
 		const { user, shop } = await artistAtConnectedShop();
 		const appointment = await pendingDepositAppointment(user, shop);
 
 		await post(validBody(appointment.id, { chargeType: 'deposit' }), user);
 
-		expect(createPaymentSpy.mock.calls[0][0].amountCents).toBe(20000);
+		expect(createPaymentSpy.mock.calls[0][0].amountCents).toBe(21880);
+		const stored = await Appointment.findById(appointment.id);
+		expect(stored.depositCents).toBe(20000);
+		expect(stored.taxCents).toBe(1880);
 	});
 
 	// The amount charged is the amount recorded, because they are the same stored field.
@@ -350,7 +355,7 @@ describe('charging a pending deposit', () => {
 			user,
 		);
 
-		expect(createPaymentSpy.mock.calls[0][0].amountCents).toBe(20000);
+		expect(createPaymentSpy.mock.calls[0][0].amountCents).toBe(21880);
 		const stored = await Appointment.findById(appointment.id);
 		expect(stored.depositCents).toBe(20000);
 	});

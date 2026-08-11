@@ -187,9 +187,14 @@ router.post('/square/process-payment', express.json(), async (req, res) => {
       appointment.depositCollectedAt = appointment.depositCollectedAt || new Date();
       appointment.depositPaymentMethod = 'square';
       appointment.depositSquarePaymentId = payment.id;
-      // The offset is real money collected on top of the deposit, so it is recorded - but it is
-      // NOT part of the deposit's face value and must not become spendable credit. depositCents
-      // stays the deposit; feeCents carries the offset.
+      // Tax and the offset are real money collected on top of the deposit (M11), so both are
+      // recorded - but neither is part of the deposit's face value and neither must become
+      // spendable credit. depositCents stays the deposit; taxCents and feeCents carry the rest.
+      //
+      // This is also what makes the session side add up: the deposit's face value is deducted from
+      // the session subtotal BEFORE tax there (M8), so the tax collected here plus the tax
+      // collected at the sitting covers the whole job exactly once.
+      appointment.taxCents = breakdown.taxCents;
       appointment.feeCents = breakdown.feeOffsetCents;
       appointment.totalCents = breakdown.amountDueCents;
       // The cut was already applied at recordDeposit, against depositCents, and depositCents has

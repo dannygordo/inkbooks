@@ -172,8 +172,13 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 			// parts at save time, MINUS any deposit already credited to this session. Clamped at
 			// zero: a deposit larger than the final sitting is a real case, and a negative total
 			// would be the shop owing the client money, which this flow can't hand back.
-			// (The Square charge path overwrites this with what Square actually charged; see
-			// routes/squarePayments.js on why the charge wins there.)
+			//
+			// This is a SAVED figure for a session being settled by hand (cash, or a card taken
+			// outside InkBooks), not the charge amount. The card path never sends a total: the
+			// server computes it, and its ordering is the authoritative one - a deposit comes off
+			// the subtotal before tax (M8/M11), which this rough sum does not attempt to model.
+			// The two agree whenever tax is entered net, and the server's answer wins when they
+			// don't, because it is the one that reaches the card.
 			totalCents: Math.max(
 				0,
 				subtotalCents + taxCents + feeCents + tipCents - (appointment.depositCreditCents || 0)

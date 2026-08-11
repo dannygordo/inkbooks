@@ -600,12 +600,13 @@ export const AppointmentService = (() => {
                 tipCents: $tipCents
             ) {
                 subtotalCents
+                depositCreditCents
+                netSubtotalCents
                 feeOffsetCents
                 taxableCents
                 taxCents
                 tipCents
                 totalCents
-                depositCreditCents
                 giftCardCents
                 amountDueCents
                 source

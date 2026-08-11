@@ -154,7 +154,7 @@ Rejected: freezing the cut permanently once written. That would also block legit
 — correcting a mistyped subtotal on work performed last week should re-derive the cut at *last
 week's* rate, not refuse to move at all.
 
-### M8. Tax is stored in basis points, and credits are not taxed
+### M8. Tax is stored in basis points, and a deposit comes off the base while a gift card comes off the total
 
 The rate lives on the **shop** when the artist is connected and on the **artist** when independent.
 Tax is destination-based — a client is taxed where the work happens — so two artists in the same
@@ -166,18 +166,42 @@ offset, which nobody can reason about at a counter.
 exactly where rounding stops being academic, and this codebase already keeps money in integer cents
 for the same reason.
 
-Order of operations is fixed, and two consequences follow from it:
+**Order of operations is fixed:**
 
-1. The offset joins the taxable base — it is part of the service price, not a separate fee, so it
-   **is** taxed.
-2. The deposit credit and any gift card come off the **total**, not off the taxable base. Tax on the
-   work was already owed; paying part of the bill with money taken earlier does not change what the
-   state is due.
+1. the deposit credit comes off the subtotal **first**, before anything else is computed;
+2. the offset is derived from what remains and joins the taxable base — it is part of the service
+   price, not a separate fee, so it **is** taxed;
+3. tax is computed on that base;
+4. any gift card comes off the **total**, after tax.
+
+**A deposit and a gift card are not the same kind of money.** This is the distinction the ordering
+exists to express, and getting it wrong double-taxes a client or under-collects for the state.
+
+- **A deposit is its own transaction and was taxed when it was collected** (M11). The portion of the
+  work it covers has already been taxed once. Taxing the full session again and deducting the deposit
+  from the total would charge tax twice on that portion. Off the subtotal, the session taxes exactly
+  the part of the work not yet paid for.
+- **A gift card was sold untaxed** (M6) — nothing was delivered at the sale, so nothing was due. Tax
+  on the whole session is still owed, and the card is a payment instrument against the taxed total,
+  not a prepayment of the work.
+
+Worked, at 9.4%: a $500 job with a $200 deposit already taken. The deposit was billed as
+`$200 + $18.80 tax = $218.80` at the consult. The sitting bills `($500 − $200) = $300`, tax `$28.20`,
+total `$328.20`. Tax collected across the two: `$47.00`, which is 9.4% of $500 exactly once.
+
+The same job paid with a $200 **gift card** instead bills the full `$500 + $47.00 = $547.00`, and the
+card takes $200 off that — the state still gets $47.00, and it gets it all at the sitting.
 
 Tips sit outside both the taxable base and the shop cut, and are added to what the card is charged.
 
-Credits clamp at zero. A $100 deposit against an $80 final sitting bills $0 — never a negative that
-would read as owing the client money.
+Both credits clamp at zero, per credit, before anything is derived from them. A $100 deposit against
+an $80 final sitting bills $0 — never a negative that would read as owing the client money, and never
+a negative taxable base that would invert the tax.
+
+Rejected: taking both credits off the total, on the reasoning that "tax on the work was already
+owed". That reasoning holds for a gift card and fails for a deposit, because it assumes the earlier
+money was untaxed. This document said it for both, and the implementation followed — a $500 job with
+a $200 deposit would have collected 9.4% on $700 of base across the two transactions.
 
 ### M9. A Square account belongs to an owner, not to a shop
 
@@ -286,7 +310,7 @@ computation. It sounds safer and is worse — two sources for one number, with a
 that has to decide which wins, in the one place where "they disagreed and we picked one" is not an
 acceptable answer.
 
-### M11. A deposit is recorded before it is charged, and is not taxed at collection
+### M11. A deposit is recorded before it is charged, and IS taxed at collection
 
 `recordDeposit` writes the agreed amount with `depositStatus: 'pending'` **before** any card is
 taken. The charge route reads that stored figure, charges it, and flips the status to `available`
@@ -300,16 +324,24 @@ artist to go fix it by hand. The worst case is now a pending deposit that was ne
 visible, harmless, and unspendable, since `getAvailableDeposits` and `applyDeposit` both require
 `available`.
 
-**Untaxed at collection.** M8 fixes tax to the work, collected at the session, and has the deposit
-credit come off the *total* there precisely because "tax on the work was already owed". Taxing the
-deposit as well would charge the client tax twice on the same money.
+**Taxed at collection, because a deposit is its own transaction.** It is not a down payment held
+against a future bill — it is money taken for work, at the moment it is taken, with the shop's cut
+recognised then too (M3). The tax follows the money.
 
-**The offset still applies.** M5 is explicit that deriving it from the total rather than the booked
+This is the half that makes M8's session-side ordering correct. The deposit's face value is deducted
+from the session subtotal *before* tax at the sitting, so the two transactions between them tax the
+whole job exactly once. **The two halves are load-bearing on each other** — tax the deposit without
+deducting it from the base, and the client pays tax twice on that portion; deduct it from the base
+without taxing it, and that portion is never taxed at all.
+
+**The offset applies.** M5 is explicit that deriving it from the total rather than the booked
 duration makes it work "identically for hourly and flat-priced sessions and for deposits", and works
-the $200 keyed-deposit case through by hand.
+the $200 keyed-deposit case through by hand. At the session it is derived from the subtotal *net* of
+the deposit, since the fee on the deposit was already recovered by the offset taken at collection.
 
-The offset collected on a deposit is recorded in `feeCents`, not added to `depositCents`. It is real
-money taken, but it is not part of the deposit's face value and must not become spendable credit.
+Tax and the offset collected on a deposit are recorded in `taxCents` and `feeCents`, never added to
+`depositCents`. Both are real money taken, but neither is part of the deposit's face value and
+neither must become spendable credit.
 
 ---
 

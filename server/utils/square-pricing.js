@@ -116,16 +116,27 @@ function computeFeeOffsetCents({ subtotalCents, hourlyRateCents, feeOffsetPerHou
  * `applyFeeOffset` is a CHOICE the caller passes, never inferred. The offset is presented before the
  * card is charged and the artist decides - it must not appear in a total nobody agreed to.
  *
- * ORDER MATTERS AND IS FIXED: the offset joins the taxable base, then tax is computed on that base,
- * then the deposit credit and any gift card come off the total. Two consequences worth naming:
+ * ---------------------------------------------------------------------------------------------
+ * ORDER MATTERS AND IS FIXED. A DEPOSIT AND A GIFT CARD ARE NOT THE SAME KIND OF MONEY, and they
+ * enter at different points because of it (DECISIONS.md M8):
  *
- *   - the offset is taxed, because it is part of the service price rather than a separate fee;
- *   - the deposit and gift card reduce what is COLLECTED, not what is taxed. The tax on the work
- *     was already owed; paying part of it with money taken earlier does not change what the state
- *     is due.
+ *   1. the deposit credit comes off the subtotal FIRST, before anything else is computed;
+ *   2. the offset is derived from what is left, and joins the taxable base;
+ *   3. tax is computed on that base;
+ *   4. the gift card comes off the TOTAL, after tax.
  *
- * @returns {{subtotalCents, feeOffsetCents, taxableCents, taxCents, totalCents,
- *            depositCreditCents, giftCardCents, amountDueCents}}
+ * WHY THE DEPOSIT IS DIFFERENT. A deposit is its own transaction, taxed when it was collected
+ * (M11). The work it covers has already been taxed once, so taxing the full session again and then
+ * deducting the deposit from the total would charge the client tax twice on that portion. Taking it
+ * off the subtotal taxes exactly the part of the work that has not been paid for yet.
+ *
+ * WHY THE GIFT CARD IS NOT. A gift card is sold UNTAXED (M6) - nothing was delivered at the sale,
+ * so no tax was due and none was collected. Tax on the whole session is therefore still owed, and
+ * the card is a payment instrument against the taxed total rather than a prepayment of the work.
+ * ---------------------------------------------------------------------------------------------
+ *
+ * @returns {{subtotalCents, depositCreditCents, netSubtotalCents, feeOffsetCents, taxableCents,
+ *            taxCents, tipCents, totalCents, giftCardCents, amountDueCents}}
  */
 function computeChargeBreakdown({
   subtotalCents = 0,
@@ -137,31 +148,47 @@ function computeChargeBreakdown({
   giftCardCents = 0,
   tipCents = 0,
 }) {
+  // Clamped per credit, before anything is derived from it. A negative deposit must not become a
+  // surcharge, and a deposit larger than the sitting must not produce a negative base that would
+  // invert the tax.
+  const appliedDepositCents = Math.max(0, depositCreditCents);
+  const netSubtotalCents = Math.max(0, subtotalCents - appliedDepositCents);
+
+  // Derived from the NET, not the gross. The offset recovers the processing fee on the money being
+  // charged now; the fee on the deposit was already recovered by the offset taken at collection
+  // (M5, M11). Deriving it from the gross would charge for the same fee twice.
   const feeOffsetCents = applyFeeOffset
-    ? computeFeeOffsetCents({ subtotalCents, hourlyRateCents, feeOffsetPerHourCents })
+    ? computeFeeOffsetCents({
+        subtotalCents: netSubtotalCents,
+        hourlyRateCents,
+        feeOffsetPerHourCents,
+      })
     : 0;
 
-  const taxableCents = subtotalCents + feeOffsetCents;
+  const taxableCents = netSubtotalCents + feeOffsetCents;
   const taxCents = roundCents((taxableCents * taxRateBasisPoints) / 10000);
 
   // The tip sits outside the taxable base - it is not a service price - and outside the shop cut
   // (DECISIONS.md M2). It is added to what the card is charged and nowhere else.
   const totalCents = taxableCents + taxCents + tipCents;
 
-  // Credits come off what is collected. Clamped so an over-large deposit or gift card produces a
-  // zero bill rather than a negative one that would read as owing the client money.
-  const credits = Math.max(0, depositCreditCents) + Math.max(0, giftCardCents);
-  const amountDueCents = Math.max(0, totalCents - credits);
+  // The gift card comes off here, after tax. Clamped so an over-large card produces a zero bill
+  // rather than a negative one that would read as owing the client money.
+  const amountDueCents = Math.max(0, totalCents - Math.max(0, giftCardCents));
 
   return {
     subtotalCents,
+    // The clamped figure that was actually used, not the raw input. Returning the raw one meant a
+    // negative credit came back negative beside an unreduced total, which a confirmation screen
+    // would render as a discount that had not been given.
+    depositCreditCents: appliedDepositCents,
+    netSubtotalCents,
     feeOffsetCents,
     taxableCents,
     taxCents,
     tipCents,
     totalCents,
-    depositCreditCents,
-    giftCardCents,
+    giftCardCents: Math.max(0, giftCardCents),
     amountDueCents,
   };
 }

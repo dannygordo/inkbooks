@@ -93,6 +93,10 @@ executable bit, git skips it with a hint on stderr rather than an error — whic
   stored state; the client sends which appointment, which transaction, the offset choice, the tip
   and an idempotency key. Charges settle into the owner's connected account. See `DECISIONS.md`
   M10, and M11 for the record-then-charge deposit ordering.
+- **A deposit is taxed at collection and comes off the session subtotal before tax.** M8 and M11,
+  and they are load-bearing on each other — tax the deposit without deducting it from the base and
+  the client pays tax twice on that portion; deduct without taxing and that portion is never taxed.
+  A gift card is the opposite case and comes off the total, because it was sold untaxed (M6).
 - **An independent artist can connect Square, end to end.** `getMySquareConnection`,
   `getMySquareAuthorizationUrl` and `disconnectMySquare`, with a panel in
   `components/settings/SquarePanel.jsx`. It renders for shop artists too and tells them the shop

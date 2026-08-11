@@ -61,18 +61,17 @@ async function quoteAppointmentCharge(appointment, { applyFeeOffset = false, tip
  * card is reached for. Same principle as a session: the figure is stored first and charged from
  * storage, so what was billed and what was recorded cannot be two different numbers.
  *
- * TWO DIFFERENCES FROM A SESSION CHARGE, both derived from DECISIONS.md rather than invented:
+ * A DEPOSIT IS ITS OWN TRANSACTION, AND IT IS TAXED (DECISIONS.md M11). It is not a down payment
+ * held against a future bill - it is money taken for work, at the moment it is taken, with the
+ * shop's cut recognised then too (M3). Taxing it here is what makes the session side correct: the
+ * deposit is deducted from the session subtotal BEFORE tax at the sitting (M8), so the two
+ * transactions between them tax the whole job exactly once.
  *
- *   - NO TAX. M8 fixes tax to the work, collected at the session, and says the deposit credit
- *     comes off the TOTAL rather than off the taxable base precisely because "tax on the work was
- *     already owed". Taxing the deposit at collection as well would charge the client tax twice on
- *     the same money - once here and again on the untouched taxable base at the sitting.
- *   - THE OFFSET STILL APPLIES. M5 is explicit that it is derived from the total rather than the
- *     booked duration so that it "works identically for hourly and flat-priced sessions and for
- *     deposits", and works the $200 keyed-deposit case through by hand.
+ * The offset applies, per M5's "identically for hourly and flat-priced sessions and for deposits",
+ * and joins the taxable base here the same way it does on a session.
  *
- * No deposit credit or gift card either: a deposit is the first money in, so there is nothing yet
- * to credit against it.
+ * No deposit credit or gift card: a deposit is the first money in, so there is nothing yet to
+ * credit against it.
  */
 async function quoteDepositCharge(appointment, { applyFeeOffset = false } = {}) {
   if (!appointment) {
@@ -95,9 +94,7 @@ async function quoteDepositCharge(appointment, { applyFeeOffset = false } = {}) 
     subtotalCents: appointment.depositCents,
     hourlyRateCents: settings.hourlyRateCents,
     feeOffsetPerHourCents: settings.feeOffsetCents,
-    // Zero, not settings.taxRateBasisPoints. See the note above - this is the one place the two
-    // quote functions genuinely differ, so it is spelled out rather than parameterised.
-    taxRateBasisPoints: 0,
+    taxRateBasisPoints: settings.taxRateBasisPoints,
     applyFeeOffset,
     depositCreditCents: 0,
     giftCardCents: 0,

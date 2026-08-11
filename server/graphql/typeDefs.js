@@ -174,17 +174,20 @@ module.exports = gql`
   # nothing in the system can adjudicate afterwards.
   type ChargeQuote {
     subtotalCents: Int!
-    # The Square_Fee_Offset for this subtotal (M5). Zero unless applyFeeOffset was asked for -
+    # Already collected AND already taxed at the consult that took it (M3, M11), so it comes off
+    # the subtotal before anything else - the sitting taxes only the work not yet paid for.
+    depositCreditCents: Int!
+    # Subtotal minus the deposit. What this charge is actually for.
+    netSubtotalCents: Int!
+    # The Square_Fee_Offset for the NET subtotal (M5). Zero unless applyFeeOffset was asked for -
     # it is a choice presented before the card is charged, never applied silently.
     feeOffsetCents: Int!
-    # Subtotal + offset. The offset IS taxed, because it is part of the service price (M8).
+    # Net subtotal + offset. The offset IS taxed, because it is part of the service price (M8).
     taxableCents: Int!
     taxCents: Int!
     tipCents: Int!
     totalCents: Int!
-    # Already collected at the consult that took it (M3), so it reduces what is COLLECTED here
-    # rather than what is taxed.
-    depositCreditCents: Int!
+    # Sold untaxed (M6), so unlike a deposit it comes off the TOTAL, after tax.
     giftCardCents: Int!
     # What the card is actually charged. Clamped at zero - a deposit larger than the final sitting
     # bills nothing rather than a negative that would read as owing the client money.

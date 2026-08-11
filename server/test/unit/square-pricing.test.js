@@ -199,45 +199,98 @@ describe('computeChargeBreakdown', () => {
 		});
 	});
 
-	describe('credits come off the total, not the taxable base (M8, consequence 2)', () => {
-		// The tax on the work was already owed. Paying part of the bill with money collected
-		// earlier does not change what the state is due - so taxCents must be identical whether or
-		// not a deposit is applied.
-		it('does not reduce tax when a deposit is applied', () => {
-			const withDeposit = computeChargeBreakdown({
-				subtotalCents: 18000,
+	describe('a deposit comes off the base, a gift card off the total (M8)', () => {
+		// A deposit was ITS OWN TAXED TRANSACTION at collection (M11), so the portion of the work
+		// it covers has already been taxed. The session taxes only what is left.
+		it('reduces the taxable base when a deposit is applied', () => {
+			const b = computeChargeBreakdown({
+				subtotalCents: 50000,
 				taxRateBasisPoints: 940,
-				depositCreditCents: 10000,
+				depositCreditCents: 20000,
 			});
-			const without = computeChargeBreakdown({
-				subtotalCents: 18000,
-				taxRateBasisPoints: 940,
-			});
-			expect(withDeposit.taxCents).toBe(without.taxCents);
-			expect(withDeposit.taxableCents).toBe(without.taxableCents);
-			expect(withDeposit.totalCents).toBe(without.totalCents);
-			expect(withDeposit.amountDueCents).toBe(without.totalCents - 10000);
+			expect(b.netSubtotalCents).toBe(30000);
+			expect(b.taxableCents).toBe(30000);
+			expect(b.taxCents).toBe(2820);
+			expect(b.amountDueCents).toBe(32820);
 		});
 
-		it('does not reduce tax when a gift card is applied (M6)', () => {
-			const b = computeChargeBreakdown({
+		// DECISIONS.md M8's worked example, from the other end: the deposit was billed
+		// $200 + $18.80 at the consult, the sitting bills $300 + $28.20, and the state receives
+		// 9.4% of $500 across the two - once.
+		it('taxes the whole job exactly once across the two transactions', () => {
+			const depositCharge = computeChargeBreakdown({
 				subtotalCents: 20000,
 				taxRateBasisPoints: 940,
+			});
+			const sessionCharge = computeChargeBreakdown({
+				subtotalCents: 50000,
+				taxRateBasisPoints: 940,
+				depositCreditCents: 20000,
+			});
+			expect(depositCharge.taxCents).toBe(1880);
+			expect(sessionCharge.taxCents).toBe(2820);
+			expect(depositCharge.taxCents + sessionCharge.taxCents).toBe(4700);
+			// 9.4% of the $500 job, computed directly.
+			expect(computeChargeBreakdown({ subtotalCents: 50000, taxRateBasisPoints: 940 }).taxCents)
+				.toBe(4700);
+		});
+
+		// A gift card was sold UNTAXED (M6), so tax on the whole session is still owed and the card
+		// is a payment instrument against the taxed total.
+		it('does not reduce tax when a gift card is applied', () => {
+			const b = computeChargeBreakdown({
+				subtotalCents: 50000,
+				taxRateBasisPoints: 940,
+				giftCardCents: 20000,
+			});
+			expect(b.taxableCents).toBe(50000);
+			expect(b.taxCents).toBe(4700);
+			expect(b.totalCents).toBe(54700);
+			expect(b.amountDueCents).toBe(34700);
+		});
+
+		// The distinction, side by side on the same job. The state gets $47 either way; only the
+		// timing differs.
+		it('collects the same tax on a job whether it was prepaid by deposit or gift card', () => {
+			const viaDeposit = computeChargeBreakdown({
+				subtotalCents: 50000,
+				taxRateBasisPoints: 940,
+				depositCreditCents: 20000,
+			});
+			const viaGiftCard = computeChargeBreakdown({
+				subtotalCents: 50000,
+				taxRateBasisPoints: 940,
+				giftCardCents: 20000,
+			});
+			// The deposit already carried $18.80 of tax at collection; the gift card carried none.
+			expect(viaDeposit.taxCents + 1880).toBe(viaGiftCard.taxCents);
+		});
+
+		it('applies a deposit and a gift card together, each at its own point', () => {
+			const b = computeChargeBreakdown({
+				subtotalCents: 50000,
+				taxRateBasisPoints: 940,
+				depositCreditCents: 20000,
 				giftCardCents: 10000,
 			});
-			expect(b.taxCents).toBe(1880);
-			expect(b.totalCents).toBe(21880);
-			expect(b.amountDueCents).toBe(11880);
+			// Base is $300 after the deposit, tax $28.20, total $328.20, card takes $100 off.
+			expect(b.taxCents).toBe(2820);
+			expect(b.totalCents).toBe(32820);
+			expect(b.amountDueCents).toBe(22820);
 		});
 
-		it('applies a deposit and a gift card together', () => {
+		// The offset recovers the processing fee on the money being charged NOW - the fee on the
+		// deposit was recovered by the offset taken at collection (M5, M11).
+		it('derives the offset from the net subtotal, not the gross', () => {
 			const b = computeChargeBreakdown({
-				subtotalCents: 20000,
-				taxRateBasisPoints: 940,
-				depositCreditCents: 5000,
-				giftCardCents: 5000,
+				subtotalCents: 54000,
+				hourlyRateCents: 18000,
+				feeOffsetPerHourCents: 600,
+				applyFeeOffset: true,
+				depositCreditCents: 18000,
 			});
-			expect(b.amountDueCents).toBe(11880);
+			// $360 remaining is two implied hours, so $12 - not the $18 the gross would give.
+			expect(b.feeOffsetCents).toBe(1200);
 		});
 	});
 
@@ -279,17 +332,31 @@ describe('computeChargeBreakdown', () => {
 			expect(b.amountDueCents).toBe(15000);
 		});
 
-		// Pinning current behaviour, not endorsing it: the returned depositCreditCents/giftCardCents
-		// echo the RAW inputs, while the arithmetic used the clamped values. A confirmation screen
-		// rendering these fields directly would show "-$50.00 deposit" next to an unreduced total.
-		// Worth changing to echo the clamped figures; until then, this is what callers get.
-		it('echoes the raw credit inputs even when the math clamped them', () => {
+		// Returns the CLAMPED figure, not the raw input. It used to echo the raw one, so a negative
+		// credit came back negative beside an unreduced total - which a confirmation screen would
+		// render as a discount that had not been given.
+		it('reports the credit that was actually used, not the raw input', () => {
 			const b = computeChargeBreakdown({
 				subtotalCents: 20000,
 				depositCreditCents: -5000,
+				giftCardCents: -5000,
 			});
-			expect(b.depositCreditCents).toBe(-5000);
+			expect(b.depositCreditCents).toBe(0);
+			expect(b.giftCardCents).toBe(0);
 			expect(b.amountDueCents).toBe(20000);
+		});
+
+		// A deposit larger than the sitting must not produce a negative base, which would invert
+		// the tax into a credit owed to the client.
+		it('never lets an over-large deposit invert the tax', () => {
+			const b = computeChargeBreakdown({
+				subtotalCents: 8000,
+				taxRateBasisPoints: 940,
+				depositCreditCents: 50000,
+			});
+			expect(b.netSubtotalCents).toBe(0);
+			expect(b.taxCents).toBe(0);
+			expect(b.amountDueCents).toBe(0);
 		});
 	});
 
@@ -345,12 +412,13 @@ describe('computeChargeBreakdown', () => {
 			const b = computeChargeBreakdown({});
 			expect(b).toEqual({
 				subtotalCents: 0,
+				depositCreditCents: 0,
+				netSubtotalCents: 0,
 				feeOffsetCents: 0,
 				taxableCents: 0,
 				taxCents: 0,
 				tipCents: 0,
 				totalCents: 0,
-				depositCreditCents: 0,
 				giftCardCents: 0,
 				amountDueCents: 0,
 			});
