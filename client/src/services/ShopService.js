@@ -129,13 +129,60 @@ const ShopService = (() => {
 		}
 	`;
 
+	// --- The artist's own Square connection (DECISIONS.md M9) ---
+	// The shop queries above are for a shop admin looking at a shop. These are for an artist
+	// looking at themselves, and they answer a different question: not "is this shop connected"
+	// but "where do MY sessions charge". An artist at a shop gets source 'shop' back, which is why
+	// the panel can tell them the truth instead of offering a connect button that would build an
+	// account nothing routes to.
+	const _MY_SQUARE_CONNECTION = gql`
+		query GetMySquareConnection {
+			getMySquareConnection {
+				source
+				connected
+				locationId
+				connectedAt
+				ownerName
+			}
+		}
+	`;
+
+	// Eager, unlike the shop authorization url below - the settings panel needs this to decide
+	// what to render at all, not just what to do when a button is pressed.
+	const _fetchMySquareConnection = () => useQuery(_MY_SQUARE_CONNECTION);
+
+	const _useMySquareAuthorizationUrl = () => {
+		const GET_MY_SQUARE_AUTHORIZATION_URL = gql`
+			query GetMySquareAuthorizationUrl {
+				getMySquareAuthorizationUrl
+			}
+		`;
+		return useLazyQuery(GET_MY_SQUARE_AUTHORIZATION_URL);
+	};
+
+	const _DISCONNECT_MY_SQUARE = gql`
+		mutation DisconnectMySquare {
+			disconnectMySquare {
+				source
+				connected
+				locationId
+				connectedAt
+				ownerName
+			}
+		}
+	`;
+
 	return {
 		fetchShop: _fetchShop,
 		useLazyShop: _useLazyShop,
 		fetchShops: _fetchShops,
         updateShop: _updateShop,
         useSquareAuthorizationUrl: _useSquareAuthorizationUrl,
-        DISCONNECT_SHOP_SQUARE: _DISCONNECT_SHOP_SQUARE
+        DISCONNECT_SHOP_SQUARE: _DISCONNECT_SHOP_SQUARE,
+        fetchMySquareConnection: _fetchMySquareConnection,
+        MY_SQUARE_CONNECTION: _MY_SQUARE_CONNECTION,
+        useMySquareAuthorizationUrl: _useMySquareAuthorizationUrl,
+        DISCONNECT_MY_SQUARE: _DISCONNECT_MY_SQUARE
 	};
 })();
 

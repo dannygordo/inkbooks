@@ -5,6 +5,8 @@ const square = require('../../utils/square');
 const { signState } = require('../../routes/squareOAuth');
 const { getShopIdsForUser, assertCanAccessShop } = require('../../utils/shop-membership');
 const { getActiveShopIdForArtist } = require('../../utils/artist-shop');
+const { resolveSquareAccountFor } = require('../../utils/square-account');
+const SquareAccount = require('../../models/SquareAccount');
 const { UserInputError, rethrow } = require('../../utils/errors');
 
 module.exports = {
@@ -80,6 +82,26 @@ module.exports = {
             });
           }
           return square.buildAuthorizationUrl(signState('ARTIST', user.id));
+        }),
+        // Where the caller's sessions actually charge, resolved through the same owner rule as
+        // their tax rate. An artist at a shop gets source 'shop' and the shop's connection state,
+        // even though they have no control over it - because that is the true answer to "where
+        // does my money go", and a panel that showed them their own empty account instead would be
+        // inviting them to build a connection nothing routes to.
+        getMySquareConnection: withAuth(async (_, args, context, info, user) => {
+          const { source, ownerType, ownerId, account } = await resolveSquareAccountFor(user.id);
+          let ownerName = null;
+          if (ownerType === 'SHOP') {
+            const shop = await Shop.findById(ownerId).select('name');
+            ownerName = shop ? shop.name : null;
+          }
+          return {
+            source,
+            connected: SquareAccount.isUsable(account),
+            locationId: account ? account.locationId || null : null,
+            connectedAt: account ? account.connectedAt || null : null,
+            ownerName,
+          };
         }),
     }
 }

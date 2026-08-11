@@ -13,6 +13,7 @@ import { ALERT_CONSTANTS, APP_SETTINGS_CONSTANTS } from "../../constants";
 import BookingSlugField from "../../components/artist/BookingSlugField";
 import NotificationSettingsPanel from "../../components/notifications/NotificationSettingsPanel";
 import AccountPanel from "../../components/settings/AccountPanel";
+import SquarePanel from "../../components/settings/SquarePanel";
 import { bookingUrl } from "../../utils/bookingSlug";
 
 // New top-level settings section - see PRODUCTION_ROADMAP.md's "Rates & settings" entry for why
@@ -551,6 +552,11 @@ const Settings = () => {
 						</div>
 					</form>
 				</IBCardWrapper>
+
+				{/* Sits after Rates because it answers the question Rates raises - "so where does the
+				    money actually go". Rendered for shop artists too, where it says the shop holds
+				    the connection rather than offering a button they cannot use. */}
+				<SquarePanel />
 
 				{shopId && (
 					<IBCardWrapper>

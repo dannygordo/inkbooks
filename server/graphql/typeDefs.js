@@ -168,6 +168,20 @@ module.exports = gql`
     squareLocationId: String
     squareConnectedAt: DateTime
   }
+  # The caller's own view of a Square connection. Deliberately exposes only non-secret fields -
+  # the encrypted access/refresh tokens never leave the server, exactly as on Shop.
+  type SquareConnection {
+    # 'shop' or 'artist' - who OWNS the account these sessions charge into. An artist connected to
+    # a shop gets 'shop' here even if they personally have never touched Square, because that is
+    # where their money goes (DECISIONS.md M8, M9).
+    source: String!
+    connected: Boolean!
+    locationId: String
+    connectedAt: DateTime
+    # The shop's name when source is 'shop', so the panel can name it instead of saying "your
+    # shop". Null for an independent artist.
+    ownerName: String
+  }
   input UserUpdateInput {
     id: ID!
     email: String!
@@ -946,6 +960,11 @@ module.exports = gql`
     # The same handshake for an independent artist, who has no shop to connect one against.
     # Takes no argument on purpose: it can only ever act for the caller. See DECISIONS.md M9.
     getMySquareAuthorizationUrl: String!
+    # WHERE THE CALLER'S SESSIONS ACTUALLY CHARGE - resolved through the same owner rule as their
+    # tax rate (M8/M9), not just "does this artist have a row". An artist at a shop charges into
+    # the SHOP's account, so the source field is what the settings panel needs in order to say
+    # something true rather than showing a connect button that would build a dead connection.
+    getMySquareConnection: SquareConnection!
     getPendingShopCutConfirmations(shopId: ID!): [Appointment]
 
     ######### Artists ###########
@@ -1228,6 +1247,9 @@ module.exports = gql`
     ): Shop!
     updateShop(shop: ShopInput): Shop
     disconnectShopSquare(shopId: ID!): Shop!
+    # The artist's own account, for an artist who owns one. Refuses when a shop holds the
+    # connection - it is not theirs to disconnect. See DECISIONS.md M9.
+    disconnectMySquare: SquareConnection!
 
     ######### Shop-cut ledger ###########
     # See PRODUCTION_ROADMAP.md's "Shop-cut ledger" section for the full design: Square Invoices

@@ -225,7 +225,15 @@ The blast radius is smaller than it looks: the encrypted token is read in exactl
 An independent artist connects through `getMySquareAuthorizationUrl`, which takes no argument — it
 can only act for the caller. It refuses an artist who is currently at a shop: under M8 their tax
 rate and offset already resolve to the shop, so a personal account would be a connection nothing
-routes to, sitting there looking like it works.
+routes to, sitting there looking like it works. `disconnectMySquare` refuses the same case for the
+same reason — succeeding by clearing an artist-owned row they don't use would report "Disconnected"
+while their sessions carried on charging into the shop's account.
+
+`getMySquareConnection` returns a **source**, not just a boolean, and the settings panel renders for
+shop artists as well as independent ones. Their sessions charge into the shop's account, so what
+they need is to be told that — with the shop named, and no button. Hiding the panel would leave
+"where does my money go" unanswered anywhere in the product; offering a connect button would invite
+them to build the dead connection above.
 
 Rejected: **copying the six fields onto `Artist`** and branching on "has an active shop?" at each
 consumer. Cheaper today — one real branch — but it makes M8's owner rule exist twice in two shapes,

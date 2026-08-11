@@ -200,3 +200,41 @@
     outline: 2px solid #1775ee;
     outline-offset: 2px;
 }
+
+/* --- Square panel (components/settings/SquarePanel.jsx) -------------------------------------
+   Same colour values as the shop page's equivalents in shops/shop.css, deliberately: the two
+   panels do the same job for different owners (DECISIONS.md M9) and an artist who has seen one
+   should recognise the other. Duplicated rather than shared because the UI standardisation pass
+   is a design-token extraction that goes last, and pulling one pair of classes out early would
+   be a third convention rather than a second. */
+.settingsSquareStatus {
+    margin: 0 0 6px;
+    font-weight: 500;
+}
+
+.settingsSquareStatus--connected {
+    color: #1b8a3e;
+}
+
+.settingsSquareStatus--disconnected {
+    color: #777;
+}
+
+.settingsSquareBanner {
+    padding: 10px 15px;
+    border-radius: 5px;
+    margin-bottom: 15px;
+    cursor: pointer;
+}
+
+.settingsSquareBanner--success {
+    background-color: #e6f6ea;
+    color: #1b8a3e;
+    border: 1px solid #b6e6c3;
+}
+
+.settingsSquareBanner--error {
+    background-color: #fdecea;
+    color: #a33;
+    border: 1px solid #f3c1bb;
+}

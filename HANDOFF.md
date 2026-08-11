@@ -14,16 +14,20 @@ Everything has been run and everything passes.
 
 | Suite | Files | Tests | Status |
 |---|---|---|---|
-| `client` | 22 | 108 | green |
+| `client` | 23 | 118 | new panel green; rest **not re-run** |
 | `server/test/unit` | 9 | 103 | green |
-| `server/test/integration` | 44 | 663 | green |
+| `server/test/integration` | 45 | ~677 | new suite **never run** |
 
-Everything passes, including the M9 extraction: the derived `Shop` fields, `shopCutPayments` on
-`SquareAccount`, `disconnectShopSquare`, `attention`'s `squareHealth`, and the new
-`test/integration/squareAccounts.test.js`.
+Green is the standing expectation now, not an achievement — treat a failure as a real regression
+rather than as a test nobody had ever run.
 
-This is the standing expectation now, not an achievement — treat a failure as a real regression
-rather than as a test nobody had ever run. The caveat that used to open this file is gone for good.
+**The artist-side Square panel has not been through a full run.** What was observed: the 9 unit
+suites (103), `SquarePanel.test.jsx` on its own (10), and `check-graphql-documents` across all 251
+documents. What was not: `test/integration/mySquareConnection.test.js`, which has never executed.
+
+`Settings.jsx` gained a child that fires a query, which would break any test rendering `Settings`
+without a mock for `getMySquareConnection` — checked, and no test renders it, so this should be
+clean. Worth knowing the moment one is written.
 
 Getting there took exactly one fix, and it was in a **fixture, not the code**:
 `connectArtistToShop` in `test/helpers/factories.js` still upserted on `{artistId, shopId}`, the
@@ -73,9 +77,13 @@ executable bit, git skips it with a hint on stderr rather than an error — whic
 - **Client booking confirmations.** Consults email immediately; sessions coalesce per project on a
   three-minute debounce that restarts with each new sitting.
 - **A Square account belongs to an owner.** `SquareAccount` keyed `{ownerType, ownerId}`, resolved
-  by `resolveSquareAccountFor` in the same shape as `resolveSquareSettings`. An independent artist
-  can now connect Square at all — `getMySquareAuthorizationUrl`, which takes no argument. The
-  GraphQL `Shop` fields are unchanged and derived. See `DECISIONS.md` M9.
+  by `resolveSquareAccountFor` in the same shape as `resolveSquareSettings`. The GraphQL `Shop`
+  fields are unchanged and derived. See `DECISIONS.md` M9.
+- **An independent artist can connect Square, end to end.** `getMySquareConnection`,
+  `getMySquareAuthorizationUrl` and `disconnectMySquare`, with a panel in
+  `components/settings/SquarePanel.jsx`. It renders for shop artists too and tells them the shop
+  holds the connection, naming it — that is the only place in the product that answers "where does
+  my money go".
 
 ## Next
 
