@@ -165,3 +165,25 @@ export function describeRange(range) {
 	}
 	return `${start.format("MMM D, YYYY")} - ${inclusiveEnd.format("MMM D, YYYY")}`;
 }
+
+/**
+ * A picker range as the server's AppointmentFilter bounds.
+ *
+ * ONE CONVERSION, because there were two. AppointmentsList did this inline and the dashboard lists
+ * did not do it at all, which is how "Last month" came to leave August's appointments on screen:
+ * the figures above the lists moved and the lists themselves never got the range.
+ *
+ * Returns {} rather than null for a missing range, so a caller can always spread it into a filter
+ * without a conditional - `{ upcomingOnly: true, ...rangeToFilterBounds(range) }` is the whole
+ * usage. The range's `end` is already exclusive (see buildCustomRange), which is the same half-open
+ * [from, to) convention the server uses, so this is a rename rather than a conversion.
+ */
+export function rangeToFilterBounds(range) {
+	if (!range?.start || !range?.end) {
+		return {};
+	}
+	return {
+		from: moment(range.start).toISOString(),
+		to: moment(range.end).toISOString(),
+	};
+}

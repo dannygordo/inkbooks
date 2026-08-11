@@ -128,10 +128,18 @@ const ArtistPerformancePanel = ({ artistUserId, isSelf = false }) => {
 	// They also respond to the range picker, which client-side MTD/YTD constants could not.
 	//
 	// The LISTS still come from the appointment query, because "the next five appointments" needs
-	// actual rows, not aggregates - and those two lists are not range-scoped: upcoming means
-	// what's ahead of now, and recently-completed means the most recent regardless of which
-	// window is selected. Range-scoping them would empty both for any historical range, which
-	// reads as data loss rather than as a definition.
+	// actual rows, not aggregates - and they ARE range-scoped now.
+	//
+	// They used not to be, on the reasoning that range-scoping would empty them for a historical
+	// range and read as data loss. That was wrong, and the bug it produced is the argument against
+	// it: clicking "Last month" in August moved every figure on the panel and left both lists
+	// showing August's appointments. A control that visibly changes half a screen and silently
+	// ignores the other half is worse than no control - the figures and the rows disagreed, with
+	// nothing on screen saying which one answered the question.
+	//
+	// An empty list IS the answer when there is nothing in the window. "No completed sessions in
+	// July" is information. The empty states name the range so it reads as a fact about July rather
+	// than as a failure to load.
 	const { data: analyticsData, loading: analyticsLoading } =
 		AnalyticsService.getArtistAnalytics(artistUserId, range);
 
@@ -141,9 +149,9 @@ const ArtistPerformancePanel = ({ artistUserId, isSelf = false }) => {
 	// actually asking, which is also why the sorting is right: the server orders upcoming
 	// soonest-first and completed newest-first, rather than the browser re-sorting everything.
 	const { data: upcomingData, loading: upcomingLoading } =
-		AppointmentService.getUpcomingAppointments(artistUserId, APPOINTMENT_LIST_LIMIT);
+		AppointmentService.getUpcomingAppointments(artistUserId, APPOINTMENT_LIST_LIMIT, range);
 	const { data: completedData, loading: completedLoading } =
-		AppointmentService.getCompletedAppointments(artistUserId, APPOINTMENT_LIST_LIMIT);
+		AppointmentService.getCompletedAppointments(artistUserId, APPOINTMENT_LIST_LIMIT, range);
 	const { data: payoutData, refetch: refetchAppointments } =
 		AppointmentService.getShopCutPayoutCandidates(artistUserId);
 
@@ -181,8 +189,9 @@ const ArtistPerformancePanel = ({ artistUserId, isSelf = false }) => {
 		<div className="artistPerformancePanel">
 			<DateRangePicker value={range} onChange={setRange} />
 
-			{/* The figures are aggregates over the selected range and come from the server; the
-			    lists below are not range-scoped (see the note where they're built). Rendered from
+			{/* The figures are aggregates over the selected range and come from the server, and the
+			    lists below now honour the same range - everything under this picker answers for one
+			    window. The shop-cut payout list is the single exception and says so. Rendered from
 			    `analytics` rather than from summed rows, so an artist's numbers and the shop's
 			    view of the same artist are the same computation, not two that agree by luck.
 
@@ -254,7 +263,7 @@ const ArtistPerformancePanel = ({ artistUserId, isSelf = false }) => {
 					{isSelf ? "Your Upcoming Appointments" : "Upcoming Appointments"}
 				</h2>
 				{upcoming.length === 0 ? (
-					<div className="artistPerformanceEmpty">No upcoming appointments.</div>
+					<div className="artistPerformanceEmpty">No upcoming appointments in {range?.label ?? "this range"}.</div>
 				) : (
 					<ul className="artistUpcomingList">
 						{upcoming.map((appt) => (
@@ -268,7 +277,7 @@ const ArtistPerformancePanel = ({ artistUserId, isSelf = false }) => {
 					{isSelf ? "Your Completed Sessions" : "Completed Sessions"}
 				</h2>
 				{completed.length === 0 ? (
-					<div className="artistPerformanceEmpty">No completed sessions yet.</div>
+					<div className="artistPerformanceEmpty">No completed sessions in {range?.label ?? "this range"}.</div>
 				) : (
 					<ul className="artistUpcomingList">
 						{completed.map((appt) => (

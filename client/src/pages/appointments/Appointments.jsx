@@ -1,10 +1,10 @@
-import { useState } from 'react';
-import { ToggleButton, ToggleButtonGroup } from '@mui/material';
-import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
-import ViewListIcon from '@mui/icons-material/ViewList';
-import IBCalendar from '../../components/ibCalendar/IBCalendar';
-import AppointmentsList from '../../components/appointments/AppointmentsList';
-import './appointments.css';
+import { useState } from "react";
+import { ToggleButton, ToggleButtonGroup } from "@mui/material";
+import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
+import ViewListIcon from "@mui/icons-material/ViewList";
+import IBCalendar from "../../components/ibCalendar/IBCalendar";
+import AppointmentsList from "../../components/appointments/AppointmentsList";
+import "./appointments.css";
 
 /**
  * Calendar or list, over the same appointments.
@@ -21,7 +21,7 @@ import './appointments.css';
  * people turn out to have a strong default, which is a thing to observe rather than guess.
  */
 const Appointments = () => {
-	const [view, setView] = useState('calendar');
+	const [view, setView] = useState("list");
 
 	return (
 		<div className="appointments">
@@ -37,11 +37,15 @@ const Appointments = () => {
 				>
 					<ToggleButton value="calendar" aria-label="Calendar view">
 						<CalendarMonthIcon fontSize="small" />
-						<span className="appointmentsViewToggleLabel">Calendar</span>
+						<span className="appointmentsViewToggleLabel">
+							Calendar
+						</span>
 					</ToggleButton>
 					<ToggleButton value="list" aria-label="List view">
 						<ViewListIcon fontSize="small" />
-						<span className="appointmentsViewToggleLabel">List</span>
+						<span className="appointmentsViewToggleLabel">
+							List
+						</span>
 					</ToggleButton>
 				</ToggleButtonGroup>
 			</div>
@@ -49,7 +53,7 @@ const Appointments = () => {
 			{/* Unmounted rather than hidden with CSS. Each view runs its own query - the calendar
 			    fetches the month on screen, the list fetches a chosen range - and keeping both
 			    mounted would run both on every visit to fill a screen showing one of them. */}
-			{view === 'calendar' ? <IBCalendar /> : <AppointmentsList />}
+			{view === "list" ? <AppointmentsList /> : <IBCalendar />}
 		</div>
 	);
 };

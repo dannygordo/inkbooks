@@ -1,5 +1,6 @@
 import { gql, useQuery } from "@apollo/client";
 import { getOperationName } from "@apollo/client/utilities";
+import { rangeToFilterBounds } from "../utils/dateRanges";
 
 export const AppointmentService = (() => {
     // Takes the month the calendar is actually showing. This used to fetch a shop's ENTIRE
@@ -136,19 +137,33 @@ export const AppointmentService = (() => {
     // candidates, plus the calendar's own filter - which meant every dashboard visit downloaded
     // every appointment that artist had ever had. Each of these now asks the server the question
     // the screen is actually asking. See server/graphql/typeDefs.js's AppointmentFilter.
-    const _getUpcomingAppointments = (userId, limit = 5) => {
+    // BOTH TAKE THE RANGE NOW. They used to ignore it, so clicking "Last month" on the dashboard
+    // moved every figure and left both lists showing August - the filter said one thing and the
+    // rows said another, which is worse than no filter at all.
+    //
+    // An empty list is an acceptable answer. "No completed sessions last month" is information; a
+    // list that quietly ignores the control above it is not.
+    const _getUpcomingAppointments = (userId, limit = 5, range) => {
         return useQuery(_FETCH_APPOINTMENTS_BY_ARTIST, {
-            variables: { userId, filter: { upcomingOnly: true }, page: { limit } },
+            variables: {
+                userId,
+                // upcomingOnly AND the range, which the resolver intersects rather than letting one
+                // overwrite the other - "upcoming" is still ahead of now, but never outside the
+                // window that was asked for. A past range therefore returns nothing, correctly:
+                // there are no upcoming appointments in July.
+                filter: { upcomingOnly: true, ...rangeToFilterBounds(range) },
+                page: { limit },
+            },
             skip: !userId,
             fetchPolicy: "cache-and-network",
         });
     };
 
-    const _getCompletedAppointments = (userId, limit = 5) => {
+    const _getCompletedAppointments = (userId, limit = 5, range) => {
         return useQuery(_FETCH_APPOINTMENTS_BY_ARTIST, {
             variables: {
                 userId,
-                filter: { appointmentStatus: "completed" },
+                filter: { appointmentStatus: "completed", ...rangeToFilterBounds(range) },
                 page: { limit },
             },
             skip: !userId,

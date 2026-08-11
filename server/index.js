@@ -174,7 +174,21 @@ async function start() {
   // needed for this part. cors() is applied app-wide above now, not repeated here.
   app.use(
     '/',
-    express.json(),
+    // 2mb, not Express's 100kb default.
+    //
+    // Nobody chose 100kb - it is what express.json() does when you don't say. A GraphQL mutation
+    // is a JSON body like any other, and updateProject carries a title, a description, session
+    // notes and an array of reference-image records; a project with a long description and a dozen
+    // images clears 100kb without anything unusual happening. The failure is a body-parse
+    // rejection before the request reaches Apollo, so nothing in the GraphQL layer logs it and the
+    // browser sees a bare 4xx with no useful message - which is what a "400 on reference image
+    // upload" looks like from the client side.
+    //
+    // NOT confirmed as the cause of the reported 400; the payload for that was lost. This is a
+    // size cliff nobody set deliberately, worth removing on its own. The images themselves go to
+    // Firebase from the browser and only their URLs come through here, so 2mb is generous for what
+    // this route legitimately carries.
+    express.json({ limit: '2mb' }),
     expressMiddleware(server, {
       // loaders are built fresh for every operation, never shared. They batch the per-row
       // lookups field resolvers do (see utils/loaders.js); a loader that outlived a request would

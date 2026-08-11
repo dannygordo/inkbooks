@@ -61,8 +61,19 @@ function appointmentFilterToQuery(filter) {
   // upcomingOnly is resolved HERE, at query time, rather than by the caller passing
   // `from: <now>`. "Upcoming" has to mean ahead of the moment the query runs; a client that
   // computed `now` when it rendered would drift, and a cached one would drift badly.
+  //
+  // INTERSECTED with any `from` the caller sent, not substituted for it. This used to assign
+  // `$gte = now` outright, which silently discarded the lower bound of a range - so "upcoming,
+  // within last month" became "upcoming, ever". It happened to produce the right answer for a past
+  // range only because the `$lt` from `to` survived, and correctness that depends on which of two
+  // lines runs second is not correctness.
+  //
+  // The later of the two is the right start: a future range starts at the range, a range containing
+  // now starts at now, and a past range ends up with $gte after $lt and returns nothing - which is
+  // the true answer. There are no upcoming appointments in July.
   if (filter.upcomingOnly) {
-    dateBounds.$gte = new Date();
+    const now = new Date();
+    dateBounds.$gte = dateBounds.$gte && dateBounds.$gte > now ? dateBounds.$gte : now;
   }
   if (Object.keys(dateBounds).length > 0) {
     query.appointmentDate = dateBounds;
