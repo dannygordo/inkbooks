@@ -10,6 +10,10 @@ be read before writing code rather than excavated afterwards.
 
 Anything marked **OPEN** has not been decided. Do not guess at it.
 
+For *where the project currently stands* — what is built, what is next, and what has not been
+verified — see `HANDOFF.md`. This file holds rules; that one holds state, and they change at
+different rates.
+
 ---
 
 ## Money
