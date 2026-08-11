@@ -120,20 +120,27 @@ executable bit, git skips it with a hint on stderr rather than an error — whic
 
 ## Next
 
-0. **Run the suites.** See the table above — two new server suites have never executed and the
-   client suite is stale. Do this before anything else.
+0. **Run the client suite.** See the table above. Do this before anything else.
 
-1. **Run the migration, then drop the old `Shop` fields.** The `SquareAccount` extraction is built
-   (`DECISIONS.md` M9). What remains is operational, not code: run
-   `node scripts/migrate-square-accounts.js --dry-run`, read the output, run it for real, confirm a
-   shop-cut invoice still issues, then delete the seven now-unread `square*` fields from stored
-   shop documents in a follow-up. The script is idempotent and never overwrites an existing
-   account, so a re-run cannot clobber a token refreshed since the first pass.
-2. Gift cards — model, balance, partial redemption, the payout sign convention in `DECISIONS.md` M6.
-3. Adjustment records — shop-admin only, never calls Square.
-4. GraphQL surface for client flags. The automatic path works end to end; reading a client's flags
+1. **Take one real payment end to end.** Nothing in the charge path has ever touched Square. It was
+   built against their published REST docs, and `utils/square.js` has said so at the top since it
+   was written. The sequence: run `scripts/migrate-square-accounts.js`, connect a Square **sandbox**
+   seller through the OAuth flow, set a tax rate and offset in Settings, then charge a session and a
+   deposit and confirm the figures in Square's dashboard match what InkBooks recorded. Everything
+   below is built on arithmetic that has only ever been checked against itself.
+2. **Drop the old `Shop` Square fields.** Once the migration has run and a charge has worked, delete
+   the seven now-unread `square*` fields from stored shop documents. Deliberately left in place for
+   one deploy — see M9.
+3. Gift cards — model, balance, partial redemption, the payout sign convention in `DECISIONS.md` M6,
+   and the offset at purchase. The ownership question they depended on is answered (M9), and the
+   sale is priced by the same `computeChargeBreakdown` with tax zeroed.
+4. **Fix the S2 gate gap.** The `withAuth(fn, ROLES.SHOP_ADMIN)` call sites still refuse an
+   independent artist outright — they cannot archive their own client. Decided long ago, and the
+   codebase now half-agrees with S2: M9, M10 and the pricing settings all treat independent artists
+   as real owners while `archiveClient` does not.
+5. Adjustment records — shop-admin only, never calls Square.
+6. GraphQL surface for client flags. The automatic path works end to end; reading a client's flags
    and raising a manual one exist only as functions.
-5. The Orders-based charge itself, then the deposit UI at every booking entry point.
 
 Last of all, deliberately: the UI standardisation pass onto the register-page aesthetic. It collides
 with everything else.
