@@ -47,6 +47,26 @@ function run(query, user, variables) {
 	);
 }
 
+/**
+ * "This was refused" - asserted on the FIELD, not on `data`.
+ *
+ * GraphQL nulls `data` itself only when the failing field is non-nullable; when it is nullable the
+ * error propagates no further than the field, and `data` comes back as `{ archiveClient: null }`.
+ * archiveClient/archiveArtist return a NULLABLE type, so `expect(data).toBeNull()` fails on a
+ * refusal that worked perfectly - which is exactly what it did here.
+ *
+ * The trap is that the same assertion PASSES on a non-nullable field, so it looks correct
+ * everywhere it has been used before. Asserting on the field works either way, and every caller
+ * below also checks the stored record is untouched - which is the real claim being made.
+ */
+function expectRefused(result, field) {
+	const { data, errors } = result.body.singleResult;
+	expect(errors).toBeDefined();
+	if (data !== null && data !== undefined) {
+		expect(data[field]).toBeNull();
+	}
+}
+
 // An independent artist reaches their own client through the work - there is no shop to share.
 // See canAccessClient's "an ARTIST is their own shop for this purpose" branch.
 async function independentArtistWithClient() {
@@ -106,11 +126,7 @@ describe('nothing else was loosened', () => {
 		const { client } = await createClientUser();
 		await createProject(artistUser.id, client._id);
 
-		const { data, errors } = (await run(ARCHIVE_CLIENT, artistUser, { clientId: client.id }))
-			.body.singleResult;
-
-		expect(data).toBeNull();
-		expect(errors).toBeDefined();
+		expectRefused(await run(ARCHIVE_CLIENT, artistUser, { clientId: client.id }), 'archiveClient');
 
 		const stored = await Client.findById(client._id);
 		expect(stored.status).not.toBe(Constants.CLIENT_STATUS.ARCHIVED);
@@ -138,11 +154,10 @@ describe('nothing else was loosened', () => {
 		const { client } = await createClientUser();
 		await createProject(theirs.id, client._id);
 
-		const { data, errors } = (await run(ARCHIVE_CLIENT, mine, { clientId: client.id }))
-			.body.singleResult;
+		expectRefused(await run(ARCHIVE_CLIENT, mine, { clientId: client.id }), 'archiveClient');
 
-		expect(data).toBeNull();
-		expect(errors).toBeDefined();
+		const stored = await Client.findById(client._id);
+		expect(stored.status).not.toBe(Constants.CLIENT_STATUS.ARCHIVED);
 	});
 
 	// Removing the floor from archiveArtist relies entirely on assertCanManageArtist's own
@@ -154,11 +169,7 @@ describe('nothing else was loosened', () => {
 		await connectArtistToShop(mine.id, shop.id);
 		await connectArtistToShop(theirs.id, shop.id);
 
-		const { data, errors } = (await run(ARCHIVE_ARTIST, mine, { artistId: theirArtist.id }))
-			.body.singleResult;
-
-		expect(data).toBeNull();
-		expect(errors).toBeDefined();
+		expectRefused(await run(ARCHIVE_ARTIST, mine, { artistId: theirArtist.id }), 'archiveArtist');
 
 		const stored = await Artist.findById(theirArtist._id);
 		expect(stored.status).toBe(Constants.ARTIST_STATUS.ACTIVE);
