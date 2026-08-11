@@ -168,6 +168,34 @@ module.exports = gql`
     squareLocationId: String
     squareConnectedAt: DateTime
   }
+  # What charging a session would come to. Every figure server-computed from stored rates - see
+  # utils/charge-quote.js. The UI displays this and then charges it; it never adds the numbers up
+  # itself, because a total agreed on screen and a different total leaving the card is a bug
+  # nothing in the system can adjudicate afterwards.
+  type ChargeQuote {
+    subtotalCents: Int!
+    # The Square_Fee_Offset for this subtotal (M5). Zero unless applyFeeOffset was asked for -
+    # it is a choice presented before the card is charged, never applied silently.
+    feeOffsetCents: Int!
+    # Subtotal + offset. The offset IS taxed, because it is part of the service price (M8).
+    taxableCents: Int!
+    taxCents: Int!
+    tipCents: Int!
+    totalCents: Int!
+    # Already collected at the consult that took it (M3), so it reduces what is COLLECTED here
+    # rather than what is taxed.
+    depositCreditCents: Int!
+    giftCardCents: Int!
+    # What the card is actually charged. Clamped at zero - a deposit larger than the final sitting
+    # bills nothing rather than a negative that would read as owing the client money.
+    amountDueCents: Int!
+    # 'shop' or 'artist' - whose tax rate and offset these are, and whose Square account this would
+    # settle to. The same owner for both, by construction (M8, M9).
+    source: String!
+    # False when that owner has no usable Square connection. The UI needs to say so before the
+    # artist reaches for a card, not after the charge fails.
+    canCharge: Boolean!
+  }
   # The caller's own view of a Square connection. Deliberately exposes only non-secret fields -
   # the encrypted access/refresh tokens never leave the server, exactly as on Shop.
   type SquareConnection {
@@ -951,6 +979,10 @@ module.exports = gql`
     # scrolling problem to hide.
     getShopCutPayoutCandidates(userId: ID!): [Appointment!]!
     getAppointment(appointmentId: ID!): Appointment
+    # The charge total, computed server-side, BEFORE the card is taken. applyFeeOffset and
+    # tipCents are the only two inputs because they are the only two the caller legitimately
+    # knows - see utils/charge-quote.js.
+    getChargeQuote(appointmentId: ID!, applyFeeOffset: Boolean, tipCents: Int): ChargeQuote!
     getAppointmentsByProject(projectId: ID!): [Appointment]
 
     ######### Shop-cut ledger ###########
@@ -1337,11 +1369,17 @@ module.exports = gql`
     # against the cash drawer or against Square. squarePaymentId is required when the method is
     # 'square' - see mutations/deposits.js, which refuses the combination that would claim a card
     # payment with no transaction behind it.
+    #
+    # The pending flag records an amount AGREED with no money taken yet, so the charge route has a stored
+    # figure to charge rather than one the browser sends alongside the card. It is the only case
+    # where a 'square' deposit may omit squarePaymentId - the charge fills it in. A pending deposit
+    # is not spendable: applyDeposit and getAvailableDeposits both require 'available'.
     recordDeposit(
       appointmentId: ID!
       depositCents: Int!
       paymentMethod: String!
       squarePaymentId: String
+      pending: Boolean
     ): Appointment
     # Spends an available deposit against a session, exactly once. Reduces that session's total
     # and recomputes its shop cut on the reduced figure.

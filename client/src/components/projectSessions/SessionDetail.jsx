@@ -79,6 +79,12 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 	);
 	const [deleteAppointment] = useMutation(AppointmentService.DELETE_APPOINTMENT);
 	const [applyDeposit, { loading: applyingDeposit }] = useMutation(DepositService.APPLY_DEPOSIT);
+	const [fetchChargeQuote, { loading: quoting }] = AppointmentService.useChargeQuote();
+
+	// The Square_Fee_Offset is OFFERED, never applied silently (DECISIONS.md M5) - so this starts
+	// false and only the artist's own tick turns it on. The amount it adds is the server's to
+	// compute; this is only the choice.
+	const [applyFeeOffset, setApplyFeeOffset] = useState(false);
 
 	// Deposits this client has already paid and not yet spent. Skipped once this session already
 	// carries a credit - there's nothing to offer, and the server refuses a second one anyway.
@@ -245,28 +251,58 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 		}
 	};
 
-	const handleChargeViaSquare = (e) => {
+	// SAVE FIRST, THEN CHARGE. This used to open the payment form straight from the unsaved form
+	// fields, so the figures being charged existed only in the browser until the charge wrote them.
+	// The server now reads the session's price from the SAVED appointment (see
+	// server/utils/charge-quote.js) - which is what makes "what was billed" and "what was recorded"
+	// the same number rather than two numbers that happened to travel together.
+	//
+	// It also means an artist who edits the price and charges without saving no longer silently
+	// charges the edit and records something else.
+	const handleChargeViaSquare = async (e) => {
 		e.preventDefault();
-		// Charge the full amount due - work + tax + fees + tip - not the subtotal alone. The old
-		// code charged `total`, which excluded the tip entirely: any tip the artist entered was
-		// recorded in InkBooks but never actually collected from the client.
-		const payload = buildSavePayload();
+		const { data } = await updateSessionDetails({
+			variables: { appointmentInput: buildSavePayload() },
+		});
+		setAppointment((prev) => ({ ...prev, ...data.updateAppointment }));
+
+		// The amount is now the server's to state. Fetched rather than added up here, by the same
+		// function the charge route uses, so the total on screen is the total charged.
+		const { data: quoteData } = await fetchChargeQuote({
+			variables: {
+				appointmentId: appointment.id,
+				applyFeeOffset,
+				tipCents: data.updateAppointment.tipCents || 0,
+			},
+		});
+		const quote = quoteData?.getChargeQuote;
+		if (!quote) {
+			return;
+		}
+		if (!quote.canCharge) {
+			setAlert({
+				isAlert: true,
+				severity: ALERT_CONSTANTS.SEVERITY.ERROR,
+				message:
+					quote.source === "shop"
+						? "This shop has not connected a Square account yet."
+						: "Connect Square in Settings before taking a card payment.",
+				timeout: ALERT_CONSTANTS.TIMEOUT,
+				location: ALERT_CONSTANTS.DISPLAY_MODAL,
+			});
+			return;
+		}
+
 		setModal({
 			isOpen: true,
-			title: `Charge for ${project?.title || "session"}`,
+			title: `Charge ${formatCents(quote.amountDueCents)} for ${project?.title || "session"}`,
 			content: (
 				<IBSquarePaymentForm
-					amountCents={payload.totalCents}
-					// The breakdown travels with the charge so the server can persist it against
-					// this session (see routes/squarePayments.js). Without appointmentId the
-					// charge succeeds but nothing is recorded against the session - which is
-					// exactly what used to happen, leaving the money visible only in Square's own
-					// dashboard and the tip unrecoverable from InkBooks' data.
+					// Display only - the server charges what it computed, not what is passed here.
+					amountCents={quote.amountDueCents}
 					appointmentId={appointment.id}
-					subtotalCents={payload.subtotalCents}
-					taxCents={payload.taxCents}
-					feeCents={payload.feeCents}
-					tipCents={payload.tipCents}
+					applyFeeOffset={applyFeeOffset}
+					tipCents={data.updateAppointment.tipCents || 0}
 					note={`Session for project ${project?.title || ""}`}
 					onSuccess={() => {
 						setModal({ ...modal, isOpen: false });
@@ -466,6 +502,21 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 				onChange={(e) => setNotes(e.target.value)}
 			/>
 
+			{/* The offset is a CHOICE, presented before the card is charged and never applied
+			    silently (DECISIONS.md M5). Unticked by default; the amount it adds is computed
+			    server-side and appears in the charge dialog's title, not here - this component no
+			    longer works out what anything costs. */}
+			{!isClosed && (
+				<label className="sessionDetailOffset">
+					<input
+						type="checkbox"
+						checked={applyFeeOffset}
+						onChange={(e) => setApplyFeeOffset(e.target.checked)}
+					/>{" "}
+					Add the card processing offset to this charge
+				</label>
+			)}
+
 			<div className="sessionDetailActions">
 				<Button
 					variant="outlined"
@@ -475,15 +526,15 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 				>
 					Save
 				</Button>
-				{/* Disabled when there's nothing to charge. Checks the computed grand total rather
-				    than any one field, so a session that is pure tip (a touch-up the artist
-				    comped) is still chargeable. */}
+				{/* Gated on the session having a PRICE, not on a computed grand total - the total
+				    is the server's answer now and asking for it is what this button does. A
+				    session with no subtotal is unfinished, and charge-quote.js refuses it. */}
 				<Button
 					variant="outlined"
 					onClick={handleChargeViaSquare}
-					disabled={isClosed || buildSavePayload().totalCents <= 0}
+					disabled={isClosed || saving || quoting || readCents(subtotalRef, appointment.subtotalCents) <= 0}
 				>
-					Charge via Square
+					{quoting ? "Checking..." : "Charge via Square"}
 				</Button>
 				<Button
 					variant="contained"

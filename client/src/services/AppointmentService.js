@@ -1,4 +1,4 @@
-import { gql, useQuery } from "@apollo/client";
+import { gql, useQuery, useLazyQuery } from "@apollo/client";
 import { getOperationName } from "@apollo/client/utilities";
 import { rangeToFilterBounds } from "../utils/dateRanges";
 
@@ -584,6 +584,38 @@ export const AppointmentService = (() => {
         }
     `;
 
+    // What charging a session would come to, computed SERVER-SIDE by the same function the charge
+    // route uses (server/utils/charge-quote.js). Lazy, because it is asked at the moment the
+    // artist reaches for a card rather than on every render of a session.
+    //
+    // The client no longer adds these up. It used to: SessionDetail summed subtotal + tax + fee +
+    // tip and posted the components alongside the charge, and the server wrote them down and
+    // computed the shop's cut from them. A total agreed on screen and a different total leaving
+    // the card is a disagreement nothing in the system can settle afterwards.
+    const _GET_CHARGE_QUOTE = gql`
+        query GetChargeQuote($appointmentId: ID!, $applyFeeOffset: Boolean, $tipCents: Int) {
+            getChargeQuote(
+                appointmentId: $appointmentId
+                applyFeeOffset: $applyFeeOffset
+                tipCents: $tipCents
+            ) {
+                subtotalCents
+                feeOffsetCents
+                taxableCents
+                taxCents
+                tipCents
+                totalCents
+                depositCreditCents
+                giftCardCents
+                amountDueCents
+                source
+                canCharge
+            }
+        }
+    `;
+
+    const _useChargeQuote = () => useLazyQuery(_GET_CHARGE_QUOTE, { fetchPolicy: "network-only" });
+
     /**
      * Every query that draws appointments, by operation name - to hand to a mutation's
      * `refetchQueries` after anything that creates, moves or removes one.
@@ -638,6 +670,8 @@ export const AppointmentService = (() => {
         STOP_SESSION_TIMER: _STOP_SESSION_TIMER,
         RESET_SESSION_TIMER: _RESET_SESSION_TIMER,
         UPDATE_SESSION_DETAILS: _UPDATE_SESSION_DETAILS,
+        GET_CHARGE_QUOTE: _GET_CHARGE_QUOTE,
+        useChargeQuote: _useChargeQuote,
         getAppointment: _getAppointment,
         // Exported so tests can build a MockedProvider mock against the same document the
         // component actually runs - mirroring it by hand in a test file is how a query and its

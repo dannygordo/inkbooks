@@ -244,6 +244,73 @@ production.
 Rejected: **shop-only, permanently**. It contradicts S2 and strands the two pricing fields already on
 `Artist` as configuration that can never be used.
 
+### M10. The server decides what a charge is. The client only says which button was pressed
+
+Every money figure in a charge is derived from stored state: the session's price from the saved
+`Appointment`, the tax rate and fee offset from `resolveSquareSettings` (M8), the total from
+`computeChargeBreakdown`. `utils/charge-quote.js` is the only place that assembles them, and both
+the quote the UI displays and the amount actually charged come from it — so what the artist agrees
+to on screen and what leaves the card cannot differ.
+
+The route previously took `subtotalCents`, `taxCents`, `feeCents`, `tipCents` and `amountCents` from
+the request body, wrote them onto the appointment, and computed the shop's cut from the subtotal the
+caller had just supplied. An artist could charge one figure and record another, and pay their cut on
+the smaller one. The Zod schema validated those fields' *types*, which is not the same claim.
+
+There is no tighter schema that fixes this. No assertion about a number makes a client entitled to
+assert it.
+
+**What the caller still supplies, and why each is legitimate:**
+
+- `appointmentId` and `chargeType` — which record, and which of the two transactions against it.
+  A consult can take a deposit and later be charged for work.
+- `applyFeeOffset` — the offset is a choice presented before the card is charged (M5). The choice is
+  the artist's; whether it is honoured is not.
+- `tipCents` — decided at the counter, and no stored rate predicts it. Also the only caller-supplied
+  figure that cannot move the shop's cut, since tips sit outside the cuttable base (M2).
+- `idempotencyKey` — generated per Pay press and resent unchanged on retry. The server used to
+  generate its own, which made every retry a distinct charge — the precise failure idempotency keys
+  exist to prevent.
+
+**The price of the work is still the artist's to set.** That is not what was being guarded. It has to
+be *saved* before it can be charged, so that what was billed and what was recorded are the same
+number by construction, and so `updateAppointment`'s own authorization is the only path into that
+field rather than every charge request being a second, weaker one.
+
+Charges settle into the owner's connected account (M9), never a platform account. Both halves are
+load-bearing: computing the right number and charging it into InkBooks' account is still wrong, and
+charging into the seller's account an amount the caller chose is still wrong.
+
+Rejected: keeping the components as request fields and cross-checking them against a server
+computation. It sounds safer and is worse — two sources for one number, with a reconciliation rule
+that has to decide which wins, in the one place where "they disagreed and we picked one" is not an
+acceptable answer.
+
+### M11. A deposit is recorded before it is charged, and is not taxed at collection
+
+`recordDeposit` writes the agreed amount with `depositStatus: 'pending'` **before** any card is
+taken. The charge route reads that stored figure, charges it, and flips the status to `available`
+with the Square payment id. `depositCents` is never rewritten by the charge — it is the field the
+charge was computed from.
+
+Ordering, because charging first meant the amount charged and the amount recorded were two numbers
+from the same browser. It also removes a real failure: a successful charge followed by a failed
+`recordDeposit` left money taken with no record, which `BookSessionDatesForm` handled by telling the
+artist to go fix it by hand. The worst case is now a pending deposit that was never collected —
+visible, harmless, and unspendable, since `getAvailableDeposits` and `applyDeposit` both require
+`available`.
+
+**Untaxed at collection.** M8 fixes tax to the work, collected at the session, and has the deposit
+credit come off the *total* there precisely because "tax on the work was already owed". Taxing the
+deposit as well would charge the client tax twice on the same money.
+
+**The offset still applies.** M5 is explicit that deriving it from the total rather than the booked
+duration makes it work "identically for hourly and flat-priced sessions and for deposits", and works
+the $200 keyed-deposit case through by hand.
+
+The offset collected on a deposit is recorded in `feeCents`, not added to `depositCents`. It is real
+money taken, but it is not part of the deposit's face value and must not become spendable credit.
+
 ---
 
 ## Membership and attribution
@@ -373,6 +440,9 @@ share → UI surfaces → dashboard fixes. Standalone fixes pulled forward.
 | Freezing a cut permanently once written | Blocks correcting a mistyped subtotal at the rate that applied |
 | Square fields copied onto `Artist` | Two shapes of the same owner rule; new fields get added to one |
 | Square as a shop-only feature | Contradicts S2 and strands the pricing fields already on `Artist` |
+| Client-supplied charge components | No schema makes a client entitled to assert what it is owed |
+| Cross-checking client figures against server ones | Two sources for one number, needing a rule for which wins |
+| Charging a deposit before recording it | Charged and recorded become two numbers that can differ |
 
 ---
 

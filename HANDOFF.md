@@ -14,14 +14,18 @@ Everything has been run and everything passes.
 
 | Suite | Files | Tests | Status |
 |---|---|---|---|
-| `client` | 23 | 118 | green |
+| `client` | 23 | 118 | not re-run since the charge work |
 | `server/test/unit` | 9 | 103 | green |
-| `server/test/integration` | 45 | 674 | green |
-
-All of M9 is covered and observed, including the artist-side operations and the settings panel.
+| `server/test/integration` | 47 | ~712 | two new suites **never run** |
 
 Green is the standing expectation now, not an achievement — treat a failure as a real regression
 rather than as a test nobody had ever run.
+
+**The Orders charge work has not been through an integration run.** `chargeQuote.test.js` and
+`squarePaymentRoute.test.js` have never executed, and the client suite has not been re-run since
+`SessionDetail` and `BookSessionDatesForm` changed. Unit suites and all seven pre-commit checks
+pass. Expect client fallout: both of those components changed shape, and `SessionDetail` now fires
+a query it did not before.
 
 **No database has been migrated.** The code reads `SquareAccount`; every existing environment still
 has the connection on `Shop`, so a previously connected shop reads as *disconnected* until
@@ -73,11 +77,22 @@ executable bit, git skips it with a hint on stderr rather than an error — whic
   Covered by `test/unit/square-pricing.test.js`, 29 tests, observed passing. The expected figures are
   taken from the worked examples in `DECISIONS.md` M2/M3/M5/M8 rather than from the implementation,
   so a disagreement between the two files is visible instead of silently ratified.
+
+  A units bug lived in `resolveSquareSettings` under those 29 passing tests for exactly as long as
+  they existed: `hourlyRate` is stored in whole **dollars** and was assigned straight to
+  `hourlyRateCents`, so a one-hour session at $180 implied 100 hours and a $6 offset came out at
+  $600. Every one of those tests passed `hourlyRateCents` in by hand, so none of them touched the
+  function that reads it off a document. Fixed, and pinned by `test/integration/chargeQuote.test.js`.
+  Worth remembering the shape: the tested half was correct and the untested boundary was not.
 - **Client booking confirmations.** Consults email immediately; sessions coalesce per project on a
   three-minute debounce that restarts with each new sitting.
 - **A Square account belongs to an owner.** `SquareAccount` keyed `{ownerType, ownerId}`, resolved
   by `resolveSquareAccountFor` in the same shape as `resolveSquareSettings`. The GraphQL `Shop`
   fields are unchanged and derived. See `DECISIONS.md` M9.
+- **The server decides what a charge is.** `utils/charge-quote.js` computes every figure from
+  stored state; the client sends which appointment, which transaction, the offset choice, the tip
+  and an idempotency key. Charges settle into the owner's connected account. See `DECISIONS.md`
+  M10, and M11 for the record-then-charge deposit ordering.
 - **An independent artist can connect Square, end to end.** `getMySquareConnection`,
   `getMySquareAuthorizationUrl` and `disconnectMySquare`, with a panel in
   `components/settings/SquarePanel.jsx`. It renders for shop artists too and tells them the shop
@@ -85,6 +100,9 @@ executable bit, git skips it with a hint on stderr rather than an error — whic
   my money go".
 
 ## Next
+
+0. **Run the suites.** See the table above — two new server suites have never executed and the
+   client suite is stale. Do this before anything else.
 
 1. **Run the migration, then drop the old `Shop` fields.** The `SquareAccount` extraction is built
    (`DECISIONS.md` M9). What remains is operational, not code: run

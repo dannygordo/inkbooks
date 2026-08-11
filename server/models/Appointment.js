@@ -98,9 +98,23 @@ const AppointmentSchema = new mongoose.Schema({
 	// 'none' when no deposit was taken. Deliberately a status rather than a nullable
 	// depositAppliedAt: it makes the three states nameable in a query and impossible to confuse
 	// with "a deposit of zero was taken".
+	// 'pending' means an amount has been AGREED but no money has arrived - written by
+	// recordDeposit before a card is charged, so routes/squarePayments.js has a stored figure to
+	// charge rather than one the browser asserts in the same request. It becomes 'available' when
+	// the payment lands.
+	//
+	// The ordering is the point. Charging first and recording afterwards meant the amount charged
+	// and the amount recorded were two numbers from the same browser, free to differ - and it left
+	// a real failure mode where the card was charged and the record then failed, which
+	// BookSessionDatesForm handled by telling the artist to go fix it by hand. Recording first
+	// makes the worst case an agreed deposit that was never collected, which is visible and
+	// harmless, instead of collected money with no record.
+	//
+	// A 'pending' deposit is NOT spendable: getAvailableDeposits and applyDeposit both look for
+	// 'available', so nothing can credit a session with money that never arrived.
 	depositStatus: {
 		type: String,
-		enum: ['none', 'available', 'applied', 'refunded'],
+		enum: ['none', 'pending', 'available', 'applied', 'refunded'],
 		default: 'none',
 	},
 	depositCollectedAt: {type: Date},
@@ -136,6 +150,17 @@ const AppointmentSchema = new mongoose.Schema({
 	// its cut on the deposit at the consult that collected it.
 	depositCreditCents: {type: Number, default: 0},
 	depositCreditFromAppointmentId: {type: mongoose.Schema.Types.ObjectId},
+
+	// Square's payment id for the SESSION charge, the same way depositSquarePaymentId records the
+	// deposit's. Two fields rather than one because a session can carry both - a deposit taken at
+	// the consult and the balance charged at the sitting are two payments, auditable separately
+	// against Square's dashboard.
+	//
+	// Also the already-paid guard: routes/squarePayments.js refuses a charge on an appointment
+	// that has one. Idempotency keys protect a retry of the SAME request; they do nothing about a
+	// second, deliberate charge on a session that was already settled, because as far as Square is
+	// concerned that is simply a different payment.
+	squarePaymentId: {type: String},
 	// Was `required: true` - broke independent artists (no shop, nothing to owe) unless every
 	// caller remembered to pass a throwaway value. 'none' is the real default for that case;
 	// the rest of the enum is the shop-cut payment lifecycle (see PRODUCTION_ROADMAP.md's

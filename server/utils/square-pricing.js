@@ -35,6 +35,23 @@ function roundCents(value) {
  * Returns `source` so a UI can say whose settings these are. An artist looking at a number they
  * cannot change should be told why.
  */
+/**
+ * DOLLARS TO CENTS, at the boundary.
+ *
+ * Shop.hourlyRate and Artist.hourlyRate are stored in WHOLE DOLLARS - they are configuration a
+ * human types, not transaction records, and were deliberately left in dollars when the money
+ * migration moved everything else to cents (see client/src/utils/sessionRate.js, which converts at
+ * the same boundary for the same reason).
+ *
+ * This conversion was missing. `hourlyRateCents: shop.hourlyRate` put 180 into a field every
+ * consumer reads as 18000, and computeFeeOffsetCents divides the subtotal BY it: a one-hour
+ * session at $180 implied 100 hours, so a $6 offset came out as $600 - and then got taxed, since
+ * the offset joins the taxable base (M8). The unit is in the field name; the value has to match it.
+ */
+function dollarsToCents(dollars) {
+  return Math.round((dollars || 0) * 100);
+}
+
 async function resolveSquareSettings(artistUserId) {
   const shopId = await getActiveShopIdForArtist(artistUserId);
   if (shopId) {
@@ -45,8 +62,10 @@ async function resolveSquareSettings(artistUserId) {
       source: 'shop',
       shopId,
       taxRateBasisPoints: shop?.taxRateBasisPoints || 0,
+      // Already cents - squareFeeOffsetCents is declared in cents and has no dollars-denominated
+      // input anywhere. Only hourlyRate needs converting.
       feeOffsetCents: shop?.squareFeeOffsetCents || 0,
-      hourlyRateCents: shop?.hourlyRate || 0,
+      hourlyRateCents: dollarsToCents(shop?.hourlyRate),
     };
   }
 
@@ -58,7 +77,7 @@ async function resolveSquareSettings(artistUserId) {
     shopId: null,
     taxRateBasisPoints: artist?.taxRateBasisPoints || 0,
     feeOffsetCents: artist?.squareFeeOffsetCents || 0,
-    hourlyRateCents: artist?.hourlyRate || 0,
+    hourlyRateCents: dollarsToCents(artist?.hourlyRate),
   };
 }
 

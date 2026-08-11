@@ -343,58 +343,62 @@ function verifyWebhookSignature({ notificationUrl, rawBody, signatureHeader }) {
   return crypto.timingSafeEqual(expectedBuffer, receivedBuffer);
 }
 
-// --- Direct card payments (deposit checkout) ---
-// Separate, simpler feature from the OAuth/Invoices shop-cut ledger above: this charges a card
-// directly to InkBooks' own Square (sandbox) account via the Payments API, using the nonce/token
-// the client's Web Payments SDK produces - see routes/squarePayments.js and
-// client/src/components/IBSquarePayments/. No per-shop OAuth connection involved.
+// --- Direct card payments (session and deposit checkout) ---
+// The same OAuth connection as the shop-cut ledger above, not a separate one. This charges a card
+// using the nonce/token the client's Web Payments SDK produces (see routes/squarePayments.js and
+// client/src/components/IBSquarePayments/) into the connected seller's own account.
 //
-// Deliberately hardcoded to Square's sandbox host, independent of SQUARE_ENVIRONMENT/getBaseUrl()
-// above (which only governs the OAuth/shop-cut-invoices flow) - so changing that setting for the
-// other feature can never accidentally point this one at real money. See PRODUCTION_ROADMAP.md's
-// Phase 4 checklist for what has to happen (real production access/credentials, this hardcoding
-// deliberately revisited) before this can ever run against a live card.
-const SQUARE_SANDBOX_BASE_URL = 'https://connect.squareupsandbox.com';
-// Square's REST API is date-versioned or (see developer.squareup.com/docs/build-basics/
+// IT USED TO BE A SEPARATE FEATURE, with its own hardcoded sandbox host and its own platform-wide
+// SQUARE_SANDBOX_ACCESS_TOKEN, charging every payment in the app into InkBooks' own Square account.
+// The hardcoding was a deliberate safety fence around exactly that: money settling to the wrong
+// party is a problem you contain rather than ship. Per-owner credentials (DECISIONS.md M9) remove
+// the reason for the fence - a connected seller's token settles to that seller by construction,
+// and a sandbox token only works against the sandbox host, so SQUARE_ENVIRONMENT is now the one
+// switch for both flows and there is nothing left for the two to disagree about.
+//
+// The browser still needs an application id to tokenize with. That is per-ENVIRONMENT, not per
+// seller - see the /square/config route.
+
+// Square's REST API is date-versioned (see developer.squareup.com/docs/build-basics/
 // versioning-overview) - pin one explicitly rather than silently riding whatever the account
 // default happens to be. Current as of when this was written; bump periodically.
 const SQUARE_API_VERSION = '2026-07-15';
 
-function getSandboxAccessToken() {
-  const token = process.env.SQUARE_SANDBOX_ACCESS_TOKEN;
-  if (!token) {
-    throw new Error(
-      'SQUARE_SANDBOX_ACCESS_TOKEN is not set. Get one from your Square Developer Dashboard ' +
-        '(developer.squareup.com/apps -> your app -> Sandbox tab -> Sandbox Access Token) and ' +
-        'add it to .env.development. This is separate from SQUARE_APPLICATION_SECRET, which is ' +
-        'only used for the OAuth/shop-cut-ledger flow above.',
-    );
-  }
-  return token;
-}
-
-function getSandboxLocationId() {
-  const locationId = process.env.SQUARE_SANDBOX_LOCATION_ID;
-  if (!locationId) {
-    throw new Error(
-      'SQUARE_SANDBOX_LOCATION_ID is not set - find it under your Square Developer Dashboard\'s ' +
-        'sandbox seller account Locations (the same LOCATION_ID already used client-side in ' +
-        'client/src/config.js\'s SQUARE.SANDBOX block).',
-    );
-  }
-  return locationId;
-}
-
 /**
- * Charges a card via Square's Payments API using a source id (nonce/token) the client's Web
- * Payments SDK produced. Always targets the sandbox host/token - see the module-level comment
- * above. Throws (with .status/.squareErrors set, same shape as squareFetch's errors) on failure.
+ * Charges a card into the OWNER'S OWN Square account.
+ *
+ * ---------------------------------------------------------------------------------------------
+ * THE MONEY LANDS WHERE THE WORK HAPPENED. `account` is a SquareAccount resolved through
+ * resolveSquareAccountFor (DECISIONS.md M9) - the shop's when the artist is connected to one,
+ * their own when independent - so the funds settle to that seller and InkBooks is never a party to
+ * the movement.
+ *
+ * This replaces createSandboxPayment, which charged every payment through ONE platform access
+ * token (SQUARE_SANDBOX_ACCESS_TOKEN) into a hardcoded sandbox location. Every charge in the app
+ * settled to InkBooks' own Square account, which is the exact opposite of what the shop-cut ledger
+ * design says and the reason that route was fenced off as sandbox-only. Per-owner credentials are
+ * what unfences it.
+ *
+ * The sandbox/production split now comes from SQUARE_ENVIRONMENT, the same variable the OAuth flow
+ * reads, rather than from a separate hardcoded host - a connected sandbox seller's token only works
+ * against the sandbox host, so the two must agree and there is no reason for two switches.
+ *
+ * `idempotencyKey` comes from the CALLER, not from crypto.randomUUID() here. Generating it inside
+ * this function makes every retry a distinct charge, which is precisely what idempotency exists to
+ * prevent: a double-clicked Pay button was two payments.
+ *
+ * Throws (with .status/.squareErrors set, same shape as squareFetch's errors) on failure.
  */
-async function createSandboxPayment({ sourceId, amountCents, idempotencyKey, note }) {
-  const accessToken = getSandboxAccessToken();
-  const locationId = getSandboxLocationId();
+async function createPaymentForAccount({ account, sourceId, amountCents, idempotencyKey, note }) {
+  if (!account || !account.locationId) {
+    throw new Error('This Square connection is missing a location id - reconnect Square.');
+  }
+  // Refreshes the token in place if it is close to expiry, and throws if the account holds no
+  // usable credentials at all.
+  const accessToken = await getValidAccessToken(account);
+  const locationId = account.locationId;
 
-  const response = await fetch(`${SQUARE_SANDBOX_BASE_URL}/v2/payments`, {
+  const response = await fetch(`${getBaseUrl()}/v2/payments`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -431,5 +435,5 @@ module.exports = {
   createAndPublishShopCutInvoice,
   verifyWebhookSignature,
   getEnvironment,
-  createSandboxPayment,
+  createPaymentForAccount,
 };

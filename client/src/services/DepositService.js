@@ -37,18 +37,23 @@ export const DepositService = (() => {
 		});
 	};
 
+	// `pending` writes the agreed amount with no money taken yet, so the charge route has a stored
+	// figure to charge instead of one the browser sends alongside the card. See
+	// BookSessionDatesForm's card path and server/utils/charge-quote.js.
 	const _RECORD_DEPOSIT = gql`
 		mutation RecordDeposit(
 			$appointmentId: ID!
 			$depositCents: Int!
 			$paymentMethod: String!
 			$squarePaymentId: String
+			$pending: Boolean
 		) {
 			recordDeposit(
 				appointmentId: $appointmentId
 				depositCents: $depositCents
 				paymentMethod: $paymentMethod
 				squarePaymentId: $squarePaymentId
+				pending: $pending
 			) {
 				id
 				depositCents

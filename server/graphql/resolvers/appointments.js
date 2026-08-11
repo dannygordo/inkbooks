@@ -14,6 +14,9 @@ const {
   assertCanManageArtist,
 } = require('../../utils/shop-membership');
 const { paginate } = require('../../utils/pagination');
+const { quoteAppointmentCharge } = require('../../utils/charge-quote');
+const { resolveSquareAccountFor } = require('../../utils/square-account');
+const SquareAccount = require('../../models/SquareAccount');
 
 // getAppointmentsByShop is called for real by Artist- and Staff-role users viewing their own
 // shop's calendar (see client/src/components/ibCalendar/IBCalendar.jsx), not just Shop Admins -
@@ -106,6 +109,47 @@ function appointmentFilterToQuery(filter) {
 
 module.exports = {
   Query: {
+    // What charging this session would come to, computed from stored rates by the SAME function
+    // the charge route uses (utils/charge-quote.js). The UI displays this and then charges it,
+    // rather than adding the figures up itself - see that file on why one function with two
+    // callers is the point.
+    //
+    // Same ownership rule as getAppointmentsByArtist: the artist themselves, or Staff-and-above
+    // sharing a shop with them. A quote carries the session's price, the shop's tax rate and
+    // whether that owner can take a card, which is the same class of financial detail.
+    getChargeQuote: withAuth(
+      async (_, { appointmentId, applyFeeOffset, tipCents }, context, info, user) => {
+        const appointment = await Appointment.findById(appointmentId);
+        if (!appointment) {
+          throw new UserInputError('Errors', {
+            errors: { appointmentId: 'Appointment not found.' },
+          });
+        }
+        // Identical to getAppointmentsByArtist's check below, including the role floor: a shop
+        // admin is in the second group and takes the same shared-shop test as anyone else,
+        // rather than skipping it on role alone.
+        if (String(user.id) !== String(appointment.userId)) {
+          const isSameShopStaff =
+            user.role <= Constants.ROLES.SHOP_STAFF &&
+            (await sharesShopWith(user.id, appointment.userId));
+          if (!isSameShopStaff) {
+            throw new AuthenticationError('Action not allowed');
+          }
+        }
+
+        const { settings, breakdown } = await quoteAppointmentCharge(appointment, {
+          applyFeeOffset: Boolean(applyFeeOffset),
+          tipCents: tipCents || 0,
+        });
+        const { account } = await resolveSquareAccountFor(appointment.userId);
+
+        return {
+          ...breakdown,
+          source: settings.source,
+          canCharge: SquareAccount.isUsable(account),
+        };
+      },
+    ),
     // Shop-admin-or-better AND at this shop. The minRole alone was the whole check before, so any
     // shop admin could read any other shop's pending confirmations - each of which carries an
     // artist's name and the amount they claim to have paid - by passing a different shopId.

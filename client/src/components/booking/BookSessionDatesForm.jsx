@@ -99,31 +99,21 @@ const BookSessionDatesForm = ({
 		client.refetchQueries({ include: AppointmentService.CALENDAR_REFETCH_QUERIES });
 	const [recordDeposit] = useMutation(DepositService.RECORD_DEPOSIT);
 
-	// Square confirmed the charge. Only now does the deposit exist in InkBooks, and it carries the
-	// payment id that makes it reconcilable against Square's dashboard rather than merely claimed.
-	const handleCardDepositSuccess = async (paymentId) => {
-		try {
-			await recordDeposit({
-				variables: {
-					appointmentId: consultAppointmentId,
-					depositCents: pendingCardDeposit.depositCents,
-					paymentMethod: "square",
-					squarePaymentId: paymentId,
-				},
-			});
-			await refetchAppointments();
-			if (onSuccess) {
-				onSuccess(pendingCardDeposit.projectId);
-			}
-		} catch (err) {
-			// The card HAS been charged at this point. Saying so plainly matters more than a tidy
-			// error: the money left the client's account and the shop needs to know the record
-			// didn't land, because the fix is a refund or a manual entry, not a retry of the card.
-			setError(
-				`The card was charged, but recording the deposit failed: ${
-					err.graphQLErrors?.[0]?.message || err.message
-				}. Don't charge again - record this deposit manually.`
-			);
+	// RECORD FIRST, THEN CHARGE. This is the reverse of what it used to be, and the reversal is the
+	// point: the amount is written to the consult as a PENDING deposit before any card is taken,
+	// and the charge route then charges the figure it finds there (see
+	// server/utils/charge-quote.js). The browser no longer says what to charge, so the amount
+	// charged and the amount recorded cannot be two different numbers.
+	//
+	// It also removes the failure this file used to have to apologise for. Charging first meant a
+	// failed recordDeposit left money taken with no record, and the only honest thing to show was
+	// "the card was charged but recording failed - fix it by hand". Now the worst case is a pending
+	// deposit that was never collected: visible, harmless, and not spendable, since applyDeposit
+	// and getAvailableDeposits both require 'available'.
+	const handleCardDepositSuccess = async () => {
+		await refetchAppointments();
+		if (onSuccess) {
+			onSuccess(pendingCardDeposit.projectId);
 		}
 	};
 
@@ -224,11 +214,32 @@ const BookSessionDatesForm = ({
 			// Cash is recorded here and now, because cash IS an assertion - somebody handed over
 			// notes and the artist is saying so. A card is not: it has a system of record, and a
 			// "Square" deposit with no Square payment behind it is a number typed into a box
-			// wearing a payment method's name. So the card path books the sessions, then hands
-			// off to the card field below and records the deposit only once Square confirms the
-			// charge - see handleCardDepositSuccess.
+			// wearing a payment method's name.
+			//
+			// So the card path records the amount as PENDING and then charges it. Pending is the
+			// honest description of that state - agreed, not collected - and it is what gives the
+			// charge a stored figure to work from instead of one this component sends alongside
+			// the card. It is not spendable until the payment lands.
 			if (depositCents > 0 && consultAppointmentId) {
 				if (depositMethod === "square") {
+					try {
+						await recordDeposit({
+							variables: {
+								appointmentId: consultAppointmentId,
+								depositCents,
+								paymentMethod: "square",
+								pending: true,
+							},
+						});
+					} catch (depositErr) {
+						setError(
+							`Sessions booked, but the deposit couldn't be recorded: ${
+								depositErr.graphQLErrors?.[0]?.message || depositErr.message
+							}`
+						);
+						setSubmitting(false);
+						return;
+					}
 					await refetchAppointments();
 					setPendingCardDeposit({ depositCents, projectId });
 					setSubmitting(false);
@@ -281,16 +292,15 @@ const BookSessionDatesForm = ({
 					to finish.
 				</p>
 				<IBSquarePaymentForm
+					// Display only. The server charges the pending deposit recorded on the consult,
+					// not this figure - see server/utils/charge-quote.js's quoteDepositCharge.
 					amountCents={pendingCardDeposit.depositCents}
-					// No appointmentId, deliberately. Passing one makes the payment route write
-					// session money fields and recompute a shop cut against the consult (see
-					// routes/squarePayments.js) - which is a different transaction shape from a
-					// deposit. recordDeposit owns the deposit bookkeeping, including its own shop
-					// cut, and handleCardDepositSuccess calls it once the charge lands.
-					subtotalCents={pendingCardDeposit.depositCents}
-					taxCents={0}
-					feeCents={0}
-					tipCents={0}
+					// The consult IS passed now, with chargeType 'deposit'. It used to be withheld
+					// so the route wouldn't write session money fields against it; the route now
+					// distinguishes the two transactions explicitly instead, which is what lets the
+					// deposit be charged from a stored amount at all.
+					appointmentId={consultAppointmentId}
+					chargeType="deposit"
 					note="InkBooks deposit"
 					onSuccess={handleCardDepositSuccess}
 					onError={(message) => setError(message)}

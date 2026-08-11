@@ -67,7 +67,7 @@ module.exports = {
    */
   recordDeposit: withAuth(async (
     _,
-    { appointmentId, depositCents, paymentMethod, squarePaymentId },
+    { appointmentId, depositCents, paymentMethod, squarePaymentId, pending },
     context,
     info,
     user,
@@ -87,7 +87,12 @@ module.exports = {
       // nothing behind it - which is exactly the state the old free-text amount box left every
       // deposit in. Cash is allowed to be an assertion, because cash IS one; card is not,
       // because there is a system of record for it and it should agree.
-      if (paymentMethod === 'square' && !squarePaymentId) {
+      //
+      // Unless it is being recorded as PENDING, which is the opposite claim: an amount agreed,
+      // no money taken yet, waiting for routes/squarePayments.js to charge exactly this figure
+      // and fill the id in. That is the whole point of the pending state - it is what gives the
+      // charge a stored amount to read instead of one the browser sends alongside the card.
+      if (paymentMethod === 'square' && !squarePaymentId && !pending) {
         throw new UserInputError('Errors', {
           errors: { squarePaymentId: 'A Square deposit needs the payment it was collected by.' },
         });
@@ -103,8 +108,13 @@ module.exports = {
       }
 
       appointment.depositCents = depositCents;
-      appointment.depositStatus = 'available';
-      appointment.depositCollectedAt = appointment.depositCollectedAt || new Date();
+      appointment.depositStatus = pending ? 'pending' : 'available';
+      // Only stamped when money has actually arrived. A pending deposit has no collection date
+      // because nothing has been collected - and "collected at" on an uncollected deposit is
+      // exactly the kind of field that reads as true a year later.
+      if (!pending) {
+        appointment.depositCollectedAt = appointment.depositCollectedAt || new Date();
+      }
       appointment.depositPaymentMethod = paymentMethod;
       // Cleared rather than left behind when a deposit is re-recorded as cash - a stale Square id
       // on a cash deposit would point reconciliation at a payment that has nothing to do with it.
@@ -114,6 +124,11 @@ module.exports = {
       // and its total. A consult that collected $200 is a $200 transaction; leaving those at zero
       // would make the deposit invisible to every revenue figure in the app, since analytics sums
       // totalCents.
+      //
+      // Written for a pending deposit too, because that is precisely what the charge route reads
+      // to know what to charge (see utils/charge-quote.js). The shop cut is applied here as well:
+      // M3 takes the cut at collection, and a deposit that is charged moments later would
+      // otherwise need a second place that knows to apply it.
       appointment.subtotalCents = depositCents;
       appointment.totalCents =
         depositCents + (appointment.taxCents || 0) + (appointment.feeCents || 0) + (appointment.tipCents || 0);
@@ -127,17 +142,22 @@ module.exports = {
       //
       // An independent artist has no shop, so the audience is empty and nothing is written. That is
       // the shop-versus-solo distinction falling out of the data rather than out of a branch.
-      await notifySafely({
-        actorId: user.id,
-        recipientIds: await moneyAudienceForArtist(appointment.userId),
-        type: 'deposit_collected',
-        category: 'money',
-        subjectType: 'appointment',
-        subjectId: appointment._id,
-        amountCents: depositCents,
-        title: `${formatCents(depositCents)} deposit collected${appointment.title ? ` — ${appointment.title}` : ''}`,
-        body: `Taken by ${await actorName(user.id)} in ${paymentMethod === 'square' ? 'card' : 'cash'}.`,
-      });
+      // Not for a pending deposit. "$200 deposit collected" is a claim about money that has not
+      // arrived, and the charge route sends this same notification once it has - so announcing it
+      // here would either be premature or duplicated.
+      if (!pending) {
+        await notifySafely({
+          actorId: user.id,
+          recipientIds: await moneyAudienceForArtist(appointment.userId),
+          type: 'deposit_collected',
+          category: 'money',
+          subjectType: 'appointment',
+          subjectId: appointment._id,
+          amountCents: depositCents,
+          title: `${formatCents(depositCents)} deposit collected${appointment.title ? ` — ${appointment.title}` : ''}`,
+          body: `Taken by ${await actorName(user.id)} in ${paymentMethod === 'square' ? 'card' : 'cash'}.`,
+        });
+      }
 
       return appointment;
     } catch (err) {
