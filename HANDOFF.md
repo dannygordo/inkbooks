@@ -16,17 +16,14 @@ Everything has been run and everything passes.
 |---|---|---|---|
 | `client` | 22 | 108 | green |
 | `server/test/unit` | 9 | 103 | green |
-| `server/test/integration` | 44 | ~665 | **M9 changes unverified** |
+| `server/test/integration` | 44 | 663 | green |
 
-The 844 that were green covered everything up to the M9 work. That run is what retired the "written
-is not observed" caveat this file used to open with — treat a failure from here on as a real
-regression rather than as a test nobody had ever run.
+Everything passes, including the M9 extraction: the derived `Shop` fields, `shopCutPayments` on
+`SquareAccount`, `disconnectShopSquare`, `attention`'s `squareHealth`, and the new
+`test/integration/squareAccounts.test.js`.
 
-**The `SquareAccount` extraction has not been through an integration run.** The unit suites pass
-(103, including the OAuth state-token tampering cases), and `check-graphql-documents` passes, but
-the touched resolvers — `shopCutPayments`, `disconnectShopSquare`, the derived `Shop` fields,
-`attention`'s `squareHealth` — are all integration-covered and none of that has executed. The new
-`test/integration/squareAccounts.test.js` has never run at all. Do this before building on it.
+This is the standing expectation now, not an achievement — treat a failure as a real regression
+rather than as a test nobody had ever run. The caveat that used to open this file is gone for good.
 
 Getting there took exactly one fix, and it was in a **fixture, not the code**:
 `connectArtistToShop` in `test/helpers/factories.js` still upserted on `{artistId, shopId}`, the
