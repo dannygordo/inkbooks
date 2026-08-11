@@ -8,19 +8,42 @@ Last updated: 2026-08-11.
 
 ---
 
-## The one thing to do before trusting anything
+## Test status
 
-**No test suite has been run.** Roughly 30 tests were written across the last several commits and
-nobody has watched a single one pass. The environment they were written in is Linux; the repo's
-`node_modules` holds darwin-only rollup/esbuild binaries, so the suites could not execute there.
+Everything has been run and everything passes.
 
-```
-cd client && npm test
-cd server && npm test
-```
+| Suite | Files | Tests | Status |
+|---|---|---|---|
+| `client` | 22 | 108 | green |
+| `server/test/unit` | 7 | 89 | green |
+| `server/test/integration` | 43 | 647 | green |
 
-Do this before building on any of it. If something fails, that is expected — written is not
-observed, and the commit messages say so individually.
+844 tests, observed. This is the first time that sentence has been true, so the "written is not
+observed" caveat that used to head this file is retired — treat a failure from here on as a real
+regression rather than as a test nobody had ever run.
+
+Getting there took exactly one fix, and it was in a **fixture, not the code**:
+`connectArtistToShop` in `test/helpers/factories.js` still upserted on `{artistId, shopId}`, the
+row-reuse pattern A2 removed, so connecting one artist to a second shop left two open intervals and
+the partial unique index rejected the second. The helper now mirrors the production transfer
+sequence in `mutations/artistShopConnections.js`: close the open interval elsewhere, then
+reuse-or-create.
+
+Worth recording what that failure was *not*. The model, the index and the resolver were all
+correct — the partial unique index did exactly the job A2 says it exists for, and what it caught was
+a fixture building a state the application itself cannot produce. The interval migration landed
+clean.
+
+### Running them
+
+The integration suites need a `mongod` binary that `mongodb-memory-server` fetches from
+`fastdl.mongodb.org` at first run. Any environment without a route to that host cannot run them at
+all — it fails during `globalSetup`, before a single test file is collected, so the failure reads as
+"No test files found" rather than as a network error. On a normal machine the download just works.
+
+Two notes for running on Linux: the committed `node_modules` holds darwin-only rollup binaries, so
+`npm i --no-save @rollup/rollup-linux-x64-gnu` is needed in both `client` and `server` first — it is
+additive and harmless on macOS. And the client suite takes roughly five minutes.
 
 The seven pre-commit checks *have* been run and pass. They cover imports, GraphQL documents against
 the schema, React-in-tested-components, `moment.utc` in the client, unstable React keys, and
@@ -41,15 +64,20 @@ executable bit, git skips it with a hint on stderr rather than an error — whic
   Denormalised counters on `Client`.
 - **Charge arithmetic.** `utils/square-pricing.js` — tax in basis points, the fee offset derived from
   implied hours, credits off the total rather than the taxable base. Pure; nothing calls Square.
+  Covered by `test/unit/square-pricing.test.js`, 29 tests, observed passing. The expected figures are
+  taken from the worked examples in `DECISIONS.md` M2/M3/M5/M8 rather than from the implementation,
+  so a disagreement between the two files is visible instead of silently ratified.
 - **Client booking confirmations.** Consults email immediately; sessions coalesce per project on a
   three-minute debounce that restarts with each new sitting.
 
 ## Next
 
-1. **The Square account decision.** The largest fork left. `Shop` carries
-   `squareAccessTokenEncrypted` and friends *inline*; per-artist connections means either a second
-   copy of those fields or migrating a working OAuth flow onto a shared owner model. Decide before
-   writing anything. Nothing built so far depends on it.
+1. **The `SquareAccount` extraction — decided, not built.** See `DECISIONS.md` M9. The six
+   connection fields move off `Shop` onto a model keyed `{ownerType, ownerId}`, resolved by one
+   helper that mirrors `resolveSquareSettings`. Three pieces of work: the model plus a migration of
+   connected shops, widening the signed OAuth state in `routes/squareOAuth.js` from `shopId` to
+   `ownerType` + `ownerId`, and changing `refreshAccessTokenIfNeeded` in `utils/square.js` to take a
+   `SquareAccount`. The encrypted token is read in one place only (`utils/square.js:154`).
 2. Gift cards — model, balance, partial redemption, the payout sign convention in `DECISIONS.md` M6.
 3. Adjustment records — shop-admin only, never calls Square.
 4. GraphQL surface for client flags. The automatic path works end to end; reading a client's flags
@@ -71,6 +99,11 @@ with everything else.
   was on Express's 100kb default and is now 2mb; that is **not** confirmed as the cause.
 - **Artists who already disconnected and reconnected** have no interval history. There was nothing to
   migrate — the old model overwrote it. New intervals start from the change.
+- **`computeChargeBreakdown` echoes raw credit inputs, not the clamped ones.** A negative
+  `depositCreditCents` is correctly ignored by the arithmetic but returned unchanged in the result,
+  so a confirmation screen rendering that field directly would show a negative credit beside an
+  unreduced total. Pinned by a test that documents current behaviour. No caller passes a negative
+  today; worth changing to echo the clamped figures when the deposit UI is built.
 
 ## How this repo carries context
 

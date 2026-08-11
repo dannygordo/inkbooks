@@ -179,6 +179,43 @@ Tips sit outside both the taxable base and the shop cut, and are added to what t
 Credits clamp at zero. A $100 deposit against an $80 final sitting bills $0 — never a negative that
 would read as owing the client money.
 
+### M9. A Square account belongs to an owner, not to a shop
+
+Extracted into its own `SquareAccount` model keyed on `{ownerType: 'SHOP' | 'ARTIST', ownerId}`.
+The six connection fields move off `Shop`: `squareConnected`, `squareMerchantId`,
+`squareLocationId`, `squareAccessTokenEncrypted`, `squareRefreshTokenEncrypted`,
+`squareTokenExpiresAt`.
+
+The forcing question was an independent artist, who under S2 is their own admin and under M8 already
+carries `taxRateBasisPoints` and `squareFeeOffsetCents` on `Artist` — pricing configuration with no
+account to charge against. They can set a tax rate and then cannot take a card.
+
+Resolution mirrors `resolveSquareSettings` in `utils/square-pricing.js` exactly: active shop first,
+artist when independent. One helper, `resolveSquareAccountFor(artistUserId)`, so the answer to "whose
+tax rate is this" and the answer to "whose Square account is this" are produced by the same rule
+rather than two that can drift apart.
+
+What this costs, stated plainly:
+
+- A migration lifting every connected `Shop` into a `SquareAccount` row with `ownerType: 'SHOP'`.
+- `routes/squareOAuth.js` signs a JWT state carrying `shopId`; it has to carry `ownerType` **and**
+  `ownerId`. That signature is the thing stopping someone attaching their own Square account to
+  another owner, so widening it needs the same care the original had.
+- `utils/square.js`'s `refreshAccessTokenIfNeeded` takes a `shop` and writes the refreshed token back
+  onto it. It takes a `SquareAccount` instead.
+
+The blast radius is smaller than it looks: the encrypted token is read in exactly one place
+(`utils/square.js:154`).
+
+Rejected: **copying the six fields onto `Artist`** and branching on "has an active shop?" at each
+consumer. Cheaper today — one real branch — but it makes M8's owner rule exist twice in two shapes,
+and every Square field added afterwards has to be added in both places or it silently works for one
+owner and not the other. That failure is invisible until an independent artist hits it in
+production.
+
+Rejected: **shop-only, permanently**. It contradicts S2 and strands the two pricing fields already on
+`Artist` as configuration that can never be used.
+
 ---
 
 ## Membership and attribution
@@ -306,6 +343,8 @@ share → UI surfaces → dashboard fixes. Standalone fixes pulled forward.
 | Un-marking a no-show deleting the flag | Destroys the history the flag exists to keep |
 | Rate changes applying retroactively | Reprices work already performed and paid out |
 | Freezing a cut permanently once written | Blocks correcting a mistyped subtotal at the rate that applied |
+| Square fields copied onto `Artist` | Two shapes of the same owner rule; new fields get added to one |
+| Square as a shop-only feature | Contradicts S2 and strands the pricing fields already on `Artist` |
 
 ---
 
