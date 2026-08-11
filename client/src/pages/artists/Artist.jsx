@@ -4,6 +4,9 @@ import { ArtistService } from "../../services/ArtistService";
 import IBPageLoader from "../../components/ibPageLoader/IBPageLoader";
 import IBAvatar from "../../components/inputs/IBAvatar";
 import ArtistPerformancePanel from "../../components/artistDashboard/ArtistPerformancePanel";
+import ShopCutRatePanel from "../../components/artistDashboard/ShopCutRatePanel";
+import { useAuth } from "../../context/auth";
+import { ROLES } from "../../constants";
 import ArchiveControl from "../../components/archive/ArchiveControl";
 import { ARTIST_STATUS } from "../../constants";
 
@@ -13,6 +16,9 @@ import { ARTIST_STATUS } from "../../constants";
 // places with different framing rather than built twice.
 const Artist = (props) => {
 	let params = useParams();
+	// The VIEWER, not the artist being viewed - the two are the same person when an artist opens
+	// their own page, which is exactly the case the rate panel has to tell apart.
+	const { user } = useAuth();
 	/**
 	 * Gets artist by id
 	 */
@@ -61,6 +67,16 @@ const Artist = (props) => {
 						onChanged={refetch}
 					/>
 				</div>
+				{/* Above the performance figures, because the rate is the term those figures are
+				    computed under - reading revenue without knowing the split is reading half of it.
+				    canEdit is the SHOP ADMIN check; an artist viewing their own page sees the history
+				    with no form, which is the asymmetry the server enforces (a party cannot set the
+				    number they owe). Renders nothing at all for an artist with no shop. */}
+				<ShopCutRatePanel
+					artistUserId={artist.userId}
+					shopId={artist.shopId}
+					canEdit={user.role <= ROLES.SHOP_ADMIN && String(user.id) !== String(artist.userId)}
+				/>
 				<ArtistPerformancePanel artistUserId={artist.userId} isSelf={false} />
 			</div>
 		);

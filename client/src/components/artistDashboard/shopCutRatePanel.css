@@ -1,0 +1,91 @@
+/* Shop cut rate history. Deliberately reuses .settingsPanelHelp, .settingsError and .settingsActions
+   from settings.css rather than redefining them - the panel appears alongside settings-shaped cards
+   and a second set of near-identical rules is how two "the same" styles drift apart. */
+
+.shopCutRateCurrent {
+    margin: 0 0 16px;
+    font-size: 16px;
+    color: #222;
+}
+
+.shopCutRateEmpty {
+    margin: 0;
+    color: #6b7280;
+}
+
+.shopCutRateHistory {
+    list-style: none;
+    margin: 0 0 8px;
+    padding: 0;
+    border-top: 1px solid #eef0f3;
+}
+
+.shopCutRateHistory li {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid #eef0f3;
+    font-size: 14px;
+}
+
+.shopCutRatePercent {
+    font-weight: 600;
+    min-width: 48px;
+    /* Tabular figures so a column of percentages lines up instead of shimmering by digit width. */
+    font-variant-numeric: tabular-nums;
+}
+
+.shopCutRateFrom {
+    color: #6b7280;
+}
+
+.shopCutRateNote {
+    color: #9aa1ab;
+    font-style: italic;
+    /* Truncates rather than wrapping the row to two lines - the note is context, not the record. */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.shopCutRateForm {
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid #eef0f3;
+}
+
+.shopCutRateForm label {
+    display: block;
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.shopCutRateInputs {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.shopCutRateInputs input {
+    padding: 10px 12px;
+    border: 1px solid #dfe3e8;
+    border-radius: 8px;
+    font: inherit;
+}
+
+#shopCutPercent {
+    width: 90px;
+}
+
+#shopCutNote {
+    flex: 1;
+    min-width: 160px;
+}
+
+.shopCutRateSuffix {
+    margin-left: -6px;
+    color: #6b7280;
+}

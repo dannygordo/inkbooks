@@ -20,6 +20,7 @@ const appointmentMutations = require('../mutations/appointments');
 const bookingRequestResolvers = require('./bookingRequests');
 const bookingRequestMutations = require('../mutations/bookingRequests');
 const artistShopConnectionResolvers = require('./artistShopConnections');
+const shopCutRateResolvers = require('./shopCutRates');
 const analyticsResolvers = require('./analytics');
 const depositResolvers = require('./deposits');
 const passwordResolvers = require('./passwords');
@@ -73,6 +74,7 @@ module.exports = {
     ...appointmentResolvers.Query,
     ...bookingRequestResolvers.Query,
     ...artistShopConnectionResolvers.Query,
+    ...shopCutRateResolvers.Query,
     ...analyticsResolvers.Query,
     ...depositResolvers.Query,
     ...passwordResolvers.Query,
@@ -90,6 +92,7 @@ module.exports = {
     ...appointmentMutations,
     ...bookingRequestMutations,
     ...artistShopConnectionMutations,
+    ...shopCutRateResolvers.Mutation,
     ...shopCutPaymentMutations,
     ...depositMutations,
     ...passwordMutations,

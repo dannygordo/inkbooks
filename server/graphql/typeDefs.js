@@ -328,15 +328,40 @@ module.exports = gql`
     artistId: ID!
     shopId: ID!
     status: String!
+    # The INTERVAL. A membership is a period, not a flag - endedAt null means still here. Both
+    # rules that care about when somebody worked where (shop cut by session date, and what a shop
+    # can still see after a disconnect) are answered from these, not from status.
+    startedAt: DateTime!
+    endedAt: DateTime
+    # Retained alias of endedAt for callers that predate the interval.
     disconnectedAt: DateTime
     # Which side's rate (shop's or the artist's own) this artist's sessions bill against at this
     # shop - see models/ArtistShopConnection.js's comment for the full reasoning.
     rateSource: String!
-    # Per-artist override of Shop.shopCutPercent. Null means "use the shop's rate", which is a
+    # DEPRECATED as the authority - a rate can change without a reconnect, so a single number here
+    # cannot say what applied last March. ShopCutRate holds the effective-dated history. Kept as
+    # the fallback for connections that predate it. Null means "use the shop's rate", which is a
     # different thing from 0 ("this artist owes nothing") - see utils/shop-cut.js.
     shopCutPercent: Int
     createdAt: DateTime
     updatedAt: DateTime
+  }
+  # What an artist owed a shop, and from when. APPEND-ONLY: changing a rate writes a new row and
+  # never edits an old one, which is what makes "a rate change applies forward only" a property of
+  # the data rather than a rule somebody has to remember. See DECISIONS.md M7.
+  type ShopCutRate {
+    id: ID!
+    artistId: ID!
+    shopId: ID!
+    # Percentage, e.g. 40 for 40%.
+    percent: Int!
+    # Inclusive lower bound. The rate in force for a date is the row with the greatest
+    # effectiveFrom at or before it. Stored rather than derived from createdAt because they answer
+    # different questions - when it started applying, versus when somebody typed it in.
+    effectiveFrom: DateTime!
+    setByUserId: ID!
+    note: String
+    createdAt: DateTime!
   }
   # Deliberately narrow - see getPublicArtistProfile in resolvers/bookingRequests.js for why this
   # isn't just the full Artist/User type.
@@ -1011,6 +1036,9 @@ module.exports = gql`
     # Paged. The pending queue is short by nature, but the closed filter is an archive that only
     # ever grows - every request an artist has ever turned away or lost, forever - and an unbounded
     # query over it would download a career to render a screenful.
+    # Rate history for one artist at one shop, newest first. Readable by the artist themselves and
+    # by a shop admin there - an artist must be able to see what they are being charged.
+    getShopCutRates(artistId: ID!, shopId: ID!): [ShopCutRate!]!
     getBookingRequests(artistId: ID!, statuses: [String!], page: PageInput): BookingRequestPage!
     # The nav badge: how many requests the CALLER still owes an answer on. Same filter as
     # getBookingRequests with no statuses passed - literally the same function, see
@@ -1042,6 +1070,22 @@ module.exports = gql`
     getArtistAnalytics(userId: ID!, start: DateTime!, end: DateTime!): Analytics
   }
   type Mutation {
+    # Records a new shop cut rate for an artist, from a date forward. APPEND-ONLY - this never
+    # edits an existing rate, so past work keeps the rate that applied when it was performed.
+    #
+    # SHOP ADMIN ONLY, and deliberately not the artist: this is what the artist OWES the shop, and
+    # a party setting the number they owe is not a rate, it is a suggestion. The artist can read
+    # the history (getShopCutRates) - being charged a percentage you cannot see is worse.
+    #
+    # effectiveFrom defaults to now. Back-dating is allowed because renegotiating to the start of
+    # the month is ordinary; it is a different fact from when the row was typed in (createdAt).
+    setShopCutRate(
+      artistId: ID!
+      shopId: ID!
+      percent: Int!
+      effectiveFrom: DateTime
+      note: String
+    ): ShopCutRate!
     # Archiving is what "remove this person" means. It sets a status and touches nothing else:
     # their projects, appointments and the money on those appointments are untouched, still count
     # toward revenue, and still render on the calendar. What changes is that they stop appearing
