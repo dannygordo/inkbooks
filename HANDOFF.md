@@ -14,20 +14,19 @@ Everything has been run and everything passes.
 
 | Suite | Files | Tests | Status |
 |---|---|---|---|
-| `client` | 23 | 118 | new panel green; rest **not re-run** |
+| `client` | 23 | 118 | green |
 | `server/test/unit` | 9 | 103 | green |
-| `server/test/integration` | 45 | ~677 | new suite **never run** |
+| `server/test/integration` | 45 | 674 | green |
+
+All of M9 is covered and observed, including the artist-side operations and the settings panel.
 
 Green is the standing expectation now, not an achievement — treat a failure as a real regression
 rather than as a test nobody had ever run.
 
-**The artist-side Square panel has not been through a full run.** What was observed: the 9 unit
-suites (103), `SquarePanel.test.jsx` on its own (10), and `check-graphql-documents` across all 251
-documents. What was not: `test/integration/mySquareConnection.test.js`, which has never executed.
-
-`Settings.jsx` gained a child that fires a query, which would break any test rendering `Settings`
-without a mock for `getMySquareConnection` — checked, and no test renders it, so this should be
-clean. Worth knowing the moment one is written.
+**No database has been migrated.** The code reads `SquareAccount`; every existing environment still
+has the connection on `Shop`, so a previously connected shop reads as *disconnected* until
+`scripts/migrate-square-accounts.js` runs there. That applies to a local dev database as much as to
+production — see Next item 1.
 
 Getting there took exactly one fix, and it was in a **fixture, not the code**:
 `connectArtistToShop` in `test/helpers/factories.js` still upserted on `{artistId, shopId}`, the
