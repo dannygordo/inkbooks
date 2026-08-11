@@ -115,6 +115,11 @@ executable bit, git skips it with a hint on stderr rather than an error — whic
 - **S2 is implemented.** An independent artist can archive their own client and themselves.
   `hasAdminAuthority` in `utils/shop-membership.js`; two different fixes for two different
   underlying checks — see `DECISIONS.md` S2.
+- **`npm run seed:large`** — four months of a working shop: six artists (five at the shop, one
+  independent), ~275 projects, ~950 appointments, the full shop-cut lifecycle, effective-dated
+  rates, a membership that closed and reopened, no-show flags. Money computed by
+  `computeChargeBreakdown` and `applyShopCut` rather than by the script, so it cannot drift from
+  M2/M3/M5/M8/M11. `npm run seed` is still the small readable fixture.
 - **Every shop admin is an artist.** One shape, from `registerAccount`, the seed and the migration
   alike. See `DECISIONS.md` S0 — a shop owner is essentially always a tattoo artist, so a migrated
   admin appearing on the roster is correct rather than a compromise.

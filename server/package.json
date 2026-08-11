@@ -8,7 +8,8 @@
     "test:watch": "vitest",
     "start": "NODE_ENV=DEVELOPMENT nodemon index.js",
     "start:prod": "NODE_ENV=PRODUCTION nodemon index.js",
-    "seed": "node scripts/seed.js"
+    "seed": "node scripts/seed.js",
+    "seed:large": "node scripts/seed-large.js"
   },
   "keywords": [],
   "author": "",
