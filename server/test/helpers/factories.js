@@ -135,17 +135,52 @@ async function createClientUser(overrides = {}) {
 
 // artistId is the artist's own User._id, not the Artist collection's own _id - matching the
 // convention documented in models/ArtistShopConnection.js.
-// Upsert, not insert. ArtistShopConnection has a unique index on {artistId, shopId} and reuses one
-// document per pair across disconnect/reconnect cycles (see the model). Several tests both pass
-// `{ artist: { shopId } }` to createArtistUser AND call this for the same pair - since
-// createArtistUser now creates the connection itself, a plain save() would collide on the index and
-// fail the fixture rather than the assertion.
+//
+// MIRRORS THE PRODUCTION TRANSFER SEQUENCE in mutations/artistShopConnections.js: close any open
+// interval at a DIFFERENT shop first, then reuse-or-create the one for this pair. It does not go
+// through the resolver (no confirmTransfer prompt, no tagColor assignment, no auth) because most
+// callers just need the membership to exist - but the shape of what it writes has to match, or
+// fixtures build states the application itself cannot produce.
+//
+// This used to be a single findOneAndUpdate upserting on { artistId, shopId }, which is exactly the
+// row-reuse the old unique index forced and that DECISIONS.md A2 removed. Two calls for two
+// different shops then left two OPEN intervals, and the partial unique index on { artistId } where
+// endedAt is null correctly rejected the second - failing the fixture rather than the assertion.
+// An artist works at one shop at a time; connecting to a second is a transfer, not an addition.
+//
+// Reuse-or-create for the same pair still matters: several tests pass `{ artist: { shopId } }` to
+// createArtistUser AND call this for the same pair, and createArtistUser already opens the
+// connection itself.
 async function connectArtistToShop(artistUserId, shopId, overrides = {}) {
-	return ArtistShopConnection.findOneAndUpdate(
-		{ artistId: artistUserId, shopId },
-		{ artistId: artistUserId, shopId, status: 'active', ...overrides },
-		{ new: true, upsert: true, setDefaultsOnInsert: true },
+	const now = new Date();
+
+	// Close first, so there is never a moment with two open intervals.
+	await ArtistShopConnection.updateMany(
+		{ artistId: artistUserId, endedAt: null, shopId: { $ne: shopId } },
+		{ $set: { status: 'disconnected', endedAt: now, disconnectedAt: now } },
 	);
+
+	const existing = await ArtistShopConnection.findOne({
+		artistId: artistUserId,
+		shopId,
+		endedAt: null,
+	});
+	if (existing) {
+		if (Object.keys(overrides).length > 0) {
+			existing.set(overrides);
+			await existing.save();
+		}
+		return existing;
+	}
+
+	return new ArtistShopConnection({
+		artistId: artistUserId,
+		shopId,
+		status: 'active',
+		startedAt: now,
+		endedAt: null,
+		...overrides,
+	}).save();
 }
 
 // BookingRequest requires conversationId and guestToken alongside the obvious fields - both are
