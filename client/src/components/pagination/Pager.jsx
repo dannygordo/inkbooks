@@ -8,6 +8,10 @@ import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import "./pager.css";
 
+// 10/25/50 - matches EntityListPager.jsx's own options, so "how many records before paging kicks
+// in" means the same three choices everywhere in the app rather than each list inventing its own.
+const PAGE_SIZE_OPTIONS = [10, 25, 50];
+
 /**
  * Page controls for any list backed by the server's PageInput/pageInfo pair.
  *
@@ -20,10 +24,20 @@ import "./pager.css";
  * makes a truncated list honest rather than merely short. The whole reason this exists is that
  * lists were silently capping at their fetch limit and looking complete.
  *
- * Renders nothing when everything fits on one page. Controls that can only be disabled are furniture.
+ * NO SEPARATE onPageSizeChange PROP - unlike EntityListPager, this reuses the same onChange a
+ * Previous/Next click already calls, since both are just "ask the server for a different
+ * {limit, offset}" and every caller here already accepts that shape. Choosing a size resets
+ * offset to 0 - the alternative (keeping the current offset) would land on a page number that may
+ * not exist any more the moment the size grows.
+ *
+ * The Previous/Next row hides once everything fits on one page - those controls, disabled, are
+ * furniture. The size selector does NOT hide then: choosing a smaller size is exactly the action
+ * that would turn a one-page list into a multi-page one, so it has to stay reachable at the one
+ * moment someone might want it. The whole component still renders nothing for an empty list -
+ * there's no size worth choosing for zero rows.
  */
-const Pager = ({ pageInfo, onChange }) => {
-  if (!pageInfo || pageInfo.totalCount <= pageInfo.limit) {
+const Pager = ({ pageInfo, onChange, pageSizeOptions = PAGE_SIZE_OPTIONS }) => {
+  if (!pageInfo || pageInfo.totalCount === 0) {
     return null;
   }
 
@@ -33,33 +47,50 @@ const Pager = ({ pageInfo, onChange }) => {
   const last = Math.min(offset + limit, totalCount);
   const hasPrev = offset > 0;
   const hasNext = offset + limit < totalCount;
+  const fitsOnOnePage = totalCount <= limit;
 
   return (
     <div className="pager">
       <span className="pagerRange">
         Showing {first}–{last} of {totalCount}
       </span>
-      <div className="pagerButtons">
-        <Button
-          size="small"
-          disabled={!hasPrev}
-          startIcon={<ChevronLeftIcon />}
-          // Clamped at zero rather than trusting offset >= limit: a limit changed between renders
-          // would otherwise produce a negative offset, which the server refuses outright (see
-          // utils/pagination.js) and which would surface as an error rather than a first page.
-          onClick={() => onChange({ limit, offset: Math.max(0, offset - limit) })}
+      <label className="pagerPageSize">
+        Show
+        <select
+          value={limit}
+          onChange={(e) => onChange({ limit: Number(e.target.value), offset: 0 })}
         >
-          Previous
-        </Button>
-        <Button
-          size="small"
-          disabled={!hasNext}
-          endIcon={<ChevronRightIcon />}
-          onClick={() => onChange({ limit, offset: offset + limit })}
-        >
-          Next
-        </Button>
-      </div>
+          {pageSizeOptions.map((size) => (
+            <option key={size} value={size}>
+              {size}
+            </option>
+          ))}
+        </select>
+      </label>
+      {!fitsOnOnePage && (
+        <div className="pagerButtons">
+          <Button
+            size="small"
+            disabled={!hasPrev}
+            startIcon={<ChevronLeftIcon />}
+            // Clamped at zero rather than trusting offset >= limit: a limit changed between
+            // renders would otherwise produce a negative offset, which the server refuses
+            // outright (see utils/pagination.js) and which would surface as an error rather than
+            // a first page.
+            onClick={() => onChange({ limit, offset: Math.max(0, offset - limit) })}
+          >
+            Previous
+          </Button>
+          <Button
+            size="small"
+            disabled={!hasNext}
+            endIcon={<ChevronRightIcon />}
+            onClick={() => onChange({ limit, offset: offset + limit })}
+          >
+            Next
+          </Button>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,0 +1,66 @@
+/* Shared form-field layout - label above help above control, 8px-multiple spacing.
+ *
+ * LIFTED FROM register.css, GENERALIZED, NOT IMPORTED FROM IT. The register wizard's field
+ * convention (see that file's own header comment) is what "the modals don't look like the
+ * register page" was actually pointing at, so this is the same rules under app-wide names
+ * (ibField* instead of onboardField*) rather than a second, slightly-different pattern invented
+ * for modals. Deliberately a SEPARATE file rather than register.css importing/exporting these
+ * rules to modals or vice versa: register.css is a verified, shipped page and touching it to
+ * serve a second, different-context consumer (a 560px dialog instead of a full-width page) is a
+ * real regression risk for a purely cosmetic win. Two files with the same values is a small,
+ * bounded cost; a shared file with two callers pulling it in different directions is how the
+ * next person editing "the" spacing accidentally changes a page they didn't mean to touch.
+ *
+ * Spacing scale matches register.css exactly - same reasoning: 8px inside a control (label to
+ * help), 12px help to control, 32px between fields, 24px between side-by-side fields.
+ */
+
+.ibFieldGroup {
+	display: flex;
+	flex-direction: column;
+	gap: 24px;
+}
+
+.ibField {
+	display: flex;
+	flex-direction: column;
+}
+
+.ibFieldLabel {
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--ib-text-primary);
+	margin-bottom: 6px;
+}
+
+.ibFieldHelp {
+	margin: 0 0 10px;
+	font-size: 13px;
+	line-height: 1.5;
+	color: var(--ib-text-secondary);
+}
+
+.ibFieldControl {
+	display: flex;
+	flex-direction: column;
+}
+
+/* Two fields side by side (matches register.css's .onboardRow) - collapses to stacked below a
+   narrow dialog width rather than a full page's breakpoint, since a 560px modal is already
+   narrower than the point register.css switches at. */
+.ibFieldRow {
+	display: flex;
+	gap: 16px;
+}
+
+.ibFieldRow > * {
+	flex: 1;
+	min-width: 0;
+}
+
+@media (max-width: 420px) {
+	.ibFieldRow {
+		flex-direction: column;
+		gap: 24px;
+	}
+}

@@ -33,8 +33,12 @@ const Clients = () => {
   // refetch is handed to the action bar so a newly created client appears immediately.
   const [showArchived, setShowArchived] = useState(false);
   const [offset, setOffset] = useState(0);
+  // User-selectable (see EntityListPager's size selector) - PAGE_SIZE above is only the initial
+  // value, kept as the constant it always was so the default is still declared in one obvious
+  // place rather than buried in a useState call.
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const { loading, data, refetch } = ClientService.fetchClients(showArchived, {
-    limit: PAGE_SIZE,
+    limit: pageSize,
     offset,
   });
   if (loading) return <IBPageLoader />;
@@ -78,6 +82,10 @@ const Clients = () => {
       <EntityListPager
         pageInfo={data?.getClients?.pageInfo}
         onChange={setOffset}
+        onPageSizeChange={(size) => {
+          setPageSize(size);
+          setOffset(0);
+        }}
         noun="client"
       />
     </div>

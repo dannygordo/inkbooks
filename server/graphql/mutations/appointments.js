@@ -7,6 +7,28 @@ const { applyShopCut } = require('../../utils/shop-cut');
 const { queueProjectScheduleEmail } = require('../../utils/client-booking-emails');
 const { syncNoShowFlag } = require('../../utils/client-flags');
 const { canManageArtist, assertCanManageArtist } = require('../../utils/shop-membership');
+const { recordEvent, diffFields } = require('../../utils/event-log');
+
+// Fields worth an audit-trail line when they change on an Appointment - see
+// models/EventLog.js's own comment on why this is a deliberate subset rather than every field.
+// Timer state (timerStatus/timerStartedAt/accumulatedSeconds) and sessionNotes are left out on
+// purpose: those are live working state and freeform text, not the money/schedule facts this log
+// exists to answer "who changed this, and when" about.
+const APPOINTMENT_AUDIT_FIELDS = [
+  'title',
+  'description',
+  'appointmentDate',
+  'appointmentStatus',
+  'appointmentType',
+  'shopId',
+  'subtotalCents',
+  'taxCents',
+  'feeCents',
+  'tipCents',
+  'totalCents',
+  'shopCutStatus',
+  'shopCutCents',
+];
 
 // Same ownership shape as updateAppointment/deleteAppointment below - Admin/SHOP_ADMIN-or-better,
 // or the appointment's own artist. Shared by all three session-timer mutations so that check is
@@ -104,6 +126,15 @@ module.exports = {
       await applyShopCut(newAppointment);
       const appt = await newAppointment.save();
 
+      await recordEvent({
+        entityType: 'Appointment',
+        entityId: appt._id,
+        action: 'create',
+        actorUserId: user.id,
+        shopId: appt.shopId,
+        summary: `Created ${appt.appointmentType || 'appointment'}${appt.title ? ` — ${appt.title}` : ''}`,
+      });
+
       // THE SITTINGS AFTER THE FIRST COME THROUGH HERE, and this is the trigger that is easy to
       // miss. convertBookingRequest books sitting one and creates the Project; every additional
       // date on that project - BookSessionDatesForm's second, third and fourth, and the appointment
@@ -181,6 +212,16 @@ module.exports = {
       }
 
       await Appointment.deleteOne({ _id: appointmentId });
+
+      await recordEvent({
+        entityType: 'Appointment',
+        entityId: appointment._id,
+        action: 'delete',
+        actorUserId: user.id,
+        shopId: appointment.shopId,
+        summary: `Deleted ${appointment.appointmentType || 'appointment'}${appointment.title ? ` — ${appointment.title}` : ''}`,
+      });
+
       return 'Appointment deleted successfully';
     }),
     updateAppointment: withAuth(async (_, args, context, info, user) => {
@@ -228,6 +269,25 @@ module.exports = {
           // findByIdAndUpdate the old status is gone.
           const previousStatus = existingAppointment.appointmentStatus;
 
+          // CLOSING A SESSION STAMPS IT WITH THE MOMENT IT WAS CLOSED, not whatever date/time was
+          // sitting in the form. A session worked earlier or later than its booked slot - or
+          // closed days after the fact - needs to report on the day the work (and the money) were
+          // actually settled, not on the day it happened to be scheduled for. Only fires on the
+          // TRANSITION into 'completed' - a caller re-saving an already-completed appointment
+          // (there is no such caller today, but the check is what makes that safe if one ever
+          // exists) must not keep sliding its date forward on every unrelated edit.
+          //
+          // The same rule applies to a card charge closing a session automatically - see
+          // routes/squarePayments.js, which stamps appointmentDate the same way for the same
+          // reason, since that path never comes through this mutation at all.
+          if (
+            'appointmentStatus' in appointment &&
+            appointment.appointmentStatus === 'completed' &&
+            previousStatus !== 'completed'
+          ) {
+            appointment.appointmentDate = new Date();
+          }
+
           const res = await Appointment.findByIdAndUpdate({_id: appointment.id}, appointment, {new: true});
 
           // Marking a session no-show raises a NO_SHOWED flag on the client; moving it off no-show
@@ -256,6 +316,20 @@ module.exports = {
             await applyShopCut(res);
             await res.save();
           }
+
+          const changes = diffFields(existingAppointment, res, APPOINTMENT_AUDIT_FIELDS);
+          if (changes.length > 0) {
+            await recordEvent({
+              entityType: 'Appointment',
+              entityId: res._id,
+              action: 'update',
+              actorUserId: user.id,
+              shopId: res.shopId,
+              summary: `Updated ${res.appointmentType || 'appointment'}${res.title ? ` — ${res.title}` : ''}`,
+              changes,
+            });
+          }
+
           return res;
         }
         throw new AuthenticationError('Action not allowed');

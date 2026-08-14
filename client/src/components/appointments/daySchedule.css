@@ -9,7 +9,7 @@
 .dayScheduleHeader {
     font-size: 12px;
     font-weight: 600;
-    color: #666;
+    color: var(--ib-text-secondary);
     margin-bottom: 6px;
 }
 
@@ -27,7 +27,7 @@
     align-items: center;
     gap: 8px;
     font-size: 13px;
-    color: #444;
+    color: var(--ib-text-primary);
 }
 
 .dayScheduleTime {
@@ -35,7 +35,7 @@
        with the length of "9:00 AM" versus "11:30 AM". */
     min-width: 68px;
     font-variant-numeric: tabular-nums;
-    color: #333;
+    color: var(--ib-text-primary);
     font-weight: 500;
 }
 
@@ -50,7 +50,7 @@
    people keep reading. The amber "close to this" it replaced deliberately understated itself
    because the data could not support more. */
 .dayScheduleClashing {
-    border-left-color: #d32f2f;
+    border-left-color: var(--ib-error);
     background-color: #fdf5f5;
 }
 

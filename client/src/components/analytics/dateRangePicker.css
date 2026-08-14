@@ -23,12 +23,12 @@
 
 .dateRangePickerError {
 	font-size: 13px;
-	color: #861d15;
+	color: var(--ib-error-dark);
 }
 
 /* The line that makes a number quotable. A figure with no stated period is a figure someone will
    later misremember the period for. */
 .dateRangePickerSummary {
 	font-size: 13px;
-	color: #555;
+	color: var(--ib-text-secondary);
 }

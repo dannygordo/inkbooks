@@ -35,8 +35,11 @@ const Artists = () => {
 	// Reset to the first page whenever the filter changes - staying on page 4 of a list that just
 	// got shorter shows an empty screen and reads as data loss.
 	const [offset, setOffset] = useState(0);
+	// User-selectable (see EntityListPager's size selector) - PAGE_SIZE above is only the initial
+	// value.
+	const [pageSize, setPageSize] = useState(PAGE_SIZE);
 	const { loading, data, refetch } = ArtistService.fetchArtists(showArchived, {
-		limit: PAGE_SIZE,
+		limit: pageSize,
 		offset,
 	});
 	if (loading) {
@@ -89,6 +92,10 @@ const Artists = () => {
 			<EntityListPager
 				pageInfo={data?.getArtists?.pageInfo}
 				onChange={setOffset}
+				onPageSizeChange={(size) => {
+					setPageSize(size);
+					setOffset(0);
+				}}
 				noun="artist"
 			/>
 		</div>

@@ -1,12 +1,10 @@
 const Client = require('../../models/Client');
-const Project = require('../../models/Project');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 const {
-  getShopIdsForUser,
-  getArtistIdsForShops,
   assertCanAccessClient,
   canAccessClient,
+  clientScopeFilter,
 } = require('../../utils/shop-membership');
 const { archiveFilter } = require('../../utils/archiving');
 const { paginate, normalizePage } = require('../../utils/pagination');
@@ -27,26 +25,15 @@ module.exports = {
     // below relies on.
     getClients: withAuth(async (_, { includeArchived, page }, context, info, user) => {
       try {
-        const shopIds = await getShopIdsForUser(user.id);
-        const artistIds =
-          user.role === Constants.ROLES.ARTIST ? [user.id] : await getArtistIdsForShops(shopIds);
-
-        const clientIdsFromProjects = artistIds.length
-          ? await Project.distinct('clientId', { artistId: { $in: artistIds } })
-          : [];
-
-        const or = [];
-        if (shopIds.length) {
-          or.push({ shopIds: { $in: shopIds } });
-        }
-        if (clientIdsFromProjects.length) {
-          or.push({ _id: { $in: clientIdsFromProjects } });
-        }
-        if (or.length === 0) {
+        // See clientScopeFilter's own comment (utils/shop-membership.js) - this is the same
+        // scoping search's getClients-equivalent reuses, extracted so there is exactly one place
+        // that answers "which clients can this person see" rather than two that have to agree.
+        const scope = await clientScopeFilter(user);
+        if (!scope) {
           const { limit, offset } = normalizePage(page);
           return { items: [], pageInfo: { totalCount: 0, hasMore: false, limit, offset } };
         }
-        return await paginate(Client, archiveFilter(includeArchived, { $or: or }), {
+        return await paginate(Client, archiveFilter(includeArchived, scope), {
           sort: { lastName: 1 },
           page,
         });

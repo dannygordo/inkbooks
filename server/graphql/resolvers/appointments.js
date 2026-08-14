@@ -7,11 +7,10 @@ const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 const { UserInputError, AuthenticationError, rethrow } = require('../../utils/errors');
 const {
-  getShopIdsForUser,
-  getArtistIdsForShops,
   sharesShopWith,
   assertCanAccessShop,
   assertCanManageArtist,
+  canManageArtist,
 } = require('../../utils/shop-membership');
 const { paginate } = require('../../utils/pagination');
 const { quoteAppointmentCharge } = require('../../utils/charge-quote');
@@ -118,7 +117,13 @@ module.exports = {
     // sharing a shop with them. A quote carries the session's price, the shop's tax rate and
     // whether that owner can take a card, which is the same class of financial detail.
     getChargeQuote: withAuth(
-      async (_, { appointmentId, applyFeeOffset, tipCents }, context, info, user) => {
+      async (
+        _,
+        { appointmentId, applyFeeOffset, tipCents, subtotalCentsOverride },
+        context,
+        info,
+        user,
+      ) => {
         const appointment = await Appointment.findById(appointmentId);
         if (!appointment) {
           throw new UserInputError('Errors', {
@@ -140,6 +145,10 @@ module.exports = {
         const { settings, breakdown } = await quoteAppointmentCharge(appointment, {
           applyFeeOffset: Boolean(applyFeeOffset),
           tipCents: tipCents || 0,
+          subtotalCentsOverride:
+            subtotalCentsOverride === null || subtotalCentsOverride === undefined
+              ? undefined
+              : subtotalCentsOverride,
         });
         const account = await resolveArtistChargeAccount(appointment.userId);
 
@@ -170,8 +179,28 @@ module.exports = {
       if (!(await callerBelongsToShop(user, shopId))) {
         throw new AuthenticationError('Action not allowed');
       }
+      // Ascending (chronological) by default - the calendar and the appointments list both want
+      // a month/range read forward, oldest to newest, and AppointmentsList.jsx re-sorts
+      // client-side anyway so this only really matters for the calendar's own grid.
+      //
+      // Descending ONLY for "completed, not upcoming" - the shop-wide dashboard's Completed
+      // Sessions list (ArtistPerformancePanel's shopWide mode) asks for this with a small page
+      // limit (5), wanting the most RECENTLY finished sessions. Ascending + a small limit was
+      // silently returning the OLDEST five completed appointments in the shop's entire history
+      // instead - a session closed five minutes ago could never appear no matter how recently it
+      // happened, because it was always the newest row an ascending sort places last. Reported as
+      // "closed a session, shows correctly on my own dashboard, missing from the shop admin's
+      // Completed Sessions list" - getAppointmentsByArtist already had this exact asymmetry
+      // right (`filter.upcomingOnly ? 1 : -1`); this resolver just never had it at all.
+      //
+      // Scoped narrowly (appointmentStatus set AND upcomingOnly not) rather than copying
+      // getAppointmentsByArtist's blanket "ascending only when upcomingOnly" rule wholesale -
+      // that would also flip the calendar/list's plain date-range case (no status filter at all)
+      // to descending, which nothing asked for and AppointmentsList.jsx's real pagination (unlike
+      // its client-side re-sort) would actually be affected by.
+      const sortDirection = filter && filter.appointmentStatus && !filter.upcomingOnly ? -1 : 1;
       return paginate(Appointment, { shopId, ...appointmentFilterToQuery(filter) }, {
-        sort: { appointmentDate: 1 },
+        sort: { appointmentDate: sortDirection },
         page,
       });
     }),
@@ -217,16 +246,49 @@ module.exports = {
      * 'unpaid' only: invoice_sent and pending_confirmation already have an action in flight, and
      * showing them here would invite invoicing the same session twice. Requires a shopId, since a
      * cut with no shop attached is an independent artist's session and owed to nobody.
+     *
+     * filter is OPTIONAL and, if given, only its date bounds (from/to) matter here -
+     * appointmentFilterToQuery also understands upcomingOnly/appointmentStatus/shopCutStatus, but
+     * those are meaningless for a list that's already pinned to completed+unpaid, so they're
+     * spread in FIRST and the hardcoded three fields below are spread in after, guaranteeing a
+     * caller can never use filter to loosen this endpoint's own contract - only to narrow the
+     * date window on top of it. Was unfiltered entirely: the dashboard's date range picker sits
+     * above every section including this one, and every other section already honoured it, so
+     * "This Month" narrowing everything except the payout list read as the control being broken.
      */
-    getShopCutPayoutCandidates: withAuth(async (_, { userId }, context, info, user) => {
+    getShopCutPayoutCandidates: withAuth(async (_, { userId, filter }, context, info, user) => {
       await assertCanManageArtist(user, userId, Constants.ROLES.SHOP_STAFF);
       return Appointment.find({
+        ...appointmentFilterToQuery(filter),
         userId,
         appointmentStatus: 'completed',
         shopCutStatus: 'unpaid',
         shopId: { $ne: null },
       }).sort({ appointmentDate: 1 });
     }),
+    /**
+     * The shop-wide counterpart to getShopCutPayoutCandidates above - every artist's unpaid,
+     * completed shop cut at this shop in one list, for the shop admin dashboard's payout section
+     * (see client/src/components/artistDashboard/ArtistPerformancePanel.jsx's shopWide mode).
+     *
+     * Gated to SHOP_ADMIN-or-better via the withAuth role floor below, same as
+     * getPendingShopCutConfirmations - not SHOP_STAFF, since this is what every artist at the shop
+     * owes in money terms, not the front-desk-visible calendar. assertCanAccessShop on top of that
+     * checks the caller actually belongs to THIS shop, so one shop admin can't read another shop's
+     * payout ledger by passing a different shopId.
+     *
+     * filter - see getShopCutPayoutCandidates's own note just above; same date-bounds-only
+     * treatment, same reason.
+     */
+    getShopCutPayoutCandidatesByShop: withAuth(async (_, { shopId, filter }, context, info, user) => {
+      await assertCanAccessShop(user, shopId);
+      return Appointment.find({
+        ...appointmentFilterToQuery(filter),
+        shopId,
+        appointmentStatus: 'completed',
+        shopCutStatus: 'unpaid',
+      }).sort({ appointmentDate: 1 });
+    }, Constants.ROLES.SHOP_ADMIN),
     // Was withAuth with no restriction at all - any authenticated user could pass an arbitrary
     // appointmentId and read its full detail, including total/tip/shopCutAmount. Allowed:
     // shop-admin-or-better, the assigned artist (Appointment.userId, matching
@@ -253,9 +315,13 @@ module.exports = {
     // Powers the in-project session list (see client/src/pages/projects/Project.jsx) - every
     // session appointment tied to a project, so the artist can see and reopen past sessions'
     // timer/notes/total. Same ownership shape as getProject itself (resolvers/projects.js):
-    // shop-admin-or-better, the project's own artist, the project's own client, or shop staff
-    // affiliated with the project's artist - checked against the Project, not the individual
-    // Appointment, since that's the resource actually being browsed here.
+    // shop-admin-or-better sharing a shop with the project's artist, the project's own artist, or
+    // the project's own client - checked against the Project, not the individual Appointment,
+    // since that's the resource actually being browsed here.
+    //
+    // Was the same "isShopStaff ignores role" bug getProject had (see that resolver's own comment)
+    // - any artist sharing a shop with the project's artist passed, not just staff/admins. Fixed
+    // the same way: canManageArtist, which checks role as well as the shop relationship.
     getAppointmentsByProject: withAuth(async (_, { projectId }, context, info, user) => {
       const project = await Project.findById(projectId);
       if (!project) {
@@ -264,13 +330,7 @@ module.exports = {
       if (String(user.id) !== String(project.artistId)) {
         const myClient = await Client.findOne({ userId: user.id }).select('_id');
         const isOwnClient = myClient && String(myClient.id) === String(project.clientId);
-        let isShopStaff = false;
-        if (!isOwnClient) {
-          const shopIds = await getShopIdsForUser(user.id);
-          const artistIds = await getArtistIdsForShops(shopIds);
-          isShopStaff = artistIds.map(String).includes(String(project.artistId));
-        }
-        if (!isOwnClient && !isShopStaff) {
+        if (!isOwnClient && !(await canManageArtist(user, project.artistId))) {
           throw new AuthenticationError('Action not allowed');
         }
       }

@@ -62,7 +62,7 @@ module.exports = {
         artistId,
         clientId,
         referenceImages: remapIdToMongoId(referenceImages),
-        bodyImages,
+        bodyImages: remapIdToMongoId(bodyImages),
         designImages: remapIdToMongoId(designImages),
         materialsUsed,
         notes: remapIdToMongoId(notes),
@@ -97,6 +97,7 @@ module.exports = {
         const projectUpdate = {
           ...project,
           referenceImages: remapIdToMongoId(project.referenceImages),
+          bodyImages: remapIdToMongoId(project.bodyImages),
           designImages: remapIdToMongoId(project.designImages),
           notes: remapIdToMongoId(project.notes),
         };

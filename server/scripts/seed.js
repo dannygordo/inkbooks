@@ -34,6 +34,7 @@ const BookingRequest = require('../models/BookingRequest');
 const PasswordToken = require('../models/PasswordToken');
 const { Constants } = require('../utils/constants');
 const { pickDefaultTagColor } = require('../utils/tag-color');
+const { setShopCutRate } = require('../utils/shop-cut');
 
 // Every seeded account uses this same password - it's local dev data, not real credentials.
 const DEV_PASSWORD = 'devpass123';
@@ -209,6 +210,18 @@ async function seed() {
     status: Constants.STAFF_STATUS.ACTIVE,
     title: 'Owner',
   }).save();
+  // Mirrors what registerAccount now writes for real at signup (see
+  // graphql/resolvers/users.js's own comment on this) - the owner never owes their own shop a
+  // cut. Dana has no appointments of her own in this fixture today, so nothing currently reads
+  // this row, but the shop's own default set above (shopCutPercent: 20) is exactly the value
+  // that would silently apply to her if that ever changes without this override existing.
+  await setShopCutRate({
+    artistUserId: shopAdminUser._id,
+    shopId: shop._id,
+    percent: 0,
+    setByUserId: shopAdminUser._id,
+    note: 'Shop owner - does not owe their own shop a cut.',
+  });
 
   // --- Shop Staff (front desk) ----------------------------------------------
   const staffUser = await new User({

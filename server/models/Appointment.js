@@ -151,6 +151,30 @@ const AppointmentSchema = new mongoose.Schema({
 	depositCreditCents: {type: Number, default: 0},
 	depositCreditFromAppointmentId: {type: mongoose.Schema.Types.ObjectId},
 
+	// --- Gift cards - see DECISIONS.md M6 and utils/charge-quote.js. ---------------------------
+	// The total gift card credit applied to THIS session, across however many redeemGiftCard calls
+	// contributed to it (a client can split one session across more than one card). This is what
+	// utils/charge-quote.js's quoteAppointmentCharge reads into computeChargeBreakdown's
+	// giftCardCents slot - the same shape as depositCreditCents feeding depositCreditCents there,
+	// except a gift card comes off the TAXED TOTAL (M8), never the subtotal, so this field is never
+	// read by applyShopCut and never reduces the taxable base the way depositCreditCents does.
+	giftCardCreditCents: {type: Number, default: 0},
+	// The SUBSET of giftCardCreditCents that came from ARTIST-issued cards specifically - the only
+	// portion that reduces the shop-cut CUTTABLE base (see utils/shop-cut.js's applyShopCut). A
+	// shop-issued card's applied amount does NOT belong in this field: that card's cut was never
+	// taken at sale (M6 - it settles at redemption via a different, signed formula -
+	// utils/gift-card.js's computeShopIssuedGiftCardPayoutCents), so the ordinary per-appointment
+	// cut still runs on the FULL subtotal for that case. Conflating the two would double-discount
+	// the shop's cut on a shop-issued card the same way skipping this field entirely would
+	// double-charge it on an artist-issued one - see applyShopCut's own comment.
+	//
+	// A separate field rather than reusing giftCardCreditCents with a lookup at cut-computation
+	// time, because applyShopCut is a synchronous, DB-free function (see its own comment on why) -
+	// it cannot itself go ask which issuer type funded this session's gift card credit. Writing the
+	// answer here, once, at redeemGiftCard time (when the issuer type is already in hand) keeps
+	// that property intact.
+	artistIssuedGiftCardCreditCents: {type: Number, default: 0},
+
 	// Square's payment id for the SESSION charge, the same way depositSquarePaymentId records the
 	// deposit's. Two fields rather than one because a session can carry both - a deposit taken at
 	// the consult and the balance charged at the sitting are two payments, auditable separately

@@ -19,7 +19,7 @@
 	font-weight: 500;
 	letter-spacing: 0.3px;
 	text-transform: uppercase;
-	color: #777;
+	color: var(--ib-text-secondary);
 }
 
 .entityHeaderCell {
@@ -37,7 +37,7 @@
 	padding: 12px 16px;
 	border-left: 4px solid transparent;
 	border-radius: 6px;
-	background-color: #fff;
+	background-color: var(--ib-surface-card);
 	transition: background-color 140ms ease, box-shadow 140ms ease;
 }
 
@@ -46,8 +46,8 @@
 }
 
 .entityRowClickable:hover {
-	background-color: #fafafa;
-	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+	background-color: var(--ib-surface-hover);
+	box-shadow: 0 1px 3px rgba(var(--ib-shadow-color), 0.12);
 }
 
 /* min-width: 0 is load-bearing on a grid child too - without it the track refuses to shrink below
@@ -70,7 +70,7 @@
 
 .entityRowSecondary {
 	font-size: 13px;
-	color: #555;
+	color: var(--ib-text-secondary);
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -80,7 +80,7 @@
    left edge - the point of a column is that you can compare down it. */
 .entityRowCell {
 	font-size: 13px;
-	color: #333;
+	color: var(--ib-text-primary);
 	font-variant-numeric: tabular-nums;
 	min-width: 0;
 	overflow: hidden;
@@ -89,7 +89,7 @@
 }
 
 .entityListEmpty {
-	color: #666;
+	color: var(--ib-text-secondary);
 	font-style: italic;
 	padding: 16px 0;
 }
@@ -123,7 +123,7 @@
 		font-weight: 500;
 		letter-spacing: 0.3px;
 		text-transform: uppercase;
-		color: #777;
+		color: var(--ib-text-secondary);
 		flex-shrink: 0;
 	}
 }
@@ -137,8 +137,8 @@
 	margin-left: 8px;
 	padding: 2px 8px;
 	border-radius: 10px;
-	background: #4a3a1a;
-	color: #e0c072;
+	background: var(--ib-archived-bg);
+	color: var(--ib-archived-text);
 	font-size: 11px;
 	font-weight: 600;
 	letter-spacing: 0.04em;
@@ -152,7 +152,7 @@
 	align-items: center;
 	gap: 8px;
 	margin: 0 0 12px 4px;
-	color: #bbb;
+	color: var(--ib-border-strong);
 	font-size: 14px;
 	cursor: pointer;
 	user-select: none;
@@ -172,7 +172,7 @@
 	justify-content: space-between;
 	gap: 16px;
 	margin: 12px 4px 0;
-	color: #bbb;
+	color: var(--ib-border-strong);
 	font-size: 14px;
 }
 /* When there's nothing to navigate, the count stands alone rather than sitting opposite two
@@ -190,4 +190,22 @@
 .entityListPagerButtons button {
 	padding: 6px 14px;
 	font-size: 14px;
+}
+
+/* The "Show 10/25/50" size selector - see EntityListPager.jsx's own comment on why it renders
+   even when there's nothing to page through yet. */
+.entityListPageSize {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	white-space: nowrap;
+}
+.entityListPageSize select {
+	color: inherit;
+	font: inherit;
+	background: transparent;
+	border: 1px solid var(--ib-text-muted);
+	border-radius: 4px;
+	padding: 3px 6px;
+	cursor: pointer;
 }

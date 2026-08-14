@@ -6,7 +6,6 @@ import UtilsService from '../../services/UtilsService';
 import CalendarHeader from './CalendarHeader';
 import './ibCalendar.css';
 import Month from './Month';
-import Sidebar from './Sidebar';
 
 const IBCalendar = () => {
     const { user } = useAuth();
@@ -74,11 +73,12 @@ const IBCalendar = () => {
     <>
         <div className='ibCalendar'>
             <CalendarHeader />
-            <div style={{display: 'flex', flexDirection: 'row'}}>
-                <Sidebar />
-                <div className="ibCalendarContainer">
-                    <Month month={currentMonth} />    
-                </div>
+            {/* Was a flex-row wrapper around <Sidebar /> (Create Event + the mini month-picker)
+                and this container - the sidebar's gone (see CalendarHeader.jsx, which now hosts
+                Create Event in the header itself), so the grid no longer needs a row partner to
+                sit beside. */}
+            <div className="ibCalendarContainer">
+                <Month month={currentMonth} />
             </div>
         </div>
     </>

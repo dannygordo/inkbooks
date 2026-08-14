@@ -1,7 +1,7 @@
 a:link, a:visited {
 
     text-decoration: none !important;
-    color: #555;
+    color: var(--ib-text-secondary);
 }
 .sidebar {
     flex: 1;
@@ -13,14 +13,14 @@ a:link, a:visited {
 }
 .sidebarWrapper {
     padding: 20px;
-    color: #555;
+    color: var(--ib-text-secondary);
 }
 .sidebarMenu {
     margin-bottom: 10px;
 }
 .sidebarTitle {
     font-size: 14px;
-    color: #bbb;
+    color: var(--ib-border-strong);
 }
 .sidebarList {
     list-style: none;
@@ -37,7 +37,7 @@ a:link, a:visited {
 }
 .sidebarListItem:active,
 .sidebarListItem:hover {
-    background-color: #ddd;
+    background-color: var(--ib-border);
 }
 
 .sidebarIcon {

@@ -1,7 +1,7 @@
 .bookingRequest {
     width: 100vw;
     min-height: 100vh;
-    background-color: #f0f2f5;
+    background-color: var(--ib-surface-page);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -12,7 +12,7 @@
 .bookingRequestWrapper {
     width: 100%;
     max-width: 480px;
-    background-color: white;
+    background-color: var(--ib-surface-card);
     border-radius: 10px;
     padding: 30px;
     box-sizing: border-box;
@@ -21,13 +21,13 @@
 .bookingRequestLogo {
     font-size: 28px;
     font-weight: 800;
-    color: #1775ee;
+    color: var(--ib-primary);
     margin: 0 0 10px 0;
 }
 
 .bookingRequestDesc {
     font-size: 15px;
-    color: #444;
+    color: var(--ib-text-primary);
     display: block;
     margin-bottom: 20px;
 }
@@ -42,7 +42,7 @@
 .bookingRequestTextarea {
     height: 45px;
     border-radius: 8px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--ib-border-strong);
     font-size: 15px;
     padding: 0 14px;
     font-family: inherit;
@@ -57,7 +57,7 @@
 .bookingRequestInput:focus,
 .bookingRequestTextarea:focus {
     outline: none;
-    border-color: #1775ee;
+    border-color: var(--ib-primary);
 }
 
 .bookingRequestCheckbox {
@@ -65,7 +65,7 @@
     align-items: center;
     gap: 8px;
     font-size: 14px;
-    color: #444;
+    color: var(--ib-text-primary);
 }
 
 .bookingRequestUpload {
@@ -76,31 +76,31 @@
 
 .bookingRequestUploadLabel {
     font-size: 13px;
-    color: #666;
+    color: var(--ib-text-secondary);
 }
 
 .bookingRequestFileList {
     font-size: 13px;
-    color: #1775ee;
+    color: var(--ib-primary);
 }
 
 .bookingRequestFieldError {
     font-size: 13px;
-    color: #d32f2f;
+    color: var(--ib-error);
 }
 
 .bookingRequestButton {
     height: 46px;
     border-radius: 8px;
     border: none;
-    background-color: #1775ee;
-    color: white;
+    background-color: var(--ib-primary);
+    color: var(--ib-primary-contrast);
     font-size: 16px;
     font-weight: 600;
     cursor: pointer;
 }
 
 .bookingRequestButton:disabled {
-    background-color: #90b8e8;
+    background-color: var(--ib-primary-disabled);
     cursor: not-allowed;
 }

@@ -18,7 +18,7 @@
 .register {
     min-height: 100vh;
     width: 100%;
-    background-color: #f0f2f5;
+    background-color: var(--ib-surface-page);
     display: flex;
     align-items: flex-start;
     justify-content: center;
@@ -32,7 +32,7 @@
 .onboardCard {
     width: 100%;
     max-width: 640px;
-    background-color: #fff;
+    background-color: var(--ib-surface-card);
     border-radius: 14px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.06);
     overflow: hidden;
@@ -51,23 +51,23 @@
     margin: 0;
     font-size: 24px;
     font-weight: 700;
-    color: #1775ee;
+    color: var(--ib-primary);
 }
 
 .onboardProgress {
     font-size: 13px;
-    color: #888;
+    color: var(--ib-text-muted);
     font-variant-numeric: tabular-nums;
 }
 
 .onboardProgressBar {
     height: 3px;
-    background-color: #eef0f3;
+    background-color: var(--ib-surface-subtle);
 }
 
 .onboardProgressBarFill {
     height: 100%;
-    background-color: #1775ee;
+    background-color: var(--ib-primary);
     transition: width 240ms ease;
 }
 
@@ -89,7 +89,7 @@
     margin: 0 0 8px;
     font-size: 14px;
     line-height: 1.6;
-    color: #666;
+    color: var(--ib-text-secondary);
     /* Stops a long subtitle running the full width of the card. Around 60 characters a line is
        where prose stays readable; a single line spanning 640px makes the eye lose its place
        returning to the left edge. */
@@ -139,7 +139,7 @@
 .onboardFieldLabel {
     font-size: 15px;
     font-weight: 600;
-    color: #222;
+    color: var(--ib-text-primary);
     margin-bottom: 6px;
 }
 
@@ -149,7 +149,7 @@
     margin: 0 0 12px;
     font-size: 13px;
     line-height: 1.6;
-    color: #777;
+    color: var(--ib-text-secondary);
     max-width: 56ch;
 }
 
@@ -176,7 +176,7 @@
     padding: 24px 28px;
     border: 1px solid #dfe3e8;
     border-radius: 12px;
-    background-color: #fff;
+    background-color: var(--ib-surface-card);
     text-align: left;
     cursor: pointer;
     font-family: inherit;
@@ -184,12 +184,12 @@
 }
 
 .onboardChoice:hover {
-    border-color: #1775ee;
+    border-color: var(--ib-primary);
     background-color: #f7faff;
 }
 
 .onboardChoiceSelected {
-    border-color: #1775ee;
+    border-color: var(--ib-primary);
     background-color: #f2f7ff;
 }
 
@@ -202,7 +202,7 @@
 .onboardChoiceBlurb {
     font-size: 14px;
     line-height: 1.6;
-    color: #666;
+    color: var(--ib-text-secondary);
 }
 
 /* --- Errors and the final screen ----------------------------------------------------------- */
@@ -211,7 +211,7 @@
     margin-top: 28px;
     padding: 16px 20px;
     border-radius: 8px;
-    background-color: #fdeded;
+    background-color: var(--ib-error-bg);
     color: #b3261e;
     font-size: 14px;
     line-height: 1.6;
@@ -225,7 +225,7 @@
 .onboardDone {
     font-size: 16px;
     line-height: 1.7;
-    color: #333;
+    color: var(--ib-text-primary);
 }
 
 /* --- Actions ------------------------------------------------------------------------------- */
@@ -251,8 +251,8 @@
     padding: 14px 28px;
     border: none;
     border-radius: 8px;
-    background-color: #1775ee;
-    color: #fff;
+    background-color: var(--ib-primary);
+    color: var(--ib-primary-contrast);
     font-family: inherit;
     font-size: 15px;
     font-weight: 600;
@@ -264,7 +264,7 @@
 }
 
 .onboardPrimaryButton:hover:not(:disabled) {
-    background-color: #1465cc;
+    background-color: var(--ib-primary-hover);
 }
 
 .onboardPrimaryButton:disabled {
@@ -276,7 +276,7 @@
     border: none;
     background: none;
     padding: 0;
-    color: #1775ee;
+    color: var(--ib-primary);
     font-family: inherit;
     font-size: 14px;
     cursor: pointer;
@@ -284,5 +284,5 @@
 }
 
 .onboardLinkButton:hover {
-    color: #1465cc;
+    color: var(--ib-primary-hover);
 }

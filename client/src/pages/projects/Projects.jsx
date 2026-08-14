@@ -34,7 +34,10 @@ const PROJECT_COLUMNS = [
 
 const Projects = () => {
   const [offset, setOffset] = useState(0);
-  const { loading, data } = ProjectService.fetchProjects({ limit: PAGE_SIZE, offset });
+  // User-selectable (see EntityListPager's size selector) - PAGE_SIZE above is only the initial
+  // value.
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
+  const { loading, data } = ProjectService.fetchProjects({ limit: pageSize, offset });
   if (loading) return <IBPageLoader />;
 
   const items = (data?.getProjects?.items || []).map((project) => ({
@@ -71,6 +74,10 @@ const Projects = () => {
       <EntityListPager
         pageInfo={data?.getProjects?.pageInfo}
         onChange={setOffset}
+        onPageSizeChange={(size) => {
+          setPageSize(size);
+          setOffset(0);
+        }}
         noun="project"
       />
     </div>

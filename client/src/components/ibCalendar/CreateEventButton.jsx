@@ -1,5 +1,5 @@
 import { Add } from '@mui/icons-material'
-import { Fab } from '@mui/material'
+import { Button } from '@mui/material'
 import React from 'react'
 import { useAuth } from "../../context/auth";
 import { useCalendar } from '../../context/calendar';
@@ -26,23 +26,20 @@ const CreateEventButton = ({ day }) => {
   return (
     <>
         <div className="ibCalendarCreateEventButton">
-            <Fab  
+            {/* A plain themed Button, not a Fab - a floating action button is for a screen with no
+                other obvious primary action (the calendar has a whole page of controls around it,
+                so "floating" over them reads as visual noise, not affordance). variant="contained"
+                with no color override picks up theme.js's primary copper automatically, same as
+                every other primary button in the app - the old hardcoded #ddd/#333 sx block is
+                exactly why this one alone stayed gray through the rest of the theming pass. */}
+            <Button
+            variant="contained"
             size="small"
-            variant="extended"
+            startIcon={<Add />}
             onClick={handleCreateEvent}
-            sx={{
-                marginRight: "5px",
-                backgroundColor: "#ddd",
-                paddingRight: "15px",
-                color: "#333",
-                "&:hover": {
-                    color: "#ddd",
-                    backgroundColor: "#333",
-                },
-            }}>
-                <Add sx={{ mr: 1}} />
+            sx={{ marginRight: "5px" }}>
                 Create Event
-            </Fab>
+            </Button>
         </div>
     </>
   )

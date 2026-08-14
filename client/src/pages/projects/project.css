@@ -18,7 +18,7 @@
 	margin-bottom: 10px;
 	font-size: 14px;
 	font-weight: 600;
-	color: #555;
+	color: var(--ib-text-secondary);
 }
 .projectItem > input {
 	height: 20px;
@@ -46,6 +46,41 @@
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
+	/* Shared with .projectClientBubble below, so "same size as the project title" is one number
+	   in one place rather than two font-sizes that happen to match today. Equal to the browser's
+	   default <h1> size (2em) - .projectTitle had no font-size rule before this, so setting it
+	   explicitly here changes nothing about how the title itself looks. */
+	--project-title-size: 2em;
+}
+.projectTitle {
+	font-size: var(--project-title-size);
+}
+/* Client attribution beside the project title - see Project.jsx. Right-justified by the
+   container's space-between rather than text-align, so it stays pinned to the right edge
+   regardless of how long the title is. A bubble (MUI Chip) rather than plain text, sized to
+   match the title via the CSS variable above - MUI's own font-size/height rules are overridden
+   here since they otherwise win on specificity. */
+.projectClientBubble.projectClientBubble {
+	font-size: var(--project-title-size);
+	height: auto;
+	padding: 4px 10px;
+	font-weight: 500;
+	color: var(--ib-text-primary);
+	background-color: var(--ib-surface-subtle);
+}
+.projectClientBubble.projectClientBubble .MuiChip-label {
+	padding: 0 6px;
+}
+/* The no-id fallback (a client record that somehow isn't linkable) keeps the same look without
+   pretending to be clickable. */
+.projectClientBubbleStatic {
+	display: inline-flex;
+	align-items: center;
+	border-radius: 16px;
+	padding: 4px 10px;
+	font-weight: 500;
+	color: var(--ib-text-primary);
+	background-color: var(--ib-surface-subtle);
 }
 .projectContainer {
 	margin-top: 10px;
@@ -97,13 +132,13 @@
    colour. */
 .projectDetailsSaveState {
     font-size: 12px;
-    color: #777;
+    color: var(--ib-text-secondary);
     min-height: 16px;
     display: inline-block;
     transition: color 140ms ease;
 }
 .projectDetailsSaveState--error {
-    color: #861d15;
+    color: var(--ib-error-dark);
     font-weight: 500;
 }
 
@@ -121,16 +156,32 @@
     font-weight: 500;
     letter-spacing: 0.3px;
     text-transform: uppercase;
-    color: #777;
+    color: var(--ib-text-secondary);
 }
 .projectDepositValue {
     font-size: 15px;
-    color: #333;
+    color: var(--ib-text-primary);
 }
 .projectDepositValueNone {
-    color: #777;
+    color: var(--ib-text-secondary);
     font-style: italic;
 }
 .projectDepositNote {
-    color: #555;
+    color: var(--ib-text-secondary);
+}
+
+/* Add Deposit - see Project.jsx's handleAddDeposit. Sits directly under the read-only readout
+   above, so the button reads as an action on that same figure rather than a separate feature. */
+.projectAddDeposit {
+    margin: 4px 8px 12px;
+}
+.projectAddDepositForm {
+    display: flex;
+    flex-direction: column;
+    max-width: 280px;
+}
+.projectAddDepositFormButtons {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
 }

@@ -22,13 +22,26 @@ const { resolveSquareSettings, computeChargeBreakdown } = require('./square-pric
  *     applied silently (M5). The choice is the artist's; whether it is honoured is not.
  *   - `tipCents` - decided at the counter. Also the one caller-supplied figure that cannot move
  *     the shop's cut, since tips sit outside the cuttable base by construction (M2).
+ *   - `subtotalCentsOverride` - PREVIEW ONLY, never used to charge. SessionDetail.jsx quotes as
+ *     the artist types, before the price is saved, so the on-screen tax/fee/total update live
+ *     instead of only after a save. routes/squarePayments.js never passes this - the actual charge
+ *     still reads subtotalCents from the saved appointment exactly as before, which is what keeps
+ *     "what was billed" and "what was recorded" the same number. A caller that passed this to
+ *     charge real money would defeat the entire point of the SAVE-FIRST rule above.
  * ---------------------------------------------------------------------------------------------
  */
-async function quoteAppointmentCharge(appointment, { applyFeeOffset = false, tipCents = 0 } = {}) {
+async function quoteAppointmentCharge(
+  appointment,
+  { applyFeeOffset = false, tipCents = 0, subtotalCentsOverride } = {},
+) {
   if (!appointment) {
     throw new Error('There is no session to charge.');
   }
-  if (!appointment.subtotalCents || appointment.subtotalCents <= 0) {
+  const subtotalCents =
+    subtotalCentsOverride !== undefined && subtotalCentsOverride !== null
+      ? subtotalCentsOverride
+      : appointment.subtotalCents;
+  if (!subtotalCents || subtotalCents <= 0) {
     // Refused rather than charging tax and a tip on a zero subtotal. A session with no price on it
     // is unfinished, not free, and the artist has a step left to do.
     throw new Error('Set and save this session\'s price before charging it.');
@@ -37,7 +50,7 @@ async function quoteAppointmentCharge(appointment, { applyFeeOffset = false, tip
   const settings = await resolveSquareSettings(appointment.userId);
 
   const breakdown = computeChargeBreakdown({
-    subtotalCents: appointment.subtotalCents,
+    subtotalCents,
     hourlyRateCents: settings.hourlyRateCents,
     feeOffsetPerHourCents: settings.feeOffsetCents,
     taxRateBasisPoints: settings.taxRateBasisPoints,
@@ -45,9 +58,15 @@ async function quoteAppointmentCharge(appointment, { applyFeeOffset = false, tip
     // Already collected and already recognised as revenue at the consult that took it (M3). It
     // reduces what is COLLECTED here, not what is taxed.
     depositCreditCents: appointment.depositCreditCents || 0,
-    // Gift cards are not built yet (M6). Passed explicitly at zero rather than omitted, so that
-    // when they land there is one obvious line to change rather than a default to discover.
-    giftCardCents: 0,
+    // Real lookup, replacing the hardcoded 0 this line used to carry (see the comment that used to
+    // sit here, and DECISIONS.md M6). redeemGiftCard (mutations/giftCards.js via
+    // resolvers/giftCards.js) is the only writer of giftCardCreditCents - it validates the card,
+    // enforces the issuer lock, decrements the card's balance and records the redemption ledger
+    // row BEFORE this field is ever read, so by the time a charge is quoted the credit is real
+    // money already spoken for, not a caller's assertion. Whole-session gift card money, both
+    // issuer types - see models/Appointment.js's own comment on why this is a different field from
+    // artistIssuedGiftCardCreditCents, which applyShopCut reads instead.
+    giftCardCents: appointment.giftCardCreditCents || 0,
     tipCents,
   });
 

@@ -7,8 +7,8 @@
 button {
     border: none;
     border-radius: 5px;
-    background-color: #ddd;
-    color: #333;
+    background-color: var(--ib-border);
+    color: var(--ib-text-primary);
     padding: 6px 16px;
     cursor: pointer;
     margin-right: 20px;
@@ -24,8 +24,8 @@ button {
     transition: background-color 250ms cubic-bezier(0.4, 0, 0.2, 1) 0ms,box-shadow 250ms cubic-bezier(0.4, 0, 0.2, 1) 0ms,border-color 250ms cubic-bezier(0.4, 0, 0.2, 1) 0ms,color 250ms cubic-bezier(0.4, 0, 0.2, 1) 0ms;
 }
 button:hover {
-    background-color: #333;
-    color: #ddd;
+    background-color: var(--ib-text-primary);
+    color: var(--ib-border);
 }
 button:focus{
     outline: none;
@@ -45,6 +45,22 @@ input {
 }
 input:focus{
     outline: none;
+}
+
+/* No spin buttons on any number input, anywhere - the register form's own number fields
+   (hourly rate, flat rate, shop cut) never had them because MUI's TextField happens to render
+   plainly there, but every other type="number" field in the app (session totals, deposits,
+   settings) is on the same underlying <input> and gets the browser's default up/down arrows.
+   Global rather than per-component so a new number field is consistent by default instead of by
+   remembering to opt in. Money and percentages are typed or pasted, not incremented by clicking
+   a tiny arrow, and the arrows eat click targets next to fields that are often narrow. */
+input[type="number"] {
+    -moz-appearance: textfield;
+}
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
 }
 
 .errors {

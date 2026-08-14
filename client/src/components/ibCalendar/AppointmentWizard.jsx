@@ -13,6 +13,7 @@ import IBInput from "../inputs/IBInput";
 import IBMultilineInput from "../inputs/IBMultilineInput";
 import IBProjectsByArtistSelect from "../inputs/IBProjectsByArtistSelect";
 import IBPageLoader from "../ibPageLoader/IBPageLoader";
+import FormField from "../formField/FormField";
 import { AppointmentService } from "../../services/AppointmentService";
 import ProjectService from "../../services/ProjectService";
 import ClientService from "../../services/ClientService";
@@ -371,15 +372,19 @@ const AppointmentWizard = ({ selectedDay }) => {
 						onDurationChange={setDurationMinutes}
 						artistUserId={user.id}
 					/>
-					<IBInput
-						helperText="Title"
-						placeholder="e.g. Out of office"
-						onChange={(e) => setOtherTitle(e.target.value)}
-					/>
-					<IBMultilineInput
-						helperText="Description"
-						onChange={(e) => setOtherDescription(e.target.value)}
-					/>
+					<FormField id="otherTitle" label="Title">
+						<IBInput
+							id="otherTitle"
+							placeholder="e.g. Out of office"
+							onChange={(e) => setOtherTitle(e.target.value)}
+						/>
+					</FormField>
+					<FormField id="otherDescription" label="Description">
+						<IBMultilineInput
+							id="otherDescription"
+							onChange={(e) => setOtherDescription(e.target.value)}
+						/>
+					</FormField>
 					{error && <div className="bookingRequestError">{error}</div>}
 				</DialogContent>
 				<DialogActions className="appointmentWizardDialogActions">
@@ -400,13 +405,15 @@ const AppointmentWizard = ({ selectedDay }) => {
 		// would make the user wait to type.
 		return (
 			<DialogContent dividers className="appointmentWizardDialogContent">
-				<IBInput
-					helperText="Client email"
-					type="email"
-					defaultValue={clientEmail}
-					onChange={(e) => setClientEmail(e.target.value)}
-					placeholder="jon.snow@example.com"
-				/>
+				<FormField id="clientEmail" label="Client email">
+					<IBInput
+						id="clientEmail"
+						type="email"
+						defaultValue={clientEmail}
+						onChange={(e) => setClientEmail(e.target.value)}
+						placeholder="jon.snow@example.com"
+					/>
+				</FormField>
 				{matchedClient ? (
 					<div className="clientEmailMatchCard">
 						Found: {matchedClient.firstName} {matchedClient.lastName}
@@ -427,21 +434,27 @@ const AppointmentWizard = ({ selectedDay }) => {
 								No existing client found for this email - enter their details to create
 								one.
 							</div>
-							<IBInput
-								helperText="First Name"
-								defaultValue={clientFirstName}
-								onChange={(e) => setClientFirstName(e.target.value)}
-							/>
-							<IBInput
-								helperText="Last Name"
-								defaultValue={clientLastName}
-								onChange={(e) => setClientLastName(e.target.value)}
-							/>
-							<IBInput
-								helperText="Phone (optional)"
-								defaultValue={clientPhone}
-								onChange={(e) => setClientPhone(e.target.value)}
-							/>
+							<FormField id="clientFirstName" label="First Name">
+								<IBInput
+									id="clientFirstName"
+									defaultValue={clientFirstName}
+									onChange={(e) => setClientFirstName(e.target.value)}
+								/>
+							</FormField>
+							<FormField id="clientLastName" label="Last Name">
+								<IBInput
+									id="clientLastName"
+									defaultValue={clientLastName}
+									onChange={(e) => setClientLastName(e.target.value)}
+								/>
+							</FormField>
+							<FormField id="clientPhone" label="Phone (optional)">
+								<IBInput
+									id="clientPhone"
+									defaultValue={clientPhone}
+									onChange={(e) => setClientPhone(e.target.value)}
+								/>
+							</FormField>
 						</>
 					)
 				)}
@@ -486,32 +499,42 @@ const AppointmentWizard = ({ selectedDay }) => {
 		return (
 			<DialogContent dividers className="appointmentWizardDialogContent">
 				{type === "session" && (
-					<IBInput
-						helperText="Project Title"
-						defaultValue={projectTitle}
-						onChange={(e) => setProjectTitle(e.target.value)}
-					/>
+					<FormField id="projectTitle" label="Project Title">
+						<IBInput
+							id="projectTitle"
+							defaultValue={projectTitle}
+							onChange={(e) => setProjectTitle(e.target.value)}
+						/>
+					</FormField>
 				)}
-				<IBMultilineInput
-					helperText="What's the idea? (required)"
-					defaultValue={intakeDescription}
-					onChange={(e) => setIntakeDescription(e.target.value)}
-				/>
-				<IBInput
-					helperText="Placement"
-					defaultValue={intakePlacement}
-					onChange={(e) => setIntakePlacement(e.target.value)}
-				/>
-				<IBInput
-					helperText="Size"
-					defaultValue={intakeSize}
-					onChange={(e) => setIntakeSize(e.target.value)}
-				/>
-				<IBInput
-					helperText="Budget"
-					defaultValue={intakeBudget}
-					onChange={(e) => setIntakeBudget(e.target.value)}
-				/>
+				<FormField id="intakeDescription" label="What's the idea? (required)">
+					<IBMultilineInput
+						id="intakeDescription"
+						defaultValue={intakeDescription}
+						onChange={(e) => setIntakeDescription(e.target.value)}
+					/>
+				</FormField>
+				<FormField id="intakePlacement" label="Placement">
+					<IBInput
+						id="intakePlacement"
+						defaultValue={intakePlacement}
+						onChange={(e) => setIntakePlacement(e.target.value)}
+					/>
+				</FormField>
+				<FormField id="intakeSize" label="Size">
+					<IBInput
+						id="intakeSize"
+						defaultValue={intakeSize}
+						onChange={(e) => setIntakeSize(e.target.value)}
+					/>
+				</FormField>
+				<FormField id="intakeBudget" label="Budget">
+					<IBInput
+						id="intakeBudget"
+						defaultValue={intakeBudget}
+						onChange={(e) => setIntakeBudget(e.target.value)}
+					/>
+				</FormField>
 				<label className="appointmentWizardCheckboxRow">
 					<input type="checkbox" checked={isCoverUp} onChange={(e) => setIsCoverUp(e.target.checked)} />{" "}
 					Cover-up / touch-up

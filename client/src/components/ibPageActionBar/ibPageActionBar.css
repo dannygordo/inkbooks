@@ -13,7 +13,7 @@
     gap: 16px;
     padding-bottom: 16px;
     margin-bottom: 20px;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--ib-surface-subtle);
 }
 
 /* h1 carries a browser default bottom margin that fought the container's own spacing - with both

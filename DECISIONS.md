@@ -122,14 +122,38 @@ because the fee applies to the grossed-up total.
   comes off the session's total. Both take the offset. See M8 for the ordering that falls out.
 - Full face value loaded as balance. Partial redemption supported. Spendable on deposits.
 - No expiry — Washington prohibits it. The liability never ages off.
-- **OPEN, and now in tension with M9.** This said "shop-level when the artist is connected,
-  artist-level otherwise — the shop holds the entire amount", written when a client charge was
-  thought to settle to the shop. It does not (M9): a client pays the artist. Whether the LIABILITY
-  for an outstanding gift card sits with the shop or the artist is a separate question from which
-  Square account the sale was charged into, and it has not been decided. Decide it before building
-  gift cards.
+- **RESOLVED.** The earlier framing ("shop-level when the artist is connected, artist-level
+  otherwise — the shop holds the entire amount") was written when a client charge was thought to
+  settle to the shop. It does not (M9): a client pays the artist. Liability doesn't follow a
+  connection status — it follows **who issued the card**, and every card records that explicitly:
+  `issuerType: 'ARTIST' | 'SHOP'`, `issuerArtistId` set only when `ARTIST`. The two issuer types are
+  not one flow with a flag — they are different money events.
 
-Payout on redemption:
+  **Artist-issued.** Sold by one artist, for that artist alone. **Locked to them at redemption — no
+  other artist at the shop, and the shop itself, will honour it.** The card's own terms say so, and a
+  redemption attempt against any other artist's session is refused outright, not silently allowed.
+  This is the same shape as a deposit (M3), because it's the same kind of money: the artist collected
+  it, into their own account (M9), at the moment of sale. So the shop's cut is taken **at the sale**,
+  through `applyShopCut`, exactly as if the sale were a consult deposit — not deferred to redemption.
+  Because the cut is already settled by then, `computeChargeBreakdown`'s cuttable base at redemption
+  must exclude an artist-issued card's applied amount the same way it already excludes
+  `depositCreditCents` (M3) — skip that and the same money gets cut twice. An independent artist's
+  card carries no cut at all, same as M1's `0`-with-no-shop case.
+
+  **Shop-issued.** Sold as a shop product, not attributed to any one artist's book of business — the
+  client buys it from the shop, not from an artist, and no `Client` record or session context is
+  required to make the sale at all. **Always charged by a shop admin.** Every shop admin is an artist
+  (S0), so they have their own connected Square account like anyone else (M9), and that account is
+  what takes the payment — there is no other path, since only an artist's own account can take a
+  client's card. But **none of it is the admin's revenue**: the full face value is recorded as owed
+  to the shop, settled through the same shop-cut invoice machinery already built
+  (`createAndPublishShopCutInvoice` / `markShopCutPaidManually` / `confirmShopCutPaid`), at 100%
+  rather than whatever the admin's own artist rate happens to be. **Redeemable against any artist's
+  session at the shop** — the artist who eventually does the work was never involved in the sale, and
+  is owed their share at redemption regardless of who sold the card.
+
+Payout at redemption — **shop-issued cards only**, since an artist-issued card never reaches a second
+party to net against:
 
 ```
 (session_total × shop_rate) − gift_card_applied
@@ -141,9 +165,11 @@ sign convention into every test — inverted payout signs are found three months
 Worked both directions. $200 session, 40%, $100 card: `80 − 100 = −20`, shop owes the artist $20.
 Same session, $50 card: `80 − 50 = +30`, artist owes the shop $30.
 
-Gift card sales are a **liability, not revenue**, recognised at redemption. A report must show
-outstanding balance, card count and oldest issue date, because that portion of the bank balance is
-already spoken for.
+A gift card's unspent balance is a **liability, not revenue**, for as long as it's outstanding,
+regardless of issuer — a report must show outstanding balance, card count and oldest issue date,
+because that portion of the bank balance is already spoken for. What differs by issuer is **when the
+shop's cut is recognised as revenue**: at sale for an artist-issued card (deposit-shaped), at
+redemption for a shop-issued one (the formula above).
 
 ### M7. A rate change applies forward only, never backward
 

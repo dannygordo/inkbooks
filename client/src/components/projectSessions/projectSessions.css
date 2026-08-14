@@ -10,13 +10,13 @@
 	justify-content: space-between;
 	align-items: center;
 	padding: 10px 14px;
-	border: 1px solid #ddd;
+	border: 1px solid var(--ib-border);
 	border-radius: 6px;
 	cursor: pointer;
 }
 
 .projectSessionRow:hover {
-	background-color: #f5f5f5;
+	background-color: var(--ib-surface-hover);
 }
 
 .projectSessionRowInfo {
@@ -30,11 +30,11 @@
 
 .projectSessionRowMeta {
 	font-size: 0.85em;
-	color: #666;
+	color: var(--ib-text-secondary);
 }
 
 .projectSessionsEmpty {
-	color: #666;
+	color: var(--ib-text-secondary);
 	font-style: italic;
 }
 
@@ -87,8 +87,8 @@
 	flex-direction: column;
 	gap: 8px;
 	padding: 12px 14px;
-	border: 1px solid #b6e6c3;
-	background-color: #e6f6ea;
+	border: 1px solid var(--ib-success-border);
+	background-color: var(--ib-success-bg);
 	border-radius: 6px;
 }
 .sessionDetailDepositsLabel {
@@ -104,22 +104,63 @@
 }
 .sessionDetailDepositsHint {
 	font-size: 12px;
-	color: #555;
+	color: var(--ib-text-secondary);
 	font-style: italic;
 }
 /* The settled state - the deposit is spent and the total below already reflects it. */
 .sessionDetailDepositApplied {
 	font-size: 13px;
-	color: #555;
+	color: var(--ib-text-secondary);
 	padding: 10px 14px;
-	background-color: #f4f4f4;
+	background-color: var(--ib-surface-subtle);
 	border-radius: 6px;
+}
+
+/* Tax/Fees/Offset Fee/Total - auto-generated, read-only figures (see SessionDetail.jsx). Styled
+   like a disabled field's stack (label, value, helper text) rather than a plain sentence, so they
+   read as the same kind of thing as the editable dollar inputs beside them, not as prose. */
+.sessionDetailMoneyLabel {
+	display: flex;
+	flex-direction: column;
+	min-width: 110px;
+	padding: 8px 0;
+}
+.sessionDetailMoneyLabelName {
+	font-size: 12px;
+	color: var(--ib-text-secondary);
+}
+.sessionDetailMoneyLabelValue {
+	font-size: 16px;
+	color: var(--ib-text-primary);
+}
+.sessionDetailMoneyLabelHint {
+	font-size: 11px;
+	color: var(--ib-text-muted);
+}
+.sessionDetailMoneyLabelTotal .sessionDetailMoneyLabelName {
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--ib-text-primary);
+}
+.sessionDetailMoneyLabelTotal .sessionDetailMoneyLabelValue {
+	font-size: 22px;
+	font-weight: 700;
+}
+/* Only shows up when the live quote actually failed (see SessionDetail.jsx's getFreshQuote) -
+   deliberately visible rather than a silently blank total, since a blank total and "nothing
+   typed yet" used to look identical on screen. */
+.sessionDetailQuoteError {
+	font-size: 13px;
+	color: var(--ib-error-dark);
+	background-color: var(--ib-error-bg);
+	border-radius: 6px;
+	padding: 8px 12px;
 }
 
 /* Reads as a consequence of the numbers above it, not as another field. */
 .sessionDetailShopCutNote {
 	font-size: 13px;
-	color: #666;
+	color: var(--ib-text-secondary);
 	font-style: italic;
 }
 
@@ -133,7 +174,7 @@
 	display: flex;
 	flex-direction: column;
 	gap: 10px;
-	background-color: #f8f9fb;
+	background-color: var(--ib-surface-page);
 	padding: 14px 16px;
 	border-radius: 8px;
 }
@@ -152,6 +193,6 @@
     align-items: center;
     gap: 8px;
     font-size: 13px;
-    color: #555;
+    color: var(--ib-text-secondary);
     margin: 10px 0 0;
 }

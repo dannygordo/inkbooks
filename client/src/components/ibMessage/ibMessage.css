@@ -13,23 +13,23 @@
     margin-left: 10px;
     padding: 10px;
     border-radius: 10px;
-    color: #000;
-    background-color: #efefef;
-    -webkit-box-shadow: 5px 5px 15px -12px #000000;
-    box-shadow: 5px 5px 15px -12px #000000;
+    color: var(--ib-text-primary);
+    background-color: var(--ib-surface-subtle);
+    -webkit-box-shadow: 5px 5px 15px -12px rgba(var(--ib-shadow-color), 1);
+    box-shadow: 5px 5px 15px -12px rgba(var(--ib-shadow-color), 1);
     max-width: 300px;
 }
 .ibMessageBottom {
     font-size: 12px;
     margin-top: 10px;
     font-weight: 500;
-    color: #888;
+    color: var(--ib-text-muted);
 }
 .ibMessage.own {
     align-items: flex-end;
 }
 .ibMessage.own .ibMessageText{
     align-items: flex-end;
-    color: #fff;
-    background-color: rgb(0, 116, 184);
+    color: var(--ib-primary-contrast);
+    background-color: var(--ib-primary);
 }

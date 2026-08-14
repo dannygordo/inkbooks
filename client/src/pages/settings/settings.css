@@ -1,29 +1,32 @@
 /* Settings.
  *
- * ONE COLUMN, and that is the fix. This was `display: flex; flex-wrap: wrap` with no gap and no
- * basis, and IBCardWrapper carries `flex: 2` of its own (see components/card/ibCard/ibCard.css) -
- * so every panel took `flex: 2 2 0%` and they all crushed themselves onto a single row. It was
- * survivable at three panels and unreadable at seven, which is what folding the profile page in
- * produced: photo, password, calendar colour, shop, notifications and booking link shoulder to
- * shoulder.
+ * ONE COLUMN WITHIN A CATEGORY, and that is still the fix the comment below originally described -
+ * it just no longer has to apply to every panel on the page at once. Settings used to render every
+ * panel in one long scroll (photo, password, calendar colour, shop, notifications, booking link,
+ * rates, Square...) and kept gaining a new one every time a new kind of setting needed a home,
+ * which is exactly the "seven panels shoulder to shoulder" problem this file's original comment
+ * described. It's now a category shell (see pages/settings/settingsCategories.js and
+ * Settings.jsx): a nav down the side picks ONE category, and .settingsContainer below still holds
+ * only that category's panels in the original single, readable column - the fix just moved from
+ * "the only screen" to "every screen this page can show."
  *
- * A settings page is a list of unrelated decisions read top to bottom, not a dashboard to be
- * scanned at a glance, so the column is also the right shape rather than merely the easy fix. A
- * grid would put "shop connection" beside "calendar colour" and imply a relationship that isn't
- * there, and it makes every row as tall as its tallest card.
+ * A settings CATEGORY is a list of unrelated decisions read top to bottom, not a dashboard to be
+ * scanned at a glance, so the column is also the right shape within one, same as before. A grid
+ * would put "shop connection" beside "calendar colour" and imply a relationship that isn't there.
  *
  * SPACING SYSTEM, so the numbers below are not arbitrary:
  *     8px   inside a control
  *     16px  help text to the control it explains
  *     32px  card padding
  *     28px  between cards
- *     40px  title to first card
+ *     40px  title to the nav/content row
+ *     32px  nav to content
  */
 
 .settings {
-	/* `flex: 4` was here, left over from a flex-row layout this page hasn't been inside for a long
-	   time - <main> is a block Box (see App.jsx), so it did nothing at all. */
-	max-width: 820px;
+	/* Wider than the old single-column page (820px) - there are now two columns, and the content
+	   column keeps its old readable width once the nav's own space is accounted for. */
+	max-width: 1040px;
 	margin: 0 auto;
 	padding: 32px 24px 80px;
 	box-sizing: border-box;
@@ -38,11 +41,71 @@
 	font-size: 28px;
 	font-weight: 600;
 }
-.settingsContainer {
+.settingsShell {
 	margin-top: 40px;
+	display: flex;
+	align-items: flex-start;
+	gap: 32px;
+}
+.settingsNav {
+	flex: 0 0 208px;
+	/* Stays in view while a long category (the Activity Log, say) scrolls past it - the same
+	   reason the app's own left Sidebar doesn't scroll with the page. This page's own content
+	   already clears App.jsx's fixed AppBar (an empty spacer <Toolbar /> ahead of every route
+	   does that once, for all of them) - what this offset clears is the AppBar ITSELF once the
+	   page scrolls the nav up underneath it, so it matches the AppBar's own height (MUI's default
+	   Toolbar - 64px desktop) rather than double-counting the spacer. */
+	position: sticky;
+	top: 76px;
+}
+.settingsNavItem {
+	border-radius: 8px !important;
+	margin-bottom: 2px;
+}
+.settingsNavIcon {
+	min-width: 36px !important;
+	color: var(--ib-text-muted);
+}
+.settingsContainer {
+	flex: 1 1 auto;
+	/* Without this a flex child won't shrink below its content's natural width - a long unbroken
+	   string (an email address in a diff row, say) would push the whole shell wider than its
+	   container instead of wrapping. */
+	min-width: 0;
 	display: flex;
 	flex-direction: column;
 	gap: 28px;
+}
+
+@media (max-width: 860px) {
+	/* Below the point where a fixed 208px nav plus a readable content column no longer both fit,
+	   the nav becomes a horizontal, scrollable row of pills above the content instead of a side
+	   column - the same "which screen am I on" job, in the space that's actually available. */
+	.settingsShell {
+		flex-direction: column;
+		gap: 20px;
+	}
+	.settingsNav {
+		flex: none;
+		width: 100%;
+		position: static;
+		overflow-x: auto;
+		-webkit-overflow-scrolling: touch;
+	}
+	.settingsNav .MuiList-root {
+		display: flex;
+		flex-direction: row;
+		gap: 4px;
+		padding-bottom: 4px;
+	}
+	.settingsNavItem {
+		flex: none;
+		width: auto !important;
+		white-space: nowrap;
+	}
+	.settingsNavItem .MuiListItemIcon-root {
+		display: none;
+	}
 }
 
 /* Scoped to this page rather than changing ibCard.css, which is shared with the dashboard and the
@@ -53,7 +116,7 @@
 	box-sizing: border-box;
 	padding: 32px;
 	border-radius: 12px;
-	background-color: #fff;
+	background-color: var(--ib-surface-card);
 	border: 1px solid #e6e8eb;
 	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.04);
 }
@@ -92,11 +155,11 @@
 	margin: 0;
 }
 .settingsShopWebsite {
-	color: #888;
+	color: var(--ib-text-muted);
 	margin: 4px 0 0;
 }
 .settingsError {
-	color: #d32f2f;
+	color: var(--ib-error);
 	margin-top: 8px;
 	font-size: 14px;
 }
@@ -111,8 +174,8 @@
    transition via App.css's element-level button rules; only the fill differs. */
 .ibButtonSecondary {
 	background-color: transparent;
-	border: 1px solid #888;
-	color: #ddd;
+	border: 1px solid var(--ib-text-muted);
+	color: var(--ib-border);
 }
 
 /* The move-shops confirmation. Deliberately blocking: it names the shop being left, and the
@@ -128,7 +191,7 @@
 }
 .settingsConfirmDialog {
 	background: #1e1e1e;
-	color: #ddd;
+	color: var(--ib-border);
 	border-radius: 10px;
 	padding: 28px;
 	max-width: 520px;
@@ -144,7 +207,7 @@
 	line-height: 1.5;
 }
 .settingsConfirmNote {
-	color: #999;
+	color: var(--ib-text-muted);
 	font-size: 14px;
 }
 
@@ -153,7 +216,7 @@
    the rules above so it is obvious what arrived with the merge and what was always here. */
 
 /* Every panel's explanation, previously six copies of an inline
-   style={{ color: "#bbb", marginBottom: 15 }}. #bbb is 1.9:1 against white - below any contrast
+   style={{ color: "var(--ib-border-strong)", marginBottom: 15 }}. var(--ib-border-strong) is 1.9:1 against white - below any contrast
    threshold, and this is the text that explains what the control does. */
 .settingsPanelHelp {
     margin: 0 0 16px;
@@ -188,7 +251,7 @@
     height: 60px;
     padding: 5px;
     margin: 5px;
-    color: #fff;
+    color: var(--ib-primary-contrast);
     font: inherit;
     display: flex;
     justify-content: center;
@@ -197,7 +260,7 @@
 }
 
 .settingsTagColor:focus-visible {
-    outline: 2px solid #1775ee;
+    outline: 2px solid var(--ib-primary);
     outline-offset: 2px;
 }
 
@@ -213,11 +276,11 @@
 }
 
 .settingsSquareStatus--connected {
-    color: #1b8a3e;
+    color: var(--ib-success);
 }
 
 .settingsSquareStatus--disconnected {
-    color: #777;
+    color: var(--ib-text-secondary);
 }
 
 .settingsSquareBanner {
@@ -228,9 +291,9 @@
 }
 
 .settingsSquareBanner--success {
-    background-color: #e6f6ea;
-    color: #1b8a3e;
-    border: 1px solid #b6e6c3;
+    background-color: var(--ib-success-bg);
+    color: var(--ib-success);
+    border: 1px solid var(--ib-success-border);
 }
 
 .settingsSquareBanner--error {
@@ -251,7 +314,98 @@
 }
 
 .settingsPricingSaved {
-    color: #1b8a3e;
+    color: var(--ib-success);
     font-size: 13px;
     align-self: center;
+}
+
+/* --- Activity Log (components/settings/EventLogPanel.jsx) --------------------------------- */
+.eventLogList {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+}
+.eventLogRow {
+	padding: 12px 14px;
+	border: 1px solid #e6e8eb;
+	border-radius: 8px;
+}
+.eventLogRowHeader {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+.eventLogAction {
+	font-size: 11px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+	padding: 2px 8px;
+	border-radius: 4px;
+	white-space: nowrap;
+}
+.eventLogAction--create {
+	background-color: var(--ib-success-bg);
+	color: var(--ib-success);
+}
+.eventLogAction--update {
+	background-color: #eaf1fd;
+	color: #1a56c4;
+}
+.eventLogAction--delete {
+	background-color: #fdecea;
+	color: #a33;
+}
+.eventLogSummary {
+	font-size: 14px;
+	font-weight: 500;
+}
+.eventLogMeta {
+	margin-top: 4px;
+	font-size: 12.5px;
+	color: var(--ib-text-muted);
+}
+.eventLogChanges {
+	list-style: none;
+	margin: 8px 0 0;
+	padding: 10px 12px;
+	background-color: #f7f8f9;
+	border-radius: 6px;
+	font-size: 13px;
+	color: var(--ib-text-primary);
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+.eventLogChangeField {
+	font-weight: 600;
+	color: var(--ib-text-primary);
+}
+
+/* --- Reminders (components/settings/RemindersPanel.jsx) ----------------------------------- */
+.remindersChannelRow {
+	margin-bottom: 8px;
+}
+.remindersSmsHelp {
+	margin: 0 0 0 46px;
+}
+.remindersSubheading {
+	margin: 24px 0 10px;
+	font-size: 15px;
+	font-weight: 600;
+}
+.remindersRules {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 8px;
+	margin-bottom: 8px;
+}
+.remindersRuleRow {
+	display: flex;
+	align-items: center;
 }

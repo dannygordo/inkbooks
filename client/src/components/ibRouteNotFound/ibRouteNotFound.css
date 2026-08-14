@@ -20,5 +20,5 @@
 
 .ibRouteNotFoundCard:hover {
     cursor: pointer;
-    background-color: #eee;
+    background-color: var(--ib-surface-subtle);
 }

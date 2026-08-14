@@ -13,6 +13,7 @@ import { CacheService } from "./services/CacheService";
 import { io } from "socket.io-client";
 import { apiBaseUrl } from "./utils/apiUrl";
 import { AuthProvider } from "./context/auth";
+import ThemeModeProvider from "./theme/ThemeModeProvider";
 
 const httpLink = createHttpLink({
 	// Vite doesn't polyfill Node's process.env - it exposes mode via import.meta.env.MODE
@@ -57,7 +58,9 @@ root.render(
 	<ApolloProvider client={client}>
 		<BrowserRouter>
 			<AuthProvider>
-				<App />
+				<ThemeModeProvider>
+					<App />
+				</ThemeModeProvider>
 			</AuthProvider>
 		</BrowserRouter>
 	</ApolloProvider>

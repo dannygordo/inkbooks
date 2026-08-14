@@ -11,6 +11,7 @@ const { notifySafely } = require('../../utils/notifications');
 const { shopAdminUserIds } = require('../../utils/notification-audience');
 const { actorName } = require('../../utils/notification-copy');
 const { formatCents } = require('../../utils/money');
+const { recordEvent } = require('../../utils/event-log');
 const square = require('../../utils/square');
 const {
   sendShopCutMarkedPaidNotificationToShop,
@@ -93,10 +94,21 @@ module.exports = {
       paymentMethod,
     });
 
+    const previousShopCutStatus = appointment.shopCutStatus;
     appointment.shopCutSquareInvoiceId = invoiceResult.invoiceId;
     appointment.shopCutStatus = 'invoice_sent';
     appointment.shopCutPaymentMethod = 'square_invoice';
     await appointment.save();
+
+    await recordEvent({
+      entityType: 'Appointment',
+      entityId: appointment._id,
+      action: 'update',
+      actorUserId: user.id,
+      shopId: appointment.shopId,
+      summary: `Invoiced ${formatCents(targetAmountCents)} shop cut via Square`,
+      changes: [{ field: 'shopCutStatus', from: previousShopCutStatus, to: 'invoice_sent' }],
+    });
 
     // NOTE - this is the reverse of what NOTIFICATIONS_DESIGN.md §4 assumed.
     //
@@ -200,6 +212,15 @@ module.exports = {
       appointment.shopCutStatus = 'invoice_sent';
       appointment.shopCutPaymentMethod = 'square_invoice';
       await appointment.save();
+      await recordEvent({
+        entityType: 'Appointment',
+        entityId: appointment._id,
+        action: 'update',
+        actorUserId: user.id,
+        shopId: appointment.shopId,
+        summary: `Invoiced ${formatCents(appointment.shopCutCents)} shop cut via Square (batch of ${appointments.length})`,
+        changes: [{ field: 'shopCutStatus', from: 'unpaid', to: 'invoice_sent' }],
+      });
     }
 
     return { appointments, invoiceUrl: invoiceResult.publicUrl };
@@ -231,11 +252,22 @@ module.exports = {
       throw new UserInputError('Errors', { errors: { appointmentId: 'This shop cut is already awaiting the shop\'s confirmation.' } });
     }
 
+    const previousShopCutStatus = appointment.shopCutStatus;
     appointment.shopCutStatus = 'pending_confirmation';
     appointment.shopCutPaymentMethod = 'manual';
     appointment.shopCutMarkedPaidBy = user.id;
     appointment.shopCutMarkedPaidAt = new Date();
     await appointment.save();
+
+    await recordEvent({
+      entityType: 'Appointment',
+      entityId: appointment._id,
+      action: 'update',
+      actorUserId: user.id,
+      shopId: appointment.shopId,
+      summary: `Marked ${formatCents(appointment.shopCutCents)} shop cut paid manually`,
+      changes: [{ field: 'shopCutStatus', from: previousShopCutStatus, to: 'pending_confirmation' }],
+    });
 
     const shop = await Shop.findById(appointment.shopId);
     const artist = await User.findById(appointment.userId);
@@ -297,6 +329,16 @@ module.exports = {
     appointment.shopCutConfirmedBy = user.id;
     appointment.shopCutConfirmedAt = new Date();
     await appointment.save();
+
+    await recordEvent({
+      entityType: 'Appointment',
+      entityId: appointment._id,
+      action: 'update',
+      actorUserId: user.id,
+      shopId: appointment.shopId,
+      summary: `Confirmed ${formatCents(appointment.shopCutCents)} shop cut received`,
+      changes: [{ field: 'shopCutStatus', from: 'pending_confirmation', to: 'paid' }],
+    });
 
     const artist = await User.findById(appointment.userId);
     const shop = await Shop.findById(appointment.shopId);

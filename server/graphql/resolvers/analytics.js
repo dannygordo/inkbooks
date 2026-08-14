@@ -29,6 +29,7 @@ const ARTIST_ROW_MONEY_FIELDS = [
   'tipsCents',
   'shopCutEarnedCents',
   'shopCutOutstandingCents',
+  'shopCutAwaitingConfirmationCents',
 ];
 
 // Nulls every money field, top-level and per-artist. Null rather than 0 deliberately: 0 is a

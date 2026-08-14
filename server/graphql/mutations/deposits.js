@@ -9,6 +9,14 @@ const { notifySafely } = require('../../utils/notifications');
 const { moneyAudienceForArtist } = require('../../utils/notification-audience');
 const { actorName } = require('../../utils/notification-copy');
 const { formatCents } = require('../../utils/money');
+const { recordEvent, diffFields } = require('../../utils/event-log');
+
+const DEPOSIT_AUDIT_FIELDS = [
+  'depositCents',
+  'depositStatus',
+  'depositPaymentMethod',
+  'depositCreditCents',
+];
 
 /**
  * Deposits.
@@ -98,6 +106,9 @@ module.exports = {
         });
       }
       const appointment = await loadOwnedAppointment(appointmentId, user, 'appointmentId');
+      // Snapshot before any field on `appointment` is touched below - diffFields needs an
+      // untouched "before" to compare the saved result against.
+      const before = appointment.toObject();
       if (appointment.depositStatus === 'applied') {
         throw new UserInputError('Errors', {
           errors: {
@@ -134,6 +145,16 @@ module.exports = {
         depositCents + (appointment.taxCents || 0) + (appointment.feeCents || 0) + (appointment.tipCents || 0);
       await applyShopCut(appointment);
       await appointment.save();
+
+      await recordEvent({
+        entityType: 'Appointment',
+        entityId: appointment._id,
+        action: 'update',
+        actorUserId: user.id,
+        shopId: appointment.shopId,
+        summary: `${pending ? 'Recorded pending' : 'Recorded'} ${formatCents(depositCents)} deposit (${paymentMethod === 'square' ? 'card' : 'cash'})`,
+        changes: diffFields(before, appointment, DEPOSIT_AUDIT_FIELDS),
+      });
 
       // The artist who took it is NOT told - they were standing there. Their shop admin is, because
       // money arrived at their shop and they weren't present for it. This is the founding example
@@ -264,6 +285,29 @@ module.exports = {
         // Recomputed because the cut follows the reduced figure - see utils/shop-cut.js.
         await applyShopCut(target);
         await target.save();
+
+        // Two records changed - the deposit's own source appointment (flipped to 'applied') and
+        // the session it was credited to (depositCreditCents set) - so this is two audit rows,
+        // not one, matching EventLog's one-row-per-entity shape.
+        await recordEvent({
+          entityType: 'Appointment',
+          entityId: claimed._id,
+          action: 'update',
+          actorUserId: user.id,
+          shopId: claimed.shopId,
+          summary: `Applied ${formatCents(claimed.depositCents)} deposit to a session`,
+          changes: diffFields(deposit, claimed, DEPOSIT_AUDIT_FIELDS),
+        });
+        await recordEvent({
+          entityType: 'Appointment',
+          entityId: target._id,
+          action: 'update',
+          actorUserId: user.id,
+          shopId: target.shopId,
+          summary: `Received ${formatCents(claimed.depositCents)} deposit credit`,
+          changes: [{ field: 'depositCreditCents', from: 0, to: claimed.depositCents }],
+        });
+
         return target;
       } catch (err) {
         rethrow(err);

@@ -4,6 +4,7 @@ const { Constants } = require('../../utils/constants');
 const { UserInputError, AuthenticationError } = require('../../utils/errors');
 const { assertCanAccessShop, canManageArtist } = require('../../utils/shop-membership');
 const { setShopCutRate } = require('../../utils/shop-cut');
+const { recordEvent } = require('../../utils/event-log');
 
 /**
  * The shop cut rate history.
@@ -52,7 +53,7 @@ module.exports = {
         }
 
         try {
-          return await setShopCutRate({
+          const rate = await setShopCutRate({
             artistUserId: artistId,
             shopId,
             percent,
@@ -60,6 +61,17 @@ module.exports = {
             effectiveFrom: effectiveFrom ? new Date(effectiveFrom) : undefined,
             note,
           });
+          // Append-only history, like the row itself - a new ShopCutRate document, so this is a
+          // 'create', not an 'update' of some prior rate.
+          await recordEvent({
+            entityType: 'ShopCutRate',
+            entityId: rate._id,
+            action: 'create',
+            actorUserId: user.id,
+            shopId,
+            summary: `Set shop cut to ${percent}% for an artist`,
+          });
+          return rate;
         } catch (err) {
           // setShopCutRate throws plain Errors for the two things a caller can get wrong - an
           // out-of-range percent and a collision on effectiveFrom. Both are user input, so they

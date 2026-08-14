@@ -18,7 +18,7 @@
     margin-bottom: 10px;
     font-size: 14px;
     font-weight: 600;
-    color: #555;
+    color: var(--ib-text-secondary);
 }
 .shopItem>input {
     height: 20px;
@@ -43,7 +43,7 @@
 .squareSection {
     margin-top: 20px;
     padding: 15px 20px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--ib-border);
     border-radius: 8px;
     max-width: 500px;
 }
@@ -53,11 +53,11 @@
     margin-bottom: 8px;
 }
 .squareStatusConnected {
-    color: #1b8a3e;
+    color: var(--ib-success);
     font-weight: 600;
 }
 .squareStatusDisconnected {
-    color: #777;
+    color: var(--ib-text-secondary);
 }
 .squareBanner {
     padding: 10px 15px;
@@ -66,9 +66,9 @@
     max-width: 500px;
 }
 .squareBannerSuccess {
-    background-color: #e6f6ea;
-    color: #1b8a3e;
-    border: 1px solid #b6e6c3;
+    background-color: var(--ib-success-bg);
+    color: var(--ib-success);
+    border: 1px solid var(--ib-success-border);
 }
 .squareBannerError {
     background-color: #fdecea;
@@ -79,7 +79,7 @@
 /* Shop-cut percentage, saved on blur - the only place this can be configured. */
 .shopSectionHint {
     font-size: 13px;
-    color: #555;
+    color: var(--ib-text-secondary);
     margin: 0 0 10px;
     max-width: 520px;
 }
@@ -88,11 +88,23 @@
     align-items: center;
     gap: 14px;
 }
-.shopCutSaveState {
-    font-size: 12px;
-    color: #777;
+
+/* Shop name + the shared autosave status for every field on this page (Shop Info panel and the
+   Shop cut field below it) - same pattern as Project.jsx's Details panel. */
+.shopTitleRow {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
 }
-.shopCutSaveState--error {
-    color: #861d15;
+.shopDetailsSaveState {
+    font-size: 12px;
+    color: var(--ib-text-secondary);
+    min-height: 16px;
+    display: inline-block;
+    transition: color 140ms ease;
+}
+.shopDetailsSaveState--error {
+    color: var(--ib-error-dark);
     font-weight: 500;
 }

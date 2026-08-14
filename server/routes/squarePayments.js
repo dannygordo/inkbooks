@@ -13,6 +13,7 @@ const { moneyAudienceForArtist } = require('../utils/notification-audience');
 const { actorName } = require('../utils/notification-copy');
 const { formatCents } = require('../utils/money');
 const { Constants } = require('../utils/constants');
+const { recordEvent } = require('../utils/event-log');
 
 const router = express.Router();
 
@@ -177,6 +178,8 @@ router.post('/square/process-payment', express.json(), async (req, res) => {
     // is specifically excluded from the shop cut. Collapsing them into one number destroys
     // exactly the distinctions the ledger runs on.
     const { breakdown } = quote;
+    const previousDepositStatus = appointment.depositStatus;
+    const previousAppointmentStatus = appointment.appointmentStatus;
 
     if (isDeposit) {
       // The money has now arrived, so the pending record becomes a collected one. depositCents is
@@ -207,12 +210,38 @@ router.post('/square/process-payment', express.json(), async (req, res) => {
       appointment.tipCents = breakdown.tipCents;
       appointment.totalCents = breakdown.totalCents;
       appointment.squarePaymentId = payment.id;
+      // A session paid by card, successfully, is done - there's no cash to hand over and no
+      // separate "mark it closed" step left for the artist to remember. Same transition
+      // mutations/appointments.js's updateAppointment makes when "Close Session" is clicked by
+      // hand; this is the other caller that can produce it, and it never comes through that
+      // mutation at all, so it has to be set here too.
+      //
+      // appointmentDate is stamped to THIS MOMENT for the same reason that resolver does it -
+      // reports run off when the work was actually settled, not off whatever slot it was booked
+      // into. A client charged today for a session booked (or rescheduled) some other day should
+      // show up today.
+      appointment.appointmentStatus = 'completed';
+      appointment.appointmentDate = new Date();
       // Recomputed from the subtotal just written, so the cut reflects the money actually
       // collected. Tips excluded by construction - see utils/shop-cut.js. The subtotal is now a
       // figure the caller cannot influence, which is what makes the cut trustworthy.
       await applyShopCut(appointment);
     }
     await appointment.save();
+
+    await recordEvent({
+      entityType: 'Appointment',
+      entityId: appointment._id,
+      action: 'update',
+      actorUserId: user.id,
+      shopId: appointment.shopId,
+      summary: isDeposit
+        ? `Charged ${formatCents(breakdown.amountDueCents)} deposit via Square`
+        : `Charged ${formatCents(breakdown.amountDueCents)} via Square, session closed`,
+      changes: isDeposit
+        ? [{ field: 'depositStatus', from: previousDepositStatus, to: appointment.depositStatus }]
+        : [{ field: 'appointmentStatus', from: previousAppointmentStatus, to: appointment.appointmentStatus }],
+    });
 
     // The person who took the payment is the actor. There IS one here - this route is
     // authenticated (checkAuth above), so unlike a Square webhook it never has to guess.

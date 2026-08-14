@@ -27,13 +27,13 @@ const IBProgressListProject = ({ files, project, title }) => {
 		}
 		hasSubmittedBatch.current = true;
 
-		//this pulls the destructured properties off of the project object that cannot be updated by Graphql and assigns the remaining properties to ...prj
-		const { __typename, artist, client, conversation, ...prj } = project;
-
-		let updatedReferenceImages = prj.referenceImages.map(
+		let updatedReferenceImages = project.referenceImages.map(
 			({ __typename, userInfo, ...keepAttrs }) => keepAttrs
 		);
-		let updatedDesignImages = prj.designImages.map(
+		let updatedDesignImages = project.designImages.map(
+			({ __typename, userInfo, ...keepAttrs }) => keepAttrs
+		);
+		let updatedBodyImages = (project.bodyImages || []).map(
 			({ __typename, userInfo, ...keepAttrs }) => keepAttrs
 		);
 
@@ -44,19 +44,40 @@ const IBProgressListProject = ({ files, project, title }) => {
 			case "Design":
 				updatedDesignImages = [...updatedDesignImages, ...urlList];
 				break;
+			case "Finished Tattoo":
+				updatedBodyImages = [...updatedBodyImages, ...urlList];
+				break;
 		}
 
-		const notesToSave = prj.notes.map(
+		const notesToSave = project.notes.map(
 			({ __typename, ...keepAttrs }) => keepAttrs
 		);
 
-		//merges the new list of images with the old one and updates Mongo
+		// Built explicitly from ProjectInput's own field list (typeDefs.js) rather than spreading
+		// the whole fetched project (`...prj`, as this used to do). The fetched project - the
+		// GraphQL Project *output* type - carries several server-resolved fields ProjectInput has
+		// no matching input field for: depositCollectedCents, depositAvailableCents, deposits,
+		// consultAppointment. Spreading it into the mutation variables sent those along and every
+		// image upload was rejected outright with "Field X is not defined by type ProjectInput" -
+		// found via a live upload attempt. Listing the valid fields by hand means a field added to
+		// the fetch query later can't silently break every upload again.
 		updateProject({
 			variables: {
 				project: {
-					...prj,
+					id: project.id,
+					title: project.title,
+					description: project.description,
+					placement: project.placement,
+					size: project.size,
+					palette: project.palette,
+					artistId: project.artistId,
+					clientId: project.clientId,
+					materialsUsed: project.materialsUsed,
+					tags: project.tags,
+					status: project.status,
 					referenceImages: updatedReferenceImages,
 					designImages: updatedDesignImages,
+					bodyImages: updatedBodyImages,
 					notes: [...notesToSave],
 				},
 			},

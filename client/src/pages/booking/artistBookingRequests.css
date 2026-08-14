@@ -11,7 +11,7 @@
     width: 320px;
     flex-shrink: 0;
     overflow-y: auto;
-    background-color: white;
+    background-color: var(--ib-surface-card);
     border-radius: 10px;
     padding: 16px;
     box-sizing: border-box;
@@ -22,7 +22,7 @@
 }
 
 .bookingRequestsEmpty {
-    color: #999;
+    color: var(--ib-text-muted);
     font-size: 14px;
 }
 
@@ -34,11 +34,11 @@
 }
 
 .bookingRequestsListItem:hover {
-    background-color: #f5f6f8;
+    background-color: var(--ib-surface-hover);
 }
 
 .bookingRequestsListItemSelected {
-    background-color: #eaf1fd;
+    background-color: var(--ib-primary-bg);
 }
 
 .bookingRequestsListItemHeader {
@@ -56,8 +56,8 @@
 .bookingRequestsListItemStatus {
     font-size: 12px;
     font-weight: 600;
-    color: #666;
-    background-color: #f0f2f5;
+    color: var(--ib-text-secondary);
+    background-color: var(--ib-surface-page);
     padding: 3px 8px;
     border-radius: 10px;
     white-space: nowrap;
@@ -65,7 +65,7 @@
 
 .bookingRequestsListItemSnippet {
     font-size: 13px;
-    color: #666;
+    color: var(--ib-text-secondary);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -74,7 +74,7 @@
 .bookingRequestDetail {
     flex: 1;
     overflow-y: auto;
-    background-color: white;
+    background-color: var(--ib-surface-card);
     border-radius: 10px;
     padding: 24px;
     box-sizing: border-box;
@@ -84,7 +84,7 @@
 }
 
 .bookingRequestDetailEmpty {
-    color: #999;
+    color: var(--ib-text-muted);
 }
 
 .bookingRequestDetailHeader {
@@ -99,7 +99,7 @@
 
 .bookingRequestDetailContact {
     font-size: 13px;
-    color: #666;
+    color: var(--ib-text-secondary);
 }
 
 .bookingRequestDetailFields {
@@ -107,15 +107,15 @@
     flex-direction: column;
     gap: 4px;
     font-size: 13px;
-    color: #555;
-    background-color: #f8f9fb;
+    color: var(--ib-text-secondary);
+    background-color: var(--ib-surface-page);
     border-radius: 8px;
     padding: 12px 14px;
 }
 
 .bookingRequestDetailFields p {
     margin: 0 0 6px 0;
-    color: #222;
+    color: var(--ib-text-primary);
     font-size: 14px;
 }
 
@@ -148,27 +148,27 @@
 }
 
 .bookingRequestActionButton {
-    background-color: #1775ee;
-    color: white;
+    background-color: var(--ib-primary);
+    color: var(--ib-primary-contrast);
 }
 
 .bookingRequestActionButtonDecline {
-    background-color: #f0f2f5;
-    color: #d32f2f;
+    background-color: var(--ib-surface-page);
+    color: var(--ib-error);
 }
 
 .bookingRequestConvertForm {
     display: flex;
     align-items: flex-end;
     gap: 10px;
-    background-color: #f8f9fb;
+    background-color: var(--ib-surface-page);
     padding: 12px 14px;
     border-radius: 8px;
 }
 
 .bookingRequestConvertForm label {
     font-size: 13px;
-    color: #555;
+    color: var(--ib-text-secondary);
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -188,13 +188,13 @@
 }
 
 .bookingRequestConvertFormButtons button[type="submit"] {
-    background-color: #1775ee;
-    color: white;
+    background-color: var(--ib-primary);
+    color: var(--ib-primary-contrast);
 }
 
 .bookingRequestError {
     font-size: 13px;
-    color: #d32f2f;
+    color: var(--ib-error);
 }
 
 .bookingRequestConversation {
@@ -215,7 +215,7 @@
     flex: 1;
     height: 42px;
     border-radius: 8px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--ib-border-strong);
     padding: 0 14px;
     font-size: 14px;
     font-family: inherit;
@@ -234,8 +234,8 @@
     padding: 0 18px;
     border-radius: 8px;
     border: none;
-    background-color: #1775ee;
-    color: white;
+    background-color: var(--ib-primary);
+    color: var(--ib-primary-contrast);
     /* Inherited, so the button matches the input beside it - a bare <button> otherwise falls back
        to the browser's own UI font, which has different metrics and is half the reason the label
        looked off in the first place. */
@@ -268,7 +268,7 @@
 
 .guestMessageTime {
     font-size: 11px;
-    color: #888;
+    color: var(--ib-text-muted);
     margin-top: 3px;
     padding: 0 4px;
 }
@@ -281,14 +281,14 @@
     height: 8px;
     margin-right: 6px;
     border-radius: 50%;
-    background-color: #d32f2f;
+    background-color: var(--ib-error);
     vertical-align: middle;
 }
 
 .bookingRequestsEmptyHint {
     margin-top: 6px;
     font-size: 12px;
-    color: #999;
+    color: var(--ib-text-muted);
     line-height: 1.4;
 }
 
@@ -296,16 +296,16 @@
     width: calc(100% - 20px);
     margin: 0 10px 10px;
     padding: 6px 8px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--ib-border);
     border-radius: 6px;
-    background: #fff;
+    background: var(--ib-surface-card);
     font-size: 13px;
-    color: #333;
+    color: var(--ib-text-primary);
 }
 
 .bookingRequestThreadLoading {
     padding: 12px 4px;
-    color: #888;
+    color: var(--ib-text-muted);
     font-size: 13px;
 }
 
@@ -319,11 +319,11 @@
 }
 
 .guestMessageMine .guestMessageBubble {
-    background-color: #1775ee;
-    color: white;
+    background-color: var(--ib-primary);
+    color: var(--ib-primary-contrast);
 }
 
 .guestMessageTheirs .guestMessageBubble {
-    background-color: #f0f2f5;
-    color: #222;
+    background-color: var(--ib-surface-page);
+    color: var(--ib-text-primary);
 }

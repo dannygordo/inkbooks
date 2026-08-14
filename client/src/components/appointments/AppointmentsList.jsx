@@ -14,8 +14,21 @@ import Pager from "../pagination/Pager";
 import CreateEventButton from "../ibCalendar/CreateEventButton";
 import { buildScheduleRanges, getDefaultScheduleRange } from "../../utils/dateRanges";
 import { tagColorRowStyle } from "../../utils/tagColor";
+import { canManageAppointment } from "../../utils/permissions";
 import { ROUTE_CONSTANTS } from "../../constants";
 import "./appointmentsList.css";
+
+// Matches server/utils/validation.js's appointmentStatus enum exactly (scheduled, completed,
+// rescheduled, cancelled, no_show) - just humanized for display. Kept local rather than shared:
+// ClientDashboard.jsx renders the raw value today, and unifying that is a separate change this
+// task didn't ask for.
+const APPOINTMENT_STATUS_LABELS = {
+	scheduled: "Scheduled",
+	completed: "Completed",
+	rescheduled: "Rescheduled",
+	cancelled: "Cancelled",
+	no_show: "No-show",
+};
 
 /**
  * One row, with its own hover state.
@@ -24,36 +37,68 @@ import "./appointmentsList.css";
  * same shape ArtistPerformancePanel's row uses, for the same reason. Keeping it in the parent would
  * mean one hovered id threaded through the map, which is the same thing written worse.
  */
-const AppointmentRow = ({ appointment, tinted, showArtist, onOpen }) => {
+const AppointmentRow = ({ appointment, tinted, showArtist, onOpen, canManage }) => {
 	const [hovered, setHovered] = useState(false);
 	return (
 		<div
-			className="appointmentsListRow"
-			style={tinted ? tagColorRowStyle(appointment.user?.tagColor, hovered) : undefined}
+			className={
+				canManage ? "appointmentsListRow" : "appointmentsListRow appointmentsListRowLocked"
+			}
+			style={tinted ? tagColorRowStyle(appointment.user?.tagColor, hovered && canManage) : undefined}
 			onMouseEnter={() => setHovered(true)}
 			onMouseLeave={() => setHovered(false)}
-			onClick={() => onOpen(appointment)}
-			role="button"
-			tabIndex={0}
-			onKeyDown={(e) => {
-				if (e.key === "Enter" || e.key === " ") {
-					e.preventDefault();
-					onOpen(appointment);
-				}
-			}}
+			// Viewable on a shared shop calendar regardless of whose appointment it is - that's the
+			// whole point of a shop calendar. Only OPENING it (which leads to the session/consult
+			// management view) is restricted - see utils/permissions.js's own comment on why this is
+			// presentation for a server rule that already exists, not a new one invented here.
+			onClick={canManage ? () => onOpen(appointment) : undefined}
+			role={canManage ? "button" : undefined}
+			tabIndex={canManage ? 0 : undefined}
+			title={canManage ? undefined : "You can only open your own appointments"}
+			onKeyDown={
+				canManage
+					? (e) => {
+							if (e.key === "Enter" || e.key === " ") {
+								e.preventDefault();
+								onOpen(appointment);
+							}
+					  }
+					: undefined
+			}
 		>
 			<span className="appointmentsListTime">
 				{moment(appointment.appointmentDate).format("h:mm A")}
 			</span>
-			<AppointmentTypeChip type={appointment.appointmentType} size="small" />
+			{/* Fixed-width wrapper, not the chip alone - "Consult" and "Session" render at
+			    different natural widths, which pushed every column after this one out of
+			    alignment from row to row. Every column below has the same fixed-width treatment
+			    for the same reason. */}
+			<span className="appointmentsListType">
+				<AppointmentTypeChip type={appointment.appointmentType} size="small" />
+			</span>
 			<span className="appointmentsListTitle">
 				{appointment.project?.title || appointment.title || "(untitled appointment)"}
 			</span>
+			{/* Client name - the project's client for a session, the booking request's for a
+			    consult (a consult has no Project of its own yet - see models/Appointment.js). */}
+			<span className="appointmentsListClient">
+				{appointment.project?.client?.user
+					? `${appointment.project.client.user.firstName} ${appointment.project.client.user.lastName}`
+					: appointment.bookingRequest?.client
+					? `${appointment.bookingRequest.client.firstName} ${appointment.bookingRequest.client.lastName}`
+					: ""}
+			</span>
+			<span className="appointmentsListStatus">
+				{APPOINTMENT_STATUS_LABELS[appointment.appointmentStatus] ||
+					appointment.appointmentStatus}
+			</span>
 			{/* Only meaningful on a shop calendar, where rows belong to different artists. An
-			    independent artist's list would repeat their own name on every line. */}
-			{showArtist && appointment.user && (
+			    independent artist's list would repeat their own name on every line. Always
+			    rendered (with an empty fallback) rather than only when appointment.user exists, so
+			    a row missing that data doesn't lose the column and throw off every row under it. */}
+			{showArtist && (
 				<span className="appointmentsListArtist">
-					{appointment.user.firstName} {appointment.user.lastName}
+					{appointment.user ? `${appointment.user.firstName} ${appointment.user.lastName}` : ""}
 				</span>
 			)}
 		</div>
@@ -210,6 +255,11 @@ const AppointmentsList = () => {
 								tinted={Boolean(shopId)}
 								showArtist={Boolean(shopId)}
 								onOpen={openAppointment}
+								// Own appointment always manageable; on an independent artist's list
+								// (no shopId) every row is already their own regardless. See
+								// utils/permissions.js - this is what turns "viewing is allowed, opening
+								// isn't" from the user's report into an actual disabled click.
+								canManage={canManageAppointment(user, appt)}
 							/>
 						))}
 					</div>

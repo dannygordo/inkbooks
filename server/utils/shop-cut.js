@@ -159,7 +159,8 @@ async function applyShopCut(appointment) {
     appointment.shopId,
     appointment.appointmentDate || new Date(),
   );
-  // subtotalCents ONLY, minus any deposit credited to this appointment.
+  // subtotalCents ONLY, minus any deposit credited to this appointment AND minus any
+  // ARTIST-ISSUED gift card credit applied to it (DECISIONS.md M6).
   //
   // The deposit deduction is a deliberate rule, and it's the one place the cut is computed on
   // less than the work was priced at: a $200 session with a $100 deposit applied is a $100
@@ -167,12 +168,24 @@ async function applyShopCut(appointment) {
   // itself a payment when it was collected at the consult, and the cut was taken on it there.
   // Taking it again here would charge the artist twice on the same $100.
   //
-  // Clamped at zero because a deposit larger than the session it's applied to is a real case
-  // (a $500 deposit against a $300 final sitting), and a negative shop cut would read as the
-  // shop owing the artist money.
+  // The gift card exclusion is the SAME rule for the SAME reason: an artist-issued card had its
+  // cut taken at the SALE, exactly as if the sale were a deposit (M6/M3) - via applyShopCut
+  // against a synthetic sale-shaped object, see resolvers/giftCards.js. If this appointment's cut
+  // were computed on the full subtotal when that card is later redeemed here, the shop would take
+  // its cut twice on the same money: once at the sale, again at the session. Only
+  // artistIssuedGiftCardCreditCents is subtracted, never giftCardCreditCents as a whole - a
+  // SHOP-issued card's applied amount was never cut at sale (it settles at redemption instead, via
+  // a different formula entirely - utils/gift-card.js's computeShopIssuedGiftCardPayoutCents), so
+  // excluding it here would UNDER-cut the shop rather than avoid double-cutting it.
+  //
+  // Clamped at zero because a deposit (or gift card) larger than the session it's applied to is a
+  // real case (a $500 deposit against a $300 final sitting), and a negative shop cut would read as
+  // the shop owing the artist money.
   const cuttableCents = Math.max(
     0,
-    (appointment.subtotalCents || 0) - (appointment.depositCreditCents || 0),
+    (appointment.subtotalCents || 0) -
+      (appointment.depositCreditCents || 0) -
+      (appointment.artistIssuedGiftCardCreditCents || 0),
   );
   const cut = percentOfCents(cuttableCents, percent);
   appointment.shopCutCents = cut;

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { DialogActions, DialogContent, Button } from "@mui/material";
 import IBInput from "../inputs/IBInput";
+import FormField from "../formField/FormField";
 import "./entityWizard.css";
 
 /**
@@ -98,7 +99,7 @@ const EntityWizard = ({ steps, onSubmit, submitLabel = "Create", onClose }) => {
 					{result}
 				</DialogContent>
 				<DialogActions className="entityWizardActions">
-					<Button variant="contained" sx={{ backgroundColor: "#333" }} onClick={onClose}>
+					<Button variant="contained" onClick={onClose}>
 						Done
 					</Button>
 				</DialogActions>
@@ -133,16 +134,27 @@ const EntityWizard = ({ steps, onSubmit, submitLabel = "Create", onClose }) => {
 							})}
 						</React.Fragment>
 					) : (
-						<IBInput
+						// Label above, static help above the control, validation error below it -
+						// the register wizard's field convention (see FormField.jsx), not MUI's
+						// floating label. IBInput gets no label prop of its own - FormField's real
+						// <label htmlFor> is what identifies the control; a second, floating one
+						// would be the exact "two labels for one field" FormField's own comment
+						// warns about.
+						<FormField
 							key={field.name}
 							id={field.name}
 							label={field.required ? `${field.label} *` : field.label}
-							type={field.type === "email" ? "email" : field.type || "text"}
-							defaultValue={values[field.name] || ""}
-							error={Boolean(errors[field.name])}
-							helperText={errors[field.name] || field.helperText || " "}
-							onChange={(e) => setValue(field.name, e.target.value)}
-						/>
+							help={field.helperText}
+						>
+							<IBInput
+								id={field.name}
+								type={field.type === "email" ? "email" : field.type || "text"}
+								defaultValue={values[field.name] || ""}
+								error={Boolean(errors[field.name])}
+								helperText={errors[field.name] || " "}
+								onChange={(e) => setValue(field.name, e.target.value)}
+							/>
+						</FormField>
 					)
 				)}
 
@@ -167,7 +179,7 @@ const EntityWizard = ({ steps, onSubmit, submitLabel = "Create", onClose }) => {
 						{submitting ? "Creating..." : submitLabel}
 					</Button>
 				) : (
-					<Button variant="contained" sx={{ backgroundColor: "#333" }} onClick={handleNext}>
+					<Button variant="contained" onClick={handleNext}>
 						Next
 					</Button>
 				)}

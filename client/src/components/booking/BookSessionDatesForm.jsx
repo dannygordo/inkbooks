@@ -9,6 +9,7 @@ import { Button, IconButton, ToggleButton, ToggleButtonGroup } from "@mui/materi
 import { Add, Close } from "@mui/icons-material";
 import IBDateTimePicker from "../inputs/IBDateTimePicker";
 import IBInput from "../inputs/IBInput";
+import FormField from "../formField/FormField";
 import BookingRequestService, {
 	BOOKING_BADGE_REFETCH,
 } from "../../services/BookingRequestService";
@@ -323,12 +324,14 @@ const BookSessionDatesForm = ({
 
 	return (
 		<form className="bookSessionDatesForm" onSubmit={handleSubmit}>
-			<IBInput
-				label="Project title"
-				placeholder="e.g. Sleeve piece"
-				onChange={(e) => setProjectTitle(e.target.value)}
-				required
-			/>
+			<FormField id="bookSessionProjectTitle" label="Project title">
+				<IBInput
+					id="bookSessionProjectTitle"
+					placeholder="e.g. Sleeve piece"
+					onChange={(e) => setProjectTitle(e.target.value)}
+					required
+				/>
+			</FormField>
 			<div className="bookSessionDatesList">
 				{sessionDates.map((sitting, index) => (
 					// Keyed on the index so the schedule hint stays attached to its own row - it
@@ -375,13 +378,18 @@ const BookSessionDatesForm = ({
 			    that took it is exactly what the ledger design avoids. */}
 			{consultAppointmentId && (
 				<>
-					<IBInput
+					<FormField
+						id="bookSessionDepositDollars"
 						label="Deposit taken today $"
-						type="number"
-						placeholder="0"
-						helperText="Optional - credited against the client's final session"
-						onChange={(e) => setDepositDollars(e.target.value)}
-					/>
+						help="Optional - credited against the client's final session"
+					>
+						<IBInput
+							id="bookSessionDepositDollars"
+							type="number"
+							placeholder="0"
+							onChange={(e) => setDepositDollars(e.target.value)}
+						/>
+					</FormField>
 					{/* Only asked once there's an amount. A payment-method question above an empty
 					    deposit field is a question about nothing. */}
 					{needsMethod && (

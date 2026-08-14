@@ -1,7 +1,7 @@
 .guestConversation {
     width: 100vw;
     min-height: 100vh;
-    background-color: #f0f2f5;
+    background-color: var(--ib-surface-page);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -12,7 +12,7 @@
 .guestConversationWrapper {
     width: 100%;
     max-width: 560px;
-    background-color: white;
+    background-color: var(--ib-surface-card);
     border-radius: 10px;
     padding: 30px;
     box-sizing: border-box;
@@ -30,15 +30,15 @@
 .guestConversationLogo {
     font-size: 22px;
     font-weight: 800;
-    color: #1775ee;
+    color: var(--ib-primary);
     margin: 0;
 }
 
 .guestConversationStatus {
     font-size: 13px;
     font-weight: 600;
-    color: #666;
-    background-color: #f0f2f5;
+    color: var(--ib-text-secondary);
+    background-color: var(--ib-surface-page);
     padding: 4px 10px;
     border-radius: 12px;
 }
@@ -48,15 +48,15 @@
     flex-direction: column;
     gap: 4px;
     font-size: 13px;
-    color: #555;
-    background-color: #f8f9fb;
+    color: var(--ib-text-secondary);
+    background-color: var(--ib-surface-page);
     border-radius: 8px;
     padding: 12px 14px;
 }
 
 .guestConversationSummary p {
     margin: 0 0 6px 0;
-    color: #222;
+    color: var(--ib-text-primary);
     font-size: 14px;
 }
 
@@ -71,7 +71,7 @@
 
 .guestConversationEmpty {
     font-size: 13px;
-    color: #999;
+    color: var(--ib-text-muted);
     text-align: center;
     padding: 20px 0;
 }
@@ -95,7 +95,7 @@
 
 .guestMessageTime {
     font-size: 11px;
-    color: #888;
+    color: var(--ib-text-muted);
     margin-top: 3px;
     padding: 0 4px;
 }
@@ -110,13 +110,13 @@
 }
 
 .guestMessageMine .guestMessageBubble {
-    background-color: #1775ee;
-    color: white;
+    background-color: var(--ib-primary);
+    color: var(--ib-primary-contrast);
 }
 
 .guestMessageTheirs .guestMessageBubble {
-    background-color: #f0f2f5;
-    color: #222;
+    background-color: var(--ib-surface-page);
+    color: var(--ib-text-primary);
 }
 
 .guestConversationInputRow {
@@ -128,7 +128,7 @@
     flex: 1;
     height: 44px;
     border-radius: 8px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--ib-border-strong);
     font-size: 15px;
     padding: 0 14px;
     font-family: inherit;
@@ -136,7 +136,7 @@
 
 .guestConversationInput:focus {
     outline: none;
-    border-color: #1775ee;
+    border-color: var(--ib-primary);
 }
 
 /* Same centring fix as artistBookingRequests.css - see the comment there for why a fixed-height
@@ -149,8 +149,8 @@
     padding: 0 20px;
     border-radius: 8px;
     border: none;
-    background-color: #1775ee;
-    color: white;
+    background-color: var(--ib-primary);
+    color: var(--ib-primary-contrast);
     font-family: inherit;
     font-size: 15px;
     font-weight: 600;
@@ -159,11 +159,11 @@
 }
 
 .guestConversationSendButton:disabled {
-    background-color: #90b8e8;
+    background-color: var(--ib-primary-disabled);
     cursor: not-allowed;
 }
 
 .guestConversationError {
     font-size: 13px;
-    color: #d32f2f;
+    color: var(--ib-error);
 }

@@ -19,15 +19,11 @@ import Shops from "./pages/shops/Shops";
 import Staff from "./pages/staff/Staff";
 import Appointments from "./pages/appointments/Appointments";
 import Artist from "./pages/artists/Artist";
-import EditArtist from "./components/artist/edit/EditArtist";
 import Client from "./pages/clients/Client";
 import IBRouteNotFound from "./components/ibRouteNotFound/IBRouteNotFound";
-import EditClient from "./components/client/edit/EditClient";
 import StaffProfile from "./pages/staff/StaffProfile";
-import EditStaff from "./components/staff/edit/EditStaff";
 import Project from "./pages/projects/Project";
 import Shop from "./pages/shops/Shop";
-import EditShop from "./components/shop/edit/EditShop";
 import IBDisplayPageAlert from "./components/ibAlert/IBDisplayPageAlert";
 import Messenger from "./pages/messenger/Messenger";
 import { SocketProvider } from "./context/SocketProvider";
@@ -42,6 +38,7 @@ import ShopCutConfirmations from "./pages/shopCutConfirmations/ShopCutConfirmati
 import Settings from "./pages/settings/Settings";
 import ClientSettings from "./pages/settings/ClientSettings";
 import ConsultDetail from "./pages/consults/ConsultDetail";
+import Search from "./pages/search/Search";
 
 // An artist keeps access to their own /artist/:artistId page (and its edit form) even though the
 // directory is Staff-only. The route param is the Artist document's id, not the User's - see
@@ -138,14 +135,11 @@ function App() {
 								</RoleRoute>
 							}
 						/>
-						<Route
-							path="/artist/edit/:artistId"
-							element={
-								<RoleRoute minRole={ROLES.SHOP_STAFF} allowIf={isOwnArtistPage}>
-									<EditArtist />
-								</RoleRoute>
-							}
-						/>
+						{/* /artist/edit/:artistId is gone - same reasoning as /project/edit/:projectId
+						    below. Every artist field EditArtist.jsx offered is now editable in place
+						    on Artist.jsx itself (see that file's Details panel), and nothing in the
+						    app ever navigated to this route - it was reachable only by typing the
+						    URL. */}
 						<Route
 							path="/clients"
 							element={
@@ -162,14 +156,11 @@ function App() {
 								</AuthRoute>
 							}
 						/>
-						<Route
-							path="/client/edit/:clientId"
-							element={
-								<AuthRoute>
-									<EditClient />
-								</AuthRoute>
-							}
-						/>
+						{/* /client/edit/:clientId is gone - same reasoning as /project/edit/:projectId
+						    below. Every field EditClient.jsx offered is now editable in place on
+						    Client.jsx itself (see that file's Contact Info panel), and nothing in the
+						    app ever navigated to this route - it was reachable only by typing the
+						    URL. */}
 						<Route
 							path="/staff"
 							element={
@@ -186,14 +177,11 @@ function App() {
 								</AuthRoute>
 							}
 						/>
-						<Route
-							path="/staff/edit/:staffId"
-							element={
-								<AuthRoute>
-									<EditStaff />
-								</AuthRoute>
-							}
-						/>
+						{/* /staff/edit/:staffId is gone - same reasoning as /project/edit/:projectId
+						    below. Every field EditStaff.jsx offered is now editable in place on
+						    StaffProfile.jsx itself (see that file's Details panel), and nothing in
+						    the app ever navigated to this route - it was reachable only by typing
+						    the URL. */}
 						<Route
 							path="/projects"
 							element={
@@ -258,14 +246,10 @@ function App() {
 								</AuthRoute>
 							}
 						/>
-						<Route
-							path="/shop/edit/:shopId"
-							element={
-								<AuthRoute>
-									<EditShop />
-								</AuthRoute>
-							}
-						/>
+						{/* /shop/edit/:shopId is gone - same reasoning as /project/edit/:projectId
+						    below. Every field EditShop.jsx offered is now editable in place on
+						    Shop.jsx itself (see that file's Shop Info panel), and nothing in the app
+						    ever navigated to this route - it was reachable only by typing the URL. */}
 						<Route
 							path="/messenger"
 							element={
@@ -306,6 +290,14 @@ function App() {
 							element={
 								<AuthRoute>
 									<Settings />
+								</AuthRoute>
+							}
+						/>
+						<Route
+							path="/search"
+							element={
+								<AuthRoute>
+									<Search />
 								</AuthRoute>
 							}
 						/>

@@ -1,5 +1,5 @@
 import React, { useContext, useState } from "react";
-import { styled, useTheme, alpha } from "@mui/material/styles";
+import { styled, useTheme } from "@mui/material/styles";
 import Box from "@mui/material/Box";
 import MuiDrawer from "@mui/material/Drawer";
 import MuiAppBar from "@mui/material/AppBar";
@@ -21,12 +21,12 @@ import PriceCheckIcon from "@mui/icons-material/PriceCheck";
 import SettingsIcon from "@mui/icons-material/Settings";
 import { AuthContext } from "../../context/auth";
 import { APP_SETTINGS_CONSTANTS, ROUTE_CONSTANTS, ROLES, roleLabel } from "../../constants";
-import InputBase from "@mui/material/InputBase";
 import { useNavigate } from "react-router-dom";
 import IBAvatar from "../inputs/IBAvatar";
 import MessengerService from "../../services/MessengerService";
 import { usePendingBookingRequestCount } from "../../services/BookingRequestService";
 import NotificationBell from "../notifications/NotificationBell";
+import GlobalSearch from "../search/GlobalSearch";
 import {
 	AccountBox,
 	AccountCircle,
@@ -45,64 +45,8 @@ import MenuItem from "@mui/material/MenuItem";
 import Tooltip from "@mui/material/Tooltip";
 import Logout from "@mui/icons-material/Logout";
 
-import SearchIcon from "@mui/icons-material/Search";
 import { Badge } from "@mui/material";
 import NotificationsIcon from "@mui/icons-material/Notifications";
-
-const Search = styled("div")(({ theme }) => ({
-	position: "relative",
-	borderRadius: theme.shape.borderRadius,
-	backgroundColor: alpha(theme.palette.common.black, 0.15),
-	"&:hover": {
-		backgroundColor: alpha(theme.palette.common.black, 0.25),
-	},
-	marginRight: theme.spacing(2),
-	marginLeft: 0,
-	width: "100%",
-	[theme.breakpoints.up("sm")]: {
-		marginLeft: theme.spacing(3),
-		// Grows with the header instead of sitting at a fixed width. `width: auto` sized the box to
-		// the input's own 20ch, so it stayed the same small pill whether the window was 900px or
-		// 2500px, and the space it should have taken went to the empty spacer beside it.
-		//
-		// A maxWidth as well as flexGrow: unbounded, this would stretch to a search field the width
-		// of a desk on a wide monitor, which is worse than too small - the cursor ends up miles from
-		// the results it produces.
-		flexGrow: 1,
-		width: "auto",
-		maxWidth: 520,
-	},
-}));
-
-const handleSearch = (e) => {
-	e.preventDefault();
-	console.log(e.target.value);
-};
-
-const SearchIconWrapper = styled("div")(({ theme }) => ({
-	padding: theme.spacing(0, 2),
-	height: "100%",
-	position: "absolute",
-	pointerEvents: "none",
-	display: "flex",
-	alignItems: "center",
-	justifyContent: "center",
-}));
-
-const StyledInputBase = styled(InputBase)(({ theme }) => ({
-	color: "inherit",
-	"& .MuiInputBase-input": {
-		padding: theme.spacing(1, 1, 1, 0),
-		// vertical padding + font size from searchIcon
-		paddingLeft: `calc(1em + ${theme.spacing(4)})`,
-		transition: theme.transitions.create("width"),
-		// 100% at every size now. The `20ch` override at md was what pinned the field's width, so
-		// making the wrapper flexible without removing this would have left a wide box containing a
-		// narrow input - the growth has to happen in both or it shows up as dead space inside the
-		// control.
-		width: "100%",
-	},
-}));
 
 const drawerWidth = 240;
 
@@ -160,7 +104,7 @@ const AppBar = styled(MuiAppBar, {
 		display: "flex",
 		alignItems: "flex-end",
 		justifyContent: "space-between",
-		backgroundColor: "#ffffff",
+		backgroundColor: "var(--ib-surface-card)",
 		width: `calc(100% - ${drawerWidth}px)`,
 		transition: theme.transitions.create(["width", "margin"], {
 			easing: theme.transitions.easing.sharp,
@@ -189,8 +133,6 @@ const Drawer = styled(MuiDrawer, {
 export default function Sidebar() {
 	const theme = useTheme();
 	const [open, setOpen] = useState(true);
-
-	const [searchEnabled, setSearchEnabled] = useState(true);
 
 	const { user, logout } = useContext(AuthContext);
 	let navigate = useNavigate();
@@ -347,7 +289,7 @@ export default function Sidebar() {
 						display: "flex",
 						alignItems: "center",
 						justifyContent: "space-between",
-						backgroundColor: "#ffffff",
+						backgroundColor: "var(--ib-surface-card)",
 					}}
 				>
 					<IconButton
@@ -369,22 +311,7 @@ export default function Sidebar() {
 							textAlign: "center",
 						}}
 					>
-						{searchEnabled && (
-							<Search>
-								<SearchIconWrapper>
-									<SearchIcon />
-								</SearchIconWrapper>
-								<StyledInputBase
-									placeholder="Search…"
-									onKeyDown={(e) => {
-										if (e.key === "Enter") {
-											handleSearch(e, e.target.value);
-										}
-									}}
-									inputProps={{ "aria-label": "search" }}
-								/>
-							</Search>
-						)}
+						<GlobalSearch />
 						<Box sx={{ flexGrow: 1 }} />
 						<Box sx={{ display: { xs: "none", md: "flex" } }}>
 							{/* The mail Fab that used to sit here is gone. It was hardcoded to

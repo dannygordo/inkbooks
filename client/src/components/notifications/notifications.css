@@ -10,7 +10,7 @@
 	align-items: center;
 	justify-content: space-between;
 	padding: 8px 16px;
-	border-bottom: 1px solid #eee;
+	border-bottom: 1px solid var(--ib-surface-subtle);
 }
 
 .notificationMenuTitle {
@@ -21,7 +21,7 @@
 .notificationEmpty {
 	padding: 28px 16px;
 	text-align: center;
-	color: #6b6b6b;
+	color: var(--ib-text-secondary);
 	font-size: 13px;
 }
 
@@ -32,7 +32,7 @@
 
 .notificationItem {
 	padding: 12px 16px;
-	border-bottom: 1px solid #f2f2f2;
+	border-bottom: 1px solid var(--ib-surface-subtle);
 }
 
 /* Unread is a left bar rather than a background wash - it survives being printed, screenshotted
@@ -58,13 +58,13 @@
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
 	font-weight: 700;
-	color: #6b6b6b;
+	color: var(--ib-text-secondary);
 }
 
 .notificationCategory--money { color: #2e7d32; }
 .notificationCategory--schedule { color: #1565c0; }
 .notificationCategory--roster { color: #6a1b9a; }
-.notificationCategory--message { color: #6b6b6b; }
+.notificationCategory--message { color: var(--ib-text-secondary); }
 
 .notificationWhen {
 	font-size: 11px;
@@ -74,12 +74,12 @@
 .notificationTitle {
 	font-size: 14px;
 	line-height: 1.35;
-	color: #222;
+	color: var(--ib-text-primary);
 }
 
 .notificationBody {
 	font-size: 12px;
-	color: #6b6b6b;
+	color: var(--ib-text-secondary);
 	margin-top: 2px;
 }
 
@@ -111,7 +111,7 @@
 
 .notificationPrefHint {
 	font-size: 12px;
-	color: #6b6b6b;
+	color: var(--ib-text-secondary);
 	margin-left: 48px;
 	margin-top: -4px;
 }

@@ -30,6 +30,17 @@ export const AppointmentService = (() => {
                     }
                     depositCollectedCents
                 }
+                # A consult has no project yet (see models/Appointment.js), so its client only
+                # exists via the original booking request - same fallback AppointmentsList.jsx's
+                # row already needs, kept minimal (just the name) since this list only displays it.
+                bookingRequest {
+                    id
+                    client {
+                        id
+                        firstName
+                        lastName
+                    }
+                }
                 shopId
                 user {
                     id
@@ -44,6 +55,14 @@ export const AppointmentService = (() => {
                 appointmentDate
                 durationMinutes
                 appointmentEnd
+                appointmentStatus
+                # Needed so the shop-wide dashboard (ArtistPerformancePanel's shopWide mode, see
+                # components/artistDashboard) can show a completed session's earnings the same way
+                # the single-artist dashboard already does via _FETCH_APPOINTMENTS_BY_ARTIST -
+                # AppointmentsList.jsx itself doesn't render either, but selecting them here costs
+                # nothing extra on that request.
+                totalCents
+                tipCents
                 shopCutStatus
                 shopCutCents
                 shopCutPaymentMethod
@@ -114,6 +133,24 @@ export const AppointmentService = (() => {
                 project {
                     id
                     title
+                    client {
+                        id
+                        user {
+                            id
+                            firstName
+                            lastName
+                        }
+                    }
+                }
+                # A consult has no project yet (see models/Appointment.js) - same fallback
+                # AppointmentsList.jsx's row already uses, for the same reason.
+                bookingRequest {
+                    id
+                    client {
+                        id
+                        firstName
+                        lastName
+                    }
                 }
             }
               pageInfo { totalCount hasMore limit offset }
@@ -143,7 +180,10 @@ export const AppointmentService = (() => {
     //
     // An empty list is an acceptable answer. "No completed sessions last month" is information; a
     // list that quietly ignores the control above it is not.
-    const _getUpcomingAppointments = (userId, limit = 5, range) => {
+    // limit/offset instead of a bare limit - was fixed at "the first 5, always" with no way to see
+    // the sixth. pageInfo was already coming back on every response (this reuses
+    // _FETCH_APPOINTMENTS_BY_ARTIST, same as the calendar), it just wasn't being read by anything.
+    const _getUpcomingAppointments = (userId, limit = 5, range, offset = 0) => {
         return useQuery(_FETCH_APPOINTMENTS_BY_ARTIST, {
             variables: {
                 userId,
@@ -152,28 +192,64 @@ export const AppointmentService = (() => {
                 // window that was asked for. A past range therefore returns nothing, correctly:
                 // there are no upcoming appointments in July.
                 filter: { upcomingOnly: true, ...rangeToFilterBounds(range) },
-                page: { limit },
+                page: { limit, offset },
             },
             skip: !userId,
             fetchPolicy: "cache-and-network",
         });
     };
 
-    const _getCompletedAppointments = (userId, limit = 5, range) => {
+    const _getCompletedAppointments = (userId, limit = 5, range, offset = 0) => {
         return useQuery(_FETCH_APPOINTMENTS_BY_ARTIST, {
             variables: {
                 userId,
                 filter: { appointmentStatus: "completed", ...rangeToFilterBounds(range) },
-                page: { limit },
+                page: { limit, offset },
             },
             skip: !userId,
             fetchPolicy: "cache-and-network",
         });
     };
 
+    // The shop-wide counterparts to the two above - every artist's appointments at a shop rather
+    // than one artist's own, for ArtistPerformancePanel's shopWide mode (a shop admin's own
+    // dashboard, once they have a shop - see that component). Reuses _FETCH_APPOINTMENTS_BY_SHOP
+    // (same query AppointmentsList.jsx runs) rather than inventing a fourth document: it already
+    // carries client name, appointmentStatus and per-artist tagColor, which is exactly what a
+    // multi-artist list needs and a single-artist one didn't.
+    const _getUpcomingAppointmentsForShop = (shopId, limit = 5, range, offset = 0) => {
+        return useQuery(_FETCH_APPOINTMENTS_BY_SHOP, {
+            variables: {
+                shopId,
+                filter: { upcomingOnly: true, ...rangeToFilterBounds(range) },
+                page: { limit, offset },
+            },
+            skip: !shopId,
+            fetchPolicy: "cache-and-network",
+        });
+    };
+
+    const _getCompletedAppointmentsForShop = (shopId, limit = 5, range, offset = 0) => {
+        return useQuery(_FETCH_APPOINTMENTS_BY_SHOP, {
+            variables: {
+                shopId,
+                filter: { appointmentStatus: "completed", ...rangeToFilterBounds(range) },
+                page: { limit, offset },
+            },
+            skip: !shopId,
+            fetchPolicy: "cache-and-network",
+        });
+    };
+
+    // project/status/client added for the payout list's own fields (project title, project
+    // status, client name) - previously this query didn't select a project at all. bookingRequest
+    // is deliberately NOT selected here the way the appointments-list queries do: a shop cut is
+    // only ever assessed on a session's subtotal (see DECISIONS.md M2), and a session always has a
+    // project by the time it reaches 'completed' - there's no consult-shaped row in this list to
+    // fall back for.
     const _FETCH_SHOP_CUT_PAYOUT_CANDIDATES = gql`
-        query GetShopCutPayoutCandidates($userId: ID!) {
-            getShopCutPayoutCandidates(userId: $userId) {
+        query GetShopCutPayoutCandidates($userId: ID!, $filter: AppointmentFilter) {
+            getShopCutPayoutCandidates(userId: $userId, filter: $filter) {
                 id
                 title
                 appointmentDate
@@ -189,16 +265,81 @@ export const AppointmentService = (() => {
                 shopCutSquareInvoiceId
                 userId
                 user { id firstName lastName tagColor }
+                projectId
+                project {
+                    id
+                    title
+                    status
+                    client {
+                        id
+                        user {
+                            id
+                            firstName
+                            lastName
+                        }
+                    }
+                }
             }
         }
     `;
 
-    // Everything owed, unpaginated on purpose - the task is settling a debt, and a batch
-    // "invoice all" over a paged list is ambiguous about what it covers. See typeDefs.js.
-    const _getShopCutPayoutCandidates = (userId) => {
+    // Everything owed IN THE SELECTED RANGE, unpaginated on purpose - the task is settling a
+    // debt, and a batch "invoice all" over a paged list is ambiguous about what it covers. See
+    // typeDefs.js. range is optional (rangeToFilterBounds(undefined) is just {}, same as passing
+    // no filter at all) - was unconditionally unbounded regardless of the dashboard's own date
+    // range picker, which every OTHER section on the panel already honoured; "This Month" doing
+    // nothing to this one list read as the control being broken rather than as a deliberate
+    // "debts don't expire" choice, so it's range-scoped now like everything else.
+    const _getShopCutPayoutCandidates = (userId, range) => {
         return useQuery(_FETCH_SHOP_CUT_PAYOUT_CANDIDATES, {
-            variables: { userId },
+            variables: { userId, filter: rangeToFilterBounds(range) },
             skip: !userId,
+            fetchPolicy: "cache-and-network",
+        });
+    };
+
+    // Same selection set, scoped to a shop instead of one artist - see
+    // getShopCutPayoutCandidatesByShop in typeDefs.js/resolvers/appointments.js. Shop-admin-only
+    // on the server; ArtistPerformancePanel only ever calls this in its shopWide branch.
+    const _FETCH_SHOP_CUT_PAYOUT_CANDIDATES_BY_SHOP = gql`
+        query GetShopCutPayoutCandidatesByShop($shopId: ID!, $filter: AppointmentFilter) {
+            getShopCutPayoutCandidatesByShop(shopId: $shopId, filter: $filter) {
+                id
+                title
+                appointmentDate
+                durationMinutes
+                appointmentEnd
+                appointmentStatus
+                totalCents
+                subtotalCents
+                shopId
+                shopCutStatus
+                shopCutCents
+                shopCutPaymentMethod
+                shopCutSquareInvoiceId
+                userId
+                user { id firstName lastName tagColor }
+                projectId
+                project {
+                    id
+                    title
+                    status
+                    client {
+                        id
+                        user {
+                            id
+                            firstName
+                            lastName
+                        }
+                    }
+                }
+            }
+        }
+    `;
+    const _getShopCutPayoutCandidatesByShop = (shopId, range) => {
+        return useQuery(_FETCH_SHOP_CUT_PAYOUT_CANDIDATES_BY_SHOP, {
+            variables: { shopId, filter: rangeToFilterBounds(range) },
+            skip: !shopId,
             fetchPolicy: "cache-and-network",
         });
     };
@@ -240,6 +381,15 @@ export const AppointmentService = (() => {
                     }
                     depositCollectedCents
                 }
+                # Same consult fallback as _FETCH_APPOINTMENTS_BY_SHOP above - see its comment.
+                bookingRequest {
+                    id
+                    client {
+                        id
+                        firstName
+                        lastName
+                    }
+                }
                 shopId
                 user {
                     id
@@ -254,6 +404,7 @@ export const AppointmentService = (() => {
                 appointmentDate
                 durationMinutes
                 appointmentEnd
+                appointmentStatus
                 shopCutStatus
                 shopCutCents
                 shopCutPaymentMethod
@@ -593,11 +744,17 @@ export const AppointmentService = (() => {
     // computed the shop's cut from them. A total agreed on screen and a different total leaving
     // the card is a disagreement nothing in the system can settle afterwards.
     const _GET_CHARGE_QUOTE = gql`
-        query GetChargeQuote($appointmentId: ID!, $applyFeeOffset: Boolean, $tipCents: Int) {
+        query GetChargeQuote(
+            $appointmentId: ID!
+            $applyFeeOffset: Boolean
+            $tipCents: Int
+            $subtotalCentsOverride: Int
+        ) {
             getChargeQuote(
                 appointmentId: $appointmentId
                 applyFeeOffset: $applyFeeOffset
                 tipCents: $tipCents
+                subtotalCentsOverride: $subtotalCentsOverride
             ) {
                 subtotalCents
                 depositCreditCents
@@ -655,7 +812,10 @@ export const AppointmentService = (() => {
         getAppointmentsByArtist: _getAppointmentsByArtist,
         getUpcomingAppointments: _getUpcomingAppointments,
         getCompletedAppointments: _getCompletedAppointments,
+        getUpcomingAppointmentsForShop: _getUpcomingAppointmentsForShop,
+        getCompletedAppointmentsForShop: _getCompletedAppointmentsForShop,
         getShopCutPayoutCandidates: _getShopCutPayoutCandidates,
+        getShopCutPayoutCandidatesByShop: _getShopCutPayoutCandidatesByShop,
         getAppointmentsByArtistForCalendar: _getAppointmentsByArtistForCalendar,
         CREATE_APPOINTMENT: _CREATE_APPOINTMENT,
         UPDATE_APPOINTMENT: _UPDATE_APPOINTMENT,

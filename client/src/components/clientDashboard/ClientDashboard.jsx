@@ -7,10 +7,32 @@ import ClientService from "../../services/ClientService";
 import IBCardWrapper from "../card/ibCard/IBCardWrapper";
 import IBPageLoader from "../ibPageLoader/IBPageLoader";
 import IBMultilineInput from "../inputs/IBMultilineInput";
+import EntityListPager from "../entityList/EntityListPager";
 import { useAuth } from "../../context/auth";
 import { ALERT_CONSTANTS } from "../../constants";
 import { formatCents } from "../../utils/money";
 import "./clientDashboard.css";
+
+// These three lists (Projects/Appointments/Notes below) come back as full arrays on client.projects
+// etc - see the Client.projects/appointments field resolvers in resolvers/index.js, which return
+// everything with no page/limit args at all. Paging them for real would mean turning each into a
+// paginated connection server-side; this is a lighter fix that slices the array that's already in
+// hand and reuses the app's own EntityListPager for the controls, so a client with years of history
+// gets a scrollable page instead of one long list, without a schema change.
+const DASHBOARD_LIST_PAGE_SIZE = 10;
+const DASHBOARD_LIST_PAGE_SIZE_OPTIONS = [10, 25, 50];
+
+/**
+ * Turns a plain in-memory array + an offset/limit into the {totalCount, hasMore, limit, offset}
+ * shape EntityListPager expects from a server response - built here instead of there, since the
+ * server never sees offset/limit for these three fields.
+ */
+const buildClientSidePageInfo = (fullLength, offset, limit) => ({
+	totalCount: fullLength,
+	hasMore: offset + limit < fullLength,
+	limit,
+	offset,
+});
 
 /**
  * The client view, mounted in two places with different scoping - the same approach
@@ -43,6 +65,12 @@ const ClientDashboard = ({ clientId, isSelf = false }) => {
 	const { loading, data } = ClientService.fetchClientDashboard(clientId);
 	const [newNote, setNewNote] = useState("");
 	const [showNoteForm, setShowNoteForm] = useState(false);
+	const [projectsOffset, setProjectsOffset] = useState(0);
+	const [projectsPageSize, setProjectsPageSize] = useState(DASHBOARD_LIST_PAGE_SIZE);
+	const [appointmentsOffset, setAppointmentsOffset] = useState(0);
+	const [appointmentsPageSize, setAppointmentsPageSize] = useState(DASHBOARD_LIST_PAGE_SIZE);
+	const [notesOffset, setNotesOffset] = useState(0);
+	const [notesPageSize, setNotesPageSize] = useState(DASHBOARD_LIST_PAGE_SIZE);
 	const [updateClientNotes, { loading: savingNote }] = useMutation(
 		ClientService.UPDATE_CLIENT_NOTES
 	);
@@ -177,21 +205,39 @@ const ClientDashboard = ({ clientId, isSelf = false }) => {
 				{projects.length === 0 ? (
 					<p className="clientDashboardEmpty">No projects yet.</p>
 				) : (
-					<ul className="clientDashboardList">
-						{projects.map((project) => (
-							<li key={project.id} className="clientDashboardListRow">
-								<span className="clientDashboardListPrimary">
-									{project.title || "Untitled project"}
-								</span>
-								<span className="clientDashboardListMeta">
-									{project.status || "unknown"}
-									{project.createdAt
-										? ` - started ${moment(project.createdAt).format("MMM D, YYYY")}`
-										: ""}
-								</span>
-							</li>
-						))}
-					</ul>
+					<>
+						<ul className="clientDashboardList">
+							{projects
+								.slice(projectsOffset, projectsOffset + projectsPageSize)
+								.map((project) => (
+									<li key={project.id} className="clientDashboardListRow">
+										<span className="clientDashboardListPrimary">
+											{project.title || "Untitled project"}
+										</span>
+										<span className="clientDashboardListMeta">
+											{project.status || "unknown"}
+											{project.createdAt
+												? ` - started ${moment(project.createdAt).format("MMM D, YYYY")}`
+												: ""}
+										</span>
+									</li>
+								))}
+						</ul>
+						<EntityListPager
+							pageInfo={buildClientSidePageInfo(
+								projects.length,
+								projectsOffset,
+								projectsPageSize
+							)}
+							onChange={setProjectsOffset}
+							onPageSizeChange={(size) => {
+								setProjectsPageSize(size);
+								setProjectsOffset(0);
+							}}
+							pageSizeOptions={DASHBOARD_LIST_PAGE_SIZE_OPTIONS}
+							noun="project"
+						/>
+					</>
 				)}
 			</IBCardWrapper>
 
@@ -200,30 +246,48 @@ const ClientDashboard = ({ clientId, isSelf = false }) => {
 				{appointments.length === 0 ? (
 					<p className="clientDashboardEmpty">No appointments yet.</p>
 				) : (
-					<ul className="clientDashboardList">
-						{appointments.map((appointment) => (
-							<li key={appointment.id} className="clientDashboardListRow">
-								<span className="clientDashboardListPrimary">
-									{appointment.title ||
-										appointment.project?.title ||
-										"Untitled"}
-								</span>
-								<span className="clientDashboardListMeta">
-									{moment
-										.utc(appointment.appointmentDate)
-										.format("MMM D, YYYY h:mma")}
-									{" - "}
-									{appointment.appointmentStatus}
-									{appointment.totalCents
-										? ` - ${formatCents(appointment.totalCents)}`
-										: ""}
-									{appointment.tipCents
-										? ` (incl. ${formatCents(appointment.tipCents)} tip)`
-										: ""}
-								</span>
-							</li>
-						))}
-					</ul>
+					<>
+						<ul className="clientDashboardList">
+							{appointments
+								.slice(appointmentsOffset, appointmentsOffset + appointmentsPageSize)
+								.map((appointment) => (
+									<li key={appointment.id} className="clientDashboardListRow">
+										<span className="clientDashboardListPrimary">
+											{appointment.title ||
+												appointment.project?.title ||
+												"Untitled"}
+										</span>
+										<span className="clientDashboardListMeta">
+											{moment
+												.utc(appointment.appointmentDate)
+												.format("MMM D, YYYY h:mma")}
+											{" - "}
+											{appointment.appointmentStatus}
+											{appointment.totalCents
+												? ` - ${formatCents(appointment.totalCents)}`
+												: ""}
+											{appointment.tipCents
+												? ` (incl. ${formatCents(appointment.tipCents)} tip)`
+												: ""}
+										</span>
+									</li>
+								))}
+						</ul>
+						<EntityListPager
+							pageInfo={buildClientSidePageInfo(
+								appointments.length,
+								appointmentsOffset,
+								appointmentsPageSize
+							)}
+							onChange={setAppointmentsOffset}
+							onPageSizeChange={(size) => {
+								setAppointmentsPageSize(size);
+								setAppointmentsOffset(0);
+							}}
+							pageSizeOptions={DASHBOARD_LIST_PAGE_SIZE_OPTIONS}
+							noun="appointment"
+						/>
+					</>
 				)}
 			</IBCardWrapper>
 
@@ -257,7 +321,6 @@ const ClientDashboard = ({ clientId, isSelf = false }) => {
 							<Button
 								type="submit"
 								variant="contained"
-								sx={{ backgroundColor: "#333" }}
 								disabled={savingNote || !newNote.trim()}
 							>
 								Save note
@@ -268,24 +331,44 @@ const ClientDashboard = ({ clientId, isSelf = false }) => {
 					{notes.length === 0 ? (
 						<p className="clientDashboardEmpty">No notes yet.</p>
 					) : (
-						<ul className="clientDashboardList">
-							{[...notes]
-								.sort(
-									(a, b) =>
-										new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
-								)
-								.map((note) => (
-									<li key={note.id} className="clientDashboardNoteRow">
-										<p className="clientDashboardNoteBody">{note.note}</p>
-										<span className="clientDashboardListMeta">
-											{note.author}
-											{note.createdAt
-												? ` - ${moment(note.createdAt).format("MMM D, YYYY")}`
-												: ""}
-										</span>
-									</li>
-								))}
-						</ul>
+						(() => {
+							const sortedNotes = [...notes].sort(
+								(a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+							);
+							return (
+								<>
+									<ul className="clientDashboardList">
+										{sortedNotes
+											.slice(notesOffset, notesOffset + notesPageSize)
+											.map((note) => (
+												<li key={note.id} className="clientDashboardNoteRow">
+													<p className="clientDashboardNoteBody">{note.note}</p>
+													<span className="clientDashboardListMeta">
+														{note.author}
+														{note.createdAt
+															? ` - ${moment(note.createdAt).format("MMM D, YYYY")}`
+															: ""}
+													</span>
+												</li>
+											))}
+									</ul>
+									<EntityListPager
+										pageInfo={buildClientSidePageInfo(
+											sortedNotes.length,
+											notesOffset,
+											notesPageSize
+										)}
+										onChange={setNotesOffset}
+										onPageSizeChange={(size) => {
+											setNotesPageSize(size);
+											setNotesOffset(0);
+										}}
+										pageSizeOptions={DASHBOARD_LIST_PAGE_SIZE_OPTIONS}
+										noun="note"
+									/>
+								</>
+							);
+						})()
 					)}
 				</IBCardWrapper>
 			)}

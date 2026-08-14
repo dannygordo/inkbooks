@@ -113,7 +113,9 @@ const updateProjectInputSchema = z.object({
   artistId: objectIdSchema,
   clientId: objectIdSchema,
   referenceImages: z.array(z.any()).nullish(),
-  bodyImages: z.array(z.string()).nullish(),
+  // Was z.array(z.string()) from when bodyImages stored bare URLs - now IBImage objects, same
+  // shape as referenceImages/designImages (see typeDefs.js's Project.bodyImages comment).
+  bodyImages: z.array(z.any()).nullish(),
   designImages: z.array(z.any()).nullish(),
   materialsUsed: z.array(z.string()).nullish(),
   notes: z.array(z.any()).nullish(),
@@ -447,6 +449,78 @@ const processSquarePaymentInputSchema = z.object({
   tipCents: z.number().int().nonnegative().nullish(),
 });
 
+/**
+ * One appointment-reminder rule: how long before the appointment it fires. See
+ * models/ReminderSettings.js for why this is minutes rather than hours (a same-day "30 minutes
+ * before" nudge needs a finer unit than hours would give it) and why it's capped at 30 days - a
+ * rule further out than that is really "remind me a month early", which is a different feature
+ * than an appointment reminder.
+ */
+const reminderRuleInputSchema = z.object({
+  offsetMinutes: z
+    .number()
+    .int('Must be a whole number of minutes')
+    .min(5, 'Must fire at least 5 minutes before the appointment')
+    .max(43200, 'Must fire within 30 days of the appointment'),
+  enabled: z.boolean(),
+});
+
+// Every field optional - see resolvers/reminders.js: a caller sends only what changed, same
+// pattern as updateNotificationSettings. Templates are nullable rather than merely optional so
+// the client can explicitly reset one back to the built-in default (null) as opposed to leaving
+// it untouched (omitted) - see models/ReminderSettings.js's own comment on that distinction.
+const updateReminderSettingsInputSchema = z.object({
+  emailEnabled: z.boolean().optional(),
+  smsEnabled: z.boolean().optional(),
+  rules: z
+    .array(reminderRuleInputSchema)
+    .max(10, 'Ten rules is plenty - simplify rather than add more.')
+    .optional(),
+  emailSubjectTemplate: z.string().trim().max(200).nullish(),
+  emailBodyTemplate: z.string().trim().max(4000).nullish(),
+  // Kept short deliberately - a template this long is several SMS segments before any merge field
+  // even expands, and each segment is a separate cost/carrier hop.
+  smsTemplate: z.string().trim().max(1000).nullish(),
+});
+
+// --- Gift cards --- See DECISIONS.md M6 and graphql/resolvers/giftCards.js.
+//
+// Neither create schema takes issuerArtistId/soldByUserId - those come from the authenticated
+// caller (mutations/giftCards.js), never from the request, the same reasoning M10 applies to a
+// charge: no assertion about who gets credited/billed belongs to the caller to make. shopId is
+// likewise never accepted on the artist-issued schema - it's resolved server-side from the
+// caller's own active connection (or left null for an independent artist, per M6) - only the
+// shop-issued schema takes one, because a shop admin's own shop genuinely isn't derivable any
+// other way (an admin's Staff row can reference more than the one shop being sold for, in theory,
+// so the caller has to say which - the resolver still checks they actually belong to it).
+const createArtistGiftCardInputSchema = z.object({
+  faceValueCents: z.number().int().positive('A gift card needs a face value above zero'),
+  applyFeeOffset: z.boolean().nullish(),
+});
+
+const createShopGiftCardInputSchema = z.object({
+  shopId: objectIdSchema,
+  faceValueCents: z.number().int().positive('A gift card needs a face value above zero'),
+  applyFeeOffset: z.boolean().nullish(),
+});
+
+// code is free text at this layer - normalizeGiftCardCode (utils/gift-card.js) is what actually
+// compares it against a stored code, so this only guards against an empty string.
+const redeemGiftCardInputSchema = z.object({
+  appointmentId: objectIdSchema,
+  code: z.string().trim().min(1, 'Enter the gift card code'),
+  amountCents: z.number().int().positive('Enter an amount above zero to redeem'),
+});
+
+const giftCardIdInputSchema = z.object({
+  giftCardId: objectIdSchema,
+});
+
+const createGiftCardShopCutInvoiceInputSchema = z.object({
+  giftCardId: objectIdSchema,
+  paymentMethod: z.enum(['ach', 'card']).nullish(),
+});
+
 module.exports = {
   loginInputSchema,
   registerInputSchema,
@@ -472,5 +546,12 @@ module.exports = {
   appointmentIdInputSchema,
   processSquarePaymentInputSchema,
   squarePricingSettingsInputSchema,
+  reminderRuleInputSchema,
+  updateReminderSettingsInputSchema,
+  createArtistGiftCardInputSchema,
+  createShopGiftCardInputSchema,
+  redeemGiftCardInputSchema,
+  giftCardIdInputSchema,
+  createGiftCardShopCutInvoiceInputSchema,
   validate,
 };

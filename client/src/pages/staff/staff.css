@@ -19,13 +19,13 @@
     border: none;
     padding: 5px;
     border-radius: 10px;
-    background-color: #ddd;
-    color: #555;
+    background-color: var(--ib-border);
+    color: var(--ib-text-secondary);
     font-size: 16px;
 }
 .staffAddButton:hover {
-    background-color: #555;
-    color: #ddd;
+    background-color: var(--ib-text-secondary);
+    color: var(--ib-border);
     cursor: pointer;
 }
 .staffListAvatarContainer {
@@ -43,21 +43,21 @@
     border: none;
     border-radius: 10px;
     padding: 5px 10px;
-    background-color: #ddd;
-    color: #555;
+    background-color: var(--ib-border);
+    color: var(--ib-text-secondary);
     cursor: pointer;
     margin-right: 20px;
 }
 .staffListEdit:hover {
-    background-color: #555;
-    color: #ddd;
+    background-color: var(--ib-text-secondary);
+    color: var(--ib-border);
 }
 .staffListDelete {
     cursor: pointer;
 }
 .staffListDelete:hover {
     cursor: pointer;
-    color: #ccc;
+    color: var(--ib-border-strong);
 }
 .staffContainer {
     display: flex;

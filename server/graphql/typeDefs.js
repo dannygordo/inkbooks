@@ -240,6 +240,7 @@ module.exports = gql`
     avatar: String
     role: Int!
     tagColor: String
+    themePreference: String
   }
   type User {
     id: ID!
@@ -255,6 +256,8 @@ module.exports = gql`
     userType: String!
     userInfo: UserInfo
     tagColor: String
+    # light | dark | system. Null/absent reads as 'system' client-side - see ThemeModeProvider.jsx.
+    themePreference: String
     # Per-user Firebase custom token, used by the client to sign into Firebase Auth as this
     # specific user (replaces the old shared firebase@inkbooks.net account). Null if the server's
     # Firebase Admin SDK isn't configured yet - see server/utils/firebase-admin.js.
@@ -429,6 +432,41 @@ module.exports = gql`
     note: String
     createdAt: DateTime!
   }
+  # The audit trail - see models/EventLog.js for what this does and doesn't cover, and why. One
+  # field-level change; getEventLogs below returns these as a plain list, oldest changes first
+  # within EventLogEntry.changes (the order diffFields() built them in).
+  type EventLogChange {
+    field: String!
+    # Stringified on the way out - the underlying value can be a number, a date, or an id (see
+    # EventLog.js's own comment on why the stored value stays Mixed rather than a pre-formatted
+    # string). GraphQL has no untyped scalar that round-trips all three cleanly, and a viewer only
+    # ever needs to display these, never compute on them.
+    from: String
+    to: String
+  }
+  type EventLogEntry {
+    id: ID!
+    entityType: String!
+    entityId: ID!
+    action: String!
+    actorUserId: ID!
+    actorName: String!
+    shopId: ID
+    summary: String!
+    changes: [EventLogChange!]!
+    createdAt: DateTime!
+  }
+  type EventLogPage {
+    items: [EventLogEntry!]!
+    pageInfo: PageInfo!
+  }
+  input EventLogFilter {
+    entityType: String
+    shopId: ID
+    actorUserId: ID
+    from: DateTime
+    to: DateTime
+  }
   # Deliberately narrow - see getPublicArtistProfile in resolvers/bookingRequests.js for why this
   # isn't just the full Artist/User type.
   # Both fields matter to the form: available drives the tick or cross, and reason is what gets
@@ -469,6 +507,40 @@ module.exports = gql`
     slug: String!
     available: Boolean!
     reason: String
+  }
+  # Appointment reminders (text + email to CLIENTS ahead of an appointment) - see
+  # models/ReminderSettings.js and utils/reminders.js. One row per artist, the caller's own -
+  # there is no "whose settings" argument on the query below because it is always the signed-in
+  # artist's, the same authority shape as the Square connection.
+  type ReminderRule {
+    id: ID!
+    offsetMinutes: Int!
+    enabled: Boolean!
+  }
+  input ReminderRuleInput {
+    offsetMinutes: Int!
+    enabled: Boolean!
+  }
+  # Global search - see utils/search.js. Reuses the existing Client/Project/Message types rather
+  # than inventing narrower search-result shapes, since a result IS the real record (clicking one
+  # navigates straight to it) and there's nothing about being a search hit that changes its shape.
+  # Grouped by type deliberately, not one interleaved/ranked list - see the chat thread this
+  # shipped from: "grouped by type" was the explicit ask.
+  type SearchResults {
+    clients: [Client!]!
+    projects: [Project!]!
+    messages: [Message!]!
+  }
+  type ReminderSettings {
+    emailEnabled: Boolean!
+    smsEnabled: Boolean!
+    rules: [ReminderRule!]!
+    # Null means "use the built-in default" - see utils/reminders.js's DEFAULT_EMAIL_SUBJECT_TEMPLATE
+    # / DEFAULT_EMAIL_BODY_TEMPLATE / DEFAULT_SMS_TEMPLATE, which the UI shows as placeholder text
+    # when these come back null rather than leaving the box looking empty.
+    emailSubjectTemplate: String
+    emailBodyTemplate: String
+    smsTemplate: String
   }
   # One shape for both halves of the notification system.
   #
@@ -524,8 +596,9 @@ module.exports = gql`
     # userId, but a guest submitting this form has no User/Client record yet (that's only
     # created inside the createBookingRequest resolver itself). Uploaded ahead of time via the
     # separate POST /booking-uploads route (routes/bookingUploads.js), which returns plain URLs
-    # for exactly this reason. Project.bodyImages already establishes [String] as a valid
-    # pattern in this schema, so this isn't a new shape.
+    # for exactly this reason. (Project.bodyImages used to be [String] too and was cited here as
+    # precedent - it's now [IBImage], see that field's own comment - so this field's [String]
+    # shape stands on the guest/no-userId reasoning above alone.)
     referenceImages: [String]
     placement: String
     size: String
@@ -575,13 +648,24 @@ module.exports = gql`
     client: Client
     conversation: Conversation
     referenceImages: [IBImage]
-    bodyImages: [String]
+    # Finished-tattoo photos - was [String] (bare URLs) while the Mongoose model
+    # (models/Project.js) already stored these as full IBImageSchema subdocuments, same shape as
+    # referenceImages/designImages. That mismatch meant the "Finished Tattoo" section couldn't
+    # show an uploader, a timestamp, or tags the way the other two sections do. Retyped to match
+    # the model it was already reading from.
+    bodyImages: [IBImage]
     designImages: [IBImage]
     materialsUsed: [String]
     notes: [IBNote]
     tags: [String]
     status: String!
     bookingRequestId: ID
+    # The consult this project's booking request produced, when there is one - resolved via
+    # bookingRequestId the same way deposits below is, so a client has an appointmentId to add
+    # more deposit money against without a separate lookup. Null for a project with no
+    # bookingRequestId (see resolvers/index.js's deposits comment on why the consult predates
+    # the Project and can't be reached through projectId).
+    consultAppointment: Appointment
     # Deposits taken at this project's consult. Resolved rather than stored, so they can't drift
     # from the appointment records that actually hold them - see resolvers/index.js.
     deposits: [Appointment]
@@ -604,7 +688,7 @@ module.exports = gql`
     artistId: ID!
     clientId: ID!
     referenceImages: [IBImageInput]
-    bodyImages: [String]
+    bodyImages: [IBImageInput]
     designImages: [IBImageInput]
     materialsUsed: [String]
     notes: [IBNoteInput]
@@ -715,6 +799,14 @@ module.exports = gql`
     # The shop cut is computed on the subtotal AFTER this is deducted - see utils/shop-cut.js.
     depositCreditCents: Int
     depositCreditFromAppointmentId: ID
+    # --- Gift cards. See models/Appointment.js and DECISIONS.md M6. ---
+    # Total gift card credit applied to this session, both issuer types. Fed into
+    # getChargeQuote/the real charge as computeChargeBreakdown's giftCardCents.
+    giftCardCreditCents: Int
+    # The subset of the above that came from ARTIST-issued cards - the portion that reduces the
+    # shop-cut cuttable base (utils/shop-cut.js). Exposed mainly for audit; most callers only need
+    # giftCardCreditCents.
+    artistIssuedGiftCardCreditCents: Int
     shopCutStatus: String!
     # Shop-cut ledger fields - see PRODUCTION_ROADMAP.md's "Shop-cut ledger" section.
     # shopCutCents is computed from subtotalCents only: never tips, tax or processing fees.
@@ -752,6 +844,101 @@ module.exports = gql`
     appointments: [Appointment!]!
     invoiceUrl: String!
   }
+
+  # --- Gift cards. See DECISIONS.md M6, models/GiftCard.js, graphql/resolvers/giftCards.js. -----
+  type GiftCard {
+    id: ID!
+    code: String!
+    issuerType: String!
+    # Only set when issuerType is ARTIST.
+    issuerArtistId: ID
+    issuerArtist: Artist
+    # Not required at the schema level - see models/GiftCard.js's own comment on why an
+    # independent artist's card can have no shop at all.
+    shopId: ID
+    shop: Shop
+    faceValueCents: Int!
+    balanceCents: Int!
+    feeOffsetCents: Int!
+    soldAt: DateTime!
+    soldByUserId: ID!
+    soldBy: User
+    # --- Shop-cut ledger fields - same shape/meaning as Appointment's. See models/GiftCard.js. ---
+    shopCutStatus: String!
+    shopCutCents: Int
+    shopCutPercentApplied: Int
+    shopCutPaymentMethod: String
+    shopCutSquareInvoiceId: String
+    shopCutMarkedPaidBy: ID
+    shopCutMarkedPaidAt: DateTime
+    shopCutConfirmedBy: ID
+    shopCutConfirmedAt: DateTime
+    createdAt: DateTime
+    updatedAt: DateTime
+  }
+
+  # One partial or full redemption - see models/GiftCardRedemption.js on why this is its own
+  # collection rather than an array on GiftCard.
+  type GiftCardRedemption {
+    id: ID!
+    giftCardId: ID!
+    appointmentId: ID!
+    appointment: Appointment
+    amountCents: Int!
+    redeemedAt: DateTime!
+    redeemedByUserId: ID!
+    # Null for an artist-issued card's redemption - see models/GiftCardRedemption.js's own
+    # comment on why that is null rather than zero. Set for a shop-issued card's redemption; sign
+    # convention is DECISIONS.md M6's, verbatim: positive means the artist owes the shop, negative
+    # means the shop owes the artist.
+    shopPayoutCents: Int
+  }
+
+  # Returned by redeemGiftCard - all three records a redemption actually touches, in one round
+  # trip, the same reasoning as ShopCutInvoiceResult bundling the appointment with the invoice url.
+  type RedeemGiftCardResult {
+    giftCard: GiftCard!
+    appointment: Appointment!
+    redemption: GiftCardRedemption!
+  }
+
+  # The liability report DECISIONS.md M6 requires: "a report must show outstanding balance, card
+  # count and oldest issue date, because that portion of the bank balance is already spoken for."
+  # Scoped to a shop - see resolvers/giftCards.js for what "outstanding" means for an independent
+  # artist's own cards (getMyGiftCardLiabilityReport, not this one).
+  type GiftCardLiabilityReport {
+    outstandingBalanceCents: Int!
+    cardCount: Int!
+    oldestIssuedAt: DateTime
+  }
+
+  # Returned by createGiftCardShopCutInvoice - mirrors ShopCutInvoiceResult exactly, for the same
+  # reason (the client shows a "pay now" link immediately).
+  type GiftCardShopCutInvoiceResult {
+    giftCard: GiftCard!
+    invoiceUrl: String!
+  }
+
+  # Sold by the artist themselves, for themselves alone - see models/GiftCard.js. No artistId
+  # argument anywhere on this input or the mutation that takes it: it can only ever act for the
+  # caller, the same convention getMySquareAuthorizationUrl already uses.
+  input CreateArtistGiftCardInput {
+    faceValueCents: Int!
+    # The processing-fee offset choice (M5), offered here on the SAME terms as anywhere else -
+    # never applied silently. Never loads onto the card's balance either way - see
+    # models/GiftCard.js's feeOffsetCents comment.
+    applyFeeOffset: Boolean
+  }
+
+  # Sold as a shop product - see models/GiftCard.js. shopId IS required here, unlike the artist
+  # version: an admin's own shop isn't derivable the way an artist's active connection is, and the
+  # resolver still checks the caller actually belongs to the shop named.
+  input CreateShopGiftCardInput {
+    shopId: ID!
+    faceValueCents: Int!
+    applyFeeOffset: Boolean
+  }
+
   # --- Dashboard analytics -------------------------------------------------------------------
   # Computed server-side (see utils/analytics.js) rather than by summing rows in the browser.
   # ArtistPerformancePanel used to do the latter, with a standing note that it should move here as
@@ -774,6 +961,13 @@ module.exports = gql`
     tipsCents: Int
     shopCutEarnedCents: Int
     shopCutOutstandingCents: Int
+    # Was computed here all along (utils/analytics.js's perArtist rows spread the same totalsAgg
+    # the shop-wide totals use) but never exposed on this type - so a per-artist "what do they
+    # actually take home" figure had no way to account for a cut the artist has already marked
+    # paid but the shop hasn't confirmed yet. Added for ArtistPerformancePanel's shopWide "Artist
+    # Totals" breakdown, which needs shopCutEarned + shopCutOutstanding + this one to know an
+    # artist's FULL assessed cut, not just the earned-and-outstanding two thirds of it.
+    shopCutAwaitingConfirmationCents: Int
     completedSessionCount: Int!
     consultCount: Int!
     appointmentCount: Int!
@@ -996,12 +1190,29 @@ module.exports = gql`
     # - does "invoice all" mean this page or everything? The set is also self-limiting, since
     # settling a row removes it. If it ever grows unreasonable that's a symptom worth seeing, not a
     # scrolling problem to hide.
-    getShopCutPayoutCandidates(userId: ID!): [Appointment!]!
+    #
+    # filter is optional and only its date bounds are honoured (see resolvers/appointments.js) -
+    # the dashboard's own date range picker sits above this list along with everything else on the
+    # panel, and this was the one section that silently ignored it.
+    getShopCutPayoutCandidates(userId: ID!, filter: AppointmentFilter): [Appointment!]!
+    # The shop-wide counterpart to getShopCutPayoutCandidates above - every artist's unpaid,
+    # completed shop cut at this shop rather than one artist's own. Shop-admin-or-better only (see
+    # resolvers/appointments.js), matching getPendingShopCutConfirmations' floor: this is the same
+    # class of financial data (what every artist here owes), not the front-desk-visible calendar.
+    getShopCutPayoutCandidatesByShop(shopId: ID!, filter: AppointmentFilter): [Appointment!]!
     getAppointment(appointmentId: ID!): Appointment
     # The charge total, computed server-side, BEFORE the card is taken. applyFeeOffset and
     # tipCents are the only two inputs because they are the only two the caller legitimately
     # knows - see utils/charge-quote.js.
-    getChargeQuote(appointmentId: ID!, applyFeeOffset: Boolean, tipCents: Int): ChargeQuote!
+    # subtotalCentsOverride is a PREVIEW-ONLY input - see utils/charge-quote.js's own comment.
+    # The real charge in routes/squarePayments.js always reads the saved subtotalCents; this exists
+    # so the session view can show live tax/fee/total figures before the artist saves.
+    getChargeQuote(
+      appointmentId: ID!
+      applyFeeOffset: Boolean
+      tipCents: Int
+      subtotalCentsOverride: Int
+    ): ChargeQuote!
     getAppointmentsByProject(projectId: ID!): [Appointment]
 
     ######### Shop-cut ledger ###########
@@ -1020,6 +1231,27 @@ module.exports = gql`
     # the settings panel; the same values routes/squarePayments.js computes every charge from.
     getMySquarePricingSettings: SquarePricingSettings!
     getPendingShopCutConfirmations(shopId: ID!): [Appointment]
+
+    ######### Gift cards ###########
+    # See DECISIONS.md M6, models/GiftCard.js, graphql/resolvers/giftCards.js.
+
+    # Looked up by code, the same way a real gift card is - anyone who has the code can look up
+    # its balance, which is the property a bearer instrument is supposed to have (M6: random code,
+    # not a hash, precisely so knowing the code is the only way in). Redemption's own checks
+    # (issuer lock, balance) are what actually protect the money, not this query.
+    getGiftCardByCode(code: String!): GiftCard
+    # A shop's own catalogue - unpaginated, matching getShopCutRates' reasoning: a shop's gift
+    # card book isn't expected to need paging soon, and if it ever does that's a symptom worth
+    # seeing, not a scrolling problem to hide (see getShopCutPayoutCandidates' comment for the
+    # fuller version of this argument).
+    getGiftCardsByShop(shopId: ID!): [GiftCard!]!
+    # An independent artist's own issued cards - the shop-scoped query above has no shop to key
+    # off for them.
+    getMyGiftCards: [GiftCard!]!
+    # One card's full redemption history - what a partial-redemption balance is actually made of.
+    getGiftCardRedemptions(giftCardId: ID!): [GiftCardRedemption!]!
+    getGiftCardLiabilityReport(shopId: ID!): GiftCardLiabilityReport!
+    getMyGiftCardLiabilityReport: GiftCardLiabilityReport!
 
     ######### Artists ###########
 
@@ -1120,6 +1352,23 @@ module.exports = gql`
     # Rate history for one artist at one shop, newest first. Readable by the artist themselves and
     # by a shop admin there - an artist must be able to see what they are being charged.
     getShopCutRates(artistId: ID!, shopId: ID!): [ShopCutRate!]!
+    # The audit trail. Scoping is enforced in the resolver, not by the filter argument here - a
+    # shop admin gets their own shop's rows regardless of what shopId they pass, a plain Admin's
+    # filter is honored as given, and an independent artist (no shop) is scoped to their own
+    # actions. See resolvers/eventLogs.js.
+    getEventLogs(filter: EventLogFilter, page: PageInput): EventLogPage!
+    # Always the caller's own row (created on first read if none exists yet) - see
+    # resolvers/reminders.js.
+    getReminderSettings: ReminderSettings!
+    # Global search across Clients, Projects, and Messages - grouped by type, scoped to exactly
+    # what the caller could otherwise list/read (see utils/search.js). Blank/whitespace-only
+    # returns all three lists empty rather than erroring - the client fires this on every
+    # keystroke, and "nothing typed yet" is a normal state, not a bad request.
+    #
+    # limit is PER TYPE, not total, and optional - omitted, it's the app bar dropdown's small
+    # default; the dedicated /search results page passes a larger one explicitly. Clamped
+    # server-side regardless of what's asked for (see utils/search.js's MAX_RESULTS_PER_TYPE).
+    search(query: String!, limit: Int): SearchResults!
     getBookingRequests(artistId: ID!, statuses: [String!], page: PageInput): BookingRequestPage!
     # The nav badge: how many requests the CALLER still owes an answer on. Same filter as
     # getBookingRequests with no statuses passed - literally the same function, see
@@ -1321,6 +1570,22 @@ module.exports = gql`
     markShopCutPaidManually(appointmentId: ID!): Appointment!
     confirmShopCutPaid(appointmentId: ID!): Appointment!
 
+    ######### Gift cards ###########
+    # See DECISIONS.md M6, models/GiftCard.js, graphql/resolvers/giftCards.js.
+
+    createArtistGiftCard(input: CreateArtistGiftCardInput!): GiftCard!
+    createShopGiftCard(input: CreateShopGiftCardInput!): GiftCard!
+    # appointmentId + code + amountCents - applies against computeChargeBreakdown's giftCardCents
+    # slot (utils/charge-quote.js) for that appointment's eventual charge. Enforces the
+    # artist-issued lock and the shop-issued "at this shop" scope - see resolvers/giftCards.js.
+    redeemGiftCard(appointmentId: ID!, code: String!, amountCents: Int!): RedeemGiftCardResult!
+    # Mirrors createShopCutInvoice/markShopCutPaidManually/confirmShopCutPaid exactly, for a
+    # GiftCard's shop-cut settlement instead of an Appointment's - see models/GiftCard.js's own
+    # comment on why the same field shape and the same dual-control machinery apply to both.
+    createGiftCardShopCutInvoice(giftCardId: ID!, paymentMethod: String): GiftCardShopCutInvoiceResult!
+    markGiftCardShopCutPaidManually(giftCardId: ID!): GiftCard!
+    confirmGiftCardShopCutPaid(giftCardId: ID!): GiftCard!
+
     ######### Staff ###########
 
     createStaff(
@@ -1377,7 +1642,7 @@ module.exports = gql`
       artistId: ID!
       clientId: ID!
       referenceImages: [IBImageInput]
-      bodyImages: [String]
+      bodyImages: [IBImageInput]
       designImages: [IBImageInput]
       materialsUsed: [String]
       notes: [IBNoteInput]
@@ -1435,6 +1700,18 @@ module.exports = gql`
       timezone: String
       digestHour: Int
     ): NotificationSettings!
+    # Every argument optional and applied only when sent - a save that only touches one field must
+    # not reset the others. Template fields are nullable so a caller can explicitly reset one back
+    # to the built-in default (null) as a distinct instruction from leaving it alone (omitted) -
+    # see models/ReminderSettings.js.
+    updateReminderSettings(
+      emailEnabled: Boolean
+      smsEnabled: Boolean
+      rules: [ReminderRuleInput!]
+      emailSubjectTemplate: String
+      emailBodyTemplate: String
+      smsTemplate: String
+    ): ReminderSettings!
     markNotificationsRead(notificationIds: [ID!]): Int!
     # Handled, not merely seen. See models/Notification.js on why these are different.
     markNotificationsDone(notificationIds: [ID!]!): Int!

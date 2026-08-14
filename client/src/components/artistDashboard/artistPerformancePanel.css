@@ -2,6 +2,68 @@
 	width: 100%;
 }
 
+/* The shopWide "Artist Totals" breakdown - same shape as ShopAnalyticsPanel's "By artist" table
+   (analyticsArtistTable/Row/Name/Num in components/analytics/analyticsPanel.css), reimplemented
+   here rather than imported: that table is reachable only via ShopAnalyticsPanel's staff-facing
+   route today, and cross-importing another component's stylesheet for four class names is more
+   coupling than four rules' worth of duplication is worth. */
+.artistTotalsTable {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.artistTotalsHeader {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	/* Matches .artistTotalsRow's padding plus its 4px left border, so the column headings line up
+	   with the values under them instead of sitting 20px to their left. */
+	padding: 0 16px 6px 20px;
+	font-size: 12px;
+	font-weight: 500;
+	letter-spacing: 0.3px;
+	text-transform: uppercase;
+	color: var(--ib-text-secondary);
+}
+
+/* Tinted by the artist's own colour like every other shop-wide list - see utils/tagColor.js.
+   border-left transparent rather than absent, same reasoning as .artistUpcomingItem above: an
+   artist with no resolvable tag colour still reserves the same 4px so the table doesn't stagger. */
+.artistTotalsRow {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 12px 16px;
+	border-left: 4px solid transparent;
+	border-radius: 6px;
+	font-size: 14px;
+}
+
+.artistTotalsName {
+	flex: 1;
+	font-weight: 500;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.artistTotalsAmount {
+	width: 110px;
+	flex-shrink: 0;
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+	color: var(--ib-text-primary);
+}
+
+/* The one figure of the three that's actually THIS artist's money, not the shop's or a
+   before-the-split total - bolded so it reads as the answer the other two columns build up to. */
+.artistTotalsTakeHome {
+	font-weight: 600;
+	color: #1a1a1a;
+}
+
 .artistPerformanceStats {
 	display: flex;
 	flex-wrap: wrap;
@@ -10,7 +72,7 @@
 }
 
 .artistStatCard {
-	background: #fff;
+	background: var(--ib-surface-card);
 	border-radius: 10px;
 	box-shadow: 0px 0px 15px -10px rgba(0, 0, 0, 0.75);
 	padding: 15px 20px;
@@ -20,7 +82,7 @@
 
 .artistStatLabel {
 	font-size: 13px;
-	color: #999;
+	color: var(--ib-text-muted);
 	margin-bottom: 6px;
 }
 
@@ -42,7 +104,7 @@
 }
 
 .artistPerformanceEmpty {
-	color: #999;
+	color: var(--ib-text-muted);
 	font-size: 14px;
 }
 
@@ -92,27 +154,76 @@
 	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
-/* #555, not the #999 this used to be. Verified rather than eyeballed: against the darkest
-   palette entry (#122152) at the hover tint, #999 lands at 2.3:1 and #666 at 3.5:1 - both below
-   WCAG AA's 4.5:1 for normal text. #555 is the lightest grey that clears AA on all fifteen
-   colours at both tint strengths. The same applies to .artistUpcomingType below. */
+/* Every column here is a fixed WIDTH plus flex-shrink: 0, not min-width - min-width still lets
+   whichever row has the longest value in a column stretch that column past what every other row
+   uses, which is the actual shape of "columns don't line up uniformly": not a single column being
+   wrong, but its width coming from content instead of being declared. Only .artistUpcomingTitle
+   stays flexible (flex: 1), matching AppointmentsList.jsx's equivalent - it absorbs whatever the
+   fixed columns don't use, with its own ellipsis for when even that isn't enough.
+   var(--ib-text-secondary), not the var(--ib-text-muted) this used to be, on the date column. Verified rather than eyeballed: against
+   the darkest palette entry (#122152) at the hover tint, var(--ib-text-muted) lands at 2.3:1 and var(--ib-text-secondary) at 3.5:1 -
+   both below WCAG AA's 4.5:1 for normal text. var(--ib-text-secondary) is the lightest grey that clears AA on all
+   fifteen colours at both tint strengths. */
 .artistUpcomingDate {
-	color: #555;
-	min-width: 90px;
+	width: 130px;
+	flex-shrink: 0;
+	color: var(--ib-text-secondary);
 }
 
 .artistUpcomingTitle {
 	flex: 1;
 	font-weight: 500;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.artistUpcomingClient {
+	width: 130px;
+	flex-shrink: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	color: var(--ib-text-primary);
+	font-size: 13px;
+	white-space: nowrap;
+}
+
+.artistUpcomingStatus {
+	width: 90px;
+	flex-shrink: 0;
+	color: var(--ib-text-secondary);
+	font-size: 12px;
+	text-transform: uppercase;
+	letter-spacing: 0.3px;
+	white-space: nowrap;
+}
+
+/* Only rendered in shopWide mode (see ArtistPerformancePanel's showArtist prop) - a shop admin's
+   own dashboard listing every artist's appointments needs the name each row belongs to, the same
+   way AppointmentsList.jsx's shop calendar does. */
+.artistUpcomingArtist {
+	width: 120px;
+	flex-shrink: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	color: var(--ib-text-secondary);
+	font-size: 13px;
+	white-space: nowrap;
 }
 
 /* Only rendered in the completed-sessions list - an upcoming appointment has no money attached
-   yet. Sits between the title and the type so the column order stays stable across both lists.
-   Tabular figures so a column of amounts lines up on the decimal instead of wandering. */
+   yet. Sits between status/artist and the type so the column order stays stable across both
+   lists. Right-aligned and tabular so a column of amounts lines up on the decimal instead of
+   wandering, and so it reads as a number column rather than more label text. */
 .artistUpcomingEarnings {
+	width: 130px;
+	flex-shrink: 0;
+	text-align: right;
 	font-variant-numeric: tabular-nums;
-	color: #333;
+	color: var(--ib-text-primary);
 	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 /* A wrapper for the chip now, not the label itself - text-transform and colour moved into
@@ -121,5 +232,6 @@
 .artistUpcomingType {
 	display: flex;
 	justify-content: flex-end;
-	min-width: 76px;
+	width: 76px;
+	flex-shrink: 0;
 }

@@ -52,7 +52,7 @@ const ClientFlagType = require('../models/ClientFlagType');
 const PasswordToken = require('../models/PasswordToken');
 const Notification = require('../models/Notification');
 const { Constants } = require('../utils/constants');
-const { pickDefaultTagColor } = require('../utils/tag-color');
+const { TAG_COLORS } = require('../utils/tag-color');
 const { computeChargeBreakdown } = require('../utils/square-pricing');
 const { applyShopCut, setShopCutRate } = require('../utils/shop-cut');
 
@@ -136,7 +136,18 @@ const PROJECT_TITLES = [
   'Snake and peony', 'Illustrative wolf', 'Art nouveau thigh piece', 'Micro-realism eye',
 ];
 const PLACEMENTS = ['Left forearm', 'Right thigh', 'Upper back', 'Ribcage', 'Sternum', 'Calf'];
-const PALETTES = ['Black and grey', 'Full colour', 'Blackwork', 'Muted colour'];
+// Real ProjectInput enum values (server/utils/validation.js's updateProjectInputSchema), not
+// display labels - the same class of bug PRODUCTION_ROADMAP.md documents already having been
+// fixed once in seed.js, apparently missed here. Mongoose's own schema (models/Project.js) has no
+// enum constraint on palette, so seeding a display label like 'Blackwork' saved without
+// complaint - but every subsequent updateProject call echoes the project's current palette value
+// back as part of its payload (see pages/projects/Project.jsx and IBProgressListProject.jsx), and
+// the GraphQL layer's zod validation does enforce the enum. The result: any project seeded with
+// one of these old labels could never be saved again, through ANY field - not just palette -
+// since the invalid value it kept echoing back failed validation before the resolver looked at
+// anything else. Found via a live "Invalid option: expected one of black|color" error on a
+// reference image upload, which is why it surfaced there first.
+const PALETTES = ['black', 'color'];
 
 let nameCounter = 0;
 function uniqueName() {
@@ -235,6 +246,18 @@ async function main() {
       email: 'june@independent.dev', slug: 'june-haddad', independent: true },
   ];
 
+  // tagColor is assigned by INDEX here, not via pickDefaultTagColor(shop._id) - that function
+  // picks a color unused by anyone currently in getMemberUserIdsForShop (Staff + active
+  // ArtistShopConnection rows for this shop), but this loop creates every shop artist's User
+  // BEFORE any of their ArtistShopConnection/Staff rows exist (those come later - the
+  // Memberships block below, and the owner's Staff row further down). Every call therefore saw
+  // zero existing members and returned the same first color: every shop artist logged in with
+  // the identical tagColor, which is exactly the "everyone's records are the same color" report.
+  // A plain index into the same palette sidesteps the ordering dependency entirely rather than
+  // reshuffling the rest of this script to interleave connection-creation with user-creation
+  // (which the Soren two-interval logic and the shop-cut-rate loop below both need done as a
+  // separate, complete-artists-array pass anyway).
+  let shopArtistColorIndex = 0;
   const artists = [];
   for (const spec of artistSpecs) {
     const user = await new User({
@@ -247,7 +270,9 @@ async function main() {
       hasSetPassword: true,
       hourlyRate: CONFIG.hourlyRateDollars,
       billingType: 'hourly',
-      tagColor: spec.independent ? undefined : await pickDefaultTagColor(shop._id),
+      tagColor: spec.independent
+        ? undefined
+        : TAG_COLORS[shopArtistColorIndex++ % TAG_COLORS.length],
     }).save();
 
     const artist = await new Artist({
@@ -289,6 +314,11 @@ async function main() {
   }).save();
 
   // A front-desk account, so the SHOP_STAFF role has a real user behind it.
+  //
+  // Still the index counter, not pickDefaultTagColor(shop._id) - at this point only the owner's
+  // Staff row exists (just above); Mika/Andre/Beatriz/Soren's ArtistShopConnection rows are still
+  // a few lines away (the Memberships block below), so a DB-driven lookup here would only exclude
+  // the owner's color and could still collide with one of theirs.
   const frontDeskUser = await new User({
     email: 'frontdesk@copperwolf.dev',
     password: hashedPassword,
@@ -297,7 +327,7 @@ async function main() {
     firstName: 'Sam',
     lastName: 'Rivera',
     hasSetPassword: true,
-    tagColor: await pickDefaultTagColor(shop._id),
+    tagColor: TAG_COLORS[shopArtistColorIndex++ % TAG_COLORS.length],
   }).save();
   await new Staff({
     firstName: 'Sam', lastName: 'Rivera', email: frontDeskUser.email, phone: '555-010-0102',
@@ -339,10 +369,18 @@ async function main() {
   }).save();
 
   // --- Shop cut rates (M1, M7) -----------------------------------------------------------------
-  // Effective-dated and append-only. Every artist starts at 40%; two of them change part-way
-  // through, so a cut computed on an old session must resolve to the old rate. That is not visible
-  // at all without at least one artist having two rows.
-  for (const a of shopArtists) {
+  // Effective-dated and append-only. Every HIRED artist starts at 40%; two of them change
+  // part-way through, so a cut computed on an old session must resolve to the old rate. That is
+  // not visible at all without at least one artist having two rows.
+  //
+  // The owner is deliberately excluded from this loop - shopArtists includes her (she's a real
+  // Artist row like everyone else, per DECISIONS.md S0), but giving her the shop's opening rate
+  // here would put her on the hook for 40% of her own chair, which the real registerAccount flow
+  // no longer does (see graphql/resolvers/users.js) since it now writes her a 0% row at signup.
+  // A seed producing a shape the app itself doesn't is worse than no seed - see this file's own
+  // header note on that. Her own 0% row is written separately, right below.
+  const hiredArtists = shopArtists.filter((a) => a.key !== 'owner');
+  for (const a of hiredArtists) {
     await setShopCutRate({
       artistUserId: a.user._id,
       shopId: shop._id,
@@ -352,6 +390,18 @@ async function main() {
       note: 'Opening rate.',
     });
   }
+  // Mirrors what registerAccount now writes for real at signup - see that resolver's own comment
+  // on why this has to be an explicit row rather than left to fall through to Shop.shopCutPercent
+  // (set to a real 40% - CONFIG.shopCutPercent - on the Shop document itself, near the top of
+  // this file - a fallback that would otherwise silently catch the owner too).
+  await setShopCutRate({
+    artistUserId: owner.user._id,
+    shopId: shop._id,
+    percent: 0,
+    setByUserId: owner.user._id,
+    effectiveFrom: historyStart,
+    note: 'Shop owner - does not owe their own shop a cut.',
+  });
   await setShopCutRate({
     artistUserId: artists.find((a) => a.key === 'artist2').user._id,
     shopId: shop._id,

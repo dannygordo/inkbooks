@@ -1,13 +1,9 @@
 import moment from "moment";
-import React, { useContext, useEffect, useState, useReducer } from "react";
+import React, { useContext, useState, useReducer } from "react";
 
 const CalendarContext = React.createContext({
 	monthIndex: 0,
 	setMonthIndex: (idx) => {},
-	smallCalendarMonth: 0,
-	setSmallCalendarMonth: (idx) => {},
-	smallDaySelected: null,
-	setSmallDaySelected: (day) => {},
 });
 
 export function useCalendar() {
@@ -34,26 +30,22 @@ const initEvents = () => {
 
 export function CalendarProvider(props) {
 	const [monthIndex, setMonthIndex] = useState(moment().month());
-	const [smallCalendarMonth, setSmallCalendarMonth] = useState(null);
 	const [daySelected, setDaySelected] = useState(moment());
 	// savedEvents is the whole set the calendar draws from. There was a parallel `filteredEvents`
 	// here, written by the Sidebar artist filter and read by Day.jsx - so the thing that rendered
-	// was never the thing that was fetched. Both are gone; see Sidebar.jsx.
+	// was never the thing that was fetched. Both are gone; so is the Sidebar itself (see
+	// CalendarHeader.jsx - Create Event now lives there) and SmallCalendar.jsx, the mini
+	// month-picker that used to live alongside it - this context used to also carry
+	// smallCalendarMonth/setSmallCalendarMonth (that component's own month-sync state, with no
+	// other reader) and a smallDaySelected/setSmallDaySelected pair that was never wired to
+	// anything at all, both removed with it.
 	const [savedEvents, setSavedEvents] = useState([]);
-
-	useEffect(() => {
-		if (smallCalendarMonth !== null) {
-			setMonthIndex(smallCalendarMonth);
-		}
-	}, [smallCalendarMonth]);
 
 	return (
 		<CalendarContext.Provider
 			value={{
 				monthIndex,
 				setMonthIndex,
-				smallCalendarMonth,
-				setSmallCalendarMonth,
 				daySelected,
 				setDaySelected,
                 savedEvents,

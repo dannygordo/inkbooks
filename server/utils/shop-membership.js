@@ -256,6 +256,58 @@ async function assertCanAccessClient(user, client) {
   }
 }
 
+/**
+ * The Mongo filter matching every Client this caller may LIST - the exact scoping getClients
+ * (resolvers/clients.js) applies, extracted so a second caller (the search resolver) reuses it
+ * rather than re-deriving it. Re-deriving authorization logic a second time is exactly the failure
+ * shape this file's own comments describe repeatedly (`role <= SHOP_ADMIN` used as a shop-scope
+ * stand-in, ~50 times, months of cross-shop leakage) - one function, two callers, is how that class
+ * of bug stops being possible rather than merely avoided this time.
+ *
+ * Returns null rather than `{}` when the caller can see no clients at all (no shop, no shared
+ * projects) - `{}` would mean "everyone," which is the one answer that must never come from here.
+ * The caller decides what null means: getClients turns it into an empty page, search skips the
+ * collection.
+ */
+async function clientScopeFilter(user) {
+  const shopIds = await getShopIdsForUser(user.id);
+  const artistIds =
+    user.role === Constants.ROLES.ARTIST ? [user.id] : await getArtistIdsForShops(shopIds);
+  const clientIdsFromProjects = artistIds.length
+    ? await Project.distinct('clientId', { artistId: { $in: artistIds } })
+    : [];
+
+  const or = [];
+  if (shopIds.length) {
+    or.push({ shopIds: { $in: shopIds } });
+  }
+  if (clientIdsFromProjects.length) {
+    or.push({ _id: { $in: clientIdsFromProjects } });
+  }
+  return or.length ? { $or: or } : null;
+}
+
+/**
+ * The Mongo filter matching every Project this caller may LIST - the exact scoping getProjects
+ * (resolvers/projects.js) applies. Same reasoning as clientScopeFilter above: one function, every
+ * caller that needs "which projects can this person see" goes through it.
+ *
+ * Returns null when the caller can see no projects (a staff/admin with no connected artists, or a
+ * client with no Client record of their own) - never `{}`.
+ */
+async function projectScopeFilter(user) {
+  if (user.role === Constants.ROLES.ARTIST) {
+    return { artistId: user.id };
+  }
+  if (user.role <= Constants.ROLES.SHOP_STAFF) {
+    const shopIds = await getShopIdsForUser(user.id);
+    const artistIds = await getArtistIdsForShops(shopIds);
+    return artistIds.length ? { artistId: { $in: artistIds } } : null;
+  }
+  const myClient = await Client.findOne({ userId: user.id }).select('_id');
+  return myClient ? { clientId: myClient.id } : null;
+}
+
 // True when two users are affiliated with at least one shop in common. Used to answer "may this
 // staff member look at this artist?" without a flat role gate: Staff at one shop have no business
 // reading an artist's books at a different shop, and role alone can't express that.
@@ -274,6 +326,8 @@ module.exports = {
   linkClientToUsersShops,
   canAccessClient,
   assertCanAccessClient,
+  clientScopeFilter,
+  projectScopeFilter,
   canManageArtist,
   assertCanManageArtist,
   hasAdminAuthority,

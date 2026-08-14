@@ -23,7 +23,11 @@ const bookingRequestMutations = require('../mutations/bookingRequests');
 const artistShopConnectionResolvers = require('./artistShopConnections');
 const shopCutRateResolvers = require('./shopCutRates');
 const analyticsResolvers = require('./analytics');
+const eventLogResolvers = require('./eventLogs');
+const reminderResolvers = require('./reminders');
+const searchResolvers = require('./search');
 const depositResolvers = require('./deposits');
+const giftCardResolvers = require('./giftCards');
 const passwordResolvers = require('./passwords');
 const passwordMutations = require('../mutations/passwords');
 const accountMutations = require('../mutations/accounts');
@@ -42,6 +46,7 @@ const Appointment = require('../../models/Appointment');
 const Project = require('../../models/Project');
 const Staff = require('../../models/Staff');
 const BookingRequest = require('../../models/BookingRequest');
+const GiftCard = require('../../models/GiftCard');
 const { findOrCreateConversationForMembers } = require('../../utils/conversations');
 const { ensureTagColor } = require('../../utils/tag-color');
 const { getActiveShopIdForArtist } = require('../../utils/artist-shop');
@@ -79,8 +84,12 @@ module.exports = {
     ...shopCutRateResolvers.Query,
     ...analyticsResolvers.Query,
     ...depositResolvers.Query,
+    ...giftCardResolvers.Query,
     ...passwordResolvers.Query,
-    ...notificationResolvers.Query
+    ...notificationResolvers.Query,
+    ...eventLogResolvers.Query,
+    ...reminderResolvers.Query,
+    ...searchResolvers.Query
   },
   Mutation: {
     ...usersResolvers.Mutation,
@@ -97,10 +106,12 @@ module.exports = {
     ...artistShopConnectionMutations,
     ...shopCutRateResolvers.Mutation,
     ...shopCutPaymentMutations,
+    ...giftCardResolvers.Mutation,
     ...depositMutations,
     ...passwordMutations,
     ...accountMutations,
-    ...notificationResolvers.Mutation
+    ...notificationResolvers.Mutation,
+    ...reminderResolvers.Mutation
   },
   Project: {
     artist: async(project, args, context, info) => {
@@ -150,6 +161,19 @@ module.exports = {
         bookingRequestId: project.bookingRequestId,
         depositCents: { $gt: 0 },
       }).sort({ depositCollectedAt: 1 });
+    },
+    // The consult itself, regardless of whether it's taken a deposit yet - unlike `deposits`
+    // above, which only returns appointments that already have depositCents set. Project.jsx's
+    // "Add Deposit" button needs an appointmentId to record the FIRST deposit against too, not
+    // just to top up an existing one.
+    consultAppointment: async(project) => {
+      if (!project.bookingRequestId) {
+        return null;
+      }
+      return Appointment.findOne({
+        bookingRequestId: project.bookingRequestId,
+        appointmentType: 'consult',
+      });
     },
     depositCollectedCents: async(project) => {
       if (!project.bookingRequestId) {
@@ -237,6 +261,23 @@ module.exports = {
         ? (await BookingRequest.findById(appointment.bookingRequestId))
         : null;
     }
+  },
+  // See models/GiftCard.js and DECISIONS.md M6.
+  GiftCard: {
+    issuerArtist: async (giftCard) => {
+      return giftCard.issuerArtistId ? Artist.findOne({ userId: giftCard.issuerArtistId }) : null;
+    },
+    shop: async (giftCard) => {
+      return giftCard.shopId ? Shop.findById(giftCard.shopId) : null;
+    },
+    soldBy: async (giftCard) => {
+      return User.findById(giftCard.soldByUserId);
+    },
+  },
+  GiftCardRedemption: {
+    appointment: async (redemption) => {
+      return Appointment.findById(redemption.appointmentId);
+    },
   },
   Artist: {
     // Derived from the artist's active ArtistShopConnection rather than read off Artist.shopId.

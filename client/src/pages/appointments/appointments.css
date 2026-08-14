@@ -27,13 +27,13 @@
     border: none;
     padding: 5px;
     border-radius: 10px;
-    background-color: #ddd;
-    color: #555;
+    background-color: var(--ib-border);
+    color: var(--ib-text-secondary);
     font-size: 16px;
 }
 .appointmentsAddButton:hover {
-    background-color: #555;
-    color: #ddd;
+    background-color: var(--ib-text-secondary);
+    color: var(--ib-border);
     cursor: pointer;
 }
 .appointmentsListAvatarContainer {
@@ -51,21 +51,21 @@
     border: none;
     border-radius: 10px;
     padding: 5px 10px;
-    background-color: #ddd;
-    color: #555;
+    background-color: var(--ib-border);
+    color: var(--ib-text-secondary);
     cursor: pointer;
     margin-right: 20px;
 }
 .appointmentsListEdit:hover {
-    background-color: #555;
-    color: #ddd;
+    background-color: var(--ib-text-secondary);
+    color: var(--ib-border);
 }
 .appointmentsListDelete {
     cursor: pointer;
 }
 .appointmentsListDelete:hover {
     cursor: pointer;
-    color: #ccc;
+    color: var(--ib-border-strong);
 }
 .appointmentsContainer {
     display: flex;

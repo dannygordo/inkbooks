@@ -54,6 +54,7 @@ export const AnalyticsService = (() => {
 					tipsCents
 					shopCutEarnedCents
 					shopCutOutstandingCents
+					shopCutAwaitingConfirmationCents
 					completedSessionCount
 					consultCount
 					appointmentCount

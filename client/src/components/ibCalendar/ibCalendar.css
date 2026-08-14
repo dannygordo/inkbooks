@@ -25,9 +25,14 @@
    --------------------------------------------------------------------------------------------- */
 :root {
 	--ibcal-font: "Google Sans", "Roboto", "Helvetica Neue", Arial, sans-serif;
-	--ibcal-text: #3c4043;
-	--ibcal-text-muted: #70757a;
-	--ibcal-blue: #1a73e8;
+	/* Were Google Calendar's own literal hex values (#3c4043/#70757a/#1a73e8), matching the
+	   layout this file mimics down to the pixel. Re-pointed at the app's own copper tokens
+	   instead - the sizing/spacing homage to Google Calendar stays, but the color no longer
+	   fights the rest of the themed app for a calendar that's on screen just as often as
+	   anything else in it. */
+	--ibcal-text: var(--ib-text-primary);
+	--ibcal-text-muted: var(--ib-text-muted);
+	--ibcal-blue: var(--ib-primary);
 }
 
 /* `body` prefix is not decoration: MUI's styled() injects its emotion classes into <head> at
@@ -52,7 +57,7 @@ body .ibCalendar * {
 	padding: 8px 2px;
 	display: flex;
 	align-items: center;
-	border-bottom: 1px solid #f0f0f0;
+	border-bottom: 1px solid var(--ib-border);
 }
 .ibCalendarContainer {
 	flex: 1;
@@ -61,7 +66,7 @@ body .ibCalendar * {
 }
 
 .ibCalendarDayContainer {
-	border: solid 1px #000;
+	border: solid 1px var(--ib-border-strong);
 }
 /* This used to carry the day-number header's own sizing (height: 24px; line-height: 24px) - since
    it wraps BOTH the header and the events list below it, that squashed the whole cell (including
@@ -124,7 +129,7 @@ body .ibCalendar * {
 	padding: 2px 6px;
 	margin-bottom: 2px;
 	border-radius: 4px;
-	color: #fff;
+	color: var(--ib-primary-contrast);
 	text-align: left;
 	cursor: pointer;
 	white-space: nowrap;
@@ -145,7 +150,7 @@ body .ibCalendar * {
 	line-height: 24px;
 	font-size: 12px;
 	font-weight: 500;
-	color: #fff;
+	color: var(--ib-primary-contrast);
 	background-color: var(--ibcal-blue);
 	-webkit-border-radius: 50%;
 	border-radius: 50%;
@@ -176,87 +181,34 @@ body .ibCalendar * {
     letter-spacing: 0;
     color: var(--ibcal-text);
 }
-.ibCalendarAsideContainer {
-    border-right: 1px solid #ddd;
-    padding: 5px;
-    flex: .2;
-    margin-right: 3px;
-}
+/* .ibCalendarAsideContainer and the .ibSmallCalendar* rules that used to follow it are gone along
+   with Sidebar.jsx/SmallCalendar.jsx - that column (Create Event + a mini month-picker) no longer
+   exists; Create Event lives in .ibCalendarHeader now (see CalendarHeader.jsx) and nothing else
+   replaced the mini-calendar. */
 .ibCalendarCreateEventButton {
     display: flex;
 	margin-left: 10px;
-    margin-top: 20px;
 }
 .ibCalendarCreateEventButton:hover {
     cursor: pointer;
+}
+/* Right-justified in the calendar header specifically - scoped to .ibCalendarHeader rather than
+   changed on .ibCalendarCreateEventButton itself, because that class is shared with
+   AppointmentsList.jsx's own "Create Event" button (components/appointments/AppointmentsList.jsx),
+   which sits in a `justify-content: space-between` row of its own and doesn't want these margins
+   overridden. margin-left: auto is what actually does the push: .ibCalendarHeader is a flex row
+   with every OTHER child sized to content, so the last child claiming all remaining space is what
+   sends it to the far edge - the standard flexbox "last item right-aligned" pattern, not a
+   wrapping container. margin-top: 0 undoes the 20px this class carries for its old sidebar
+   context, where it sat below the mini-calendar rather than centered in a single header row. */
+.ibCalendarHeader .ibCalendarCreateEventButton {
+    margin-left: auto;
+    margin-top: 0;
 }
 .ibCalendarCreateEventButtonText {
     padding-left: 3px;
     padding-right: 7px;
     margin-top: 10px;
-}
-.ibSmallCalendarContainer {
-    margin-top: 10px;
-}
-/* Google Calendar's mini-calendar month title is 14px/500, not the ambient bold. */
-.ibSmallCalendarHeader {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 20px;
-    padding-left: 10px;
-}
-.ibSmallCalendarContainer .ibSmallCalendarHeader p {
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--ibcal-text);
-}
-/* This class existed but was never applied to anything - SmallCalendar.jsx rendered the weekday
-   letters into a bare <Item> with no className, so these rules were dead. Now attached to that
-   Item. Container-qualified (0,2,0) so it outranks the emotion class MUI's styled(Paper) puts on
-   the same element, which carries theme.typography.body2's own 14px. */
-.ibSmallCalendarContainer .ibSmallCalendarDays {
-    padding-top: 1px;
-    align-items: center;
-    font-size: 10px;
-    font-weight: 500;
-    letter-spacing: 0.3px;
-    color: var(--ibcal-text-muted);
-    width: 24px;
-    height: 24px;
-}
-/* Mini-calendar day numbers. Kept ahead of the today/selected rules below, which are the same
-   specificity and therefore win on color/background by source order. */
-.ibSmallCalendarContainer .ibSmallCalendarDayNumber {
-    font-size: 11px;
-    font-weight: 500;
-    color: var(--ibcal-text);
-}
-.ibSmallCalendarContainer .ibSmallCalendarToday {
-    padding-top: 1px;
-	font-weight: 500;
-    font-size: 11px;
-    -webkit-border-radius: 50%;
-    border-radius: 50%;
-    background-color: var(--ibcal-blue);
-    color: #fff;
-    width: 24px;
-    height: 24px;
-    margin-left: -7px !important;
-    padding-right: 2px;
-}
-.ibSmallCalendarContainer .ibSmallCalendarSelectedDay {
-    padding-top: 1px;
-    color: #185abc;
-    background-color: #d2e3fc;
-    font-weight: 500;
-    font-size: 11px;
-    -webkit-border-radius: 50%;
-    border-radius: 50%;
-    width: 24px;
-    height: 24px;
-    margin-left: -7px !important;
-    padding-right: 2px;
 }
 
 /* Wraps <DialogContent> + <DialogActions> as siblings in UpdateEventDialog.jsx and
@@ -334,7 +286,7 @@ body .ibCalendar * {
     margin-bottom: 10px;
 }
 .viewEventType {
-    color: #888;
+    color: var(--ib-text-muted);
     text-transform: capitalize;
     font-size: 14px;
 }
@@ -347,15 +299,15 @@ body .ibCalendar * {
     margin: 0 0 4px;
 }
 .viewEventClient {
-    color: #555;
+    color: var(--ib-text-secondary);
     margin: 0 0 4px;
 }
 .viewEventDescription {
-    color: #555;
+    color: var(--ib-text-secondary);
     margin: 0 0 10px;
 }
 .viewEventReadOnlyNote {
-    color: #999;
+    color: var(--ib-text-muted);
     font-style: italic;
     font-size: 13px;
     margin: 10px 0 0;
@@ -363,7 +315,7 @@ body .ibCalendar * {
 .shopCutLedgerPanel {
     margin-top: 15px;
     padding: 10px 15px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--ib-border);
     border-radius: 6px;
 }
 .shopCutLedgerStatus {
@@ -384,7 +336,7 @@ body .ibCalendar * {
 .shopCutLedgerNote {
     margin-top: 8px;
     font-size: 13px;
-    color: #666;
+    color: var(--ib-text-secondary);
     font-style: italic;
 }
 /* AppointmentWizard.jsx - every step's <DialogContent> gets this class. MUI's own DialogContent
@@ -426,14 +378,14 @@ body .ibCalendar * {
    the old dropdown-based client picker was replaced with this. */
 .clientEmailMatchCard {
     padding: 14px 16px;
-    border: 1px solid #b6e6c3;
-    background-color: #e6f6ea;
+    border: 1px solid var(--ib-success-border);
+    background-color: var(--ib-success-bg);
     border-radius: 6px;
     font-size: 14px;
 }
 .clientEmailNoMatchNote {
     font-size: 13px;
-    color: #666;
+    color: var(--ib-text-secondary);
     font-style: italic;
 }
 /* min-height added - the previous fix (splitting .ibCalendarDayHeader out of

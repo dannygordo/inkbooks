@@ -61,6 +61,16 @@ const ClientSchema = new mongoose.Schema({
 }, {
     timestamps: true
 });
+
+// Global search (utils/search.js) - name and every way a client is typically looked up by hand.
+// Weighted so a name match ranks above an address/instagram-handle match on the same query, since
+// "find this person" is what search is almost always actually for. Mongo allows exactly one text
+// index per collection, so this is the only one this schema will ever declare.
+ClientSchema.index(
+    { firstName: 'text', lastName: 'text', email: 'text', phone: 'text', instagram: 'text', facebook: 'text' },
+    { weights: { firstName: 10, lastName: 10, email: 5, phone: 5, instagram: 1, facebook: 1 }, name: 'ClientTextIndex' }
+);
+
 module.exports = mongoose.model('Client', ClientSchema);
 
 

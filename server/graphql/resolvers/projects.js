@@ -1,12 +1,11 @@
 const Project = require('../../models/Project');
 const Client = require('../../models/Client');
 const withAuth = require('../../utils/with-auth');
-const { Constants } = require('../../utils/constants');
 const { UserInputError, AuthenticationError, rethrow } = require('../../utils/errors');
 const {
-  getShopIdsForUser,
-  getArtistIdsForShops,
   assertCanManageArtist,
+  canManageArtist,
+  projectScopeFilter,
 } = require('../../utils/shop-membership');
 const { paginate, normalizePage } = require('../../utils/pagination');
 
@@ -27,25 +26,12 @@ const resolvers = {
     // resolver), so this looks up the caller's own Client doc first.
     getProjects: withAuth(async (_, { page }, context, info, user) => {
       try {
-        let filter = {};
-        // No unscoped branch, for anyone. The staff test is `<= SHOP_STAFF` rather than
-        // `=== SHOP_STAFF` so a shop admin lands here rather than falling through to the client
-        // branch and seeing nothing.
-        if (user.role === Constants.ROLES.ARTIST) {
-          filter = { artistId: user.id };
-        } else if (user.role <= Constants.ROLES.SHOP_STAFF) {
-          const shopIds = await getShopIdsForUser(user.id);
-          const artistIds = await getArtistIdsForShops(shopIds);
-          if (artistIds.length === 0) {
-            return emptyProjectPage(page);
-          }
-          filter = { artistId: { $in: artistIds } };
-        } else {
-          const myClient = await Client.findOne({ userId: user.id }).select('_id');
-          if (!myClient) {
-            return emptyProjectPage(page);
-          }
-          filter = { clientId: myClient.id };
+        // See projectScopeFilter's own comment (utils/shop-membership.js) - the same scoping
+        // search's project search reuses, so there is exactly one place that answers "which
+        // projects can this person see."
+        const filter = await projectScopeFilter(user);
+        if (!filter) {
+          return emptyProjectPage(page);
         }
         return await paginate(Project, filter, { sort: { createdAt: -1 }, page });
       } catch (err) {
@@ -54,9 +40,17 @@ const resolvers = {
     }),
     // Was withAuth with no restriction at all - any authenticated user could pass an arbitrary
     // projectId and read that project's full detail (client PII, notes, reference images,
-    // deposit amount). Allowed: shop-admin-or-better, the assigned artist, the client the
-    // project belongs to, or a staff member of the assigned artist's shop - same scope as
+    // deposit amount). Allowed: shop-admin-or-better sharing a shop with the assigned artist, the
+    // assigned artist themselves, or the client the project belongs to - same scope as
     // getProjects above, just for a single project instead of a list.
+    //
+    // THE "isShopStaff" CHECK USED TO IGNORE ROLE ENTIRELY - it asked only "does this caller share
+    // a shop with the project's artist", which is true for every artist connected to that shop, not
+    // just staff/admins. That let any artist at a shop open any other artist's project - client
+    // PII, notes, images and deposit figures included - by clicking their row on a shared
+    // appointments list. Replaced with canManageArtist, the same role-aware check
+    // getProjectsByArtist below already uses for the list version of this same question - a shop
+    // admin sharing the artist's shop still gets in; a fellow artist does not.
     getProject: withAuth(async (_, { projectId }, context, info, user) => {
       try {
         const project = await Project.findById(projectId).sort({ 'notes.createdAt': -1});
@@ -66,13 +60,7 @@ const resolvers = {
         if (String(user.id) !== String(project.artistId)) {
           const myClient = await Client.findOne({ userId: user.id }).select('_id');
           const isOwnClient = myClient && String(myClient.id) === String(project.clientId);
-          let isShopStaff = false;
-          if (!isOwnClient) {
-            const shopIds = await getShopIdsForUser(user.id);
-            const artistIds = await getArtistIdsForShops(shopIds);
-            isShopStaff = artistIds.map(String).includes(String(project.artistId));
-          }
-          if (!isOwnClient && !isShopStaff) {
+          if (!isOwnClient && !(await canManageArtist(user, project.artistId))) {
             throw new AuthenticationError('Action not allowed');
           }
         }

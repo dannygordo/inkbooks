@@ -8,15 +8,18 @@ export const ROUTE_CONSTANTS = {
 	HOME: "/",
 	ARTISTS: "artists",
 	ARTIST: "/artist/",
-	EDIT_ARTIST: "/artist/edit/",
+	// EDIT_ARTIST removed alongside its route - same reasoning as EDIT_PROJECT below. Every field
+	// EditArtist.jsx offered is now editable in place on Artist.jsx itself. See App.jsx.
 	CREATE_ARTIST: "artist/create",
 	CLIENTS: "clients",
 	CLIENT: "/client/",
-	EDIT_CLIENT: "/client/edit/",
+	// EDIT_CLIENT removed alongside its route - same reasoning as EDIT_PROJECT below. Every field
+	// EditClient.jsx offered is now editable in place on Client.jsx itself. See App.jsx.
 	CREATE_CLIENT: "/client/create",
 	STAFF: "/staff/",
 	STAFF_PROFILE: "/staff-profile/",
-	EDIT_STAFF: "/staff/edit/",
+	// EDIT_STAFF removed alongside its route - same reasoning as EDIT_PROJECT below. Every field
+	// EditStaff.jsx offered is now editable in place on StaffProfile.jsx itself. See App.jsx.
 	CREATE_STAFF: "/staff/create",
 	PROJECTS: "projects",
 	PROJECT: "/project/",
@@ -27,7 +30,8 @@ export const ROUTE_CONSTANTS = {
 	CONSULT: "/consult/",
 	SHOPS: "shops",
 	SHOP: "/shop/",
-	EDIT_SHOP: "/shop/edit/",
+	// EDIT_SHOP removed alongside its route - same reasoning as EDIT_PROJECT above. Every field
+	// EditShop.jsx offered is now editable in place on Shop.jsx itself. See App.jsx.
 	CREATE_SHOP: "/shop/create",
 	// PROFILE is gone along with the page it named. Its avatar, password and calendar colour are
 	// panels on Settings now - see components/settings/AccountPanel.jsx. It was also written
@@ -117,6 +121,7 @@ export const APP_SETTINGS_CONSTANTS = {
 	PROJECT_IMAGE_TYPES: {
 		REFERENCE: "reference",
 		DESIGN: "design",
+		BODY: "body",
 	},
 	PAGE_TYPES: {
 		ARTISTS: "artists",

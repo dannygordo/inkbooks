@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
-import { useMutation } from "@apollo/client";
+import React, { useEffect, useState } from "react";
+import { useMutation, useApolloClient } from "@apollo/client";
 import moment from "moment";
 import { Button, Chip } from "@mui/material";
 import { PlayArrow, Stop, RestartAlt, Save, Delete } from "@mui/icons-material";
@@ -8,6 +8,7 @@ import IBInput from "../inputs/IBInput";
 import IBMultilineInput from "../inputs/IBMultilineInput";
 import IBDateTimePicker from "../inputs/IBDateTimePicker";
 import IBSquarePaymentForm from "../IBSquarePayments/IBSquarePaymentForm";
+import FormField from "../formField/FormField";
 import { useAuth } from "../../context/auth";
 import { ALERT_CONSTANTS } from "../../constants";
 import { formatCents, centsToDollars, dollarsToCents } from "../../utils/money";
@@ -48,16 +49,32 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 	// The date/time was previously not editable anywhere in this view - buildSavePayload just
 	// echoed back the original value on every save. The time matters just as much as the date for
 	// a booked session, so both are now editable via the same IBDateTimePicker used elsewhere.
+	//
+	// This is what the artist is offering as the session's date/time WHILE IT'S OPEN. Once the
+	// session is actually closed the server overrides appointmentDate to the moment of closing
+	// (see mutations/appointments.js's updateAppointment and routes/squarePayments.js) - reports
+	// run off when the money actually moved, not off a schedule that may have shifted. See
+	// DECISIONS.md.
 	const [sessionDate, setSessionDate] = useState(moment(initialAppointment.appointmentDate));
 	const [deleting, setDeleting] = useState(false);
-	// One ref per money component. They're captured separately because they aren't derivable from
-	// each other and the shop cut depends on telling them apart - the subtotal is the artist's
-	// earnings and the only thing the cut applies to; the tip is theirs entirely; tax and fees
-	// belong to neither party. See models/Appointment.js.
-	const subtotalRef = useRef();
-	const taxRef = useRef();
-	const feeRef = useRef();
-	const tipRef = useRef();
+	// Tattoo work and tip are the only two money figures an artist ever types in - see the render
+	// below. Controlled (not refs) because tax/fees/the total now recompute live as these change,
+	// which needs React to see every keystroke rather than only the value at save time.
+	//
+	// Lazy initializer (runs once, at mount) rather than a plain expression - it needs
+	// computeSessionSubtotalCents/getEffectiveRate purely to default an EMPTY subtotal to the
+	// suggested figure, the same fallback the old uncontrolled defaultValue had
+	// (`appointment.subtotalCents ?? suggestedSubtotalCents`). The LIVE versions of those two
+	// functions, used for the render and the "Use Suggested" button, are declared further down and
+	// track appointment (state), not this one-time initial value.
+	const [subtotalDollars, setSubtotalDollars] = useState(() => {
+		const initialSuggestedCents = computeSessionSubtotalCents(
+			getLiveElapsedSeconds(initialAppointment),
+			getEffectiveRate(project?.artist, project?.artist?.shop, connections)
+		);
+		return String(centsToDollars(initialAppointment.subtotalCents ?? initialSuggestedCents));
+	});
+	const [tipDollars, setTipDollars] = useState(String(centsToDollars(initialAppointment.tipCents)));
 	// Forces a re-render every second while the timer is running so the live elapsed readout
 	// actually ticks - the underlying value is always computed fresh from
 	// accumulatedSeconds/timerStartedAt (see getLiveElapsedSeconds), never stored client-side.
@@ -79,19 +96,102 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 	);
 	const [deleteAppointment] = useMutation(AppointmentService.DELETE_APPOINTMENT);
 	const [applyDeposit, { loading: applyingDeposit }] = useMutation(DepositService.APPLY_DEPOSIT);
+	// Used ONLY for the final, deliberate quote right before a card is actually reached for
+	// (handleChargeViaSquare) - one call, on a click, with nothing else in flight against it.
 	const [fetchChargeQuote, { loading: quoting }] = AppointmentService.useChargeQuote();
+	// Used for every OTHER quote - the live preview as the artist types and the fresh quote taken
+	// right before any save. A plain client.query() rather than the useLazyQuery hook above: those
+	// calls fire repeatedly and close together (every keystroke, debounced), and Apollo's lazy
+	// query execute function shares one underlying observable across every call from the same
+	// hook instance - a fast second call can resolve against the first call's in-flight state
+	// rather than its own, which is exactly the kind of intermittent, hard-to-notice failure that
+	// would look like "the total just stopped updating." client.query() has no shared state to
+	// collide with - every call is its own independent request.
+	const apolloClient = useApolloClient();
 
 	// The Square_Fee_Offset is OFFERED, never applied silently (DECISIONS.md M5) - so this starts
 	// false and only the artist's own tick turns it on. The amount it adds is the server's to
 	// compute; this is only the choice.
 	const [applyFeeOffset, setApplyFeeOffset] = useState(false);
 
-	// Deposits this client has already paid and not yet spent. Skipped once this session already
-	// carries a credit - there's nothing to offer, and the server refuses a second one anyway.
-	const { data: depositData } = DepositService.getAvailableDeposits(appointment.id, {
-		skip: Boolean(appointment.depositCreditCents),
-	});
-	const availableDeposits = depositData?.getAvailableDeposits || [];
+	// Live tax/fee/total preview - the server's answer (utils/charge-quote.js), the same function
+	// that decides what Square actually charges, queried with the CURRENT unsaved subtotal/tip so
+	// the numbers on screen update as the artist types instead of only after a save. See
+	// getFreshQuote below for why this state is never itself trusted at save/charge time - it's
+	// display only, and a stale debounced value here must never become what gets written or
+	// charged.
+	const [quote, setQuote] = useState(null);
+	// Surfaced rather than swallowed - an earlier version of this caught every failure here and
+	// just left the labels blank, which is indistinguishable on screen from "nothing typed yet"
+	// and impossible to diagnose from the UI. If the quote can't be computed, the reason is now
+	// visible next to the figures it would have filled in.
+	const [quoteError, setQuoteError] = useState(null);
+
+	const isClosed = appointment.appointmentStatus === "completed";
+
+	// What Square would actually charge for the CURRENT (possibly unsaved) figures on screen, via
+	// getChargeQuote's subtotalCentsOverride - see utils/charge-quote.js's own comment on why that
+	// override exists and why it can never reach a real charge. Used both by the debounced preview
+	// below and, unwrapped, at the moment of any save/close/charge so what's written is never
+	// older than what's on screen.
+	//
+	// client.query(), not the useLazyQuery hook further up - see that hook's own comment on why.
+	const getFreshQuote = async () => {
+		const subtotalCents = dollarsToCents(subtotalDollars);
+		if (subtotalCents <= 0) {
+			return null;
+		}
+		try {
+			const { data: quoteData } = await apolloClient.query({
+				query: AppointmentService.GET_CHARGE_QUOTE,
+				variables: {
+					appointmentId: appointment.id,
+					applyFeeOffset,
+					tipCents: dollarsToCents(tipDollars),
+					subtotalCentsOverride: subtotalCents,
+				},
+				fetchPolicy: "network-only",
+			});
+			setQuoteError(null);
+			return quoteData?.getChargeQuote || null;
+		} catch (err) {
+			setQuoteError(err.graphQLErrors?.[0]?.message || err.message);
+			return null;
+		}
+	};
+
+	// Debounced live preview. Closed sessions skip this entirely and read the figures actually
+	// saved (see the render below) - there is nothing left to recompute and no reason to ask.
+	useEffect(() => {
+		if (isClosed) {
+			return;
+		}
+		const subtotalCents = dollarsToCents(subtotalDollars);
+		if (subtotalCents <= 0) {
+			// No price yet - a session with nothing entered is unfinished, not free (see
+			// charge-quote.js), so there's nothing to quote. Cleared rather than left stale.
+			setQuote(null);
+			setQuoteError(null);
+			return;
+		}
+		let cancelled = false;
+		const handle = setTimeout(() => {
+			getFreshQuote().then((result) => {
+				// A slower, now-superseded call landing after a newer one started must not
+				// overwrite what the newer call already set - each call is independent (see
+				// getFreshQuote's own comment), so nothing else here prevents that race.
+				if (!cancelled) {
+					setQuote(result);
+				}
+			});
+			// eslint-disable-next-line react-hooks/exhaustive-deps
+		}, 400);
+		return () => {
+			cancelled = true;
+			clearTimeout(handle);
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [subtotalDollars, tipDollars, applyFeeOffset, isClosed, appointment.id]);
 
 	const handleApplyDeposit = (depositAppointmentId) => async () => {
 		try {
@@ -120,10 +220,15 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 		}
 	};
 
+	// Available deposits query - skipped once this session already carries a credit.
+	const { data: depositData } = DepositService.getAvailableDeposits(appointment.id, {
+		skip: Boolean(appointment.depositCreditCents),
+	});
+	const availableDeposits = depositData?.getAvailableDeposits || [];
+
 	const effectiveRate = getEffectiveRate(project?.artist, project?.artist?.shop, connections);
 	const elapsedSeconds = getLiveElapsedSeconds(appointment);
 	const suggestedSubtotalCents = computeSessionSubtotalCents(elapsedSeconds, effectiveRate);
-	const isClosed = appointment.appointmentStatus === "completed";
 
 	const handleStart = async () => {
 		const { data } = await startTimer({ variables: { appointmentId: appointment.id } });
@@ -139,28 +244,25 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 	};
 
 	const handleUseSuggested = () => {
-		if (subtotalRef.current) {
-			subtotalRef.current.value = centsToDollars(suggestedSubtotalCents);
-		}
+		setSubtotalDollars(String(centsToDollars(suggestedSubtotalCents)));
 	};
 
-	// Reads a dollar-denominated input and returns cents, falling back to the stored value when
-	// the field is empty. Note the `=== ""` check rather than a falsy one: "0" is a legitimate
-	// entry (a comped session, an untipped one) and a falsy test would silently discard it in
-	// favour of whatever was stored before.
-	const readCents = (ref, storedCents) => {
-		const raw = ref.current?.value;
-		if (raw === undefined || raw === null || raw === "") {
-			return storedCents || 0;
-		}
-		return dollarsToCents(raw);
-	};
-
-	const buildSavePayload = () => {
-		const subtotalCents = readCents(subtotalRef, appointment.subtotalCents);
-		const taxCents = readCents(taxRef, appointment.taxCents);
-		const feeCents = readCents(feeRef, appointment.feeCents);
-		const tipCents = readCents(tipRef, appointment.tipCents);
+	// Builds what gets SAVED. `freshQuote` is required for a non-zero subtotal - passed in by every
+	// caller below, fetched synchronously right before the save, rather than reading the debounced
+	// `quote` state, which can lag a few hundred milliseconds behind the box the artist just typed
+	// into. Tax and fees are no longer hand-typed (see the render below): they are exactly what the
+	// server just quoted for these figures, which is also exactly what Square would charge for them.
+	const buildSavePayload = (freshQuote) => {
+		const subtotalCents = dollarsToCents(subtotalDollars);
+		const tipCents = dollarsToCents(tipDollars);
+		const taxCents = freshQuote ? freshQuote.taxCents : 0;
+		const feeCents = freshQuote ? freshQuote.feeOffsetCents : 0;
+		// freshQuote.totalCents already accounts for the deposit credit (netSubtotalCents) and the
+		// offset, in the server's own order (DECISIONS.md M8) - not re-derived here by addition,
+		// which is exactly the "two totals that can disagree" bug this component used to have.
+		const totalCents = freshQuote
+			? freshQuote.totalCents
+			: Math.max(0, subtotalCents + tipCents - (appointment.depositCreditCents || 0));
 		return {
 			id: appointment.id,
 			appointmentDate: moment(sessionDate).toISOString(),
@@ -168,29 +270,16 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 			taxCents,
 			feeCents,
 			tipCents,
-			// Derived here rather than entered - the grand total is definitionally the sum of its
-			// parts at save time, MINUS any deposit already credited to this session. Clamped at
-			// zero: a deposit larger than the final sitting is a real case, and a negative total
-			// would be the shop owing the client money, which this flow can't hand back.
-			//
-			// This is a SAVED figure for a session being settled by hand (cash, or a card taken
-			// outside InkBooks), not the charge amount. The card path never sends a total: the
-			// server computes it, and its ordering is the authoritative one - a deposit comes off
-			// the subtotal before tax (M8/M11), which this rough sum does not attempt to model.
-			// The two agree whenever tax is entered net, and the server's answer wins when they
-			// don't, because it is the one that reaches the card.
-			totalCents: Math.max(
-				0,
-				subtotalCents + taxCents + feeCents + tipCents - (appointment.depositCreditCents || 0)
-			),
+			totalCents,
 			sessionNotes: notes,
 		};
 	};
 
 	const handleSaveDetails = async (e) => {
 		e.preventDefault();
+		const freshQuote = await getFreshQuote();
 		const { data } = await updateSessionDetails({
-			variables: { appointmentInput: buildSavePayload() },
+			variables: { appointmentInput: buildSavePayload(freshQuote) },
 		});
 		setAppointment((prev) => ({ ...prev, ...data.updateAppointment }));
 		setSessionDate(moment(data.updateAppointment.appointmentDate));
@@ -236,14 +325,20 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 		}
 	};
 
+	// Closing sets appointmentStatus to 'completed' - the server (mutations/appointments.js) reacts
+	// to that transition by overwriting appointmentDate to the moment this save lands, regardless of
+	// what sessionDate above says. That's deliberate (DECISIONS.md): a session worked early or late
+	// against its booked slot should report on the day it actually happened.
 	const handleCloseSession = async (e) => {
 		e.preventDefault();
+		const freshQuote = await getFreshQuote();
 		const { data } = await updateSessionDetails({
 			variables: {
-				appointmentInput: { ...buildSavePayload(), appointmentStatus: "completed" },
+				appointmentInput: { ...buildSavePayload(freshQuote), appointmentStatus: "completed" },
 			},
 		});
 		setAppointment((prev) => ({ ...prev, ...data.updateAppointment }));
+		setSessionDate(moment(data.updateAppointment.appointmentDate));
 		setAlert({
 			isAlert: true,
 			severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
@@ -264,15 +359,22 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 	//
 	// It also means an artist who edits the price and charges without saving no longer silently
 	// charges the edit and records something else.
+	//
+	// A successful charge here closes the session automatically on the server (routes/
+	// squarePayments.js) - a paid-by-card session has nothing left to do, so there is no separate
+	// "now click Close" step for that path. onSuccess below just reflects that back.
 	const handleChargeViaSquare = async (e) => {
 		e.preventDefault();
+		const freshQuote = await getFreshQuote();
 		const { data } = await updateSessionDetails({
-			variables: { appointmentInput: buildSavePayload() },
+			variables: { appointmentInput: buildSavePayload(freshQuote) },
 		});
 		setAppointment((prev) => ({ ...prev, ...data.updateAppointment }));
 
 		// The amount is now the server's to state. Fetched rather than added up here, by the same
-		// function the charge route uses, so the total on screen is the total charged.
+		// function the charge route uses, so the total on screen is the total charged. No override
+		// this time - this reads the subtotal that was JUST saved, which is what the charge route
+		// itself will read.
 		const { data: quoteData } = await fetchChargeQuote({
 			variables: {
 				appointmentId: appointment.id,
@@ -280,16 +382,16 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 				tipCents: data.updateAppointment.tipCents || 0,
 			},
 		});
-		const quote = quoteData?.getChargeQuote;
-		if (!quote) {
+		const chargeQuote = quoteData?.getChargeQuote;
+		if (!chargeQuote) {
 			return;
 		}
-		if (!quote.canCharge) {
+		if (!chargeQuote.canCharge) {
 			setAlert({
 				isAlert: true,
 				severity: ALERT_CONSTANTS.SEVERITY.ERROR,
 				message:
-					quote.source === "shop"
+					chargeQuote.source === "shop"
 						? "This shop has not connected a Square account yet."
 						: "Connect Square in Settings before taking a card payment.",
 				timeout: ALERT_CONSTANTS.TIMEOUT,
@@ -300,11 +402,11 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 
 		setModal({
 			isOpen: true,
-			title: `Charge ${formatCents(quote.amountDueCents)} for ${project?.title || "session"}`,
+			title: `Charge ${formatCents(chargeQuote.amountDueCents)} for ${project?.title || "session"}`,
 			content: (
 				<IBSquarePaymentForm
 					// Display only - the server charges what it computed, not what is passed here.
-					amountCents={quote.amountDueCents}
+					amountCents={chargeQuote.amountDueCents}
 					appointmentId={appointment.id}
 					applyFeeOffset={applyFeeOffset}
 					tipCents={data.updateAppointment.tipCents || 0}
@@ -314,12 +416,13 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 						setAlert({
 							isAlert: true,
 							severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
-							message: "Charged successfully.",
+							message: "Charged successfully. Session closed.",
 							timeout: ALERT_CONSTANTS.TIMEOUT,
 							location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
 						});
-						// The server just wrote the breakdown and recomputed the shop cut against
-						// the new subtotal. Without this the view keeps showing pre-charge values.
+						// The server just wrote the breakdown, closed the session and recomputed the
+						// shop cut against the new subtotal. Without this the view keeps showing
+						// pre-charge values.
 						if (onClosed) {
 							onClosed();
 						}
@@ -337,6 +440,14 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 			),
 		});
 	};
+
+	// Closed: read exactly what was saved - there's nothing left to quote and no reason to ask the
+	// server to recompute a figure that already left the client's card. Open: the live preview.
+	const displayTaxCents = isClosed ? appointment.taxCents || 0 : quote?.taxCents;
+	const displayFeeCents = isClosed ? appointment.feeCents || 0 : quote?.feeOffsetCents;
+	const displayTotalCents = isClosed ? appointment.totalCents || 0 : quote?.amountDueCents;
+	const hasDisplayFigures = isClosed || Boolean(quote);
+	const subtotalCentsEntered = dollarsToCents(subtotalDollars);
 
 	return (
 		<div className="sessionDetail">
@@ -391,59 +502,101 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 				</div>
 			</div>
 
-			{/* One field per money component, not a single "Session Total". They can't be
-			    derived from each other, and the shop cut depends on telling them apart: only the
-			    subtotal is the artist's earnings and only the subtotal is what the shop takes a
-			    percentage of. A tip folded into a grand total is a tip the shop can end up
-			    charging against. */}
+			{/* Tattoo work and tip are the only figures an artist ever types in here. Tax, fees, the
+			    offset and the total are read-only - generated automatically by the same server
+			    function that decides what Square will actually charge (utils/charge-quote.js), so
+			    what's shown here is never a number someone could disagree with the card over. */}
 			<div className="sessionDetailMoney">
 				<div className="sessionDetailMoneyRow">
-					<IBInput
+					<FormField
 						id="sessionSubtotal"
 						label="Tattoo work $"
-						helperText={`Suggested from elapsed time: ${formatCents(
-							suggestedSubtotalCents
-						)}`}
-						type="number"
-						inputRef={subtotalRef}
-						defaultValue={centsToDollars(
-							appointment.subtotalCents ?? suggestedSubtotalCents
-						)}
-						disabled={isClosed}
-					/>
+						help={`Suggested from elapsed time: ${formatCents(suggestedSubtotalCents)}`}
+					>
+						<IBInput
+							id="sessionSubtotal"
+							type="number"
+							onFocus={(e) => e.target.select()}
+							autoFocus
+							value={subtotalDollars}
+							onChange={(e) => setSubtotalDollars(e.target.value)}
+							disabled={isClosed}
+						/>
+					</FormField>
 					<Button variant="text" onClick={handleUseSuggested} disabled={isClosed}>
 						Use Suggested
 					</Button>
 				</div>
 				<div className="sessionDetailMoneyRow">
-					<IBInput
+					<FormField
 						id="sessionTip"
 						label="Tip $"
-						helperText="The artist keeps 100% of this - never part of the shop cut"
-						type="number"
-						inputRef={tipRef}
-						defaultValue={centsToDollars(appointment.tipCents)}
-						disabled={isClosed}
-					/>
-					<IBInput
-						id="sessionTax"
-						label="Tax $"
-						helperText="Not income - excluded from the shop cut"
-						type="number"
-						inputRef={taxRef}
-						defaultValue={centsToDollars(appointment.taxCents)}
-						disabled={isClosed}
-					/>
-					<IBInput
-						id="sessionFee"
-						label="Fees $"
-						helperText="Processing fees - excluded from the shop cut"
-						type="number"
-						inputRef={feeRef}
-						defaultValue={centsToDollars(appointment.feeCents)}
-						disabled={isClosed}
-					/>
+						help="The artist keeps 100% of this - never part of the shop cut"
+					>
+						<IBInput
+							id="sessionTip"
+							type="number"
+							value={tipDollars}
+							onChange={(e) => setTipDollars(e.target.value)}
+							disabled={isClosed}
+						/>
+					</FormField>
+					<div className="sessionDetailMoneyLabel">
+						<span className="sessionDetailMoneyLabelName">Tax</span>
+						<span className="sessionDetailMoneyLabelValue">
+							{hasDisplayFigures ? formatCents(displayTaxCents) : "—"}
+						</span>
+						<span className="sessionDetailMoneyLabelHint">
+							Not income - excluded from the shop cut
+						</span>
+					</div>
+					<div className="sessionDetailMoneyLabel">
+						<span className="sessionDetailMoneyLabelName">Fees</span>
+						<span className="sessionDetailMoneyLabelValue">
+							{hasDisplayFigures ? formatCents(displayFeeCents) : "—"}
+						</span>
+						<span className="sessionDetailMoneyLabelHint">
+							Processing fees - excluded from the shop cut
+						</span>
+					</div>
 				</div>
+				{/* The offset is a CHOICE, presented before the card is charged and never applied
+				    silently (DECISIONS.md M5). Unticked by default. Sits right under Tax/Fees and
+				    above the total it affects, so the relationship between checking this and the
+				    total below moving is visible rather than something to discover in a charge
+				    dialog. No separate "Offset Fee" line - when this is checked the amount already
+				    shows up in Fees above, and a second label repeating the same figure under a
+				    different name read as confusing rather than clarifying. */}
+				{!isClosed && (
+					<label className="sessionDetailOffset">
+						<input
+							type="checkbox"
+							checked={applyFeeOffset}
+							onChange={(e) => setApplyFeeOffset(e.target.checked)}
+						/>{" "}
+						Add the card processing offset to this charge
+					</label>
+				)}
+				{/* The actual total the client owes right now - subtotal, tip, tax and the offset,
+				    minus any deposit already credited (DECISIONS.md M8). This is computed by the
+				    exact same function routes/squarePayments.js charges, so it is not an estimate:
+				    if a card is charged for this session, this is the figure that leaves it. */}
+				<div className="sessionDetailMoneyRow">
+					<div className="sessionDetailMoneyLabel sessionDetailMoneyLabelTotal">
+						<span className="sessionDetailMoneyLabelName">Total charged to client</span>
+						<span className="sessionDetailMoneyLabelValue">
+							{hasDisplayFigures ? formatCents(displayTotalCents) : "—"}
+						</span>
+					</div>
+				</div>
+				{/* Only reachable when there's a real subtotal typed in and hasDisplayFigures is
+				    still false - i.e. the quote was asked for and failed, rather than never asked
+				    for. See getFreshQuote's own comment on why this used to be swallowed silently. */}
+				{!isClosed && quoteError && (
+					<div className="sessionDetailQuoteError">
+						Couldn't calculate tax/fees/total: {quoteError}
+					</div>
+				)}
 				{/* Deposits. Two mutually exclusive states: one is already applied to this
 				    session, or there are unspent ones available to apply. Never both - the server
 				    refuses a second credit, and the query is skipped once a credit exists. */}
@@ -498,29 +651,14 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 				)}
 			</div>
 
-			<IBMultilineInput
-				id="sessionNotes"
-				label="Session Notes"
-				helperText=" "
-				defaultValue={notes}
-				disabled={isClosed}
-				onChange={(e) => setNotes(e.target.value)}
-			/>
-
-			{/* The offset is a CHOICE, presented before the card is charged and never applied
-			    silently (DECISIONS.md M5). Unticked by default; the amount it adds is computed
-			    server-side and appears in the charge dialog's title, not here - this component no
-			    longer works out what anything costs. */}
-			{!isClosed && (
-				<label className="sessionDetailOffset">
-					<input
-						type="checkbox"
-						checked={applyFeeOffset}
-						onChange={(e) => setApplyFeeOffset(e.target.checked)}
-					/>{" "}
-					Add the card processing offset to this charge
-				</label>
-			)}
+			<FormField id="sessionNotes" label="Session Notes">
+				<IBMultilineInput
+					id="sessionNotes"
+					defaultValue={notes}
+					disabled={isClosed}
+					onChange={(e) => setNotes(e.target.value)}
+				/>
+			</FormField>
 
 			<div className="sessionDetailActions">
 				<Button
@@ -537,13 +675,12 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 				<Button
 					variant="outlined"
 					onClick={handleChargeViaSquare}
-					disabled={isClosed || saving || quoting || readCents(subtotalRef, appointment.subtotalCents) <= 0}
+					disabled={isClosed || saving || quoting || subtotalCentsEntered <= 0}
 				>
 					{quoting ? "Checking..." : "Charge via Square"}
 				</Button>
 				<Button
 					variant="contained"
-					sx={{ backgroundColor: "#333" }}
 					disabled={isClosed || saving}
 					onClick={handleCloseSession}
 				>

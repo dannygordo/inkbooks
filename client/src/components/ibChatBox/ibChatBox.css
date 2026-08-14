@@ -39,6 +39,6 @@
 
 .ibChatBoxLoading {
 	padding: 20px 10px;
-	color: #888;
+	color: var(--ib-text-muted);
 	font-size: 14px;
 }

@@ -16,7 +16,7 @@ import "./projectSessions.css";
 /**
  * Renders inside Project.jsx (see that file's "Sessions" IBCardWrapper) - every session-type
  * appointment tied to this project (see server/graphql/resolvers/appointments.js's
- * getAppointmentsByProject), most recent first, with "+ Add Session" to schedule another one
+ * getAppointmentsByProject), oldest first, with "+ Add Session" to schedule another one
  * directly against this project - previously the only way to add a session was the calendar's
  * "Create Event" wizard, which meant leaving the project just to book its next sitting.
  *
@@ -110,9 +110,11 @@ const ProjectSessionsList = ({ project }) => {
 		return <div className="projectSessionsEmpty">Loading sessions...</div>;
 	}
 
+	// Oldest first, most recent last - reversed from how this used to sort. See handleOpenSession's
+	// own date/time display, which is unaffected by this ordering.
 	const sessions = (data?.getAppointmentsByProject || [])
 		.slice()
-		.sort((a, b) => new Date(b.appointmentDate) - new Date(a.appointmentDate));
+		.sort((a, b) => new Date(a.appointmentDate) - new Date(b.appointmentDate));
 
 	return (
 		<div className="projectSessionsList">

@@ -6,9 +6,38 @@ const {
   assertAdminAuthority,
   assertCanAccessClient,
   linkClientToUsersShops,
+  getShopIdsForUser,
 } = require('../../utils/shop-membership');
 const { assertNoArchiveTransition } = require('../../utils/archiving');
 const { redactClient } = require('../../utils/redaction');
+const { recordEvent, diffFields } = require('../../utils/event-log');
+
+// Client contact/status fields worth an audit-trail line - see models/EventLog.js's own comment
+// on why this is a deliberate subset. Client.notes is handled separately (updateClientNotes
+// below) and deliberately logs a summary with no diff - candid shop notes about a person aren't
+// something a second, harder-to-restrict collection should be holding a copy of.
+const CLIENT_AUDIT_FIELDS = [
+  'firstName',
+  'lastName',
+  'email',
+  'phone',
+  'address',
+  'city',
+  'state',
+  'zip',
+  'instagram',
+  'facebook',
+  'status',
+];
+
+// The shop this action happened under, for EventLog.shopId - the ACTING user's own shop, not
+// (necessarily any of) the client's, since Client.shopIds is many-to-many and an audit row needs
+// exactly one scoping value. Undefined for an independent artist, same as everywhere else "no
+// shop" is a real, first-class state rather than a missing one.
+async function actingShopId(userId) {
+  const shopIds = await getShopIdsForUser(userId);
+  return shopIds[0] || undefined;
+}
 
 module.exports = {
   createClient: withAuth(async (
@@ -48,6 +77,14 @@ module.exports = {
     });
     const client = await newClient.save();
     await linkClientToUsersShops(client._id, user.id);
+    await recordEvent({
+      entityType: 'Client',
+      entityId: client._id,
+      action: 'create',
+      actorUserId: user.id,
+      shopId: await actingShopId(user.id),
+      summary: `Created client ${client.firstName} ${client.lastName}`,
+    });
     return client;
   }, Constants.ROLES.CLIENT),
   /**
@@ -83,6 +120,17 @@ module.exports = {
       { _id: client._id },
       { $set: { status: Constants.CLIENT_STATUS.ARCHIVED } },
     );
+    // No diff. This is an erasure - writing the redacted values into a second collection would
+    // undo the point of redacting them in the first place. The fact that it happened, who did it,
+    // and when is exactly what an audit trail is for; what the record used to say is not.
+    await recordEvent({
+      entityType: 'Client',
+      entityId: client._id,
+      action: 'update',
+      actorUserId: user.id,
+      shopId: await actingShopId(user.id),
+      summary: 'Redacted client record (erasure request)',
+    });
     return summary;
   }),
   // Same shape as archiveArtist - see the note there. A client's projects, appointments and the
@@ -94,8 +142,18 @@ module.exports = {
       throw new UserInputError('Errors', { errors: { clientId: 'Client not found.' } });
     }
     await assertCanAccessClient(user, client);
+    const previousStatus = client.status;
     client.status = Constants.CLIENT_STATUS.ARCHIVED;
     await client.save();
+    await recordEvent({
+      entityType: 'Client',
+      entityId: client._id,
+      action: 'update',
+      actorUserId: user.id,
+      shopId: await actingShopId(user.id),
+      summary: `Archived client ${client.firstName} ${client.lastName}`,
+      changes: [{ field: 'status', from: previousStatus, to: client.status }],
+    });
     return client;
   }),
   unarchiveClient: withAuth(async (_, { clientId }, context, info, user) => {
@@ -105,8 +163,18 @@ module.exports = {
       throw new UserInputError('Errors', { errors: { clientId: 'Client not found.' } });
     }
     await assertCanAccessClient(user, client);
+    const previousStatus = client.status;
     client.status = Constants.CLIENT_STATUS.ACTIVE;
     await client.save();
+    await recordEvent({
+      entityType: 'Client',
+      entityId: client._id,
+      action: 'update',
+      actorUserId: user.id,
+      shopId: await actingShopId(user.id),
+      summary: `Unarchived client ${client.firstName} ${client.lastName}`,
+      changes: [{ field: 'status', from: previousStatus, to: client.status }],
+    });
     return client;
   }),
   // The minRole was the whole check here too - any shop admin could rewrite any client's name,
@@ -123,6 +191,18 @@ module.exports = {
     assertNoArchiveTransition(existing, client.status, 'archiveClient');
     try{
       const res = await Client.findByIdAndUpdate({_id: client.id}, client, {new: true});
+      const changes = diffFields(existing, res, CLIENT_AUDIT_FIELDS);
+      if (changes.length > 0) {
+        await recordEvent({
+          entityType: 'Client',
+          entityId: res._id,
+          action: 'update',
+          actorUserId: user.id,
+          shopId: await actingShopId(user.id),
+          summary: `Updated client ${res.firstName} ${res.lastName}`,
+          changes,
+        });
+      }
       return res;
     } catch (err) {
         rethrow(err);
@@ -154,7 +234,18 @@ module.exports = {
       // makes this stricter than a plain read: a client may read their own record but must never
       // edit the notes written about them.
       await assertCanAccessClient(user, client);
-      return await Client.findByIdAndUpdate({ _id: clientId }, { notes }, { new: true });
+      const res = await Client.findByIdAndUpdate({ _id: clientId }, { notes }, { new: true });
+      // Summary only, no diff - see CLIENT_AUDIT_FIELDS' own comment above on why note content
+      // itself never goes into this log.
+      await recordEvent({
+        entityType: 'Client',
+        entityId: res._id,
+        action: 'update',
+        actorUserId: user.id,
+        shopId: await actingShopId(user.id),
+        summary: `Updated notes for client ${res.firstName} ${res.lastName}`,
+      });
+      return res;
     } catch (err) {
       rethrow(err);
     }

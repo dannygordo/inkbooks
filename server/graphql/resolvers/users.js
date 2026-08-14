@@ -29,6 +29,7 @@ const {
 const { DEFAULT_NO_SHOP_TAG_COLOR, isUnsetTagColor, pickDefaultTagColor } = require('../../utils/tag-color');
 const { findArtistsForShops } = require('../../utils/artist-shop');
 const { assertSlugAvailable } = require('../../utils/booking-slug');
+const { setShopCutRate } = require('../../utils/shop-cut');
 
 // A real bcrypt hash of a value nobody knows, compared against when no account matches, so a
 // missing account and a wrong password take the same time to answer. Generated once at module
@@ -248,6 +249,32 @@ module.exports = {
           shopId: shop._id,
           status: Constants.STAFF_STATUS.ACTIVE,
         }).save();
+
+        // The owner never owes their own shop a cut - "a shop owner tattoos until they say
+        // otherwise" (S0), and a session they work themselves is just shop revenue, not a
+        // chargeable percentage of it. Written as a real ShopCutRate row rather than left to
+        // default to 0, because Shop.shopCutPercent (utils/shop-cut.js's last-resort fallback)
+        // defaults to 0 but is NOT staying 0 - the owner will set a real rate there for the
+        // artists they go on to hire, and resolveShopCutPercentAt has no idea "the shop's
+        // default" and "the owner's own sessions" are different questions. Without this row, the
+        // day the owner configures a 40% shop default for hired staff, that same 40% silently
+        // starts applying to their own chair too - and there is no way for them to undo it
+        // afterward, since setShopCutRate's resolver (resolvers/shopCutRates.js) explicitly
+        // refuses letting anyone set their own rate. That block is resolver-layer only; calling
+        // the utility directly here, at account creation, is the one legitimate exception - this
+        // is a system default, not the owner editing their own number.
+        //
+        // Tied to THIS specific person (artistId: newUser._id), not to the SHOP_ADMIN role - if
+        // the shop ever has a second admin later who isn't its owner (a promoted manager who also
+        // takes clients), they get a real rate like anyone else unless the owner explicitly zeroes
+        // it, rather than every admin being exempt by role.
+        await setShopCutRate({
+          artistUserId: newUser._id,
+          shopId: shop._id,
+          percent: 0,
+          setByUserId: newUser._id,
+          note: 'Shop owner - does not owe their own shop a cut.',
+        });
       }
 
       const token = generateToken(newUser);

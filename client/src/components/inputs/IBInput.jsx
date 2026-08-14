@@ -29,7 +29,12 @@ const IBInput = ({
     error=false,
     placeholder='',
 	disabled = false,
-	variant = 'standard',
+	// Was 'standard' (MUI's old underline-only look) - 'outlined' is what every bare TextField on
+	// the register page renders as (that page never passes a variant prop, so it gets MUI's own
+	// default, which has been 'outlined' since MUI v5). Changing IBInput's own default to match is
+	// the one-line version of "modals should look like the register page" for every one of this
+	// component's ~18 callers app-wide, rather than overriding variant at each call site.
+	variant = 'outlined',
 	helperText,
 	// Attributes for the underlying <input>. Needed for step on a decimal money/percentage field:
 	// type="number" defaults to step=1, so a browser treats 9.4 as invalid and silently BLOCKS a

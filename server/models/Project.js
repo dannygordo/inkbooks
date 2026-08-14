@@ -35,4 +35,13 @@ const ProjectSchema = new mongoose.Schema({
 }, {
 	timestamps: true
 });
+
+// Global search (utils/search.js). Title weighted highest since it's the piece's own name and the
+// thing someone searching for a project almost always remembers; tags next (deliberate, chosen
+// labels); description and placement lowest, as free text that's more likely to match by accident.
+ProjectSchema.index(
+	{ title: 'text', description: 'text', tags: 'text', placement: 'text' },
+	{ weights: { title: 10, tags: 5, description: 2, placement: 1 }, name: 'ProjectTextIndex' }
+);
+
 module.exports = mongoose.model('Project', ProjectSchema);

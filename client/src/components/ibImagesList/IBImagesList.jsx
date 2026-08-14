@@ -16,6 +16,7 @@ import { Avatar, Tooltip, Typography } from "@mui/material";
 import moment from "moment";
 import { APP_SETTINGS_CONSTANTS } from "../../constants";
 import IBImagesListOptions from "./IBImagesListOptions";
+import IBImageTagEditor from "./IBImageTagEditor";
 
 // This used to append `?w=&h=&fit=crop&auto=format&dpr=2x` to every image URL - lifted straight
 // from MUI's own ImageList demo, which points at Unsplash (an image CDN that actually supports
@@ -35,7 +36,7 @@ function srcset(image) {
 	};
 }
 
-const IBImagesList = ({ imageData, updateCallback, imageType }) => {
+const IBImagesList = ({ imageData, updateCallback, imageType, onTagsUpdate }) => {
 	// -1 means closed - yet-another-react-lightbox's own convention (index is which slide to
 	// open on, not just a boolean), reused here rather than a separate open/close flag.
 	const [lightboxIndex, setLightboxIndex] = useState(-1);
@@ -81,6 +82,14 @@ const IBImagesList = ({ imageData, updateCallback, imageType }) => {
 							updateCallback={updateCallback}
                             imageType={imageType}
 						/>
+						{onTagsUpdate && (
+							<IBImageTagEditor
+								img={item}
+								onTagsUpdate={(img, newTags) =>
+									onTagsUpdate(img, newTags, imageType)
+								}
+							/>
+						)}
 						<img
 							{...srcset(item.url)}
 							alt={item.title}

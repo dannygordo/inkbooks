@@ -3,6 +3,7 @@ const User = require('../models/User');
 const { sendEmail } = require('./email');
 const { sendDailyDigests } = require('./digest');
 const { sendDueClientScheduleEmails } = require('./client-booking-emails');
+const { sendDueReminders } = require('./reminders');
 
 /**
  * The scheduled half of the notification system.
@@ -190,6 +191,19 @@ function notificationJobs({ onReport = console.warn } = {}) {
       run: async () => {
         const result = await sendDailyDigests();
         return `digests=${result.sent} considered=${result.considered}`;
+      },
+    },
+    {
+      // Appointment reminders (text and email to CLIENTS) - see utils/reminders.js and
+      // models/ReminderSettings.js. Five minutes, matching the notification-emails cadence rather
+      // than the one-minute client-schedule-emails one: a reminder rule is granular to the minute
+      // in principle, but nobody notices a few minutes of slop on a "24 hours before" nudge the
+      // way they would on a booking confirmation that's supposed to feel instant.
+      name: 'appointment-reminders',
+      everyMs: 5 * 60 * 1000,
+      run: async () => {
+        const result = await sendDueReminders();
+        return `sent=${result.sent} skipped=${result.skipped} failed=${result.failed} artistsChecked=${result.artistsChecked}`;
       },
     },
     {

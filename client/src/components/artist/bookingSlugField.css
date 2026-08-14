@@ -20,12 +20,12 @@
 }
 
 .bookingSlugPreviewUrl {
-	color: #6b6b6b;
+	color: var(--ib-text-secondary);
 	word-break: break-all;
 }
 
 .bookingSlugPreviewUrl strong {
-	color: #333;
+	color: var(--ib-text-primary);
 	font-weight: 600;
 }
 
@@ -34,7 +34,7 @@
 	align-items: center;
 	gap: 4px;
 	white-space: nowrap;
-	color: #6b6b6b;
+	color: var(--ib-text-secondary);
 }
 
 /* Not colour alone - each state also carries its own icon and its own words, so the difference

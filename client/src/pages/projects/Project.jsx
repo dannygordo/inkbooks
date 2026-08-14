@@ -20,8 +20,10 @@ import IBChatBox from "../../components/ibChatBox/IBChatBox";
 import { ObjectID } from "bson";
 import MessengerService from "../../services/MessengerService";
 import { ALERT_CONSTANTS } from "../../constants";
-import { formatCents } from "../../utils/money";
+import { formatCents, dollarsToCents } from "../../utils/money";
 import ProjectSessionsList from "../../components/projectSessions/ProjectSessionsList";
+import { AppointmentService } from "../../services/AppointmentService";
+import DepositService from "../../services/DepositService";
 
 // A project usually has exactly one deposit, but the schema allows several (a consult that took
 // two payments), so this says "Cash", "Card", or "Cash + Card" rather than silently reporting
@@ -43,6 +45,7 @@ const Project = (props) => {
 	const errors = {};
 	let updatedReferenceImages = [];
 	let updatedDesignImages = [];
+	let updatedBodyImages = [];
 	let currentProject = {};
 	let titleRef = useRef();
 	let descriptionRef = useRef();
@@ -58,14 +61,27 @@ const Project = (props) => {
 	const lastSavedDetailsRef = useRef(null);
 	const [detailsSaveState, setDetailsSaveState] = useState("idle");
 	const [projectTags, setProjectTags] = useState([]);
+	// "Add Deposit" form state - see the projectDepositReadout block below.
+	const [showAddDepositForm, setShowAddDepositForm] = useState(false);
+	const [addDepositDollars, setAddDepositDollars] = useState("");
+	const [addDepositError, setAddDepositError] = useState(null);
 
 	/**
 	 * Gets project by id
 	 */
-	const { loading, data } = ProjectService.fetchProject(
+	const { loading, data, refetch: refetchProject } = ProjectService.fetchProject(
 		params.projectId,
 		setActiveMessages
 	);
+
+	// Needed only to answer "is every session on this project already closed" for the Add Deposit
+	// gate below - a deposit is credited against a session still to come, so once none is left
+	// open there's nothing left for new money to apply to.
+	const { data: sessionsData } = AppointmentService.getAppointmentsByProject(params.projectId);
+	const sessions = sessionsData?.getAppointmentsByProject || [];
+	const hasOpenSession = sessions.length === 0 || sessions.some((s) => s.appointmentStatus !== "completed");
+
+	const [recordDeposit, { loading: addingDeposit }] = useMutation(DepositService.RECORD_DEPOSIT);
 
 	useEffect(() => {
 		console.log(user);
@@ -109,6 +125,28 @@ const Project = (props) => {
 					artistId: data.getProject.artistId,
 					status: data.getProject.status,
 					designImages: updatedImages
+				},
+			},
+		});
+	};
+
+	/**
+	 *  Takes a list of finished-tattoo (body) images and updates project. Same shape as
+	 *  handleProjectReferencesUpdate/handleProjectDesignsUpdate above - see typeDefs.js's
+	 *  Project.bodyImages comment for why this is now an IBImageInput array rather than [String].
+	 * @param {List of body images to pass to useMutation} updatedImages
+	 */
+	const handleProjectBodyImagesUpdate = (updatedImages) => {
+		updateProject({
+			variables: {
+				project: {
+					id: params.projectId,
+					title: data.getProject.title,
+					description: data.getProject.description,
+					clientId: data.getProject.clientId,
+					artistId: data.getProject.artistId,
+					status: data.getProject.status,
+					bodyImages: updatedImages
 				},
 			},
 		});
@@ -249,11 +287,50 @@ const Project = (props) => {
 		}
 	};
 
-	// The "Pay Deposit" button and its Square form that used to live here are gone. A deposit is
-	// taken at the consult, by the artist, at the moment the consult becomes a session - not later
-	// from a project page by whoever happens to be looking at it. Collecting one from here would
-	// be a second, competing way for the same money to enter the system, with no consult
-	// transaction to attach it to.
+	// "Add Deposit" - lets an artist put more cash down against this project's consult after the
+	// fact (a client who adds to their deposit on a later visit, before the work is billed). Tops
+	// up the SAME consult transaction recordDeposit already tracks, rather than opening a second,
+	// competing entry point for deposit money - see DepositService.RECORD_DEPOSIT and
+	// resolvers/index.js's Project.consultAppointment. Cash only: recordDeposit's amount is a
+	// straight overwrite of depositCents, which is safe for cash (a fresh, larger figure the
+	// artist is asserting) but would be wrong for a card top-up - the deposit may already be
+	// 'available' (collected), and re-charging the WHOLE new total through Square would charge the
+	// client a second time for money already taken. A card top-up needs a charge for only the
+	// increment, which this button does not attempt.
+	const handleAddDeposit = async (e) => {
+		e.preventDefault();
+		setAddDepositError(null);
+		const consult = data.getProject.consultAppointment;
+		if (!consult) {
+			return;
+		}
+		const addCents = dollarsToCents(addDepositDollars);
+		if (!addCents || addCents <= 0) {
+			setAddDepositError("Enter an amount greater than $0.");
+			return;
+		}
+		try {
+			await recordDeposit({
+				variables: {
+					appointmentId: consult.id,
+					depositCents: (consult.depositCents || 0) + addCents,
+					paymentMethod: "cash",
+				},
+			});
+			setAddDepositDollars("");
+			setShowAddDepositForm(false);
+			await refetchProject();
+			setAlert({
+				isAlert: true,
+				severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
+				message: "Deposit updated.",
+				timeout: ALERT_CONSTANTS.TIMEOUT,
+				location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
+			});
+		} catch (err) {
+			setAddDepositError(err.graphQLErrors?.[0]?.message || err.message);
+		}
+	};
 
 	// The corner "Edit Project" button is gone, along with its handler. Worth recording what that
 	// handler actually did: its navigate() call was commented out and the body was a
@@ -296,6 +373,22 @@ const Project = (props) => {
 	};
 
 	/**
+	 * A helper function to remove properties from the IBImage as well as filtering out image to delete.  Passes new bodyImages array to handleProjectBodyImagesUpdate for mutation.
+	 * @param {Image to delete from Project.bodyImages array} deletedImg
+	 * @param {List of current Project.bodyImages } imageList
+	 */
+	const formatBodyImagesForUpdate = (deletedImg, imageList) => {
+		const updatedBodyImagesList = imageList.filter((bodyImage) => {
+			return bodyImage.url != deletedImg.url;
+		});
+
+		const bodyImagesToSave = updatedBodyImagesList.map(
+			({ __typename, userInfo, ...keepAttrs }) => keepAttrs
+		);
+		handleProjectBodyImagesUpdate(bodyImagesToSave);
+	};
+
+	/**
 	 * Calls the proper formatting function based on image type
 	 * @param {Image to delete} deletedImg
 	 * @param {The type of images to delete from the Project object} imageType
@@ -312,6 +405,9 @@ const Project = (props) => {
 		updatedDesignImages = project.designImages.map(
 			({ __typename, userInfo, ...keepAttrs }) => keepAttrs
 		);
+		updatedBodyImages = (project.bodyImages || []).map(
+			({ __typename, userInfo, ...keepAttrs }) => keepAttrs
+		);
 		switch (imageType) {
 			case APP_SETTINGS_CONSTANTS.PROJECT_IMAGE_TYPES.REFERENCE:
 				console.log("refs");
@@ -319,6 +415,39 @@ const Project = (props) => {
 				break;
 			case APP_SETTINGS_CONSTANTS.PROJECT_IMAGE_TYPES.DESIGN:
 				formatDesignsForUpdate(deletedImg, updatedDesignImages);
+				break;
+			case APP_SETTINGS_CONSTANTS.PROJECT_IMAGE_TYPES.BODY:
+				formatBodyImagesForUpdate(deletedImg, updatedBodyImages);
+				break;
+			default:
+				return null;
+		}
+	};
+
+	/**
+	 * Applies a new tags array to a single image within one of the three image collections and
+	 * saves it. Groundwork for search: tags live on IBImage.tags (server/graphql/typeDefs.js),
+	 * not on the Project itself, so they can eventually be queried per-image rather than just
+	 * per-project the way Project.tags already is.
+	 * @param {The image whose tags changed} img
+	 * @param {The image's new, complete tags array} newTags
+	 * @param {Which collection img belongs to - reference/design/body} imageType
+	 */
+	const handleImageTagsUpdate = (img, newTags, imageType) => {
+		const applyTags = (imageList) =>
+			imageList.map(({ __typename, userInfo, ...keepAttrs }) =>
+				keepAttrs.id === img.id ? { ...keepAttrs, tags: newTags } : keepAttrs
+			);
+
+		switch (imageType) {
+			case APP_SETTINGS_CONSTANTS.PROJECT_IMAGE_TYPES.REFERENCE:
+				handleProjectReferencesUpdate(applyTags(data.getProject.referenceImages));
+				break;
+			case APP_SETTINGS_CONSTANTS.PROJECT_IMAGE_TYPES.DESIGN:
+				handleProjectDesignsUpdate(applyTags(data.getProject.designImages));
+				break;
+			case APP_SETTINGS_CONSTANTS.PROJECT_IMAGE_TYPES.BODY:
+				handleProjectBodyImagesUpdate(applyTags(data.getProject.bodyImages || []));
 				break;
 			default:
 				return null;
@@ -334,6 +463,27 @@ const Project = (props) => {
 			<div className="project">
 				<div className="projectTitleContainer">
 					<h1 className="projectTitle">{data.getProject.title}</h1>
+					{/* The client this project belongs to - right-justified so it reads as an
+					    attribution for the title rather than another heading, and placed here (above
+					    the Details card) since Details itself has no room for a title-level fact.
+					    A bubble rather than plain text so it reads as a link to somewhere, not as
+					    more title - clicking it goes to the client's own dashboard page. */}
+					{data.getProject.client?.id ? (
+						<Chip
+							className="projectClientBubble"
+							label={`${data.getProject.client?.firstName || ""} ${
+								data.getProject.client?.lastName || ""
+							}`.trim()}
+							onClick={() =>
+								navigate(`${ROUTE_CONSTANTS.CLIENT}${data.getProject.client.id}`)
+							}
+							clickable
+						/>
+					) : (
+						<span className="projectClientBubble projectClientBubbleStatic">
+							{data.getProject.client?.firstName} {data.getProject.client?.lastName}
+						</span>
+					)}
 				</div>
 				<div className="projectContainer" style={{ display: "flex" }}>
 					<IBCardWrapper>
@@ -427,6 +577,65 @@ const Project = (props) => {
 								</span>
 							)}
 						</div>
+						{/* Add Deposit - only offered when there's a consult to attach the money to, it
+						    hasn't already been spent on a session, and at least one session on this
+						    project is still open to apply it against. Once every session is closed
+						    there's nothing left for new deposit money to be credited toward. */}
+						{data.getProject.consultAppointment &&
+							data.getProject.consultAppointment.depositStatus !== "applied" &&
+							hasOpenSession && (
+								<div className="projectAddDeposit">
+									{showAddDepositForm ? (
+										<form
+											className="projectAddDepositForm"
+											onSubmit={handleAddDeposit}
+										>
+											<IBInput
+												label="Add to deposit $"
+												type="number"
+												placeholder="0"
+												helperText="Cash only - recorded immediately against the consult"
+												value={addDepositDollars}
+												onChange={(e) => setAddDepositDollars(e.target.value)}
+												autoFocus
+											/>
+											{addDepositError && (
+												<div className="bookingRequestError">{addDepositError}</div>
+											)}
+											<div className="projectAddDepositFormButtons">
+												<Button
+													type="submit"
+													variant="contained"
+													size="small"
+													disabled={addingDeposit}
+												>
+													{addingDeposit ? "Saving..." : "Add"}
+												</Button>
+												<Button
+													type="button"
+													size="small"
+													disabled={addingDeposit}
+													onClick={() => {
+														setShowAddDepositForm(false);
+														setAddDepositError(null);
+														setAddDepositDollars("");
+													}}
+												>
+													Cancel
+												</Button>
+											</div>
+										</form>
+									) : (
+										<Button
+											size="small"
+											variant="outlined"
+											onClick={() => setShowAddDepositForm(true)}
+										>
+											Add Deposit
+										</Button>
+									)}
+								</div>
+							)}
 						<div>
 							{/* A select has no meaningful "done editing" moment - picking an option IS the
 							    edit, and waiting for blur would leave a changed value unsaved until the
@@ -454,7 +663,7 @@ const Project = (props) => {
 							<h1 className="projectTitle">Notes</h1>
 							<div className="projectActions">
 								<div className="projectActionItem">
-									<IBMultilineInput
+									<IBInput
 										id="addNote"
 										inputRef={addNoteRef}
 										label="Add Note"
@@ -503,7 +712,7 @@ const Project = (props) => {
 							<h1 className="projectTitle">Tags</h1>
 							<div className="projectActions">
 								<div className="projectActionItem">
-									<IBMultilineInput
+									<IBInput
 										id="addTag"
 										inputRef={addTagRef}
 										label="Add Tag"
@@ -537,8 +746,9 @@ const Project = (props) => {
 						/>
 						<IBImagesList
 							imageData={data.getProject.referenceImages}
-							imageType="reference"
+							imageType={APP_SETTINGS_CONSTANTS.PROJECT_IMAGE_TYPES.REFERENCE}
 							updateCallback={handleUpdate}
+							onTagsUpdate={handleImageTagsUpdate}
 						/>
 					</IBCardWrapper>
 				</div>
@@ -551,8 +761,24 @@ const Project = (props) => {
 						/>
 						<IBImagesList
 							imageData={data.getProject.designImages}
-							imageType="design"
+							imageType={APP_SETTINGS_CONSTANTS.PROJECT_IMAGE_TYPES.DESIGN}
 							updateCallback={handleUpdate}
+							onTagsUpdate={handleImageTagsUpdate}
+						/>
+					</IBCardWrapper>
+				</div>
+				<div className="projectContainer">
+					<IBCardWrapper>
+						<IBImagesUpload
+							project={data.getProject}
+							title="Finished Tattoo"
+							label="Finished Tattoo"
+						/>
+						<IBImagesList
+							imageData={data.getProject.bodyImages || []}
+							imageType={APP_SETTINGS_CONSTANTS.PROJECT_IMAGE_TYPES.BODY}
+							updateCallback={handleUpdate}
+							onTagsUpdate={handleImageTagsUpdate}
 						/>
 					</IBCardWrapper>
 				</div>

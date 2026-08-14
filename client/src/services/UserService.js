@@ -28,6 +28,7 @@ export const CURRENT_USER_FIELDS = gql`
 		role
 		userType
 		tagColor
+		themePreference
 		userInfo {
 			... on Artist {
 				avatar
@@ -93,6 +94,7 @@ const UserService = (() => {
             accessToken
             userType
             tagColor
+            themePreference
             userInfo {
                 firstName
                 lastName

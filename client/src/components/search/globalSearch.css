@@ -1,0 +1,97 @@
+/* GlobalSearch.jsx - the app bar search dropdown. */
+
+.globalSearchResults {
+	position: absolute;
+	top: calc(100% + 6px);
+	left: 0;
+	right: 0;
+	max-height: 420px;
+	overflow-y: auto;
+	background-color: var(--ib-surface-card);
+	color: var(--ib-text-primary);
+	border-radius: 8px;
+	border: 1px solid var(--ib-border);
+	box-shadow: 0 8px 24px rgba(var(--ib-shadow-color), 0.16);
+	z-index: 1300;
+	padding: 6px 0;
+}
+
+.globalSearchLoading {
+	display: flex;
+	justify-content: center;
+	padding: 14px 0;
+}
+
+.globalSearchEmpty {
+	padding: 14px 16px;
+	font-size: 13.5px;
+	color: var(--ib-text-muted);
+}
+
+.globalSearchSection + .globalSearchSection {
+	border-top: 1px solid var(--ib-surface-subtle);
+	margin-top: 4px;
+	padding-top: 4px;
+}
+
+.globalSearchSectionLabel {
+	padding: 6px 16px 2px;
+	font-size: 11px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--ib-text-muted);
+}
+
+.globalSearchResultRow {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	width: 100%;
+	padding: 8px 16px;
+	border: none;
+	background: none;
+	cursor: pointer;
+	font: inherit;
+	text-align: left;
+}
+
+.globalSearchResultRow:hover,
+.globalSearchResultRow:focus-visible {
+	background-color: var(--ib-surface-hover);
+	outline: none;
+}
+
+.globalSearchResultPrimary {
+	font-size: 14px;
+	font-weight: 500;
+	color: var(--ib-text-primary);
+}
+
+.globalSearchResultSecondary {
+	font-size: 12.5px;
+	color: var(--ib-text-muted);
+	margin-top: 1px;
+}
+
+.globalSearchSeeAll {
+	display: block;
+	width: 100%;
+	padding: 10px 16px;
+	border: none;
+	border-top: 1px solid var(--ib-surface-subtle);
+	background: none;
+	cursor: pointer;
+	font: inherit;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--ib-primary);
+	text-align: left;
+	margin-top: 4px;
+}
+
+.globalSearchSeeAll:hover,
+.globalSearchSeeAll:focus-visible {
+	background-color: var(--ib-surface-hover);
+	outline: none;
+}

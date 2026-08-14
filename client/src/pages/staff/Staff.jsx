@@ -59,9 +59,12 @@ const STAFF_COLUMNS = [
 const Staff = () => {
   const [showArchived, setShowArchived] = useState(false);
   const [offset, setOffset] = useState(0);
+  // User-selectable (see EntityListPager's size selector) - PAGE_SIZE above is only the initial
+  // value.
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   // refetch is handed to the action bar so a newly created staff member appears immediately.
   const { loading, data, refetch } = useQuery(FETCH_STAFF_QUERY, {
-    variables: { includeArchived: showArchived, page: { limit: PAGE_SIZE, offset } },
+    variables: { includeArchived: showArchived, page: { limit: pageSize, offset } },
   });
   if (loading) return <IBPageLoader />;
 
@@ -104,6 +107,10 @@ const Staff = () => {
       <EntityListPager
         pageInfo={data?.getStaff?.pageInfo}
         onChange={setOffset}
+        onPageSizeChange={(size) => {
+          setPageSize(size);
+          setOffset(0);
+        }}
         noun="staff member"
       />
     </div>

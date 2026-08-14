@@ -212,9 +212,9 @@ const AccountPanel = () => {
 
 			{showsOnACalendar && (
 				<IBCardWrapper>
-					<h1>Calendar colour</h1>
+					<h1>Calendar color</h1>
 					<p className="settingsPanelHelp">
-						How your appointments are labelled on the calendar. Colours already taken by
+						How your appointments are labelled on the calendar. Colors already taken by
 						someone else at your shop are not offered.
 					</p>
 					<div className="settingsTagColors">

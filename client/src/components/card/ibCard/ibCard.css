@@ -19,7 +19,7 @@
 }
 .ibCardWrapperClickable:hover {
     cursor: pointer;
-    background-color: #eee;
+    background-color: var(--ib-surface-subtle);
 }
 .ibCardTop {
     display: flex;
@@ -27,7 +27,7 @@
 
 .ibCard:hover {
     cursor: pointer;
-    background-color: #eee;
+    background-color: var(--ib-surface-subtle);
 }
 .ibCardImage {
     width: 80px;
@@ -59,13 +59,13 @@
 .ibCardDetailsTitle {
     font-size: 14px;
     font-weight: 600;
-    color: #bbb;
+    color: var(--ib-border-strong);
 }
 .ibCardInfoContainer {
     display: flex;
     align-items: center;
     margin: 20px 0px;
-    color: #555;
+    color: var(--ib-text-secondary);
 }
 .ibCardIcon {
     font-size: 14px;
@@ -75,7 +75,7 @@
 }
 .ibCardActionsContainer {
     flex: 4;
-    border-bottom: 1px solid #555;
+    border-bottom: 1px solid var(--ib-text-secondary);
     margin-bottom: 10px;
     padding-left: 5px;
 }

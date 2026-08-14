@@ -20,7 +20,7 @@
 
 .ibCardShowErrorCard:hover {
     cursor: pointer;
-    background-color: #eee;
+    background-color: var(--ib-surface-subtle);
 }
 
 .ibCardShowErrorBottom {
@@ -29,13 +29,13 @@
 .ibCardShowErrorDetailsTitle {
     font-size: 14px;
     font-weight: 600;
-    color: #bbb;
+    color: var(--ib-border-strong);
 }
 .ibCardShowErrorInfoContainer {
     display: flex;
     align-items: center;
     margin: 20px 0px;
-    color: #555;
+    color: var(--ib-text-secondary);
 }
 .ibCardShowErrorIcon {
     font-weight: 600;

@@ -11,6 +11,7 @@ import {
 } from "../appointments/DurationPicker";
 import IBInput from "../inputs/IBInput";
 import IBMultilineInput from "../inputs/IBMultilineInput";
+import FormField from "../formField/FormField";
 import BookSessionDatesForm from "../booking/BookSessionDatesForm";
 import { useAuth } from "../../context/auth";
 import { useMutation } from "@apollo/client";
@@ -292,18 +293,21 @@ const UpdateEventDialog = ({ selectedDay, event }) => {
 								</span>
 							</div>
 						</div>
-						<IBInput
-							inputRef={titleRef}
-							helperText="Add Title"
-							placeholder="Add title"
-                            defaultValue={event.title}
-						/>
-						<IBMultilineInput
-							id="description"
-							helperText="Description"
-							inputRef={descriptionRef}
-                            defaultValue={event.description}
-						/>
+						<FormField id="updateEventTitle" label="Add Title">
+							<IBInput
+								id="updateEventTitle"
+								inputRef={titleRef}
+								placeholder="Add title"
+								defaultValue={event.title}
+							/>
+						</FormField>
+						<FormField id="description" label="Description">
+							<IBMultilineInput
+								id="description"
+								inputRef={descriptionRef}
+								defaultValue={event.description}
+							/>
+						</FormField>
 						{/* Shop cut amount/status used to be shown and editable right here - removed
 						    entirely. Paying/invoicing it already lives on the artist dashboard's
 						    "Shop Cut Payouts" list (see ArtistPerformancePanel.jsx / ShopCutPayoutList.jsx),

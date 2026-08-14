@@ -79,7 +79,27 @@ const ProjectService = (() => {
 					updatedAt
 					createdAt
 				}
-				bodyImages
+				# bodyImages was a bare [String] of URLs - promoted to the same IBImage shape as
+				# referenceImages/designImages (see server/graphql/typeDefs.js's Project.bodyImages
+				# comment) so the Finished Tattoo section can show an uploader/timestamp and support
+				# per-image tags the same way the other two sections do.
+				bodyImages {
+					id
+					url
+					avatar
+					title
+					uploadedByDisplayName
+					userId
+					userInfo {
+						firstName
+						lastName
+						avatar
+						id
+					}
+					tags
+					updatedAt
+					createdAt
+				}
 				designImages {
 					id
 					url
@@ -92,6 +112,7 @@ const ProjectService = (() => {
 						avatar
 						id
 					}
+					tags
 					updatedAt
 					createdAt
 				}
@@ -120,6 +141,15 @@ const ProjectService = (() => {
 				deposits {
 					id
 					depositCents
+					depositPaymentMethod
+					depositCollectedAt
+				}
+				# The appointmentId "Add Deposit" records against - see components/booking's deposit
+				# fields for the same shape used at consult time.
+				consultAppointment {
+					id
+					depositCents
+					depositStatus
 					depositPaymentMethod
 					depositCollectedAt
 				}
@@ -215,11 +245,20 @@ const ProjectService = (() => {
 							updatedAt
 							createdAt
 						}
-						bodyImages
+						bodyImages {
+							url
+							avatar
+							title
+							uploadedByDisplayName
+							tags
+							updatedAt
+							createdAt
+						}
 						designImages {
 							url
 							avatar
 							uploadedByDisplayName
+							tags
 							updatedAt
 							createdAt
 						}
@@ -273,7 +312,23 @@ const ProjectService = (() => {
 						updatedAt
 						createdAt
 					}
-					bodyImages
+					bodyImages {
+						id
+						url
+						avatar
+						title
+						uploadedByDisplayName
+						userId
+						userInfo {
+							firstName
+							lastName
+							avatar
+							id
+						}
+						tags
+						updatedAt
+						createdAt
+					}
 					designImages {
 						id
 						url
@@ -286,6 +341,7 @@ const ProjectService = (() => {
 							avatar
 							id
 						}
+						tags
 						updatedAt
 						createdAt
 					}
@@ -408,7 +464,21 @@ const ProjectService = (() => {
 					updatedAt
 					createdAt
 				}
-				bodyImages
+				bodyImages {
+					url
+					avatar
+					title
+					uploadedByDisplayName
+					userId
+					userInfo {
+						firstName
+						lastName
+						avatar
+					}
+					tags
+					updatedAt
+					createdAt
+				}
 				designImages {
 					url
 					avatar
@@ -419,6 +489,7 @@ const ProjectService = (() => {
 						lastName
 						avatar
 					}
+					tags
 					updatedAt
 					createdAt
 				}

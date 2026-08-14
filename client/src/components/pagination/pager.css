@@ -4,16 +4,34 @@
     justify-content: space-between;
     gap: 16px;
     padding: 12px 4px;
-    border-top: 1px solid #eee;
+    border-top: 1px solid var(--ib-surface-subtle);
 }
 
 .pagerRange {
     font-size: 13px;
-    color: #666;
+    color: var(--ib-text-secondary);
     font-variant-numeric: tabular-nums;
 }
 
 .pagerButtons {
     display: flex;
     gap: 4px;
+}
+
+.pagerPageSize {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--ib-text-secondary);
+    white-space: nowrap;
+}
+.pagerPageSize select {
+    font: inherit;
+    color: inherit;
+    background: transparent;
+    border: 1px solid var(--ib-border-strong);
+    border-radius: 4px;
+    padding: 2px 5px;
+    cursor: pointer;
 }

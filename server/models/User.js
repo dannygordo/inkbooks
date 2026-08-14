@@ -23,6 +23,12 @@ const UserSchema = new mongoose.Schema({
     lastName: {type: String},
     avatar: {type: String},
     tagColor: {type: String},
+    // Light/dark/system, chosen from Settings - Appearance. An account fact, not a device fact:
+    // deliberately NOT localStorage, so it follows the person to whatever browser or device they
+    // sign into next, the same reasoning notificationPrefs below already applies to email/in-app
+    // preferences. Absent/undefined behaves as 'system' at read time (see ThemeModeProvider.jsx)
+    // rather than defaulting a value into every existing account via migration.
+    themePreference: {type: String, enum: ['light', 'dark', 'system']},
     // Guest accounts (created behind the scenes when a booking-request intake form is
     // submitted - see models/BookingRequest.js) still populate `password` with an unusable
     // random hash to satisfy the required field above, rather than making password optional

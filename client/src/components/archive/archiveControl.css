@@ -31,7 +31,7 @@
 
 .archiveConfirmDialog {
 	background: #1e1e1e;
-	color: #ddd;
+	color: var(--ib-border);
 	border-radius: 10px;
 	padding: 28px;
 	max-width: 520px;
@@ -59,7 +59,7 @@
 }
 
 .archiveConfirmNote {
-	color: #999;
+	color: var(--ib-text-muted);
 	font-size: 14px;
 }
 
