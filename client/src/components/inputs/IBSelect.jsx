@@ -17,7 +17,15 @@ const IBSelect = ({
 	inputRef,
     selectedVal,
     setSelectedVal,
-    defaultValue
+    defaultValue,
+    // Was hardcoded below ("demo-simple-select-helper[-label]") - fine while every caller
+    // (RatesPanel, IBProjectPalettesSelect, IBProjectsByArtistSelect) only ever put one IBSelect on
+    // screen at a time, but two duplicate DOM ids the instant a second one renders alongside it -
+    // e.g. an always-visible "add new" form next to a per-row "edit" form using this same
+    // component (see pages/expenses/Expenses.jsx). Defaults to the old literal string so every
+    // existing caller renders byte-for-byte the same DOM as before; only a caller passing its own
+    // id needs to care that this changed.
+    id = "demo-simple-select-helper",
 }) => {
 	//const [selectedVal, setSelectedVal] = useState("");
 	// Was `return onChange;` - returned the function reference itself instead of calling it with
@@ -38,14 +46,16 @@ const IBSelect = ({
 		}
 	};
 
+	const labelId = `${id}-label`;
+
 	return (
 		<FormControl sx={{ minWidth: 120, marginTop: 2}}>
-			<InputLabel id="demo-simple-select-helper-label">
+			<InputLabel id={labelId}>
 				{label}
 			</InputLabel>
 			<Select
-				labelId="demo-simple-select-helper-label"
-				id="demo-simple-select-helper"
+				labelId={labelId}
+				id={id}
 				value={selectedVal}
 				autoWidth={autoWidth}
 				label={label}

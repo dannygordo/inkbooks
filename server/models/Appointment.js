@@ -50,6 +50,15 @@ const AppointmentSchema = new mongoose.Schema({
 	projectId: {type: mongoose.Schema.Types.ObjectId},
 	shopId: {type: mongoose.Schema.Types.ObjectId},
 	userId: {type: mongoose.Schema.Types.ObjectId},
+	// A personal-calendar entry: visible ONLY to its own userId, never through getAppointmentsByShop
+	// or through getAppointmentsByArtist called by anyone other than that same user - not a shop
+	// admin, not staff, nobody (see resolvers/appointments.js). Mutually exclusive with shopId/
+	// projectId by construction: createAppointment rejects a personal appointment that carries
+	// either (see mutations/appointments.js), so "no shopId" is never ambiguous between "independent
+	// artist" and "personal entry" at the query layer - only this flag is. Immutable after creation
+	// for the same reason shopId is once set (see updateAppointment) - silently flipping it either
+	// direction is a privacy or bookkeeping leak, not a normal edit.
+	isPersonal: {type: Boolean, default: false},
 	title: {type: String},
 	description: {type: String},
 	// ---------------------------------------------------------------------------------------

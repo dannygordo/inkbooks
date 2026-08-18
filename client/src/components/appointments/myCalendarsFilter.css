@@ -1,0 +1,13 @@
+.myCalendarsFilter {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	flex-wrap: wrap;
+}
+
+.myCalendarsFilterLabel {
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--ib-text-secondary);
+	margin-right: 4px;
+}

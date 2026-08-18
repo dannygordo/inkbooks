@@ -28,9 +28,11 @@ import { usePendingBookingRequestCount } from "../../services/BookingRequestServ
 import NotificationBell from "../notifications/NotificationBell";
 import GlobalSearch from "../search/GlobalSearch";
 import {
+	AccountBalance,
 	AccountBox,
 	AccountCircle,
 	Assessment,
+	Assignment,
 	Build,
 	Dashboard,
 	DateRange,
@@ -39,6 +41,7 @@ import {
 	Palette,
 	People,
 	Person,
+	TrendingUp,
 } from "@mui/icons-material";
 import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
@@ -153,6 +156,11 @@ export default function Sidebar() {
 	// Settings.jsx) - hidden for everyone else rather than linking to a page that just says
 	// "nothing to configure here yet".
 	const isArtistUser = user.userType === "artist";
+	// Mirrors the server's hasAdminAuthority (utils/shop-membership.js) and Settings' own
+	// "Expenses" and "Income" categories (settingsCategories.jsx's hasAuditAuthority): shop-admin-
+	// or-better, or an independent artist with no shop at all. A plain shop-connected artist or
+	// Staff member manages neither their shop's books nor has a personal ledger here.
+	const hasAuditAuthority = isShopAdminOrBetter || !Boolean(user.userInfo?.shop?.id);
 	// Unread messages, for the badge on Messenger below. Polled as well as refetched: a message
 	// arriving from someone else is not something this tab does, so there is nothing local to
 	// trigger a refresh off. Sixty seconds is slow enough to be free and fast enough that an
@@ -782,6 +790,105 @@ export default function Sidebar() {
 							</ListItemIcon>
 							<ListItemText
 								primary="Shop Cut Confirmations"
+								sx={{ opacity: open ? 1 : 0 }}
+							/>
+						</ListItemButton>
+					)}
+					{/* Shop admin, or an independent artist with no shop at all - same gate as the
+					    /expenses and /income routes (App.jsx) and Settings' own "Expenses" and
+					    "Income" categories (settingsCategories.jsx's hasAuditAuthority).
+					    Deliberately NOT isShopAdminOrBetter alone, unlike Shops/Booking Requests/
+					    Shop Cut Confirmations above - an independent artist with no shop manages
+					    their own books here too, and isShopAdminOrBetter is false for a plain
+					    ARTIST role.
+
+					    Two separate entries, not one "Expenses & Income" combined link - each
+					    points at its own page (/expenses, /income) and its own Settings category,
+					    so a shop tracking only one side of the ledger isn't stuck landing on the
+					    other one first. */}
+					{hasAuditAuthority && (
+						<ListItemButton
+							selected={selectedIndex === 13}
+							onClick={(event) =>
+								handleListItemClick(event, 13, "expenses")
+							}
+							key="Expenses"
+							sx={{
+								minHeight: 48,
+								justifyContent: open ? "initial" : "center",
+								px: 2.5,
+							}}
+						>
+							<ListItemIcon
+								sx={{
+									minWidth: 0,
+									mr: open ? 3 : "auto",
+									justifyContent: "center",
+								}}
+							>
+								<AccountBalance />
+							</ListItemIcon>
+							<ListItemText
+								primary="Expenses"
+								sx={{ opacity: open ? 1 : 0 }}
+							/>
+						</ListItemButton>
+					)}
+					{hasAuditAuthority && (
+						<ListItemButton
+							selected={selectedIndex === 14}
+							onClick={(event) =>
+								handleListItemClick(event, 14, "income")
+							}
+							key="Income"
+							sx={{
+								minHeight: 48,
+								justifyContent: open ? "initial" : "center",
+								px: 2.5,
+							}}
+						>
+							<ListItemIcon
+								sx={{
+									minWidth: 0,
+									mr: open ? 3 : "auto",
+									justifyContent: "center",
+								}}
+							>
+								<TrendingUp />
+							</ListItemIcon>
+							<ListItemText
+								primary="Income"
+								sx={{ opacity: open ? 1 : 0 }}
+							/>
+						</ListItemButton>
+					)}
+					{/* Same gate as Expenses/Income directly above and the /forms route (App.jsx) -
+					    shop admin, or an independent artist with no shop at all (see models/Form.js's
+					    own header comment on why Forms follows that exact ownership model). */}
+					{hasAuditAuthority && (
+						<ListItemButton
+							selected={selectedIndex === 15}
+							onClick={(event) =>
+								handleListItemClick(event, 15, "forms")
+							}
+							key="Forms"
+							sx={{
+								minHeight: 48,
+								justifyContent: open ? "initial" : "center",
+								px: 2.5,
+							}}
+						>
+							<ListItemIcon
+								sx={{
+									minWidth: 0,
+									mr: open ? 3 : "auto",
+									justifyContent: "center",
+								}}
+							>
+								<Assignment />
+							</ListItemIcon>
+							<ListItemText
+								primary="Forms"
 								sx={{ opacity: open ? 1 : 0 }}
 							/>
 						</ListItemButton>

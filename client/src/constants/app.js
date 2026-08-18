@@ -37,7 +37,15 @@ export const ROUTE_CONSTANTS = {
 	// panels on Settings now - see components/settings/AccountPanel.jsx. It was also written
 	// 'profile', with no leading slash, unlike every other absolute route here: navigate('profile')
 	// resolves RELATIVE to wherever you already are, so it only ever landed correctly from the root.
-	SETTINGS: '/settings'
+	SETTINGS: '/settings',
+	EXPENSES: '/expenses',
+	INCOME: '/income',
+	FORMS: '/forms',
+	FORM: '/forms/',
+	// Public, unauthenticated - same shape as /book/:artistHandle. A guest link is
+	// /form/:publicToken (singular "form", not "forms"), so it can never collide with the
+	// authenticated management list's own /forms/:formId route above.
+	PUBLIC_FORM: '/form/'
 };
 
 export const APP_SETTINGS_CONSTANTS = {
@@ -100,6 +108,27 @@ export const APP_SETTINGS_CONSTANTS = {
 	PROJECT_PALETTE_OPTIONS: [
 		{ value: "black", label: "Black and Grey" },
 		{ value: "color", label: "Color" },
+	],
+	// Mirrors server/models/Form.js's FORM_FIELD_TYPES exactly - same 7 values, same order. Kept as
+	// a flat, hand-copied list rather than read off a GraphQL enum: this app has no other client-
+	// side enum sourced from the schema (see e.g. APPOINTMENT_STATUS above, PROJECT_STATUS below),
+	// so introducing that pattern for one feature would be its own new thing to keep in sync.
+	// 'signature' is a TYPED signature (full name, server-set timestamp) - NOT a drawn/canvas pad,
+	// see Form.js's own comment and HANDOFF.md for why that's deliberately deferred.
+	FORM_FIELD_TYPES: [
+		{ value: "short_text", label: "Short answer" },
+		{ value: "paragraph", label: "Paragraph" },
+		{ value: "single_choice", label: "Single choice" },
+		{ value: "multi_choice", label: "Multiple choice" },
+		{ value: "date", label: "Date" },
+		{ value: "file_upload", label: "File upload" },
+		{ value: "signature", label: "Signature (typed)" },
+	],
+	FORM_CHOICE_FIELD_TYPES: ["single_choice", "multi_choice"],
+	FORM_STATUSES: [
+		{ value: "draft", label: "Draft" },
+		{ value: "published", label: "Published" },
+		{ value: "archived", label: "Archived" },
 	],
 	TAG_COLORS: [
 		{ value: '#c69818', label: 'Goldfinger' },

@@ -103,6 +103,13 @@ function appointmentFilterToQuery(filter) {
   if (filter.shopCutStatus) {
     query.shopCutStatus = filter.shopCutStatus;
   }
+  // Only applied when the caller actually asked (undefined/null means "don't care, either kind").
+  // `{ $ne: true }` rather than `false` on the exclude side so pre-this-feature documents (no
+  // isPersonal field at all) still match "not personal" - they're all shop/solo-practice
+  // appointments by definition, since the field didn't exist for them to be personal with.
+  if (filter.isPersonal !== undefined && filter.isPersonal !== null) {
+    query.isPersonal = filter.isPersonal ? true : { $ne: true };
+  }
   return query;
 }
 
@@ -199,10 +206,20 @@ module.exports = {
       // to descending, which nothing asked for and AppointmentsList.jsx's real pagination (unlike
       // its client-side re-sort) would actually be affected by.
       const sortDirection = filter && filter.appointmentStatus && !filter.upcomingOnly ? -1 : 1;
-      return paginate(Appointment, { shopId, ...appointmentFilterToQuery(filter) }, {
-        sort: { appointmentDate: sortDirection },
-        page,
-      });
+      // isPersonal excluded explicitly and LAST, so nothing in appointmentFilterToQuery(filter) can
+      // override it - a shop calendar must never surface a personal appointment, full stop. A
+      // personal appointment never carries a shopId in the first place (createAppointment refuses
+      // that combination - see mutations/appointments.js), so this is defense-in-depth rather than
+      // the only thing standing between a shop admin and someone's private calendar - but that
+      // privacy guarantee is exactly the one place in this app worth a belt AND suspenders.
+      return paginate(
+        Appointment,
+        { shopId, ...appointmentFilterToQuery(filter), isPersonal: { $ne: true } },
+        {
+          sort: { appointmentDate: sortDirection },
+          page,
+        },
+      );
     }),
     // Was withAuth with no ownership check at all - any authenticated user could pass an
     // arbitrary userId and read that artist's entire appointment/financial history. Same
@@ -216,22 +233,33 @@ module.exports = {
     // at a DIFFERENT shop stay denied - role alone can't express that, hence sharesShopWith.
     // ARTIST-role callers are unaffected and still only ever see their own history.
     getAppointmentsByArtist: withAuth(async (_, { userId, filter, page }, context, info, user) => {
+        const isSelf = String(user.id) === String(userId);
         // The artist themselves, or Staff-and-above who share a shop with them. A shop admin is
         // in that second group and takes the same shared-shop check as anyone else - previously
         // `role > SHOP_ADMIN` let them skip it and read any artist's financial history.
-        if (String(user.id) !== String(userId)) {
+        if (!isSelf) {
           const isSameShopStaff =
             user.role <= Constants.ROLES.SHOP_STAFF && (await sharesShopWith(user.id, userId));
           if (!isSameShopStaff) {
             throw new AuthenticationError('Action not allowed');
           }
         }
+        const query = { userId, ...appointmentFilterToQuery(filter) };
+        // A personal appointment is visible to nobody but its own owner - not even a shop admin or
+        // staff who otherwise has every right to browse this artist's schedule for shop purposes.
+        // Forced LAST so it can't be loosened by whatever filter.isPersonal the caller sent - the
+        // isSelf branch is the only path that can ever see one, and even then only because the
+        // filter (or its absence) says so honestly, not because this override let something slip
+        // through.
+        if (!isSelf) {
+          query.isPersonal = { $ne: true };
+        }
         // Sorted by appointmentDate, not updatedAt. Every caller of this is asking a
         // date-shaped question - the next few, the most recent few, a month - and updatedAt
         // ordering made "the first N" mean "the N most recently edited", which is not a thing
         // anybody wants to see. It only went unnoticed because the client re-sorted the whole
         // array itself after fetching all of it.
-        return paginate(Appointment, { userId, ...appointmentFilterToQuery(filter) }, {
+        return paginate(Appointment, query, {
           sort: { appointmentDate: filter && filter.upcomingOnly ? 1 : -1 },
           page,
         });
@@ -300,6 +328,13 @@ module.exports = {
         const appointment = await Appointment.findById(appointmentId);
         if (!appointment) {
           throw new UserInputError('Errors', { errors: { appointmentId: 'Appointment not found.' } });
+        }
+        // Checked BEFORE, and instead of, the shop-membership fallback below - a personal
+        // appointment has no shopId for callerBelongsToShop to even match against, but this is
+        // explicit rather than relying on that being true, since this is the one privacy rule in
+        // the app that must never regress from a change to how shopId happens to be populated.
+        if (appointment.isPersonal && String(user.id) !== String(appointment.userId)) {
+          throw new AuthenticationError('Action not allowed');
         }
         if (
           String(user.id) !== String(appointment.userId) &&

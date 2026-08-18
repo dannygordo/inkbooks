@@ -718,3 +718,437 @@ describe('getAppointment: ownership', () => {
 		expect(data.getAppointment.id).toBe(appointment.id);
 	});
 });
+
+// --- isPersonal (personal calendar) coverage ------------------------------------------------
+//
+// Added in the same session as the rest of this file's existing tests, but flagged separately
+// because of it: this sandbox's MongoMemoryServer can't download a Mongo binary here
+// (fastdl.mongodb.org returns 403 for this platform - the same caveat already on
+// clientFlags.test.js/expenses.test.js/analytics.test.js, see HANDOFF.md's Known Gaps), so NONE
+// of the tests in this file - the ones above that predate this feature included - actually
+// execute in this environment. Everything below is written to the same structure and passing
+// conventions as the createAppointment/updateAppointment/getAppointmentsBy*/getAppointment blocks
+// above it; someone with real network access to fastdl.mongodb.org (or a local `mongod`) needs to
+// be the first to actually run it. Covers mutations/appointments.js's isPersonal exclusivity/
+// immutability guards and resolvers/appointments.js's three-deep privacy check
+// (getAppointmentsByShop, getAppointmentsByArtist, getAppointment).
+
+const GET_APPOINTMENTS_BY_ARTIST_FILTERED = `
+	query GetAppointmentsByArtist($userId: ID!, $filter: AppointmentFilter) {
+		getAppointmentsByArtist(userId: $userId, filter: $filter) { items {
+			id
+			isPersonal
+		} }
+	}
+`;
+
+const CREATE_PERSONAL_APPOINTMENT = `
+	mutation CreateAppointment($appointmentInput: AppointmentInput) {
+		createAppointment(appointmentInput: $appointmentInput) {
+			id
+			userId
+			shopId
+			projectId
+			isPersonal
+		}
+	}
+`;
+
+const UPDATE_APPOINTMENT_ISPERSONAL = `
+	mutation UpdateAppointment($appointmentInput: AppointmentInput) {
+		updateAppointment(appointmentInput: $appointmentInput) {
+			id
+			isPersonal
+			title
+		}
+	}
+`;
+
+function basePersonalInput(overrides = {}) {
+	const now = new Date().toISOString();
+	return {
+		appointmentDate: now,
+		// 'other' - the same internal bucket AppointmentWizard.jsx sends for every personal entry
+		// (see that file's own comment on why: the chip never reads this field for a personal
+		// appointment, so the exact value doesn't matter beyond satisfying the required enum).
+		appointmentType: 'other',
+		appointmentStatus: 'scheduled',
+		createdAt: now,
+		updatedAt: now,
+		isPersonal: true,
+		...overrides,
+	};
+}
+
+// A document with BOTH isPersonal and a real shopId can only exist as corrupted/legacy data -
+// createAppointment refuses that combination outright (see the exclusivity tests below), so the
+// only way to construct one for a test is directly against the model, bypassing the mutation
+// entirely. That's deliberate here: it's what actually proves the resolver-level exclusions in
+// getAppointmentsByShop/getAppointment are real, load-bearing checks rather than just happening to
+// pass because a personal appointment never has a shopId in ordinary use - see those two
+// resolvers' own "defense-in-depth" comments.
+function saveCorruptedShopPersonalAppointment({ userId, shopId, title }) {
+	const now = new Date();
+	return new Appointment({
+		appointmentDate: now,
+		userId,
+		shopId,
+		isPersonal: true,
+		title,
+		appointmentType: 'other',
+		appointmentStatus: 'scheduled',
+		shopCutStatus: 'none',
+		createdAt: now,
+		updatedAt: now,
+	}).save();
+}
+
+describe('createAppointment: isPersonal exclusivity + forced ownership', () => {
+	it('rejects a personal appointment that also carries a shopId', async () => {
+		const { user } = await createArtistUser();
+		const { shop } = await createShopAdminUser();
+		await connectArtistToShop(user.id, shop.id);
+		const token = signTestToken(user);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{
+				query: CREATE_PERSONAL_APPOINTMENT,
+				variables: { appointmentInput: basePersonalInput({ shopId: shop.id }) },
+			},
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(data.createAppointment).toBeNull();
+		expect(errors[0].extensions.errors.isPersonal).toMatch(
+			/cannot be attributed to a shop or a project/,
+		);
+	});
+
+	it('rejects a personal appointment that also carries a projectId', async () => {
+		const { user } = await createArtistUser();
+		const token = signTestToken(user);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{
+				query: CREATE_PERSONAL_APPOINTMENT,
+				// A real ObjectId-shaped string - objectIdSchema validates shape, not existence, and
+				// this request is rejected before anything would try to look the project up.
+				variables: {
+					appointmentInput: basePersonalInput({ projectId: '507f1f77bcf86cd799439011' }),
+				},
+			},
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(data.createAppointment).toBeNull();
+		expect(errors[0].extensions.errors.isPersonal).toMatch(
+			/cannot be attributed to a shop or a project/,
+		);
+	});
+
+	it("forces the appointment to the caller's own userId, ignoring a different userId in the input", async () => {
+		const { user: caller } = await createArtistUser();
+		const { user: someoneElse } = await createArtistUser();
+		const token = signTestToken(caller);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{
+				query: CREATE_PERSONAL_APPOINTMENT,
+				variables: { appointmentInput: basePersonalInput({ userId: someoneElse.id }) },
+			},
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.createAppointment.userId).toBe(caller.id);
+		expect(data.createAppointment.isPersonal).toBe(true);
+		expect(data.createAppointment.shopId).toBeNull();
+	});
+
+	it('creates a personal appointment with no shop or project attached', async () => {
+		const { user } = await createArtistUser();
+		const { shop } = await createShopAdminUser();
+		// Connected to a real shop - proves isPersonal isn't just "what happens when there's no
+		// shop to attribute to" but an explicit, honored choice even for a shop-connected artist.
+		await connectArtistToShop(user.id, shop.id);
+		const token = signTestToken(user);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: CREATE_PERSONAL_APPOINTMENT, variables: { appointmentInput: basePersonalInput() } },
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.createAppointment.isPersonal).toBe(true);
+		expect(data.createAppointment.shopId).toBeNull();
+		expect(data.createAppointment.projectId).toBeNull();
+	});
+});
+
+describe('updateAppointment: isPersonal immutability', () => {
+	it('rejects turning an existing shop appointment into a personal one', async () => {
+		const { user } = await createArtistUser();
+		const { shop } = await createShopAdminUser();
+		await connectArtistToShop(user.id, shop.id);
+		const appointment = await createAppointment(user.id, { shopId: shop.id, isPersonal: false });
+		const token = signTestToken(user);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{
+				query: UPDATE_APPOINTMENT_ISPERSONAL,
+				variables: {
+					appointmentInput: baseAppointmentInput({
+						id: appointment.id,
+						userId: user.id,
+						isPersonal: true,
+						title: 'Trying to go private',
+					}),
+				},
+			},
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(data.updateAppointment).toBeNull();
+		expect(errors[0].message).toMatch(/calendar \(shop or personal\) cannot be changed/);
+	});
+
+	it('rejects turning an existing personal appointment into a shop one', async () => {
+		const { user } = await createArtistUser();
+		const appointment = await createAppointment(user.id, { isPersonal: true });
+		const token = signTestToken(user);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{
+				query: UPDATE_APPOINTMENT_ISPERSONAL,
+				variables: {
+					appointmentInput: baseAppointmentInput({
+						id: appointment.id,
+						userId: user.id,
+						isPersonal: false,
+						title: 'Trying to go public',
+					}),
+				},
+			},
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(data.updateAppointment).toBeNull();
+		expect(errors[0].message).toMatch(/calendar \(shop or personal\) cannot be changed/);
+	});
+
+	// Mirrors the shopId "partial update that omits the key entirely" case in the
+	// updateAppointment describe block above (see that test's own comment on the real regression
+	// it caught) - a save that never mentions isPersonal at all must not be read as an attempt to
+	// flip it.
+	it('allows a partial update that omits isPersonal entirely on a personal appointment', async () => {
+		const { user } = await createArtistUser();
+		const appointment = await createAppointment(user.id, { isPersonal: true });
+		const token = signTestToken(user);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{
+				query: UPDATE_APPOINTMENT_ISPERSONAL,
+				variables: {
+					appointmentInput: {
+						id: appointment.id,
+						appointmentDate: new Date().toISOString(),
+						title: 'Updated title only',
+					},
+				},
+			},
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.updateAppointment.isPersonal).toBe(true);
+		expect(data.updateAppointment.title).toBe('Updated title only');
+	});
+});
+
+describe('getAppointmentsByShop: never surfaces a personal appointment', () => {
+	it("excludes a personal appointment even if it somehow carries the shop's own shopId", async () => {
+		const { user: shopAdmin, shop } = await createShopAdminUser();
+		await saveCorruptedShopPersonalAppointment({
+			userId: shopAdmin.id,
+			shopId: shop.id,
+			title: 'Should never appear on the shop calendar',
+		});
+		await createAppointment(shopAdmin.id, { shopId: shop.id }); // an ordinary shop appointment
+		const token = signTestToken(shopAdmin);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_APPOINTMENTS_BY_SHOP, variables: { shopId: shop.id } },
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.getAppointmentsByShop.items).toHaveLength(1);
+	});
+});
+
+describe('getAppointmentsByArtist: isPersonal visibility', () => {
+	it("includes the caller's own personal appointments alongside shop ones when no isPersonal filter is given", async () => {
+		const { user } = await createArtistUser();
+		await createAppointment(user.id, { isPersonal: true });
+		await createAppointment(user.id, { isPersonal: false });
+		const token = signTestToken(user);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_APPOINTMENTS_BY_ARTIST_FILTERED, variables: { userId: user.id } },
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.getAppointmentsByArtist.items).toHaveLength(2);
+	});
+
+	it('lets the caller narrow to just their own personal appointments via filter.isPersonal', async () => {
+		const { user } = await createArtistUser();
+		await createAppointment(user.id, { isPersonal: true });
+		await createAppointment(user.id, { isPersonal: false });
+		const token = signTestToken(user);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{
+				query: GET_APPOINTMENTS_BY_ARTIST_FILTERED,
+				variables: { userId: user.id, filter: { isPersonal: true } },
+			},
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.getAppointmentsByArtist.items).toHaveLength(1);
+		expect(data.getAppointmentsByArtist.items[0].isPersonal).toBe(true);
+	});
+
+	// The privacy-critical case: a Shop Admin is otherwise fully entitled to browse this artist's
+	// schedule (see the plain ownership describe block above), but a personal appointment must
+	// stay invisible to them regardless - even when they explicitly ask for it by filter.
+	it("excludes a personal appointment from a Shop Admin's view of the artist's schedule, even when filter.isPersonal is explicitly true", async () => {
+		const { user: owner } = await createArtistUser();
+		const { user: shopAdmin, shop } = await createShopAdminUser();
+		await connectArtistToShop(owner.id, shop.id);
+		await createAppointment(owner.id, { isPersonal: true });
+		await createAppointment(owner.id, { shopId: shop.id });
+		const token = signTestToken(shopAdmin);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{
+				query: GET_APPOINTMENTS_BY_ARTIST_FILTERED,
+				variables: { userId: owner.id, filter: { isPersonal: true } },
+			},
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		// NOT empty - the isPersonal:true this admin asked for is force-overridden to $ne:true
+		// (applied LAST, after the filter spread - see resolvers/appointments.js's own comment on
+		// why), which doesn't make the query unsatisfiable, it OVERWRITES the caller's isPersonal
+		// value entirely. So this still matches the shop's own non-personal appointment - the
+		// privacy guarantee is "you can never see the personal one", not "asking for isPersonal:true
+		// as a non-owner returns nothing".
+		expect(data.getAppointmentsByArtist.items).toHaveLength(1);
+		expect(data.getAppointmentsByArtist.items[0].isPersonal).toBeFalsy();
+	});
+});
+
+describe('getAppointment: personal-appointment privacy', () => {
+	it('allows the owner to read their own personal appointment', async () => {
+		const { user } = await createArtistUser();
+		const appointment = await createAppointment(user.id, { isPersonal: true });
+		const token = signTestToken(user);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_APPOINTMENT, variables: { appointmentId: appointment.id } },
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(errors).toBeUndefined();
+		expect(data.getAppointment.id).toBe(appointment.id);
+	});
+
+	it("denies a Shop Admin of the appointment owner's own shop, even though they'd normally be let in", async () => {
+		const { user: owner } = await createArtistUser();
+		const { user: shopAdmin, shop } = await createShopAdminUser();
+		await connectArtistToShop(owner.id, shop.id);
+		const appointment = await createAppointment(owner.id, { isPersonal: true });
+		const token = signTestToken(shopAdmin);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_APPOINTMENT, variables: { appointmentId: appointment.id } },
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(data.getAppointment).toBeNull();
+		expect(errors[0].message).toMatch(/Action not allowed/);
+	});
+
+	// Same defense-in-depth scenario as the getAppointmentsByShop test above, applied to this
+	// resolver - proves the isPersonal check really does run first and isn't just correct by
+	// coincidence because a personal appointment never has a shopId to fall through to
+	// callerBelongsToShop with. See resolvers/appointments.js's own comment on exactly this.
+	it('denies even a Shop Admin who WOULD pass the shop-membership check, if isPersonal is set', async () => {
+		const { user: owner } = await createArtistUser();
+		const { user: shopAdmin, shop } = await createShopAdminUser();
+		await connectArtistToShop(owner.id, shop.id);
+		const appointment = await saveCorruptedShopPersonalAppointment({
+			userId: owner.id,
+			shopId: shop.id,
+			title: 'Corrupted record - should still be denied',
+		});
+		const token = signTestToken(shopAdmin);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_APPOINTMENT, variables: { appointmentId: appointment.id } },
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(data.getAppointment).toBeNull();
+		expect(errors[0].message).toMatch(/Action not allowed/);
+	});
+
+	it("denies an unrelated artist from reading someone else's personal appointment", async () => {
+		const { user: owner } = await createArtistUser();
+		const { user: otherArtist } = await createArtistUser();
+		const appointment = await createAppointment(owner.id, { isPersonal: true });
+		const token = signTestToken(otherArtist);
+		const server = createTestServer();
+
+		const response = await server.executeOperation(
+			{ query: GET_APPOINTMENT, variables: { appointmentId: appointment.id } },
+			{ contextValue: contextWithToken(token) },
+		);
+
+		const { errors, data } = response.body.singleResult;
+		expect(data.getAppointment).toBeNull();
+		expect(errors[0].message).toMatch(/Action not allowed/);
+	});
+});

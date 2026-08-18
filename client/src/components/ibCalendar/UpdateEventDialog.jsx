@@ -99,7 +99,15 @@ const UpdateEventDialog = ({ selectedDay, event }) => {
             // Appointment.shopId is nullable for exactly this reason - sending undefined here is
             // correct, not a workaround. Optional-chained since the old unconditional access
             // crashed this whole dialog for such an artist, found via manual testing.
-            shopId: user.userInfo?.shop?.id,
+            //
+            // event.isPersonal short-circuits this to undefined regardless of the CURRENT user's
+            // shop - without this, editing a personal appointment belonging to a shop-connected
+            // user would resend that user's own shopId on every save, and the server would read
+            // that as "being attributed to a shop for the first time" (see updateAppointment's own
+            // isPersonal-immutability check in mutations/appointments.js) and reject the save
+            // outright rather than silently corrupt it - but the fix belongs here, not in a
+            // confusing server error a routine title edit should never hit.
+            shopId: event.isPersonal ? undefined : user.userInfo?.shop?.id,
             title: titleRef.current.value,
             description: descriptionRef.current.value,
             // Shop cut is no longer editable from this dialog at all (see the removed JSX block
@@ -276,22 +284,42 @@ const UpdateEventDialog = ({ selectedDay, event }) => {
 						</div>
 
 						{/* Read-only. See this file's header comment on why type and project are no
-						    longer editable from here. */}
+						    longer editable from here. Calendar (shop/personal) joins them for the
+						    same reason - see mutations/appointments.js's isPersonal-immutability check:
+						    it cannot be changed after creation, so there is no honest editable control
+						    to offer for it either. */}
 						<div className="updateEventReadOnlyFields">
 							<div className="updateEventReadOnlyField">
 								<span className="updateEventReadOnlyLabel">
-									Appointment Type
+									Calendar
 								</span>
 								<span className="updateEventReadOnlyValue">
-									{appointmentTypeLabel}
+									{event.isPersonal ? "Personal" : "Shop"}
 								</span>
 							</div>
-							<div className="updateEventReadOnlyField">
-								<span className="updateEventReadOnlyLabel">Project</span>
-								<span className="updateEventReadOnlyValue">
-									{projectLabel}
-								</span>
-							</div>
+							{/* Type and Project are meaningless for a personal entry - it was never asked
+							    a Consult/Session question at creation (see AppointmentWizard.jsx) and never
+							    has a Project. Showing them anyway would read as "Type: Other", a value
+							    that only exists as this feature's internal storage bucket and was never a
+							    real answer to anything - see AppointmentTypeChip.jsx's own comment. */}
+							{!event.isPersonal && (
+								<>
+									<div className="updateEventReadOnlyField">
+										<span className="updateEventReadOnlyLabel">
+											Appointment Type
+										</span>
+										<span className="updateEventReadOnlyValue">
+											{appointmentTypeLabel}
+										</span>
+									</div>
+									<div className="updateEventReadOnlyField">
+										<span className="updateEventReadOnlyLabel">Project</span>
+										<span className="updateEventReadOnlyValue">
+											{projectLabel}
+										</span>
+									</div>
+								</>
+							)}
 						</div>
 						<FormField id="updateEventTitle" label="Add Title">
 							<IBInput

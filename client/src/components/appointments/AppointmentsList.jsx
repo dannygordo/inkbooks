@@ -7,14 +7,18 @@ import moment from "moment";
 import { useNavigate } from "react-router-dom";
 import { CircularProgress } from "@mui/material";
 import { useAuth } from "../../context/auth";
+import { useCalendar } from "../../context/calendar";
 import { AppointmentService } from "../../services/AppointmentService";
 import DateRangePicker from "../analytics/DateRangePicker";
 import AppointmentTypeChip from "./AppointmentTypeChip";
 import Pager from "../pagination/Pager";
 import CreateEventButton from "../ibCalendar/CreateEventButton";
+import UpdateEventDialog from "../ibCalendar/UpdateEventDialog";
+import MyCalendarsFilter from "./MyCalendarsFilter";
 import { buildScheduleRanges, getDefaultScheduleRange } from "../../utils/dateRanges";
 import { tagColorRowStyle } from "../../utils/tagColor";
 import { canManageAppointment } from "../../utils/permissions";
+import { filterByCalendars } from "../../utils/calendarFilters";
 import { ROUTE_CONSTANTS } from "../../constants";
 import "./appointmentsList.css";
 
@@ -74,7 +78,12 @@ const AppointmentRow = ({ appointment, tinted, showArtist, onOpen, canManage }) 
 			    alignment from row to row. Every column below has the same fixed-width treatment
 			    for the same reason. */}
 			<span className="appointmentsListType">
-				<AppointmentTypeChip type={appointment.appointmentType} size="small" />
+				<AppointmentTypeChip
+					type={appointment.appointmentType}
+					size="small"
+					personal={appointment.isPersonal}
+					tagColor={appointment.user?.tagColor}
+				/>
 			</span>
 			<span className="appointmentsListTitle">
 				{appointment.project?.title || appointment.title || "(untitled appointment)"}
@@ -125,7 +134,8 @@ const AppointmentRow = ({ appointment, tinted, showArtist, onOpen, canManage }) 
  * empty precisely because a query had no fallback.
  */
 const AppointmentsList = () => {
-	const { user } = useAuth();
+	const { user, setModal } = useAuth();
+	const { calendarFilters } = useCalendar();
 	const navigate = useNavigate();
 	// Opens on THIS WEEK, not this month. A schedule is read forward and at working-week
 	// resolution; a month of appointments is a scroll, not an answer.
@@ -166,24 +176,51 @@ const AppointmentsList = () => {
 			filter,
 			page
 		);
+	// This user's OWN personal-calendar appointments - never returned by getAppointmentsByShop (no
+	// shopId - see models/Appointment.js) and not what artistData above is scoped to fetch either
+	// once there's a shop. Fetched at a generous fixed page size rather than sharing the list's own
+	// `page` state: personal entries are a small, separate bucket, and trying to interleave one
+	// pager across two differently-shaped result sets (a shop's entire roster vs. one person's own
+	// private items) would need real cursor merging for a case that in practice never has enough
+	// rows to need paging at all. Skipped entirely (via the query's own !userId guard) once there's
+	// no shop, since artistData already covers everything - personal or not - this user owns.
+	const { data: personalData, loading: personalLoading } =
+		AppointmentService.getAppointmentsByArtistForCalendar(
+			shopId ? user.id : undefined,
+			filter,
+			{ limit: 200 },
+			{ isPersonal: true }
+		);
 
-	const loading = shopId ? shopLoading : artistLoading;
+	const loading = shopId ? shopLoading || personalLoading : artistLoading;
 
+	// Driven by the SHOP query alone when shop-connected - personalData's own count isn't folded in
+	// here. The personal fetch above is a flat, unpaged 200-row batch precisely so it doesn't need
+	// its own pager; Pager below is only ever really answering "is there another page of shop
+	// appointments", which stays true regardless of how many personal ones are mixed into what's on
+	// screen.
 	const pageInfo = shopId
 		? shopData?.getAppointmentsByShop?.pageInfo
 		: artistData?.getAppointmentsByArtist?.pageInfo;
 
 	const appointments = useMemo(() => {
 		const items = shopId
-			? shopData?.getAppointmentsByShop?.items
+			? [
+					...(shopData?.getAppointmentsByShop?.items || []),
+					...(personalData?.getAppointmentsByArtist?.items || []),
+			  ]
 			: artistData?.getAppointmentsByArtist?.items;
+		// "My Calendars" applied here, over data the server has already scoped correctly - see
+		// utils/calendarFilters.js's own comment on why this is a display preference, not the
+		// privacy boundary itself.
+		const visible = filterByCalendars(items, calendarFilters);
 		// Sorted here rather than trusting arrival order: the two queries are paged and their
 		// server-side ordering serves the calendar, which doesn't care. A list read top to bottom
 		// does.
-		return [...(items || [])].sort(
+		return [...(visible || [])].sort(
 			(a, b) => new Date(a.appointmentDate) - new Date(b.appointmentDate)
 		);
-	}, [shopId, shopData, artistData]);
+	}, [shopId, shopData, artistData, personalData, calendarFilters]);
 
 	// Grouped by day so the date is a heading rather than a column repeated down every row. Three
 	// appointments on one Tuesday should say Tuesday once.
@@ -200,6 +237,21 @@ const AppointmentsList = () => {
 	}, [appointments]);
 
 	const openAppointment = (appt) => {
+		// A personal-calendar entry never went through the client-intake/booking-request pipeline
+		// a real consult or session did (see AppointmentWizard.jsx's own comment on why personal
+		// entries are a simple title/description/date form instead) - it has no BookingRequest,
+		// and a session-labeled one has no Project. Routing it to ConsultDetail or a Project page
+		// the way a shop appointment's type would suggest lands on a page with nothing to show.
+		// The same quick-edit dialog the calendar view already opens for it (see Day.jsx) works
+		// for both label types here without assuming either pipeline exists.
+		if (appt.isPersonal) {
+			setModal({
+				isOpen: true,
+				title: `Personal appointment - ${moment(appt.appointmentDate).format("LLL")}`,
+				content: <UpdateEventDialog selectedDay={moment(appt.appointmentDate)} event={appt} />,
+			});
+			return;
+		}
 		// A consult has its own detail page; a session belongs to a project. Mirrors what the
 		// calendar's day cells already do rather than introducing a third destination.
 		if (appt.appointmentType === "consult") {
@@ -217,6 +269,7 @@ const AppointmentsList = () => {
 					onChange={setRangeAndReset}
 					presets={buildScheduleRanges()}
 				/>
+				<MyCalendarsFilter hasShop={Boolean(shopId)} />
 				{/* Booking has to be reachable from whichever view you happen to be in. Sending
 				    someone back to the calendar to make an appointment turns a view preference into
 				    a workflow detour. Defaults to TODAY rather than to the calendar's last-clicked

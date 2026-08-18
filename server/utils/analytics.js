@@ -3,6 +3,8 @@ const Project = require('../models/Project');
 const Client = require('../models/Client');
 const User = require('../models/User');
 const Artist = require('../models/Artist');
+const Expense = require('../models/Expense');
+const Income = require('../models/Income');
 const { getArtistIdsForShops } = require('./shop-membership');
 const { toObjectId } = require('./object-id');
 
@@ -45,6 +47,15 @@ const { toObjectId } = require('./object-id');
  *                (unpaid/invoice_sent - money owed), and awaiting confirmation
  *                (pending_confirmation - an artist says they paid, the shop hasn't agreed yet).
  *                Summing those into one number would hide the only one that needs action.
+ *   expenses     every Expense row (models/Expense.js) OWNED by this exact scope - not derived
+ *                through artist membership the way revenue is. A shop's rent isn't any artist's
+ *                session, so this is Expense.find({shopId}) / Expense.find({artistUserId})
+ *                directly, scoped by `date` the same [start, end) way as everything else here.
+ *   other income Income rows (models/Income.js) - money in that isn't a tattoo session, same
+ *                direct ownership scoping as expenses. Kept OUT of revenueCents on purpose: the
+ *                two answer different questions ("what did sessions bring in" vs "what did
+ *                everything else bring in"), and netCents is where they're finally added
+ *                together.
  *
  * Everything is scoped by appointmentDate, not createdAt: a shop owner asking "how did March go"
  * means the work done in March, not the records typed up in March.
@@ -162,6 +173,26 @@ async function computeAnalytics({ shopId, artistUserId, start, end }) {
     { $group: { _id: null, ...totalsAgg } },
   ]);
 
+  // --- Expenses and other income ------------------------------------------------------------
+  // Owned directly by this scope (shopId XOR artistUserId on the row itself - see
+  // utils/shop-membership.js's resolveBusinessOwner), not resolved through artist membership the
+  // way appointment-derived figures above are. date, not createdAt - matches this whole file's
+  // "a window means when it happened, not when it was typed in" rule.
+  const ownerMatch = shopId ? { shopId: toObjectId(shopId) } : { artistUserId: toObjectId(artistUserId) };
+  const dateMatch = { date: { $gte: start, $lt: end } };
+  const [[expenseRow], [incomeRow]] = await Promise.all([
+    Expense.aggregate([
+      { $match: { ...ownerMatch, ...dateMatch } },
+      { $group: { _id: null, totalCents: { $sum: '$amountCents' } } },
+    ]),
+    Income.aggregate([
+      { $match: { ...ownerMatch, ...dateMatch } },
+      { $group: { _id: null, totalCents: { $sum: '$amountCents' } } },
+    ]),
+  ]);
+  const expensesCents = (expenseRow && expenseRow.totalCents) || 0;
+  const otherIncomeCents = (incomeRow && incomeRow.totalCents) || 0;
+
   // Per-artist breakdown, same figures grouped by userId instead of collapsed. Skipped entirely
   // for a single-artist query, where it would just restate the totals as a one-row table.
   let perArtist = [];
@@ -253,6 +284,11 @@ async function computeAnalytics({ shopId, artistUserId, start, end }) {
     depositsCollectedCents: totals.depositsCollectedCents || 0,
     depositsAppliedCents: totals.depositsAppliedCents || 0,
     depositsOutstandingCents: totals.depositsOutstandingCents || 0,
+    expensesCents,
+    otherIncomeCents,
+    // See this file's header - computed here so the three figures on a dashboard card always
+    // agree by construction.
+    netCents: (totals.revenueCents || 0) + otherIncomeCents - expensesCents,
     completedSessionCount: totals.completedSessionCount || 0,
     consultCount: totals.consultCount || 0,
     appointmentCount: totals.appointmentCount || 0,

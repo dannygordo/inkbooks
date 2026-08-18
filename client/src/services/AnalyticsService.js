@@ -26,6 +26,9 @@ export const AnalyticsService = (() => {
 		depositsCollectedCents
 		depositsAppliedCents
 		depositsOutstandingCents
+		expensesCents
+		otherIncomeCents
+		netCents
 	`;
 
 	const _ACTIVITY_FIELDS = `

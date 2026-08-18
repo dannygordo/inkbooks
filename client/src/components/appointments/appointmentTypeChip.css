@@ -18,3 +18,17 @@
     padding: 1px 8px;
     font-size: 11px;
 }
+
+/* Personal appointments (see AppointmentTypeChip.jsx) - a thicker border than the 1px every filled
+   chip uses, because on a transparent background a 1px line is the only thing distinguishing this
+   chip from empty space; the type chips don't have that problem since their fill already does the
+   work. Padding trimmed by the same 1px added to the border on each side, so a personal chip takes
+   up exactly the same box as a filled one and rows don't jump around based on which kind of
+   appointment is in them. */
+.appointmentTypeChipPersonal {
+    border-width: 2px;
+    padding: 1px 9px;
+}
+.appointmentTypeChipPersonal.appointmentTypeChipSmall {
+    padding: 0px 7px;
+}

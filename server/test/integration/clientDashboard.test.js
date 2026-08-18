@@ -23,12 +23,15 @@ const {
 } = require('../helpers/factories');
 const Client = require('../../models/Client');
 
+// projects/appointments are paged connections now (Client.projects/appointments in
+// typeDefs.js take page: PageInput and return a *Page) - items + pageInfo, same shape as every
+// other paged list in the schema.
 const GET_CLIENT_DASHBOARD = `
 	query GetClientDashboard($clientId: ID!) {
 		getClient(clientId: $clientId) {
 			id
-			projects { id title }
-			appointments { id totalCents tipCents appointmentStatus }
+			projects { items { id title } pageInfo { totalCount hasMore limit offset } }
+			appointments { items { id totalCents tipCents appointmentStatus } pageInfo { totalCount hasMore limit offset } }
 			notes { id note author }
 		}
 	}
@@ -76,11 +79,13 @@ describe('Client.projects / Client.appointments', () => {
 
 		const { errors, data } = res.body.singleResult;
 		expect(errors).toBeUndefined();
-		expect(data.getClient.projects).toHaveLength(1);
-		expect(data.getClient.projects[0].title).toBe('Koi half sleeve');
-		expect(data.getClient.appointments).toHaveLength(1);
-		expect(data.getClient.appointments[0].totalCents).toBe(36000);
-		expect(data.getClient.appointments[0].tipCents).toBe(6000);
+		expect(data.getClient.projects.items).toHaveLength(1);
+		expect(data.getClient.projects.items[0].title).toBe('Koi half sleeve');
+		expect(data.getClient.projects.pageInfo.totalCount).toBe(1);
+		expect(data.getClient.appointments.items).toHaveLength(1);
+		expect(data.getClient.appointments.items[0].totalCents).toBe(36000);
+		expect(data.getClient.appointments.items[0].tipCents).toBe(6000);
+		expect(data.getClient.appointments.pageInfo.totalCount).toBe(1);
 	});
 
 	it("does not leak another client's projects", async () => {
@@ -99,8 +104,73 @@ describe('Client.projects / Client.appointments', () => {
 			{ contextValue: contextWithToken(signTestToken(artist)) },
 		);
 
-		const titles = res.body.singleResult.data.getClient.projects.map((p) => p.title);
+		const titles = res.body.singleResult.data.getClient.projects.items.map((p) => p.title);
 		expect(titles).toEqual(['A only']);
+	});
+});
+
+describe('Client.stats', () => {
+	// The whole reason this field exists: projects/appointments are paged now, so a caller can't
+	// sum "the current page" and get the right lifetime total. This asserts the aggregation itself
+	// is right, independent of whatever page size the dashboard happens to be showing.
+	it("aggregates the client's full history regardless of any page size", async () => {
+		const { user: artist } = await createArtistUser();
+		const { client } = await createClientUser();
+		const project = await createProject(artist.id, client.id);
+		// Two completed sessions (one tipped, one not) and one still-scheduled appointment, which
+		// should count toward upcoming but not toward totalSpentCents/completedSessionCount.
+		await createAppointment(artist.id, {
+			projectId: project.id,
+			appointmentStatus: 'completed',
+			totalCents: 20000,
+			tipCents: 4000,
+		});
+		await createAppointment(artist.id, {
+			projectId: project.id,
+			appointmentStatus: 'completed',
+			totalCents: 15000,
+			tipCents: 0,
+		});
+		await createAppointment(artist.id, {
+			projectId: project.id,
+			appointmentStatus: 'scheduled',
+			appointmentDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+			totalCents: 30000,
+		});
+
+		const server = createTestServer();
+		const res = await server.executeOperation(
+			{
+				query: `
+					query ($clientId: ID!) {
+						getClient(clientId: $clientId) {
+							stats {
+								totalSpentCents
+								totalTipsCents
+								averageTipCents
+								tippedSessionCount
+								completedSessionCount
+								projectCount
+								upcomingAppointmentCount
+							}
+						}
+					}
+				`,
+				variables: { clientId: client.id },
+			},
+			{ contextValue: contextWithToken(signTestToken(artist)) },
+		);
+
+		const { errors, data } = res.body.singleResult;
+		expect(errors).toBeUndefined();
+		const stats = data.getClient.stats;
+		expect(stats.totalSpentCents).toBe(35000);
+		expect(stats.totalTipsCents).toBe(4000);
+		expect(stats.tippedSessionCount).toBe(1);
+		expect(stats.averageTipCents).toBe(4000);
+		expect(stats.completedSessionCount).toBe(2);
+		expect(stats.projectCount).toBe(1);
+		expect(stats.upcomingAppointmentCount).toBe(1);
 	});
 });
 

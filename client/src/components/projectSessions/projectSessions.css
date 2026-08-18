@@ -164,6 +164,59 @@
 	font-style: italic;
 }
 
+/* DECISIONS.md M4 - a documented reversal already performed by hand in Square, not a live money
+   control. Styled deliberately plainer than the deposit block above (no colored border/background)
+   - a deposit is an offer to take an action right now; this is a record of one already taken. */
+.sessionDetailAdjustments {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 12px 14px;
+	border: 1px solid var(--ib-border);
+	border-radius: 6px;
+}
+.sessionDetailAdjustmentsLabel {
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--ib-text-primary);
+}
+.sessionDetailAdjustmentsEmpty {
+	font-size: 13px;
+	color: var(--ib-text-secondary);
+	font-style: italic;
+}
+.sessionDetailAdjustmentsList {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+.sessionDetailAdjustmentRow {
+	display: flex;
+	align-items: baseline;
+	gap: 10px;
+	flex-wrap: wrap;
+	font-size: 13px;
+}
+.sessionDetailAdjustmentAmount {
+	font-weight: 600;
+	color: var(--ib-text-primary);
+}
+.sessionDetailAdjustmentReason {
+	color: var(--ib-text-primary);
+}
+.sessionDetailAdjustmentMeta {
+	font-size: 12px;
+	color: var(--ib-text-muted);
+	margin-left: auto;
+}
+.sessionDetailAdjustmentForm {
+	display: flex;
+	align-items: flex-end;
+	gap: 8px;
+	flex-wrap: wrap;
+	margin-top: 4px;
+}
+
 .sessionDetailActions {
 	display: flex;
 	gap: 8px;

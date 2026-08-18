@@ -17,7 +17,12 @@
 	gap: 10px;
 	flex-wrap: wrap;
 	padding: 12px 14px;
-	background-color: #fafafa;
+	/* Was a hardcoded #fafafa, a flat light gray that predated the copper theme sweep and never got
+	   swept along with it - it neither matched the app's own surface colour in light mode nor
+	   flipped for dark mode at all, so this panel stayed a stark light-gray box regardless of the
+	   selected appearance setting. --ib-surface-subtle is the token every other "tinted panel
+	   sitting on a card" already uses (see tokens.css's own sweep-mapping comment). */
+	background-color: var(--ib-surface-subtle);
 	border-radius: 6px;
 }
 

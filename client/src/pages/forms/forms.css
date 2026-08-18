@@ -1,0 +1,305 @@
+/* Shared by every page under pages/forms/ (Forms, FormBuilder, FormResponses,
+   PublicFormFillOut) - one stylesheet for the whole feature rather than four near-identical
+   files, since none of these pages is a mirror-pair the way Expenses/Income are (see that
+   pair's own comment on why THEY stay split). */
+
+.formsPage,
+.formBuilderPage,
+.formResponsesPage {
+	flex: 4;
+	padding: 20px;
+	margin-left: 10px;
+	max-width: 900px;
+}
+
+.formsPageHeader {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	margin-bottom: 4px;
+}
+
+.formsFilterBar {
+	display: flex;
+	gap: 8px;
+	margin: 16px 0 20px;
+}
+.formsFilterBar button {
+	padding: 6px 14px;
+	border-radius: 999px;
+	border: 1px solid var(--ib-border);
+	background: transparent;
+	color: var(--ib-text-secondary);
+	cursor: pointer;
+	font-size: 13px;
+}
+.formsFilterBar button.formsFilterActive {
+	background: var(--ib-primary);
+	border-color: var(--ib-primary);
+	color: var(--ib-on-primary, #fff);
+}
+
+.formsList {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	list-style: none;
+	padding: 0;
+	margin: 0 0 20px;
+}
+.formRow {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	padding: 14px 18px;
+	border: 1px solid var(--ib-border);
+	border-radius: 6px;
+}
+.formRowMain {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+.formRowTitle {
+	font-weight: 700;
+	font-size: 16px;
+	text-decoration: none;
+	color: var(--ib-text-primary, inherit);
+}
+.formRowTitle:hover {
+	text-decoration: underline;
+}
+.formRowMeta {
+	font-size: 12px;
+	color: var(--ib-text-secondary);
+}
+.formRowActions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	flex-shrink: 0;
+	justify-content: flex-end;
+}
+
+/* --- Builder ---------------------------------------------------------------------------- */
+.formBuilderTopRow {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	margin-bottom: 8px;
+}
+.formBuilderStatusChip {
+	font-size: 12px;
+	padding: 2px 10px;
+	border-radius: 999px;
+	border: 1px solid var(--ib-border);
+	color: var(--ib-text-secondary);
+	text-transform: capitalize;
+}
+.formBuilderGuestLink {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 12px 0 24px;
+	font-size: 13px;
+	color: var(--ib-text-secondary);
+}
+.formBuilderGuestLinkUrl {
+	font-family: monospace;
+	background: var(--ib-surface-inset, rgba(127, 127, 127, 0.1));
+	padding: 4px 8px;
+	border-radius: 4px;
+	word-break: break-all;
+}
+
+.fieldEditorList {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	margin: 20px 0;
+}
+.fieldEditorRow {
+	border: 1px solid var(--ib-border);
+	border-radius: 6px;
+	padding: 16px;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+.fieldEditorTopLine {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+.fieldEditorTopLine > *:first-child {
+	flex: 2;
+}
+.fieldEditorTopLine > *:nth-child(2) {
+	flex: 1;
+}
+.fieldEditorRowButtons {
+	display: flex;
+	gap: 2px;
+	flex-shrink: 0;
+}
+.fieldEditorRequiredRow {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 13px;
+}
+.fieldEditorOptions {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.fieldEditorOptionRow {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.fieldEditorOptionRow > *:first-child {
+	flex: 1;
+}
+.formBuilderAddFieldRow {
+	margin: 8px 0 24px;
+}
+
+/* --- Fields renderer (shared by authenticated + public fill-out) ------------------------ */
+.formFieldsRenderer {
+	display: flex;
+	flex-direction: column;
+	gap: 18px;
+}
+.formFieldBlock {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+.formFieldQuestion {
+	font-weight: 600;
+	font-size: 14px;
+}
+.formFieldRequiredMark {
+	color: var(--ib-error, #c0392b);
+	margin-left: 2px;
+}
+.formFieldHelp {
+	font-size: 12px;
+	color: var(--ib-text-secondary);
+	margin: -2px 0 4px;
+}
+.formFieldChoiceRow {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 14px;
+}
+.formFieldError {
+	font-size: 12px;
+	color: var(--ib-error, #c0392b);
+}
+.formFieldFileList {
+	font-size: 12px;
+	color: var(--ib-text-secondary);
+}
+
+/* --- Public guest fill-out page --------------------------------------------------------- */
+.publicFormFillOut {
+	display: flex;
+	justify-content: center;
+	padding: 40px 16px;
+}
+.publicFormFillOutWrapper {
+	width: 100%;
+	max-width: 560px;
+	background: var(--ib-surface-card);
+	border: 1px solid var(--ib-border);
+	border-radius: 10px;
+	padding: 32px;
+}
+.publicFormFillOutGuestFields {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	margin-bottom: 20px;
+	padding-bottom: 20px;
+	border-bottom: 1px solid var(--ib-border);
+}
+
+/* --- Responses + analytics ---------------------------------------------------------------*/
+.formResponsesSummary {
+	display: flex;
+	gap: 24px;
+	margin: 16px 0 24px;
+	flex-wrap: wrap;
+}
+.formResponsesStatCard {
+	border: 1px solid var(--ib-border);
+	border-radius: 6px;
+	padding: 12px 18px;
+	min-width: 140px;
+}
+.formResponsesStatLabel {
+	font-size: 12px;
+	color: var(--ib-text-secondary);
+}
+.formResponsesStatValue {
+	font-size: 20px;
+	font-weight: 700;
+}
+.formAnalyticsFieldRow {
+	border: 1px solid var(--ib-border);
+	border-radius: 6px;
+	padding: 12px 16px;
+	margin-bottom: 10px;
+}
+.formAnalyticsFieldLabel {
+	font-weight: 600;
+}
+.formAnalyticsOptionBar {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 13px;
+	margin-top: 4px;
+}
+.formAnalyticsOptionBarTrack {
+	flex: 1;
+	height: 6px;
+	border-radius: 3px;
+	background: var(--ib-surface-inset, rgba(127, 127, 127, 0.15));
+	overflow: hidden;
+}
+.formAnalyticsOptionBarFill {
+	height: 100%;
+	background: var(--ib-primary);
+}
+.formResponseRow {
+	border: 1px solid var(--ib-border);
+	border-radius: 6px;
+	padding: 14px 18px;
+	margin-bottom: 10px;
+}
+.formResponseRowHeader {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+.formResponseAnswerList {
+	margin-top: 10px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	font-size: 13px;
+}
+.formResponseAnswerQuestion {
+	font-weight: 600;
+	color: var(--ib-text-secondary);
+}

@@ -129,6 +129,11 @@ const updateAppointmentInputSchema = z.object({
   projectId: objectIdSchema.nullish(),
   userId: objectIdSchema.nullish(),
   shopId: objectIdSchema.nullish(),
+  // Whether this is a personal-calendar entry. See models/Appointment.js - immutable once set, so
+  // this schema accepts it purely so updateAppointment can SEE that a caller tried to change it and
+  // reject the request, rather than zod silently stripping the key and the mutation appearing to
+  // succeed while quietly ignoring it.
+  isPersonal: z.boolean().nullish(),
   title: z.string().nullish(),
   description: z.string().nullish(),
   // Integer CENTS - see utils/money.js. `.int()` is load-bearing, not decoration: a fractional
@@ -197,6 +202,10 @@ const createAppointmentInputSchema = z.object({
   projectId: objectIdSchema.nullish(),
   userId: objectIdSchema.nullish(),
   shopId: objectIdSchema.nullish(),
+  // A personal-calendar entry - see models/Appointment.js. createAppointment rejects this alongside
+  // a shopId or projectId (mutually exclusive by design), and forces userId to the caller
+  // regardless of what's sent, so nobody can attribute a "private" appointment to someone else.
+  isPersonal: z.boolean().nullish(),
   // Only ever set server-side by convertBookingRequest, never by a client directly - see
   // models/Appointment.js's own comment. Included here so it actually survives this schema's
   // validation (zod strips unrecognized keys) rather than silently getting dropped before the
@@ -521,6 +530,198 @@ const createGiftCardShopCutInvoiceInputSchema = z.object({
   paymentMethod: z.enum(['ach', 'card']).nullish(),
 });
 
+// amountCents is a positive magnitude, not signed - see models/Adjustment.js's own comment on
+// why. reason is required and non-empty: DECISIONS.md M4 calls for "a documented reason", and an
+// adjustment nobody can explain later isn't one.
+const recordAdjustmentInputSchema = z.object({
+  appointmentId: objectIdSchema,
+  amountCents: z.number().int().positive('Enter an amount above zero'),
+  reason: z.string().trim().min(1, 'A reason is required'),
+});
+
+// --- Expenses, non-tattoo income, recurring expenses ------------------------------------------
+// shopId is nullish on every create schema below - see resolveBusinessOwner
+// (utils/shop-membership.js): omitted means the caller's own artistUserId scope, not "no owner at
+// all". amountCents is a positive magnitude everywhere, same convention as gift cards/adjustments.
+
+const createExpenseTypeInputSchema = z.object({
+  shopId: objectIdSchema.nullish(),
+  name: z.string().trim().min(1, 'A name is required'),
+  description: z.string().nullish(),
+});
+const updateExpenseTypeInputSchema = z.object({
+  expenseTypeId: objectIdSchema,
+  name: z.string().trim().min(1, 'A name is required').nullish(),
+  description: z.string().nullish(),
+  active: z.boolean().nullish(),
+});
+const createIncomeTypeInputSchema = z.object({
+  shopId: objectIdSchema.nullish(),
+  name: z.string().trim().min(1, 'A name is required'),
+  description: z.string().nullish(),
+});
+const updateIncomeTypeInputSchema = z.object({
+  incomeTypeId: objectIdSchema,
+  name: z.string().trim().min(1, 'A name is required').nullish(),
+  description: z.string().nullish(),
+  active: z.boolean().nullish(),
+});
+
+const recordExpenseInputSchema = z.object({
+  shopId: objectIdSchema.nullish(),
+  expenseTypeId: objectIdSchema,
+  amountCents: z.number().int().positive('Enter an amount above zero'),
+  description: z.string().nullish(),
+  date: dateLikeSchema,
+});
+const updateExpenseInputSchema = z.object({
+  expenseId: objectIdSchema,
+  expenseTypeId: objectIdSchema.nullish(),
+  amountCents: z.number().int().positive('Enter an amount above zero').nullish(),
+  description: z.string().nullish(),
+  date: dateLikeSchema.nullish(),
+});
+const recordIncomeInputSchema = z.object({
+  shopId: objectIdSchema.nullish(),
+  incomeTypeId: objectIdSchema,
+  amountCents: z.number().int().positive('Enter an amount above zero'),
+  description: z.string().nullish(),
+  date: dateLikeSchema,
+});
+const updateIncomeInputSchema = z.object({
+  incomeId: objectIdSchema,
+  incomeTypeId: objectIdSchema.nullish(),
+  amountCents: z.number().int().positive('Enter an amount above zero').nullish(),
+  description: z.string().nullish(),
+  date: dateLikeSchema.nullish(),
+});
+
+const recurringFrequencySchema = z.enum(['weekly', 'monthly', 'yearly']);
+const createRecurringExpenseInputSchema = z.object({
+  shopId: objectIdSchema.nullish(),
+  expenseTypeId: objectIdSchema,
+  amountCents: z.number().int().positive('Enter an amount above zero'),
+  description: z.string().nullish(),
+  frequency: recurringFrequencySchema,
+  startDate: dateLikeSchema,
+  endDate: dateLikeSchema.nullish(),
+});
+const updateRecurringExpenseInputSchema = z.object({
+  recurringExpenseId: objectIdSchema,
+  expenseTypeId: objectIdSchema.nullish(),
+  amountCents: z.number().int().positive('Enter an amount above zero').nullish(),
+  description: z.string().nullish(),
+  frequency: recurringFrequencySchema.nullish(),
+  endDate: dateLikeSchema.nullish(),
+  active: z.boolean().nullish(),
+});
+
+// --- Forms (custom consent/waiver/intake forms - see models/Form.js) --------------------------
+// Separate feature from booking requests/BookingRequest.js - see that model's own header comment
+// on why "booking requests" as an example form TYPE didn't become a migration of the existing
+// pipeline.
+
+const FORM_FIELD_TYPES_TUPLE = [
+  'short_text',
+  'paragraph',
+  'single_choice',
+  'multi_choice',
+  'date',
+  'file_upload',
+  'signature',
+];
+
+// A field's own shape - shared between createFormInputSchema and updateFormInputSchema below.
+// `key` is nullish: omitted for a brand-new field (the mutation generates one - see
+// models/Form.js's FormFieldSchema default), supplied to keep an EXISTING field's identity across
+// an edit (so historical FormResponse.answers, keyed by this, still resolve against the field
+// that's still - deliberately - the same question, just perhaps reworded). superRefine rather than
+// a plain `.min(2)` on options, because the rule only applies to the two CHOICE types - a
+// short_text field's empty options array is correct, not a validation failure.
+const formFieldInputSchema = z
+  .object({
+    key: z.string().trim().min(1).nullish(),
+    type: z.enum(FORM_FIELD_TYPES_TUPLE, {
+      errorMap: () => ({ message: 'Choose a field type.' }),
+    }),
+    label: z.string().trim().min(1, 'Every field needs a label'),
+    helpText: z.string().nullish(),
+    required: z.boolean().nullish(),
+    options: z.array(z.string().trim().min(1)).nullish(),
+  })
+  .superRefine((field, ctx) => {
+    const isChoiceType = field.type === 'single_choice' || field.type === 'multi_choice';
+    if (isChoiceType && (!field.options || field.options.length < 2)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['options'],
+        message: 'A choice field needs at least two options.',
+      });
+    }
+  });
+
+const createFormInputSchema = z.object({
+  // Nullish - see resolveBusinessOwner (utils/shop-membership.js): omitted means the caller's own
+  // artistUserId scope, matching every other create-*Input in this file that carries an owner.
+  shopId: objectIdSchema.nullish(),
+  title: z.string().trim().min(1, 'Give the form a title'),
+  description: z.string().nullish(),
+  fields: z.array(formFieldInputSchema).min(1, 'Add at least one field'),
+});
+
+// Status (draft/published/archived) and allowGuestSubmissions are deliberately NOT here - both
+// change what a form actually DOES (a published form is live, guest access mints/uses a real
+// public link), so both go through their own explicit mutations (publishForm/archiveForm/
+// setFormGuestAccess in resolvers/forms.js) rather than being two more fields on a generic PATCH,
+// the same reasoning shop-cut payments' dual control and adjustment records both already follow
+// in this codebase - an intentional action, not a value that happened to change.
+const updateFormInputSchema = z.object({
+  formId: objectIdSchema,
+  title: z.string().trim().min(1, 'Give the form a title').nullish(),
+  description: z.string().nullish(),
+  fields: z.array(formFieldInputSchema).min(1, 'Add at least one field').nullish(),
+});
+
+// One answer, shaped generically enough to cover every field type - resolvers/forms.js's
+// submitFormResponse is what actually checks a given answer lands in the slot its field's type
+// says it should (e.g. a `date` field answered with textValue is refused there, not here; this
+// schema only guards the wire shape, the same division of labor createAppointmentInputSchema and
+// its isPersonal exclusivity check already use).
+const formAnswerInputSchema = z.object({
+  fieldKey: z.string().trim().min(1),
+  textValue: z.string().nullish(),
+  selectedOptions: z.array(z.string()).nullish(),
+  dateValue: dateLikeSchema.nullish(),
+  // Populated from POST /form-uploads' response (routes/formUploads.js), the same shape
+  // BookingRequest.referenceImages already takes from POST /booking-uploads - see that field's own
+  // comment in typeDefs.js.
+  fileUrls: z.array(z.string()).nullish(),
+  // The typed name only - signedAt is set server-side at submission (see models/FormResponse.js's
+  // own comment on why a client-supplied timestamp is never trusted for a consent record).
+  signedName: z.string().trim().nullish(),
+});
+
+// firstName/lastName/email/phone are only REQUIRED in effect when the caller is an unauthenticated
+// guest on a form with allowGuestSubmissions - conditional on auth context, which this schema
+// can't see, so that half is enforced in the resolver (mirrors createBookingRequestInputSchema's
+// own fields, reused for the exact same findOrCreateGuestClient call - see utils/guest-client.js).
+// Exactly one of formId/publicToken identifies which form this is - see resolvers/forms.js's
+// submitFormResponse for why a guest may only ever use publicToken (proof of holding the real
+// shareable link) while every authenticated path uses formId instead. clientId is only meaningful
+// for the authenticated "staff filling this out on a specific client's behalf" path - see that
+// resolver for the rest of the branching this schema can't express (which fields are actually
+// required depends on WHO the caller turns out to be, not on the wire shape alone).
+const submitFormResponseInputSchema = z.object({
+  formId: objectIdSchema.nullish(),
+  publicToken: z.string().trim().min(1).nullish(),
+  clientId: objectIdSchema.nullish(),
+  answers: z.array(formAnswerInputSchema),
+  firstName: z.string().trim().nullish(),
+  lastName: z.string().trim().nullish(),
+  email: z.string().trim().email('Email must be a valid email address').nullish(),
+  phone: z.string().nullish(),
+});
+
 module.exports = {
   loginInputSchema,
   registerInputSchema,
@@ -553,5 +754,21 @@ module.exports = {
   redeemGiftCardInputSchema,
   giftCardIdInputSchema,
   createGiftCardShopCutInvoiceInputSchema,
+  recordAdjustmentInputSchema,
+  createExpenseTypeInputSchema,
+  updateExpenseTypeInputSchema,
+  createIncomeTypeInputSchema,
+  updateIncomeTypeInputSchema,
+  recordExpenseInputSchema,
+  updateExpenseInputSchema,
+  recordIncomeInputSchema,
+  updateIncomeInputSchema,
+  createRecurringExpenseInputSchema,
+  updateRecurringExpenseInputSchema,
+  formFieldInputSchema,
+  createFormInputSchema,
+  updateFormInputSchema,
+  formAnswerInputSchema,
+  submitFormResponseInputSchema,
   validate,
 };

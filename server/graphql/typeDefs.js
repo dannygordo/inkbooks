@@ -289,14 +289,84 @@ module.exports = gql`
     # Everything below powers the client dashboard (client/src/components/clientDashboard).
     # Resolved on demand rather than stored, so nothing has to be kept in sync - see
     # resolvers/index.js's Client field resolvers.
-    projects: [Project]
-    appointments: [Appointment]
+    #
+    # page: PageInput on both - a client with years of history used to ship every project and
+    # every appointment it ever had on every dashboard visit, so the browser could show five of
+    # them. See ClientPage/AppointmentPage's own use elsewhere; utils/pagination.js.
+    projects(page: PageInput): ProjectPage!
+    appointments(page: PageInput): AppointmentPage!
     # SHOP-SIDE notes about the client - allergies, sitting tolerance, healing history. NOT
     # visible to the client themselves: the whole value of a note like "cancels a lot" or
     # "needed a break every 20 minutes" depends on it being a candid internal record rather than
     # a message to the person it's about. ClientDashboard renders this section only in the
-    # artist/staff view, and updateClientNotes below refuses a client editing their own.
+    # artist/staff view, and updateClientNotes below refuses a client editing their own. Still a
+    # bare array, not paged server-side - see ClientStats' own comment on why a note list didn't
+    # need the same treatment as projects/appointments.
     notes: [IBNote]
+    # The dashboard's stat cards, computed here rather than derived from projects/appointments
+    # above - those two are now PAGED, so summing whatever page happens to be on screen would
+    # make "Total spent" silently wrong the moment a client has more than one page of history.
+    # This aggregates the client's FULL history in Mongo regardless of what page the lists are
+    # showing, the same separation ArtistPerformancePanel already uses (figures from
+    # utils/analytics.js, lists from a separately-paged query) - see resolvers/index.js.
+    stats: ClientStats!
+    # Live (unresolved) flags only - see models/ClientFlag.js. A resolved flag is history, not a
+    # current fact about this client, and this is what a booking screen or dashboard badge asks
+    # "does this apply right now" through. Newest first, matching every other history list here.
+    flags: [ClientFlag!]!
+  }
+  # See models/ClientFlag.js for the full reasoning (resolved-not-deleted, why the counters on
+  # Client are denormalised, who can see one). This is a read/raise surface over that existing
+  # logic (utils/client-flags.js) - there is deliberately no resolve-by-id mutation yet; the only
+  # resolve path today is the automatic one wired into an appointment's status changing.
+  type ClientFlag {
+    id: ID!
+    clientId: ID!
+    typeKey: String!
+    type: ClientFlagType
+    appointmentId: ID
+    appointment: Appointment
+    shopId: ID
+    createdByUserId: ID
+    createdBy: User
+    systemGenerated: Boolean!
+    note: String
+    resolvedAt: DateTime
+    resolvedByUserId: ID
+    resolvedBy: User
+    createdAt: DateTime!
+  }
+  type ClientFlagType {
+    id: ID!
+    key: String!
+    label: String!
+    description: String
+    shopId: ID
+    systemGenerated: Boolean!
+    active: Boolean!
+  }
+  input RaiseClientFlagInput {
+    clientId: ID!
+    typeKey: String!
+    note: String
+  }
+  type ClientStats {
+    # Completed appointments only - a scheduled session has a price attached but nothing has
+    # changed hands yet. Matches utils/analytics.js's own revenue definition.
+    totalSpentCents: Int!
+    totalTipsCents: Int!
+    # Over TIPPED completed appointments only, not every completed one - dividing by all of them
+    # drags the figure toward zero with untipped sessions. tippedSessionCount is what it was
+    # divided by, so a caller can show "across N tipped sessions" without a second field.
+    averageTipCents: Int!
+    tippedSessionCount: Int!
+    completedSessionCount: Int!
+    # Every project regardless of status - matches the plain count the old projects.length gave.
+    projectCount: Int!
+    # Any status, appointmentDate in the future - matches the old client-side filter exactly
+    # (upcoming ≠ "scheduled"; a rescheduled or other-status appointment still due to happen
+    # counts).
+    upcomingAppointmentCount: Int!
   }
   input ClientInput {
     id: ID!
@@ -727,6 +797,10 @@ module.exports = gql`
     projectId: ID
     userId: ID
     shopId: ID
+    # A personal-calendar entry, visible only to its own userId - see models/Appointment.js.
+    # createAppointment rejects this alongside a shopId or projectId, and updateAppointment rejects
+    # any attempt to change it after creation - see mutations/appointments.js for both.
+    isPersonal: Boolean
     title: String
     description: String
     # All money is integer CENTS - see server/utils/money.js. These were previously total/tip,
@@ -778,6 +852,8 @@ module.exports = gql`
     shop: Shop
     userId: ID
     user: User
+    # See AppointmentInput.isPersonal above. Never true alongside a non-null shopId or projectId.
+    isPersonal: Boolean!
     title: String
     description: String
     # Integer CENTS - see server/utils/money.js.
@@ -829,6 +905,29 @@ module.exports = gql`
     timerStartedAt: DateTime
     accumulatedSeconds: Int
     sessionNotes: String
+    # DECISIONS.md M4 - a documented reversal, recorded here AFTER the real money movement already
+    # happened by hand in the Square app. Resolved on demand, not denormalised: this appointment's
+    # own totalCents/tipCents/shopCutCents are untouched by these rows - see models/Adjustment.js.
+    # Newest first, matching the model's own index and every other history list in this schema.
+    adjustments: [Adjustment!]!
+  }
+  # See models/Adjustment.js for the full reasoning. amountCents is always a positive magnitude -
+  # the amount reversed, never signed.
+  type Adjustment {
+    id: ID!
+    appointmentId: ID!
+    shopId: ID
+    artistUserId: ID!
+    amountCents: Int!
+    reason: String!
+    createdByUserId: ID!
+    createdBy: User
+    createdAt: DateTime!
+  }
+  input RecordAdjustmentInput {
+    appointmentId: ID!
+    amountCents: Int!
+    reason: String!
   }
   # Returned by createShopCutInvoice - the invoiceUrl is surfaced directly so the client can show
   # a "pay now" link immediately without waiting on Square's own email/SMS delivery (see
@@ -1003,6 +1102,21 @@ module.exports = gql`
     depositsAppliedCents: Int
     depositsOutstandingCents: Int
 
+    # --- Non-tattoo bookkeeping. See models/Expense.js, models/Income.js. ---
+    # Every Expense in this scope and window - rent, supplies, anything logged against an
+    # ExpenseType, including rows a RecurringExpense template auto-generated.
+    expensesCents: Int
+    # Every Income row in this scope and window - money in that ISN'T a tattoo session
+    # (revenueCents already covers that side). Named otherIncomeCents rather than incomeCents so
+    # it reads unambiguously next to revenueCents on the same card, not as a second, competing
+    # definition of "income".
+    otherIncomeCents: Int
+    # revenueCents + otherIncomeCents - expensesCents, computed server-side rather than left for
+    # a dashboard to add up - the same "the server decides every figure" principle
+    # utils/charge-quote.js states for a charge applies here: three numbers that agree by
+    # construction rather than by three widgets doing the same arithmetic and hoping not to drift.
+    netCents: Int
+
     # Activity - always returned, whatever the caller's role.
     completedSessionCount: Int!
     consultCount: Int!
@@ -1020,6 +1134,330 @@ module.exports = gql`
     # Empty on the single-artist query, where it would only restate the totals as a one-row table.
     artists: [ArtistAnalyticsRow!]!
   }
+
+  # --- Expenses, non-tattoo income, and recurring expenses ------------------------------------
+  # See models/Expense.js, models/Income.js, models/RecurringExpense.js and
+  # utils/shop-membership.js's resolveBusinessOwner/assertCanManageBusinessRecord for the full
+  # design. Every type below carries EXACTLY ONE owner - shopId or artistUserId, never both, never
+  # neither - and every read/write is gated on owning that scope: a shop admin for a shopId, or
+  # the artist themselves for an artistUserId. Staff and other artists at a shop see none of this,
+  # the same way they see none of setShopCutRate's or updateSquarePricingSettings' figures.
+  type ExpenseType {
+    id: ID!
+    shopId: ID
+    artistUserId: ID
+    name: String!
+    description: String
+    active: Boolean!
+    createdAt: DateTime!
+  }
+  type IncomeType {
+    id: ID!
+    shopId: ID
+    artistUserId: ID
+    name: String!
+    description: String
+    active: Boolean!
+    createdAt: DateTime!
+  }
+  type Expense {
+    id: ID!
+    shopId: ID
+    artistUserId: ID
+    expenseTypeId: ID!
+    expenseType: ExpenseType
+    amountCents: Int!
+    description: String
+    date: DateTime!
+    # Set only on a row the recurring-expense scheduler wrote - see models/Expense.js. Editing or
+    # deleting this row never touches the template it came from.
+    recurringExpenseId: ID
+    createdByUserId: ID!
+    createdBy: User
+    createdAt: DateTime!
+  }
+  type Income {
+    id: ID!
+    shopId: ID
+    artistUserId: ID
+    incomeTypeId: ID!
+    incomeType: IncomeType
+    amountCents: Int!
+    description: String
+    date: DateTime!
+    createdByUserId: ID!
+    createdBy: User
+    createdAt: DateTime!
+  }
+  type RecurringExpense {
+    id: ID!
+    shopId: ID
+    artistUserId: ID
+    expenseTypeId: ID!
+    expenseType: ExpenseType
+    amountCents: Int!
+    description: String
+    frequency: String!
+    startDate: DateTime!
+    # The next date this template is due to generate an Expense - see the model's own comment on
+    # why this field IS the cursor, not just informational.
+    nextRunDate: DateTime!
+    endDate: DateTime
+    active: Boolean!
+    createdByUserId: ID!
+    createdAt: DateTime!
+  }
+  type ExpensePage {
+    items: [Expense!]!
+    pageInfo: PageInfo!
+  }
+  type IncomePage {
+    items: [Income!]!
+    pageInfo: PageInfo!
+  }
+
+  input CreateExpenseTypeInput {
+    # Omit for the caller's own independent-artist scope - see resolveBusinessOwner.
+    shopId: ID
+    name: String!
+    description: String
+  }
+  input UpdateExpenseTypeInput {
+    expenseTypeId: ID!
+    name: String
+    description: String
+    active: Boolean
+  }
+  input CreateIncomeTypeInput {
+    shopId: ID
+    name: String!
+    description: String
+  }
+  input UpdateIncomeTypeInput {
+    incomeTypeId: ID!
+    name: String
+    description: String
+    active: Boolean
+  }
+  input RecordExpenseInput {
+    shopId: ID
+    expenseTypeId: ID!
+    amountCents: Int!
+    description: String
+    date: DateTime!
+  }
+  input UpdateExpenseInput {
+    expenseId: ID!
+    expenseTypeId: ID
+    amountCents: Int
+    description: String
+    date: DateTime
+  }
+  input RecordIncomeInput {
+    shopId: ID
+    incomeTypeId: ID!
+    amountCents: Int!
+    description: String
+    date: DateTime!
+  }
+  input UpdateIncomeInput {
+    incomeId: ID!
+    incomeTypeId: ID
+    amountCents: Int
+    description: String
+    date: DateTime
+  }
+  input CreateRecurringExpenseInput {
+    shopId: ID
+    expenseTypeId: ID!
+    amountCents: Int!
+    description: String
+    frequency: String!
+    startDate: DateTime!
+    endDate: DateTime
+  }
+  input UpdateRecurringExpenseInput {
+    recurringExpenseId: ID!
+    expenseTypeId: ID
+    amountCents: Int
+    description: String
+    frequency: String
+    endDate: DateTime
+    active: Boolean
+  }
+
+  # --- Forms (consent/waiver/intake - see models/Form.js and models/FormResponse.js) -----------
+  # Same ownership model as Expenses/Income directly above: shopId XOR artistUserId, gated through
+  # the same resolveBusinessOwner/assertCanManageBusinessRecord. A separate feature from
+  # BookingRequest - see models/Form.js's own header comment.
+  type FormField {
+    key: ID!
+    type: String!
+    label: String!
+    helpText: String
+    required: Boolean!
+    # Only meaningful when type is single_choice/multi_choice - empty on every other field type.
+    options: [String!]!
+  }
+  type Form {
+    id: ID!
+    shopId: ID
+    artistUserId: ID
+    title: String!
+    description: String
+    status: String!
+    allowGuestSubmissions: Boolean!
+    # Null until allowGuestSubmissions has been turned on at least once - see setFormGuestAccess.
+    # Never exposed on PublicForm below - a guest holding a link has no business learning it.
+    publicToken: ID
+    fields: [FormField!]!
+    createdByUserId: ID!
+    createdBy: User
+    createdAt: DateTime!
+    updatedAt: DateTime!
+  }
+  # The stripped-down shape a stranger holding a public link actually gets - see getPublicForm's
+  # own comment on why this isn't just Form with some fields nulled out at the resolver level. No
+  # shopId/artistUserId/status/createdByUserId/publicToken - none of a shop's internal identity or
+  # this form's own access token belongs in a response a browser with no login can read.
+  type PublicForm {
+    id: ID!
+    title: String!
+    description: String
+    fields: [FormField!]!
+  }
+  type FormPage {
+    items: [Form!]!
+    pageInfo: PageInfo!
+  }
+  # One submitted answer - see models/FormResponse.js's own comment on why exactly one of these
+  # value slots is meaningful per answer, chosen by the matching field's type.
+  type FormAnswer {
+    fieldKey: ID!
+    textValue: String
+    selectedOptions: [String!]!
+    dateValue: DateTime
+    fileUrls: [String!]!
+    signature: FormSignature
+  }
+  type FormSignature {
+    signedName: String
+    signedAt: DateTime
+  }
+  type FormResponse {
+    id: ID!
+    formId: ID!
+    shopId: ID
+    artistUserId: ID
+    # This response's own copy of the form's title/fields AS THEY WERE at submission time - see
+    # models/FormResponse.js's header comment on why this, not a live lookup through formId, is
+    # what every answer is interpreted against.
+    formTitle: String!
+    fieldsSnapshot: [FormField!]!
+    clientId: ID!
+    client: Client
+    answers: [FormAnswer!]!
+    submittedByUserId: ID!
+    submittedBy: User
+    submitterIp: String
+    source: String!
+    createdAt: DateTime!
+  }
+  type FormResponsePage {
+    items: [FormResponse!]!
+    pageInfo: PageInfo!
+  }
+  # One field's aggregated results, over whatever responses getFormAnalytics matched.
+  type FormFieldAnalytics {
+    fieldKey: ID!
+    label: String!
+    type: String!
+    # How many responses answered this field at all (a required field should read the same as
+    # totalResponses below; a genuinely optional one may read lower).
+    answeredCount: Int!
+    # Only populated for single_choice/multi_choice (see Form.CHOICE_FIELD_TYPES) - one row per
+    # option, in the field's own option order, with how many responses selected it. Empty for every
+    # other field type: a free-text/date/file/signature answer isn't meaningfully bucketable this
+    # way, and this deliberately doesn't attempt word-frequency or similar analysis of free text.
+    optionCounts: [FormOptionCount!]!
+  }
+  type FormOptionCount {
+    option: String!
+    count: Int!
+  }
+  # Submission volume for one day, in the caller's own local sense of "a day" (see
+  # resolvers/forms.js's getFormAnalytics for how the bucketing actually works) - the same shape
+  # a dashboard sparkline needs, nothing more.
+  type FormResponsesByDay {
+    date: DateTime!
+    count: Int!
+  }
+  type FormAnalytics {
+    formId: ID!
+    totalResponses: Int!
+    responsesByDay: [FormResponsesByDay!]!
+    fields: [FormFieldAnalytics!]!
+  }
+
+  input FormFieldInput {
+    # Omit for a brand-new field; supply an EXISTING field's key to preserve its identity across an
+    # edit - see utils/validation.js's formFieldInputSchema for the full reasoning.
+    key: ID
+    type: String!
+    label: String!
+    helpText: String
+    required: Boolean
+    options: [String!]
+  }
+  input CreateFormInput {
+    # Omit for the caller's own independent-artist scope - see resolveBusinessOwner.
+    shopId: ID
+    title: String!
+    description: String
+    fields: [FormFieldInput!]!
+  }
+  # status and allowGuestSubmissions are NOT here - see publishForm/archiveForm/setFormGuestAccess
+  # in the Mutation block below for why each is its own explicit action rather than a value this
+  # generic PATCH could flip unremarked-on alongside a title typo fix.
+  input UpdateFormInput {
+    formId: ID!
+    title: String
+    description: String
+    fields: [FormFieldInput!]
+  }
+  input FormAnswerInput {
+    fieldKey: ID!
+    textValue: String
+    selectedOptions: [String!]
+    dateValue: DateTime
+    # Populated from POST /form-uploads (routes/formUploads.js) - see BookingRequest.referenceImages'
+    # own comment for why file uploads are a plain REST route, not part of this GraphQL mutation.
+    fileUrls: [String!]
+    # The typed name only - signedAt is always set server-side, never accepted from the client. See
+    # models/FormResponse.js's own comment on why a client-supplied timestamp is never trusted here.
+    signedName: String
+  }
+  input SubmitFormResponseInput {
+    # Exactly one of these identifies the form. formId for every authenticated path (the caller
+    # already has real access); publicToken for the guest path - proof of holding the actual
+    # shareable link, the same role BookingRequest.guestToken plays. A guest is never allowed to
+    # resolve a form by formId alone - see resolvers/forms.js's submitFormResponse.
+    formId: ID
+    publicToken: String
+    # Only meaningful for an authenticated caller submitting THIS response on a specific existing
+    # client's behalf (e.g. staff at the counter) - see resolvers/forms.js for the full branching.
+    # Omitted for a guest, and omitted for a logged-in client filling out their own copy.
+    clientId: ID
+    answers: [FormAnswerInput!]!
+    # Only read on the guest path (no authenticated caller, and therefore no clientId either) -
+    # exactly the case createBookingRequest already handles the same way, via the same
+    # findOrCreateGuestClient. Ignored (and may be omitted) for every authenticated submission.
+    firstName: String
+    lastName: String
+    email: String
+    phone: String
+  }
+
   # What the set-password page can learn about a link before anyone types into the form.
   # Deliberately carries no email and no user id - a guessed token must not become a way to read
   # an account. See resolvers/passwords.js.
@@ -1168,6 +1606,11 @@ module.exports = gql`
     # true = appointmentDate >= now. Separate from the from/to bounds because "upcoming" has to mean "ahead of
     # right now" at the moment the query runs, not at the moment the client rendered.
     upcomingOnly: Boolean
+    # Filter on Appointment.isPersonal. Only meaningful (and only ever honoured) on
+    # getAppointmentsByArtist when the caller IS the artist being asked about - see that resolver's
+    # own comment. A caller viewing someone else's calendar can send this and it will be silently
+    # overridden to exclude personal appointments regardless, never loosened by it.
+    isPersonal: Boolean
   }
 
   type Query {
@@ -1288,7 +1731,12 @@ module.exports = gql`
     # leaking their name and phone to whoever can guess an address. Creating them is still correct
     # in that case - createClientAccount links the existing person to this shop.
     findClientByEmail(email: String!): Client
-    
+    # The types a manual-flag picker can offer: every platform-wide type (shopId omitted or null)
+    # plus, when shopId is passed, that shop's own. Includes systemGenerated types too (NO_SHOWED)
+    # so a client's flag list can label one correctly - raiseClientFlag below is what actually
+    # refuses a systemGenerated key from being hand-created, not this list.
+    getClientFlagTypes(shopId: ID): [ClientFlagType!]!
+
     ######### Users ###########
     
     getUser(userId: ID!): User
@@ -1398,6 +1846,49 @@ module.exports = gql`
 
     getShopAnalytics(shopId: ID!, start: DateTime!, end: DateTime!): Analytics
     getArtistAnalytics(userId: ID!, start: DateTime!, end: DateTime!): Analytics
+
+    ######### Expenses, income, recurring expenses ###########
+    # Exactly one of shopId/artistUserId is required on every one of these - see the type block's
+    # own comment above. includeInactive defaults to false: a deactivated type has no reason to
+    # show up in a picker, only in the management panel that offers to reactivate it.
+    getExpenseTypes(shopId: ID, artistUserId: ID, includeInactive: Boolean): [ExpenseType!]!
+    getIncomeTypes(shopId: ID, artistUserId: ID, includeInactive: Boolean): [IncomeType!]!
+    # start/end are optional - omitted, this returns the scope's full history (paged). A caller
+    # wanting a window passes both, half-open [start, end) matching every other range in this
+    # schema.
+    getExpenses(
+      shopId: ID
+      artistUserId: ID
+      start: DateTime
+      end: DateTime
+      page: PageInput
+    ): ExpensePage!
+    getIncomes(
+      shopId: ID
+      artistUserId: ID
+      start: DateTime
+      end: DateTime
+      page: PageInput
+    ): IncomePage!
+    # Unpaginated, like getGiftCardsByShop/getShopCutRates - a shop's set of recurring line items
+    # isn't expected to need paging, and if it ever does that's a symptom worth seeing.
+    getRecurringExpenses(shopId: ID, artistUserId: ID, includeInactive: Boolean): [RecurringExpense!]!
+
+    ######### Forms (consent/waiver/intake) ###########
+    # See the type block's own header comment (models/Form.js) for the ownership model - identical
+    # to Expenses/Income above, reusing the same resolveBusinessOwner/assertCanManageBusinessRecord.
+    getForm(formId: ID!): Form!
+    getForms(shopId: ID, artistUserId: ID, status: String, page: PageInput): FormPage!
+    # PUBLIC - no auth, no ownership check. This is the one Forms query a stranger with a link but
+    # no InkBooks account can ever call, matching inspectPasswordToken/createBookingRequest's own
+    # "public by design" convention above. Returns null for a token that doesn't exist, isn't
+    # published, or belongs to a form with allowGuestSubmissions: false - never an error, since a
+    # dead/typo'd link and a deliberately-closed form should look identical to whoever's holding it,
+    # not confirm which one it is.
+    getPublicForm(publicToken: String!): PublicForm
+    getFormResponses(formId: ID!, page: PageInput): FormResponsePage!
+    getFormResponse(formResponseId: ID!): FormResponse!
+    getFormAnalytics(formId: ID!): FormAnalytics!
   }
   type Mutation {
     # Records a new shop cut rate for an artist, from a date forward. APPEND-ONLY - this never
@@ -1570,6 +2061,14 @@ module.exports = gql`
     markShopCutPaidManually(appointmentId: ID!): Appointment!
     confirmShopCutPaid(appointmentId: ID!): Appointment!
 
+    ######### Adjustments ###########
+    # DECISIONS.md M4 - a documented reversal, recorded AFTER the real reversal already happened
+    # by hand in the Square app. See models/Adjustment.js and resolvers/adjustments.js. Same
+    # authority shape as everywhere else this file writes money-adjacent history: the appointment's
+    # own artist, or a shop admin who shares a shop with them (utils/shop-membership.js's
+    # canManageArtist) - which is exactly "shop-admin only where there is a shop."
+    recordAdjustment(input: RecordAdjustmentInput!): Adjustment!
+
     ######### Gift cards ###########
     # See DECISIONS.md M6, models/GiftCard.js, graphql/resolvers/giftCards.js.
 
@@ -1654,6 +2153,11 @@ module.exports = gql`
     # Shop-side client notes - see the comment on Client.notes. Deliberately NOT available to the
     # client whose record it is, even though getClient lets them read their own row.
     updateClientNotes(notes: [IBNoteInput], clientId: ID!): Client
+    # Hand-raises a flag - see models/ClientFlag.js and utils/client-flags.js's raiseClientFlag.
+    # Always systemGenerated: false; the automatic path (NO_SHOWED) is only ever reached from an
+    # appointment's own status changing, never from here. Refuses a systemGenerated typeKey itself
+    # (raiseClientFlag does), same as it refuses an unknown one.
+    raiseClientFlag(input: RaiseClientFlagInput!): ClientFlag!
 
     ######### Deposits ############
     # Records a deposit taken on an appointment (normally a consult). Also sets that appointment's
@@ -1751,5 +2255,60 @@ module.exports = gql`
     # the current and new artist are actively connected to. See mutations/bookingRequests.js for
     # the same-shop check this enforces - this is not a general "reassign to anyone" escape hatch.
     reassignBookingRequest(bookingRequestId: ID!, newArtistId: ID!): BookingRequest!
+
+    ######### Expenses, income, recurring expenses ###########
+    # See the Query section's own header for the ownership/authorization model shared by all of
+    # these - resolvers/expenses.js and resolvers/income.js.
+    createExpenseType(input: CreateExpenseTypeInput!): ExpenseType!
+    updateExpenseType(input: UpdateExpenseTypeInput!): ExpenseType!
+    createIncomeType(input: CreateIncomeTypeInput!): IncomeType!
+    updateIncomeType(input: UpdateIncomeTypeInput!): IncomeType!
+    recordExpense(input: RecordExpenseInput!): Expense!
+    updateExpense(input: UpdateExpenseInput!): Expense!
+    deleteExpense(expenseId: ID!): Boolean!
+    recordIncome(input: RecordIncomeInput!): Income!
+    updateIncome(input: UpdateIncomeInput!): Income!
+    deleteIncome(incomeId: ID!): Boolean!
+    # See models/RecurringExpense.js - creating one does NOT immediately write an Expense; the
+    # first occurrence is generated by the scheduler once nextRunDate (== startDate at creation)
+    # is actually due, the same as every later occurrence.
+    createRecurringExpense(input: CreateRecurringExpenseInput!): RecurringExpense!
+    # Editing amountCents/description/frequency here changes the TEMPLATE going forward only -
+    # occurrences already generated as real Expense rows are untouched (edit those directly). See
+    # resolvers/expenses.js for what happens to nextRunDate when frequency changes mid-cycle.
+    updateRecurringExpense(input: UpdateRecurringExpenseInput!): RecurringExpense!
+    # Deletes the template. Already-generated Expense rows are real, independent records (see
+    # models/Expense.js) and are NOT deleted with it - this only stops future generation, which is
+    # also exactly what setting active: false via updateRecurringExpense does. Provided anyway
+    # because "this was a mistake, it should never have existed" is a different intent from
+    # "pause it", and forcing a pause to stand in for a delete would leave a dead template on
+    # every list forever.
+    deleteRecurringExpense(recurringExpenseId: ID!): Boolean!
+
+    ######### Forms (consent/waiver/intake) ###########
+    # See getForm's own header comment above for the ownership model. createForm/updateForm never
+    # touch status or allowGuestSubmissions - see UpdateFormInput's own comment for why those are
+    # separate, explicit actions below rather than two more fields on a generic PATCH.
+    createForm(input: CreateFormInput!): Form!
+    updateForm(input: UpdateFormInput!): Form!
+    publishForm(formId: ID!): Form!
+    # Reversible - an archived form can be published again, unlike deleteForm below. Hides it from
+    # the default getForms list and (if it had one) from its public link, without losing anything -
+    # a form that already has real signed responses on file should never actually disappear.
+    archiveForm(formId: ID!): Form!
+    # Mints a publicToken the first time this turns true (see models/Form.js's own comment on why
+    # it's minted once, not regenerated on every toggle) and leaves it alone on every later flip.
+    setFormGuestAccess(formId: ID!, allow: Boolean!): Form!
+    # Refused once ANY FormResponse references this form - a signed waiver is exactly the kind of
+    # record this app must never let disappear by accident (see models/FormResponse.js's own header
+    # comment on why responses keep their own title/field snapshot independent of the Form). Use
+    # archiveForm instead; deleteForm only ever removes a form nobody has actually filled out yet.
+    deleteForm(formId: ID!): Boolean!
+    # Works both authenticated (an existing Client, or staff filling one out on their behalf) and,
+    # when the form's allowGuestSubmissions is true, unauthenticated via a public link - see
+    # resolvers/forms.js for the shared find-or-create-guest-client path this takes from
+    # createBookingRequest. Every REQUIRED field (per the form's live definition at submission time)
+    # must have a real answer or this is refused - see FormField.required.
+    submitFormResponse(input: SubmitFormResponseInput!): FormResponse!
   }
 `;

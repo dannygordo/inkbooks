@@ -163,6 +163,58 @@ async function assertAdminAuthority(user) {
 }
 
 /**
+ * Business-record ownership - expenses, income, and their recurring/type tables (see
+ * models/Expense.js, models/Income.js, models/RecurringExpense.js).
+ *
+ * ---------------------------------------------------------------------------------------------
+ * EVERY ONE OF THESE ROWS CARRIES EXACTLY ONE OWNER: a shopId (the shop's own books) or an
+ * artistUserId (an independent artist's own books - or a shop-affiliated artist's personal
+ * tracking, kept separate from the shop's). This is deliberately NOT the shape Appointment uses,
+ * where shopId is one artist's session attributed to a shop they're connected to - a shop's rent
+ * isn't any one artist's session, and there's no membership to resolve through the way there is
+ * for a booking. The owner is exactly who the row belongs to, full stop.
+ *
+ * resolveBusinessOwner decides which owner a NEW row gets, from what the caller asked for: a
+ * shopId in the input is validated as a shop they administer (SHOP ADMIN ONLY - staff and other
+ * artists at the shop do not manage its books, matching setShopCutRate/
+ * updateSquarePricingSettings's existing money-config floor); a shopId left out becomes the
+ * caller's own artistUserId, unconditionally - even a shop-affiliated artist may keep a personal
+ * ledger here, since nothing about owning a shopId-scoped row and an artistUserId-scoped row is
+ * mutually exclusive.
+ *
+ * assertCanManageBusinessRecord re-checks the same authority against an EXISTING row's stored
+ * owner, for every read/update/delete - re-validated on every call rather than trusted from
+ * create time, the same reasoning assertCanAccessShop is always called fresh rather than cached.
+ * ---------------------------------------------------------------------------------------------
+ */
+async function resolveBusinessOwner(user, shopId) {
+  if (shopId) {
+    await assertCanAccessShop(user, shopId);
+    if (user.role > Constants.ROLES.SHOP_ADMIN) {
+      throw new AuthenticationError(
+        'A shop\'s books are shop admin only - see DECISIONS.md S2 for the independent-artist case.',
+      );
+    }
+    return { shopId, artistUserId: null };
+  }
+  return { shopId: null, artistUserId: user.id };
+}
+
+async function assertCanManageBusinessRecord(user, { shopId, artistUserId }) {
+  if (shopId) {
+    await assertCanAccessShop(user, shopId);
+    if (user.role > Constants.ROLES.SHOP_ADMIN) {
+      throw new AuthenticationError('Action not allowed');
+    }
+    return;
+  }
+  if (artistUserId && String(user.id) === String(artistUserId)) {
+    return;
+  }
+  throw new AuthenticationError('Action not allowed');
+}
+
+/**
  * "May this caller read this conversation?" A Conversation has no shopId of its own (see
  * models/Conversation.js) - members is the only field that says who's in it - so "at my shop"
  * means "at least one member works where I work".
@@ -337,4 +389,6 @@ module.exports = {
   getArtistIdsForShops,
   getMemberUserIdsForShop,
   sharesShopWith,
+  resolveBusinessOwner,
+  assertCanManageBusinessRecord,
 };

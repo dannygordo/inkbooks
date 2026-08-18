@@ -68,6 +68,7 @@ module.exports = {
             projectId,
             shopId,
             userId,
+            isPersonal,
             title,
             description,
             subtotalCents,
@@ -87,16 +88,35 @@ module.exports = {
       user,
      ) => {
       const { valid, errors } = validate(createAppointmentInputSchema, {
-        appointmentDate, projectId, shopId, userId, title, description,
+        appointmentDate, projectId, shopId, userId, isPersonal, title, description,
         subtotalCents, taxCents, feeCents, tipCents, totalCents,
         shopCutStatus, appointmentType, appointmentStatus, createdAt, updatedAt,
       });
       if (!valid) {
         throw new UserInputError('Errors', { errors });
       }
+      // A personal-calendar entry is mutually exclusive with a shop or a project - it's the
+      // user's own private calendar, never a shop's ledger or a project's session (see
+      // models/Appointment.js). Rejected outright rather than silently dropped, so a caller
+      // sending both learns immediately rather than getting a "shop" appointment back that they
+      // asked to be personal.
+      if (isPersonal && (shopId || projectId)) {
+        throw new UserInputError('Errors', {
+          errors: {
+            isPersonal: 'A personal calendar entry cannot be attributed to a shop or a project.',
+          },
+        });
+      }
+      // Forced to the CALLER, not whatever userId was sent - unlike a shop appointment (which a
+      // shop admin/staff member can legitimately book on another artist's behalf, e.g.
+      // ProjectSessionsList), nobody should be able to create a "personal" appointment attributed
+      // to someone else. That would mean two people can see it (the creator and, per the field's
+      // whole purpose, ONLY the owner) - a contradiction this stops at the source.
+      const effectiveUserId = isPersonal ? user.id : userId;
       // shopId is optional - a fully independent artist's appointment has no shop involved at
       // all, and that's a valid, unauthorized-free case. The check only applies once a shopId is
-      // actually being attributed to someone.
+      // actually being attributed to someone. Never reached for a personal entry - shopId is
+      // already guaranteed falsy by the check above.
       if (shopId) {
         await assertHasShopConnection(user.id, shopId);
       }
@@ -104,7 +124,8 @@ module.exports = {
         appointmentDate,
         projectId,
         shopId,
-        userId,
+        userId: effectiveUserId,
+        isPersonal: Boolean(isPersonal),
         title,
         description,
         subtotalCents,
@@ -261,8 +282,26 @@ module.exports = {
             }
           } else if ('shopId' in appointment && appointment.shopId) {
             // Being attributed to a shop for the first time - same authorization createAppointment
-            // requires, since this is the same class of action.
+            // requires, since this is the same class of action. Also refused for an existing
+            // personal appointment - see the isPersonal check just below, which fires first.
             await assertHasShopConnection(user.id, appointment.shopId);
+          }
+
+          // isPersonal is immutable once set - same class of change as shopId above, and a more
+          // sensitive one. Personal-to-shop would silently surface a previously-private appointment
+          // to the shop admin who has no idea it exists; shop-to-personal would let a real,
+          // financially-real appointment disappear from the shop's calendar and ledger entirely.
+          // Neither is a normal edit, so both are refused outright rather than allowed through the
+          // generic update path. Only checked when the caller's payload actually includes the key
+          // (an `in` check, matching the shopId convention above) - a save that doesn't mention
+          // isPersonal at all must not be blocked by it.
+          if (
+            'isPersonal' in appointment &&
+            Boolean(appointment.isPersonal) !== Boolean(existingAppointment.isPersonal)
+          ) {
+            throw new UserInputError(
+              "An appointment's calendar (shop or personal) cannot be changed after it's created.",
+            );
           }
 
           // Captured BEFORE the write - syncNoShowFlag needs to know what changed, and after

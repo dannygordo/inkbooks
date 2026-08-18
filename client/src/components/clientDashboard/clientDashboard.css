@@ -121,3 +121,31 @@
 	margin: 0 0 4px;
 	white-space: pre-wrap;
 }
+
+/* Flags reuse .clientDashboardNoteRow/.clientDashboardNoteBody for the list itself (see
+   models/ClientFlag.js - a flag and a note are the same shape of thing: a candid internal record
+   with an author and a date) - only the form needs its own rule, for the type <select>. */
+.clientDashboardFlagForm {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 10px;
+	margin-bottom: 18px;
+}
+
+.clientDashboardFlagTypeSelect {
+	font-size: 14px;
+	padding: 8px 10px;
+	border-radius: 6px;
+	border: 1px solid var(--ib-border);
+	background-color: var(--ib-surface-card);
+	color: var(--ib-text-primary);
+	min-width: 220px;
+}
+
+.clientDashboardFlagNote {
+	margin: 0 0 4px;
+	font-size: 13px;
+	color: var(--ib-text-secondary);
+	white-space: pre-wrap;
+}

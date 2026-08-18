@@ -28,6 +28,11 @@ const reminderResolvers = require('./reminders');
 const searchResolvers = require('./search');
 const depositResolvers = require('./deposits');
 const giftCardResolvers = require('./giftCards');
+const adjustmentResolvers = require('./adjustments');
+const clientFlagResolvers = require('./clientFlags');
+const expenseResolvers = require('./expenses');
+const incomeResolvers = require('./income');
+const formResolvers = require('./forms');
 const passwordResolvers = require('./passwords');
 const passwordMutations = require('../mutations/passwords');
 const accountMutations = require('../mutations/accounts');
@@ -47,10 +52,16 @@ const Project = require('../../models/Project');
 const Staff = require('../../models/Staff');
 const BookingRequest = require('../../models/BookingRequest');
 const GiftCard = require('../../models/GiftCard');
+const Adjustment = require('../../models/Adjustment');
+const ClientFlag = require('../../models/ClientFlag');
+const ClientFlagType = require('../../models/ClientFlagType');
+const ExpenseType = require('../../models/ExpenseType');
+const IncomeType = require('../../models/IncomeType');
 const { findOrCreateConversationForMembers } = require('../../utils/conversations');
 const { ensureTagColor } = require('../../utils/tag-color');
 const { getActiveShopIdForArtist } = require('../../utils/artist-shop');
 const { findAccountForOwner } = require('../../utils/square-account');
+const { paginate, normalizePage } = require('../../utils/pagination');
 
 // Both Artist.shop and Artist.shopId need the same answer, and a directory asks for it once per
 // row - so it goes through the request's loader, which turns N queries into one. Falls back to a
@@ -85,6 +96,10 @@ module.exports = {
     ...analyticsResolvers.Query,
     ...depositResolvers.Query,
     ...giftCardResolvers.Query,
+    ...clientFlagResolvers.Query,
+    ...expenseResolvers.Query,
+    ...incomeResolvers.Query,
+    ...formResolvers.Query,
     ...passwordResolvers.Query,
     ...notificationResolvers.Query,
     ...eventLogResolvers.Query,
@@ -107,6 +122,11 @@ module.exports = {
     ...shopCutRateResolvers.Mutation,
     ...shopCutPaymentMutations,
     ...giftCardResolvers.Mutation,
+    ...adjustmentResolvers.Mutation,
+    ...clientFlagResolvers.Mutation,
+    ...expenseResolvers.Mutation,
+    ...incomeResolvers.Mutation,
+    ...formResolvers.Mutation,
     ...depositMutations,
     ...passwordMutations,
     ...accountMutations,
@@ -260,7 +280,51 @@ module.exports = {
       return appointment.bookingRequestId
         ? (await BookingRequest.findById(appointment.bookingRequestId))
         : null;
-    }
+    },
+    // See models/Adjustment.js and typeDefs.js's own comment on this field - resolved on demand,
+    // newest first, from a query the appointment's caller has already been authorized to see.
+    adjustments: async(appointment) => {
+      return Adjustment.find({ appointmentId: appointment._id }).sort({ createdAt: -1 });
+    },
+  },
+  Adjustment: {
+    createdBy: async(adjustment) => {
+      return User.findById(adjustment.createdByUserId);
+    },
+  },
+  Expense: {
+    expenseType: async(expense) => {
+      return ExpenseType.findById(expense.expenseTypeId);
+    },
+    createdBy: async(expense) => {
+      return User.findById(expense.createdByUserId);
+    },
+  },
+  Income: {
+    incomeType: async(income) => {
+      return IncomeType.findById(income.incomeTypeId);
+    },
+    createdBy: async(income) => {
+      return User.findById(income.createdByUserId);
+    },
+  },
+  RecurringExpense: {
+    expenseType: async(recurring) => {
+      return ExpenseType.findById(recurring.expenseTypeId);
+    },
+  },
+  Form: {
+    createdBy: async(form) => {
+      return User.findById(form.createdByUserId);
+    },
+  },
+  FormResponse: {
+    client: async(formResponse) => {
+      return Client.findById(formResponse.clientId);
+    },
+    submittedBy: async(formResponse) => {
+      return User.findById(formResponse.submittedByUserId);
+    },
   },
   // See models/GiftCard.js and DECISIONS.md M6.
   GiftCard: {
@@ -338,11 +402,19 @@ module.exports = {
     // Resolved on demand rather than denormalized onto Client, so there's nothing to keep in
     // sync when a project or appointment changes.
     //
+    // BOTH NOW TAKE page: PageInput and return a *Page (items + pageInfo), the same shape every
+    // other directory in the app uses (utils/pagination.js) - these were the one place left where
+    // a "list" field returned a bare array with no bound at all, so ClientDashboard.jsx had to
+    // fake pagination in the browser over an array that was already fully downloaded regardless
+    // of what page size the UI claimed to show. A long-time client's own dashboard was the actual
+    // unbounded-list case this file's own header comment warns about, just not one that had shown
+    // up as a bug yet.
+    //
     // Project.clientId is the Client sub-document's own _id, NOT the client's User._id - see the
     // Project.client resolver above, where the same trap is written up in full. Filtering on
     // client.userId here would match nothing, silently, for every client on the platform.
-    projects: async(client) => {
-      return Project.find({ clientId: client._id }).sort({ createdAt: -1 });
+    projects: async(client, { page } = {}) => {
+      return paginate(Project, { clientId: client._id }, { sort: { createdAt: -1 }, page });
     },
     // A client's appointments are reached through their projects: Appointment has no clientId of
     // its own, only projectId.
@@ -351,13 +423,119 @@ module.exports = {
     // Project at all (see models/Appointment.js's bookingRequestId comment), so it is genuinely
     // unreachable this way and won't appear on the dashboard. Closing that needs a real clientId
     // on Appointment, which is a schema change well beyond this feature.
-    appointments: async(client) => {
+    appointments: async(client, { page } = {}) => {
       const projectIds = await Project.find({ clientId: client._id }).distinct('_id');
       if (projectIds.length === 0) {
-        return [];
+        // Still a real *Page, not an early-return bare array - a caller reading pageInfo off a
+        // client with no projects yet should see {totalCount: 0}, not crash on a missing field.
+        const { limit, offset } = normalizePage(page);
+        return { items: [], pageInfo: { totalCount: 0, hasMore: false, limit, offset } };
       }
-      return Appointment.find({ projectId: { $in: projectIds } }).sort({ appointmentDate: -1 });
-    }
+      return paginate(
+        Appointment,
+        { projectId: { $in: projectIds } },
+        { sort: { appointmentDate: -1 }, page },
+      );
+    },
+    // See ClientStats' own comment in typeDefs.js on why this exists as a separate aggregation
+    // rather than being derived from the (now paginated) projects/appointments fields above.
+    // Mirrors utils/analytics.js's own shape - one aggregation pass over the matched
+    // appointments producing every figure at once, rather than a query per stat card.
+    stats: async(client) => {
+      const projects = await Project.find({ clientId: client._id }).select('_id');
+      const projectCount = projects.length;
+      if (projectCount === 0) {
+        return {
+          totalSpentCents: 0,
+          totalTipsCents: 0,
+          averageTipCents: 0,
+          tippedSessionCount: 0,
+          completedSessionCount: 0,
+          projectCount: 0,
+          upcomingAppointmentCount: 0,
+        };
+      }
+      const projectIds = projects.map((p) => p._id);
+      const completedOnly = (field) => ({
+        $sum: { $cond: [{ $eq: ['$appointmentStatus', 'completed'] }, { $ifNull: [field, 0] }, 0] },
+      });
+      const [row] = await Appointment.aggregate([
+        { $match: { projectId: { $in: projectIds } } },
+        {
+          $group: {
+            _id: null,
+            totalSpentCents: completedOnly('$totalCents'),
+            totalTipsCents: completedOnly('$tipCents'),
+            completedSessionCount: {
+              $sum: { $cond: [{ $eq: ['$appointmentStatus', 'completed'] }, 1, 0] },
+            },
+            // Completed AND tipped - matches averageTipCents' own denominator. A tip on an
+            // appointment that never closed isn't real money yet, same reasoning as revenue.
+            tippedSessionCount: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [
+                      { $eq: ['$appointmentStatus', 'completed'] },
+                      { $gt: [{ $ifNull: ['$tipCents', 0] }, 0] },
+                    ],
+                  },
+                  1,
+                  0,
+                ],
+              },
+            },
+            // ANY status, not just 'scheduled' - matches the client-side filter this replaces
+            // exactly (`new Date(a.appointmentDate) >= new Date()`), so a rescheduled appointment
+            // still due to happen keeps counting as upcoming.
+            upcomingAppointmentCount: {
+              $sum: { $cond: [{ $gte: ['$appointmentDate', new Date()] }, 1, 0] },
+            },
+          },
+        },
+      ]);
+      const totals = row || {};
+      const totalTipsCents = totals.totalTipsCents || 0;
+      const tippedSessionCount = totals.tippedSessionCount || 0;
+      return {
+        totalSpentCents: totals.totalSpentCents || 0,
+        totalTipsCents,
+        averageTipCents: tippedSessionCount > 0 ? Math.round(totalTipsCents / tippedSessionCount) : 0,
+        tippedSessionCount,
+        completedSessionCount: totals.completedSessionCount || 0,
+        projectCount,
+        upcomingAppointmentCount: totals.upcomingAppointmentCount || 0,
+      };
+    },
+    // Live flags only - see typeDefs.js's own comment on this field and models/ClientFlag.js on
+    // why resolved rows still exist but stop counting here.
+    flags: async(client) => {
+      return ClientFlag.find({ clientId: client._id, resolvedAt: null }).sort({ createdAt: -1 });
+    },
+  },
+  ClientFlag: {
+    type: async(flag) => {
+      // Same shop-first-then-platform lookup findFlagType itself uses when a flag is raised - see
+      // utils/client-flags.js. Two shops could each define their own type sharing a key with a
+      // platform one; the one THIS flag was actually raised against depends on shopId at the time.
+      const key = flag.typeKey;
+      if (flag.shopId) {
+        const shopType = await ClientFlagType.findOne({ key, shopId: flag.shopId, active: true });
+        if (shopType) {
+          return shopType;
+        }
+      }
+      return ClientFlagType.findOne({ key, shopId: null });
+    },
+    appointment: async(flag) => {
+      return flag.appointmentId ? Appointment.findById(flag.appointmentId) : null;
+    },
+    createdBy: async(flag) => {
+      return flag.createdByUserId ? User.findById(flag.createdByUserId) : null;
+    },
+    resolvedBy: async(flag) => {
+      return flag.resolvedByUserId ? User.findById(flag.resolvedByUserId) : null;
+    },
   },
   BookingRequest: {
     client: async(bookingRequest, args, context, info) => {

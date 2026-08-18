@@ -69,8 +69,14 @@ const DateRangePicker = ({ value, onChange, presets: presetsProp }) => {
 						// Compared by key rather than by date equality - two Date objects for the
 						// same instant are never ===, and comparing timestamps would light up the
 						// preset whenever a custom range happened to coincide with it.
+						// No sx colour override - variant="contained" with no color prop already picks up
+						// theme.js's primary copper automatically (see ibCalendar/CreateEventButton.jsx's
+						// own comment on the same pattern), and MUI computes that button's hover shade
+						// FROM the theme colour. The old sx={{ backgroundColor: "#333" }} here was a flat
+						// gray that predated the copper theme sweep and never got swept along with it -
+						// hover on a selected preset just darkened #333, which is why it never looked
+						// like the rest of the app.
 						variant={value?.key === preset.key ? "contained" : "outlined"}
-						sx={value?.key === preset.key ? { backgroundColor: "#333" } : undefined}
 						onClick={() => handlePreset(preset)}
 					>
 						{preset.label}
@@ -79,7 +85,6 @@ const DateRangePicker = ({ value, onChange, presets: presetsProp }) => {
 				<Button
 					size="small"
 					variant={value?.key === RANGE_KEYS.CUSTOM ? "contained" : "outlined"}
-					sx={value?.key === RANGE_KEYS.CUSTOM ? { backgroundColor: "#333" } : undefined}
 					onClick={() => setShowCustom((open) => !open)}
 				>
 					Custom
@@ -94,7 +99,12 @@ const DateRangePicker = ({ value, onChange, presets: presetsProp }) => {
 						size="small"
 						value={customStart}
 						onChange={(e) => setCustomStart(e.target.value)}
-						InputLabelProps={{ shrink: true }}
+						// slotProps.inputLabel, NOT InputLabelProps - MUI v9 removed the old prop from
+						// TextField's public API (same migration as IBInput.jsx's inputProps ->
+						// slotProps.htmlInput), and the old name fell through to the DOM as an unknown
+						// attribute - "React does not recognize the InputLabelProps prop on a DOM
+						// element" - found via this component's own tests.
+						slotProps={{ inputLabel: { shrink: true } }}
 					/>
 					<TextField
 						label="To"
@@ -102,9 +112,9 @@ const DateRangePicker = ({ value, onChange, presets: presetsProp }) => {
 						size="small"
 						value={customEnd}
 						onChange={(e) => setCustomEnd(e.target.value)}
-						InputLabelProps={{ shrink: true }}
+						slotProps={{ inputLabel: { shrink: true } }}
 					/>
-					<Button type="submit" size="small" variant="contained" sx={{ backgroundColor: "#333" }}>
+					<Button type="submit" size="small" variant="contained">
 						Apply
 					</Button>
 				</form>

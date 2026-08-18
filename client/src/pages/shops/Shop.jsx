@@ -1,4 +1,4 @@
-import { useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useMutation } from "@apollo/client";
 import React, { useRef, useState } from "react";
 import "./shop.css";
@@ -8,7 +8,7 @@ import IBCardShowError from "../../components/card/ibCardShowError/IBCardShowErr
 import IBInput from "../../components/inputs/IBInput";
 import FormField from "../../components/formField/FormField";
 import { useAuth } from "../../context/auth";
-import { ROLES, ALERT_CONSTANTS } from "../../constants";
+import { ROLES, ALERT_CONSTANTS, ROUTE_CONSTANTS } from "../../constants";
 
 // Messages shown after landing back here from the Square OAuth redirect (see
 // routes/squareOAuth.js's callback - it redirects to /shop/:shopId?square=<status>). See
@@ -32,7 +32,6 @@ const Shop = (props) => {
 		ShopService.useSquareAuthorizationUrl();
 	const [disconnectShopSquare] = useMutation(ShopService.DISCONNECT_SHOP_SQUARE);
 	const [updateShop] = useMutation(ShopService.updateShop());
-	const shopCutRef = useRef();
 	const nameRef = useRef();
 	const emailRef = useRef();
 	const phoneRef = useRef();
@@ -56,58 +55,47 @@ const Shop = (props) => {
 
 	/**
 	 * Assembles the full shop document to send on every field's blur - name/contact fields via
-	 * refs, everything else (shopMinimum, hourlyRate, logo, billingType, status) echoed straight
-	 * from the query result since nothing on this page edits them. updateShop's own resolver
-	 * (server/graphql/mutations/shops.js) calls Shop.findByIdAndUpdate with this object directly -
-	 * see handleShopCutBlur's original comment on why the rest of the shop has to be echoed back
-	 * rather than sent as just the one changed field.
+	 * refs, everything else (shopCutPercent, shopMinimum, hourlyRate, logo, billingType, status)
+	 * echoed straight from the query result since nothing on this page edits them. updateShop's
+	 * own resolver (server/graphql/mutations/shops.js) calls Shop.findByIdAndUpdate with this
+	 * object directly, so every field has to be present or it gets nulled out, not just the one
+	 * that changed.
+	 *
+	 * shopCutPercent moved to being read-only HERE and editable only from Settings' ShopPanel -
+	 * see that file's own header comment. It used to be a second editable copy of the same field
+	 * on this page, with its own separate autosave and its own separate percent-range validation
+	 * (HANDOFF.md's "known gap" on this - two editors, one stored field). Collapsed to one: this
+	 * page now only ever echoes the value back unchanged, the same way it already treats
+	 * shopMinimum/hourlyRate/logo/billingType/status.
 	 */
-	const buildShopPayload = () => {
-		const rawCut = shopCutRef.current?.value;
-		const shopCutPercent =
-			rawCut === "" || rawCut === undefined ? 0 : Number(rawCut);
-		return {
-			id: params.shopId,
-			name: nameRef.current?.value ?? data.getShop.name,
-			email: emailRef.current?.value ?? data.getShop.email,
-			phone: phoneRef.current?.value ?? data.getShop.phone,
-			address: addressRef.current?.value ?? data.getShop.address,
-			city: cityRef.current?.value ?? data.getShop.city,
-			state: stateRef.current?.value ?? data.getShop.state,
-			zip: zipRef.current?.value ?? data.getShop.zip,
-			instagram: instagramRef.current?.value ?? data.getShop.instagram,
-			facebook: facebookRef.current?.value ?? data.getShop.facebook,
-			website: websiteRef.current?.value ?? data.getShop.website,
-			shopMinimum: data.getShop.shopMinimum,
-			hourlyRate: data.getShop.hourlyRate,
-			logo: data.getShop.logo,
-			billingType: data.getShop.billingType,
-			status: data.getShop.status,
-			shopCutPercent,
-		};
-	};
+	const buildShopPayload = () => ({
+		id: params.shopId,
+		name: nameRef.current?.value ?? data.getShop.name,
+		email: emailRef.current?.value ?? data.getShop.email,
+		phone: phoneRef.current?.value ?? data.getShop.phone,
+		address: addressRef.current?.value ?? data.getShop.address,
+		city: cityRef.current?.value ?? data.getShop.city,
+		state: stateRef.current?.value ?? data.getShop.state,
+		zip: zipRef.current?.value ?? data.getShop.zip,
+		instagram: instagramRef.current?.value ?? data.getShop.instagram,
+		facebook: facebookRef.current?.value ?? data.getShop.facebook,
+		website: websiteRef.current?.value ?? data.getShop.website,
+		shopMinimum: data.getShop.shopMinimum,
+		hourlyRate: data.getShop.hourlyRate,
+		logo: data.getShop.logo,
+		billingType: data.getShop.billingType,
+		status: data.getShop.status,
+		shopCutPercent: data.getShop.shopCutPercent ?? 0,
+	});
 
 	/**
-	 * Autosave for every field on this page, fired on blur - the shop's percentage cut and now the
-	 * rest of its name/contact details, which previously had nowhere to be edited at all short of
-	 * typing /shop/edit/:shopId by hand. Same pattern as the project Details panel: a lone Save
-	 * button next to a handful of fields is more chrome than the edit is worth, and the dirty check
-	 * against the last payload actually sent is what makes it safe to attach to every one of them -
-	 * tabbing through untouched fields changes nothing and must not write.
-	 *
-	 * The percent-range validation stays specific to shopCutPercent (0 is the default so nothing
-	 * starts billing artists a cut nobody configured - see models/Shop.js) - an invalid value there
-	 * blocks the whole save rather than silently dropping just that field, since a shop cut that
-	 * doesn't parse is worth surfacing loudly.
+	 * Autosave for the name/contact details on this page, fired on blur - same pattern as the
+	 * project Details panel: a lone Save button next to a handful of fields is more chrome than
+	 * the edit is worth, and the dirty check against the last payload actually sent is what makes
+	 * it safe to attach to every one of them - tabbing through untouched fields changes nothing
+	 * and must not write.
 	 */
 	const handleShopFieldBlur = async () => {
-		const rawCut = shopCutRef.current?.value;
-		const shopCutPercent =
-			rawCut === "" || rawCut === undefined ? 0 : Number(rawCut);
-		if (Number.isNaN(shopCutPercent) || shopCutPercent < 0 || shopCutPercent > 100) {
-			setDetailsSaveState("error");
-			return;
-		}
 		const payload = buildShopPayload();
 		const serialized = JSON.stringify(payload);
 		if (serialized === lastSavedShopRef.current) {
@@ -298,22 +286,19 @@ const Shop = (props) => {
 					<div className="squareSectionTitle">Shop cut</div>
 					<p className="shopSectionHint">
 						The shop's percentage of each artist's session work. Applied to the tattoo
-						work only - never to tips, tax or processing fees. Leave at 0 if the shop
-						doesn't take a cut.
+						work only - never to tips, tax or processing fees.
 					</p>
+					{/* Read-only here, deliberately - see buildShopPayload's own comment. The one
+					    editable copy of this field lives in Settings' ShopPanel now. */}
 					<div className="shopCutRow">
-						<IBInput
-							id="shopCutPercent"
-							label="Shop cut %"
-							type="number"
-							sx={{ m: 0, width: "16ch" }}
-							fullWidth={false}
-							helperText=" "
-							inputRef={shopCutRef}
-							defaultValue={data.getShop.shopCutPercent ?? 0}
-							disabled={!canEdit}
-							onBlur={handleShopFieldBlur}
-						/>
+						<span className="shopCutReadout">
+							{data.getShop.shopCutPercent ?? 0}%
+						</span>
+						{canEdit && (
+							<Link className="ibButtonSecondary" to={ROUTE_CONSTANTS.SETTINGS}>
+								Change in Settings
+							</Link>
+						)}
 					</div>
 				</div>
 				<div className="squareSection">

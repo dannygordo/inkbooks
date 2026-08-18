@@ -1,53 +1,60 @@
 .login {
+    min-height: 100vh;
     width: 100%;
-    height: 100vh;
+    background-color: var(--ib-surface-page);
     display: flex;
     align-items: center;
     justify-content: center;
+    padding: 24px;
+    box-sizing: border-box;
 }
+
+/* Not display:flex, deliberately - IBCardWrapper's own class carries flex: 2 (meant for sitting
+   beside siblings in a flex row elsewhere in the app), which would stretch it to fill this whole
+   container if its parent were a flex context too. A plain block parent with a max-width is what
+   actually constrains it to a login-sized card instead of a full-bleed one. */
+.loginCardOuter {
+    width: 100%;
+    max-width: 400px;
+}
+
+.loginTitle {
+    margin: 0 0 28px;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--ib-text-primary);
+}
+
 .loginForm {
     display: flex;
     flex-direction: column;
 }
-.loginInput {
-    width: 250px;
-    height: 30px;
-    border: 1px solid var(--ib-border-strong);
-    border-radius: 3px;
-    padding: 10px;
-    margin-bottom: 10px;
 
-}
-.loginButton {
-    margin-bottom: 10px;
-    width: 100%;
-}
-/* .loginButton:hover {
-    background-color: var(--ib-text-secondary);
-    color: var(--ib-border);
-}
-.loginButton:focus{
-    outline: none;
+.loginSubmit {
+    margin-top: 8px !important;
 }
 
-.loginButton:disabled{
-    cursor: not-allowed;
-} */
-
-.loginForgotContainer{
-    color: #b4b4b4;
-    display: flex;
-}
-.loginForgot{
-    justify-content: right;
-    color: #b4b4b4;
-}
-
-.loginRegisterButton{
-    margin-top: 20px;
-    width: 100%;
-}
-/* .loginRegisterButton:hover {
-    background-color: var(--ib-border);
+.loginForgot {
+    display: block;
+    margin-top: 16px;
+    font-size: 13px;
     color: var(--ib-text-secondary);
-} */
+    text-align: center;
+    text-decoration: none;
+}
+
+.loginForgot:hover {
+    color: var(--ib-primary);
+    text-decoration: underline;
+}
+
+.loginDivider {
+    height: 1px;
+    background-color: var(--ib-border);
+    margin: 28px 0 20px;
+}
+
+.loginRegisterLink {
+    display: block;
+    text-decoration: none;
+}

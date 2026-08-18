@@ -42,6 +42,12 @@ export const AppointmentService = (() => {
                     }
                 }
                 shopId
+                # See models/Appointment.js. The shop query already only ever returns shopId-scoped
+                # rows (isPersonal ones are excluded server-side, belt and suspenders - see
+                # resolvers/appointments.js), so this will always read false here - selected anyway
+                # so AppointmentTypeChip/AppointmentRow can read a consistent field across every
+                # appointment query rather than assuming based on which query it came from.
+                isPersonal
                 user {
                     id
                     tagColor
@@ -119,6 +125,7 @@ export const AppointmentService = (() => {
                 shopCutStatus
                 shopCutCents
                 shopId
+                isPersonal
                 projectId
                 bookingRequestId
                 # Added for the dashboard's row tinting - every list showing artist data colours
@@ -391,6 +398,7 @@ export const AppointmentService = (() => {
                     }
                 }
                 shopId
+                isPersonal
                 user {
                     id
                     tagColor
@@ -418,9 +426,18 @@ export const AppointmentService = (() => {
     // appointments list drives real paging through it. Defaulting here rather than at each call
     // site keeps the calendar's "give me the grid" behaviour unchanged while letting a list ask
     // for a window it can page through.
-    const _getAppointmentsByArtistForCalendar = (userId, range, page) => {
+    //
+    // extraFilter is optional and merged into the date-range filter - added for the "My Calendars"
+    // personal-appointments fetch (see IBCalendar.jsx/AppointmentsList.jsx), which reuses this same
+    // query against the caller's own userId with `{ isPersonal: true }` layered on top, rather than
+    // inventing a fourth document for what's already the exact same shape.
+    const _getAppointmentsByArtistForCalendar = (userId, range, page, extraFilter) => {
         return useQuery(_FETCH_APPOINTMENTS_BY_ARTIST_FOR_CALENDAR, {
-            variables: { userId, filter: range, page: page || { limit: 200 } },
+            variables: {
+                userId,
+                filter: range ? { ...range, ...extraFilter } : range,
+                page: page || { limit: 200 },
+            },
             skip: !userId || !range,
         });
     };
@@ -437,6 +454,7 @@ export const AppointmentService = (() => {
                     }
                 }
                 shopId
+                isPersonal
                 user {
                     id
                     firstName
@@ -466,6 +484,7 @@ export const AppointmentService = (() => {
                     }
                 }
                 shopId
+                isPersonal
                 user {
                     id
                     firstName
@@ -615,6 +634,19 @@ export const AppointmentService = (() => {
                 timerStartedAt
                 accumulatedSeconds
                 sessionNotes
+                # DECISIONS.md M4 - see SessionDetail.jsx's own Adjustments section and
+                # server/models/Adjustment.js. Newest first, matching the resolver's own sort.
+                adjustments {
+                    id
+                    amountCents
+                    reason
+                    createdAt
+                    createdBy {
+                        id
+                        firstName
+                        lastName
+                    }
+                }
             }
         }
     `;
@@ -774,6 +806,25 @@ export const AppointmentService = (() => {
 
     const _useChargeQuote = () => useLazyQuery(_GET_CHARGE_QUOTE, { fetchPolicy: "network-only" });
 
+    // DECISIONS.md M4 - a documented reversal, recorded AFTER the real one already happened by
+    // hand in Square. See server/models/Adjustment.js. Returns the new row so SessionDetail.jsx
+    // can prepend it to the list it already has without a refetch.
+    const _RECORD_ADJUSTMENT = gql`
+        mutation RecordAdjustment($input: RecordAdjustmentInput!) {
+            recordAdjustment(input: $input) {
+                id
+                amountCents
+                reason
+                createdAt
+                createdBy {
+                    id
+                    firstName
+                    lastName
+                }
+            }
+        }
+    `;
+
     /**
      * Every query that draws appointments, by operation name - to hand to a mutation's
      * `refetchQueries` after anything that creates, moves or removes one.
@@ -833,6 +884,7 @@ export const AppointmentService = (() => {
         UPDATE_SESSION_DETAILS: _UPDATE_SESSION_DETAILS,
         GET_CHARGE_QUOTE: _GET_CHARGE_QUOTE,
         useChargeQuote: _useChargeQuote,
+        RECORD_ADJUSTMENT: _RECORD_ADJUSTMENT,
         getAppointment: _getAppointment,
         // Exported so tests can build a MockedProvider mock against the same document the
         // component actually runs - mirroring it by hand in a test file is how a query and its

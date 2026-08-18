@@ -94,9 +94,14 @@ async function mintFirebaseToken(userId, claims = {}) {
 }
 
 /**
- * Uploads a single guest-submitted reference image (raw Buffer, already validated for type/size
- * by the caller - see routes/bookingUploads.js) to a scoped `booking-uploads/` path, and returns
- * a permanent public download URL.
+ * Uploads a single anonymously-submitted file (raw Buffer, already validated for type/size by the
+ * caller) to a scoped path under Storage, and returns a permanent public download URL.
+ *
+ * GENERALIZED from what used to be uploadGuestReferenceImage's own hardcoded `booking-uploads/`
+ * path - routes/formUploads.js (a form's file-upload/signature-adjacent fields) needed the exact
+ * same Storage logic under a different folder, and a second copy of this function differing only
+ * in one hardcoded path string is exactly the kind of duplication this codebase's own comments
+ * elsewhere warn is how two copies of one fact quietly drift apart.
  *
  * Uses getDownloadURL() (firebase-admin/storage's own helper, not a hand-rolled signed URL) -
  * V4 signed URLs cap out at 7 days no matter what expiry you ask for, which doesn't fit a
@@ -112,11 +117,11 @@ async function mintFirebaseToken(userId, claims = {}) {
  * response. Returns null only if Firebase Admin/Storage isn't configured yet, matching
  * mintFirebaseToken's existing "degrade, don't crash the server" convention.
  */
-async function uploadGuestReferenceImage(buffer, { extension }) {
+async function uploadPublicFile(buffer, { extension, folder }) {
   if (!ensureInitialized() || !bucketInstance) {
     return null;
   }
-  const filename = `booking-uploads/${crypto.randomUUID()}${extension}`;
+  const filename = `${folder}/${crypto.randomUUID()}${extension}`;
   const file = bucketInstance.file(filename);
   await file.save(buffer, {
     metadata: {
@@ -128,6 +133,16 @@ async function uploadGuestReferenceImage(buffer, { extension }) {
     },
   });
   return getDownloadURL(file);
+}
+
+// Thin, folder-fixed wrappers so every existing call site keeps its own descriptive name rather
+// than every route inlining its own folder string (a typo'd folder name is otherwise invisible
+// until someone goes looking in Storage for files that technically uploaded fine).
+async function uploadGuestReferenceImage(buffer, { extension }) {
+  return uploadPublicFile(buffer, { extension, folder: 'booking-uploads' });
+}
+async function uploadFormSubmissionFile(buffer, { extension }) {
+  return uploadPublicFile(buffer, { extension, folder: 'form-uploads' });
 }
 
 const EXTENSION_CONTENT_TYPES = {
@@ -142,4 +157,9 @@ function extensionToContentType(extension) {
   return EXTENSION_CONTENT_TYPES[extension] || 'application/octet-stream';
 }
 
-module.exports = { mintFirebaseToken, uploadGuestReferenceImage, EXTENSION_CONTENT_TYPES };
+module.exports = {
+  mintFirebaseToken,
+  uploadGuestReferenceImage,
+  uploadFormSubmissionFile,
+  EXTENSION_CONTENT_TYPES,
+};

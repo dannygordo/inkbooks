@@ -1,21 +1,21 @@
 
 .ibCard {
     padding: 20px;
-    -webkit-box-shadow: 2px 2px 15px -12px #000000;
-    box-shadow: 2px 2px 15px -12px #000000;
+    -webkit-box-shadow: 2px 2px 15px -12px rgba(var(--ib-shadow-color), 1);
+    box-shadow: 2px 2px 15px -12px rgba(var(--ib-shadow-color), 1);
     width: 300px;
     margin: 15px;
 }
 .ibCardWrapper {
     padding: 20px;
-    -webkit-box-shadow: 2px 2px 15px -12px #000000;
-    box-shadow: 2px 2px 15px -12px #000000;
+    -webkit-box-shadow: 2px 2px 15px -12px rgba(var(--ib-shadow-color), 1);
+    box-shadow: 2px 2px 15px -12px rgba(var(--ib-shadow-color), 1);
     flex: 2;
 }
 .ibCardWrapperClickable {
     padding: 20px;
-    -webkit-box-shadow: 2px 2px 15px -12px #000000;
-    box-shadow: 2px 2px 15px -12px #000000;
+    -webkit-box-shadow: 2px 2px 15px -12px rgba(var(--ib-shadow-color), 1);
+    box-shadow: 2px 2px 15px -12px rgba(var(--ib-shadow-color), 1);
 }
 .ibCardWrapperClickable:hover {
     cursor: pointer;

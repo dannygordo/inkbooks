@@ -59,6 +59,9 @@ body .ibCalendar * {
 	align-items: center;
 	border-bottom: 1px solid var(--ib-border);
 }
+.ibCalendarMyCalendarsRow {
+	padding: 6px 2px 0;
+}
 .ibCalendarContainer {
 	flex: 1;
 	height: calc(100vh);
@@ -135,6 +138,19 @@ body .ibCalendar * {
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
+	/* Transparent 1px base so a filled (shop) chip's box is unaffected - the personal variant below
+	   only changes the WIDTH and colour of this same border, never adds one where none existed, so
+	   a chip's size doesn't jump depending on which kind of appointment it is. */
+	border: 1px solid transparent;
+}
+/* Personal appointments (see Day.jsx's own comment) - a thicker border than the 1px base above,
+   because on a transparent background a 1px line is the only thing distinguishing this chip from
+   the day cell behind it; a filled chip doesn't have that problem since its fill already does the
+   work. Padding trimmed by the extra 1px added to the border on each side, so a personal chip
+   takes up exactly the same box as a filled one. */
+.ibCalendarEventChipPersonal {
+	border-width: 2px;
+	padding: 1px 5px;
 }
 /* margin-left: 45% was doing the centering by hand - a percentage of the cell width, so the
    circle drifted off-centre at any cell size other than the one it was eyeballed at. The parent

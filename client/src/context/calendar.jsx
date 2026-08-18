@@ -1,7 +1,12 @@
 import moment from "moment";
 import React, { useContext, useState, useReducer } from "react";
 
-const CalendarContext = React.createContext({
+// Exported (not just useCalendar) for the same reason context/auth.jsx exports AuthContext - a
+// test needs to inject a specific calendarFilters/savedEvents/etc. value directly via
+// `<CalendarContext.Provider value={...}>` rather than mounting the real CalendarProvider and
+// driving its internal state through clicks alone, the same pattern UpdateEventDialog.test.jsx
+// already uses for AuthContext.
+export const CalendarContext = React.createContext({
 	monthIndex: 0,
 	setMonthIndex: (idx) => {},
 });
@@ -40,6 +45,14 @@ export function CalendarProvider(props) {
 	// other reader) and a smallDaySelected/setSmallDaySelected pair that was never wired to
 	// anything at all, both removed with it.
 	const [savedEvents, setSavedEvents] = useState([]);
+	// "My Calendars" - which of the two calendars (the shop's, and this user's own private one -
+	// see models/Appointment.js's isPersonal) are currently shown. Lives here, not in
+	// Appointments.jsx, so List view and Calendar view - two entirely separate component trees
+	// under that page, mounted one at a time (see Appointments.jsx's own comment) - read and write
+	// the SAME two checkboxes rather than each keeping its own copy that resets when the other view
+	// is picked. Both true by default: hiding a whole calendar is an opt-out, not the starting
+	// state.
+	const [calendarFilters, setCalendarFilters] = useState({ shop: true, personal: true });
 
 	return (
 		<CalendarContext.Provider
@@ -49,7 +62,9 @@ export function CalendarProvider(props) {
 				daySelected,
 				setDaySelected,
                 savedEvents,
-                setSavedEvents
+                setSavedEvents,
+                calendarFilters,
+                setCalendarFilters
 			}}
 			{...props}
 		/>

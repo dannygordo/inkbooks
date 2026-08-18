@@ -1,0 +1,119 @@
+/* Mirrors expenses.css exactly - see that file's own header comment on why the two stylesheets
+   are kept in lockstep rather than one importing the other. */
+.businessLedgerPage {
+	flex: 4;
+	padding: 20px;
+	margin-left: 10px;
+}
+.businessLedgerTitle {
+	margin-bottom: 4px;
+}
+.businessLedgerCrossLink {
+	display: inline-block;
+	font-size: 13px;
+	color: var(--ib-primary);
+	text-decoration: none;
+	margin-bottom: 10px;
+}
+.businessLedgerCrossLink:hover {
+	text-decoration: underline;
+}
+.businessLedgerSummary {
+	margin: 16px 0 8px;
+	font-weight: 600;
+}
+.businessLedgerList {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	max-width: 900px;
+	list-style: none;
+	padding: 0;
+	margin: 0 0 20px;
+}
+.businessLedgerRow {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	padding: 14px 18px;
+	border: 1px solid var(--ib-border);
+	border-radius: 6px;
+}
+.businessLedgerMain {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+.businessLedgerAmount {
+	font-weight: 700;
+	font-size: 16px;
+}
+.businessLedgerCategory {
+	font-weight: 600;
+	color: var(--ib-text-secondary);
+}
+.businessLedgerDescription {
+	font-size: 13px;
+	color: var(--ib-text-secondary);
+}
+.businessLedgerMeta {
+	font-size: 12px;
+	color: var(--ib-text-secondary);
+}
+.businessLedgerRowActions {
+	display: flex;
+	gap: 4px;
+	flex-shrink: 0;
+}
+.businessLedgerEditForm {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	width: 100%;
+	max-width: 640px;
+}
+/* Category/amount/date side by side, matching the "log a new entry" form's own row above - see
+   .businessEntryFormRow. IBSelect plus two IBInputs, all three MUI-based (see
+   components/inputs/IBSelect.jsx, IBInput.jsx), so they line up on their own without a hand-tuned
+   override the way a bare <select> next to them used to need. */
+.businessLedgerEditRow {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+}
+.businessLedgerEditRow > * {
+	flex: 1;
+	min-width: 0;
+}
+
+/* --- The "log a new entry" form (category/amount/date/description/submit) ------------------
+   Deliberately separate from settings.css's .businessTypeAddForm (used by the Settings > Expenses/
+   Income category panels) - this page's form has its own row layout and those panels' simpler
+   single-column forms shouldn't inherit it just because they're both "a form that adds a business
+   record." */
+.businessEntryForm {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	max-width: 640px;
+	margin-bottom: 32px;
+}
+/* Category (IBSelect), amount, and date (both IBInput) as three equal columns - flex's default
+   align-items: stretch is what makes them (and the full-width description field below, a sibling
+   of this row rather than a child of it) the same width, without a hardcoded max-width duplicated
+   in two places. All three are MUI-based components now (IBSelect, IBInput) rather than a mix of a
+   bare <select> alongside them, which is what used to require a hand-tuned CSS override here to
+   make their boxes line up - see git history if that override is ever needed again for some other
+   pairing of a bare control next to an IB one. */
+.businessEntryFormRow {
+	display: flex;
+	align-items: flex-start;
+	gap: 14px;
+}
+.businessEntryFormRow > * {
+	flex: 1;
+	min-width: 0;
+}

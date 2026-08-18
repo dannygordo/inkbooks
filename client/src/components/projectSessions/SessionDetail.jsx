@@ -95,6 +95,15 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 		AppointmentService.UPDATE_SESSION_DETAILS
 	);
 	const [deleteAppointment] = useMutation(AppointmentService.DELETE_APPOINTMENT);
+	const [recordAdjustment, { loading: recordingAdjustment }] = useMutation(
+		AppointmentService.RECORD_ADJUSTMENT
+	);
+	// DECISIONS.md M4 - see the Adjustments section in the render below. Local, uncontrolled-style
+	// state that clears itself on a successful save, same pattern the rest of this form doesn't
+	// use (those fields stay populated because they describe the session itself) - this one is a
+	// log entry, not a persistent field, so there's nothing to leave filled in afterward.
+	const [adjustmentDollars, setAdjustmentDollars] = useState("");
+	const [adjustmentReason, setAdjustmentReason] = useState("");
 	const [applyDeposit, { loading: applyingDeposit }] = useMutation(DepositService.APPLY_DEPOSIT);
 	// Used ONLY for the final, deliberate quote right before a card is actually reached for
 	// (handleChargeViaSquare) - one call, on a click, with nothing else in flight against it.
@@ -322,6 +331,46 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 			});
 		} finally {
 			setDeleting(false);
+		}
+	};
+
+	// DECISIONS.md M4 - the real reversal already happened by hand in the Square app; this only
+	// records that it did. amountCents is validated server-side (positive, and a non-empty reason
+	// required) - see server/utils/validation.js's recordAdjustmentInputSchema - so the only
+	// client-side guard needed is against firing with nothing typed in at all.
+	const handleRecordAdjustment = async (e) => {
+		e.preventDefault();
+		const amountCents = dollarsToCents(adjustmentDollars);
+		if (amountCents <= 0 || !adjustmentReason.trim()) {
+			return;
+		}
+		try {
+			const { data } = await recordAdjustment({
+				variables: {
+					input: { appointmentId: appointment.id, amountCents, reason: adjustmentReason.trim() },
+				},
+			});
+			setAppointment((prev) => ({
+				...prev,
+				adjustments: [data.recordAdjustment, ...(prev.adjustments || [])],
+			}));
+			setAdjustmentDollars("");
+			setAdjustmentReason("");
+			setAlert({
+				isAlert: true,
+				severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
+				message: "Adjustment recorded.",
+				timeout: ALERT_CONSTANTS.TIMEOUT,
+				location: ALERT_CONSTANTS.DISPLAY_MODAL,
+			});
+		} catch (err) {
+			setAlert({
+				isAlert: true,
+				severity: ALERT_CONSTANTS.SEVERITY.ERROR,
+				message: err.graphQLErrors?.[0]?.message || err.message,
+				timeout: ALERT_CONSTANTS.TIMEOUT,
+				location: ALERT_CONSTANTS.DISPLAY_MODAL,
+			});
 		}
 	};
 
@@ -649,6 +698,63 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 							: ""}
 					</div>
 				)}
+			</div>
+
+			{/* DECISIONS.md M4 - "Nothing in InkBooks is refundable." The real reversal happens by
+			    hand in the Square app; this is only the documented record of it. Recording one does
+			    NOT change subtotalCents/tipCents/totalCents above - see server/models/Adjustment.js. */}
+			<div className="sessionDetailAdjustments">
+				<span className="sessionDetailAdjustmentsLabel">Adjustments</span>
+				{appointment.adjustments && appointment.adjustments.length > 0 ? (
+					<div className="sessionDetailAdjustmentsList">
+						{appointment.adjustments.map((adjustment) => (
+							<div key={adjustment.id} className="sessionDetailAdjustmentRow">
+								<span className="sessionDetailAdjustmentAmount">
+									{formatCents(adjustment.amountCents)}
+								</span>
+								<span className="sessionDetailAdjustmentReason">{adjustment.reason}</span>
+								<span className="sessionDetailAdjustmentMeta">
+									{moment(adjustment.createdAt).format("MMM D, YYYY")}
+									{adjustment.createdBy
+										? ` — ${adjustment.createdBy.firstName} ${adjustment.createdBy.lastName}`
+										: ""}
+								</span>
+							</div>
+						))}
+					</div>
+				) : (
+					<span className="sessionDetailAdjustmentsEmpty">None recorded.</span>
+				)}
+				<div className="sessionDetailAdjustmentForm">
+					<FormField id="adjustmentAmount" label="Amount reversed $">
+						<IBInput
+							id="adjustmentAmount"
+							type="number"
+							value={adjustmentDollars}
+							onChange={(e) => setAdjustmentDollars(e.target.value)}
+						/>
+					</FormField>
+					<FormField id="adjustmentReason" label="Reason">
+						<IBInput
+							id="adjustmentReason"
+							type="text"
+							placeholder="e.g. Reversed $50 in Square after a client dispute"
+							value={adjustmentReason}
+							onChange={(e) => setAdjustmentReason(e.target.value)}
+						/>
+					</FormField>
+					<Button
+						variant="outlined"
+						disabled={
+							recordingAdjustment ||
+							dollarsToCents(adjustmentDollars) <= 0 ||
+							!adjustmentReason.trim()
+						}
+						onClick={handleRecordAdjustment}
+					>
+						Record Adjustment
+					</Button>
+				</div>
 			</div>
 
 			<FormField id="sessionNotes" label="Session Notes">

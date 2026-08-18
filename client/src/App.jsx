@@ -39,6 +39,13 @@ import Settings from "./pages/settings/Settings";
 import ClientSettings from "./pages/settings/ClientSettings";
 import ConsultDetail from "./pages/consults/ConsultDetail";
 import Search from "./pages/search/Search";
+import Expenses from "./pages/expenses/Expenses";
+import Income from "./pages/income/Income";
+import Forms from "./pages/forms/Forms";
+import FormBuilder from "./pages/forms/FormBuilder";
+import FormResponses from "./pages/forms/FormResponses";
+import PublicFormFillOut from "./pages/forms/PublicFormFillOut";
+import { hasShop } from "./utils/businessScope";
 
 // An artist keeps access to their own /artist/:artistId page (and its edit form) even though the
 // directory is Staff-only. The route param is the Artist document's id, not the User's - see
@@ -274,6 +281,56 @@ function App() {
 								</AuthRoute>
 							}
 						/>
+						{/* Shop admin, or an independent artist with no shop at all - matching the
+						    server's own gate (assertCanManageBusinessRecord, utils/shop-membership.js)
+						    and Settings' own "Expenses"/"Income" categories (settingsCategories.jsx's
+						    hasAuditAuthority). A plain shop-connected artist or Staff member has
+						    neither a shop's books nor a personal ledger to see here. */}
+						<Route
+							path="/expenses"
+							element={
+								<RoleRoute minRole={ROLES.SHOP_ADMIN} allowIf={(user) => !hasShop(user)}>
+									<Expenses />
+								</RoleRoute>
+							}
+						/>
+						<Route
+							path="/income"
+							element={
+								<RoleRoute minRole={ROLES.SHOP_ADMIN} allowIf={(user) => !hasShop(user)}>
+									<Income />
+								</RoleRoute>
+							}
+						/>
+						{/* Same ownership gate as Expenses/Income above - shop admin, or an independent
+						    artist with no shop at all (see models/Form.js's own header comment on why
+						    Forms follows that exact model). /forms/new and /forms/:formId both render
+						    FormBuilder - see that component's own header comment on why one component
+						    covers both "not created yet" and "editing an existing form". */}
+						<Route
+							path="/forms"
+							element={
+								<RoleRoute minRole={ROLES.SHOP_ADMIN} allowIf={(user) => !hasShop(user)}>
+									<Forms />
+								</RoleRoute>
+							}
+						/>
+						<Route
+							path="/forms/:formId"
+							element={
+								<RoleRoute minRole={ROLES.SHOP_ADMIN} allowIf={(user) => !hasShop(user)}>
+									<FormBuilder />
+								</RoleRoute>
+							}
+						/>
+						<Route
+							path="/forms/:formId/responses"
+							element={
+								<RoleRoute minRole={ROLES.SHOP_ADMIN} allowIf={(user) => !hasShop(user)}>
+									<FormResponses />
+								</RoleRoute>
+							}
+						/>
 						{/* /profile is gone, along with the page behind it. Avatar, password and
 						    calendar colour were settings by any definition, and two destinations for
 						    "things about me I can change" meant finding either was a guess - nothing
@@ -333,6 +390,11 @@ function App() {
 						resolver also accepts a raw artist id so links handed out before slugs
 						existed keep working - see getPublicArtistProfile. */}
 						<Route path="/book/:artistHandle" element={<BookingRequest />} />
+						{/* Public, unauthenticated by design - same reasoning as /book/:artistHandle
+						    directly above. Deliberately singular "/form/" (not "/forms/", which is the
+						    authenticated management list above) so the two routes can never collide -
+						    see constants/app.js's ROUTE_CONSTANTS.PUBLIC_FORM. */}
+						<Route path="/form/:publicToken" element={<PublicFormFillOut />} />
 						{/* Token-gated, not auth-gated - see utils/guest-auth.js server-side.
 						Intentionally public/no AuthRoute: the whole point is a guest with no
 						account can reach this. */}

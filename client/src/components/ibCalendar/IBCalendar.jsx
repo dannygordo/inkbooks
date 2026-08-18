@@ -1,8 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
+// React imported explicitly: under Vitest, @vitejs/plugin-react compiles JSX with the CLASSIC
+// runtime, so a component rendered by a test needs React in scope or it throws "React is not
+// defined" - in that test's file, not this one. See vite.config.js and
+// scripts/check-react-in-tested-components.mjs. Added along with IBCalendar.test.jsx - this
+// component was never directly under a test before.
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../context/auth';
 import { useCalendar } from '../../context/calendar';
 import { AppointmentService } from '../../services/AppointmentService';
 import UtilsService from '../../services/UtilsService';
+import { filterByCalendars } from '../../utils/calendarFilters';
+import MyCalendarsFilter from '../appointments/MyCalendarsFilter';
 import CalendarHeader from './CalendarHeader';
 import './ibCalendar.css';
 import Month from './Month';
@@ -10,7 +17,7 @@ import Month from './Month';
 const IBCalendar = () => {
     const { user } = useAuth();
     const [currentMonth, setCurrentMonth] = useState(UtilsService.getMonth());
-    const { monthIndex, setMonthIndex, setSavedEvents } = useCalendar();
+    const { monthIndex, setMonthIndex, setSavedEvents, calendarFilters } = useCalendar();
     // user.userInfo.shop is legitimately absent for an independent artist (no shop connection -
     // see PRODUCTION_ROADMAP.md's artist-centric tenancy section). Both queries are always called
     // (required - hooks can't be called conditionally) but each `skip`s itself when its own id is
@@ -52,6 +59,20 @@ const IBCalendar = () => {
         shopId ? undefined : user.id,
         range
     );
+    // A shop-connected user's OWN personal-calendar appointments never come back from
+    // getAppointmentsByShop (they carry no shopId - see models/Appointment.js) and this user isn't
+    // who artistData is scoped to fetching either, so without this query a shop-connected artist's
+    // personal calendar would render permanently empty - the exact "known gap" IBCalendar's own
+    // header comment already describes for the independent-artist case, just for the opposite
+    // tenancy shape. Skipped (via getAppointmentsByArtistForCalendar's own !userId guard) once
+    // there's no shop, since artistData above already covers everything this user owns, personal or
+    // not, in that case.
+    const { data: personalData } = AppointmentService.getAppointmentsByArtistForCalendar(
+        shopId ? user.id : undefined,
+        range,
+        undefined,
+        { isPersonal: true }
+    );
 
     useEffect(() => {
         // Was two debug console.log statements hard-indexing data.getAppointmentsByShop[0] -
@@ -60,12 +81,20 @@ const IBCalendar = () => {
         // shop, or any shop between appointments), not just an independent-artist edge case.
         // Found via manual testing. Removed - they added no functional value; setSavedEvents
         // below already uses the full array correctly and doesn't depend on them.
+        //
+        // filterByCalendars applies the "My Calendars" checkboxes AFTER the fetch, over data the
+        // server has already scoped correctly - see that util's own comment on why this is a
+        // display preference layered on top of a safe result, not the thing making it safe.
         if (shopId && shopData) {
-            setSavedEvents(shopData.getAppointmentsByShop.items);
+            const shopItems = shopData.getAppointmentsByShop.items;
+            const personalItems = personalData?.getAppointmentsByArtist?.items || [];
+            setSavedEvents(filterByCalendars([...shopItems, ...personalItems], calendarFilters));
         } else if (!shopId && artistData) {
-            setSavedEvents(artistData.getAppointmentsByArtist.items);
+            setSavedEvents(
+                filterByCalendars(artistData.getAppointmentsByArtist.items, calendarFilters)
+            );
         }
-    }, [shopId, shopData, artistData])
+    }, [shopId, shopData, artistData, personalData, calendarFilters])
     useEffect(() => {
         setCurrentMonth(UtilsService.getMonth(monthIndex));
     }, [monthIndex])
@@ -73,6 +102,9 @@ const IBCalendar = () => {
     <>
         <div className='ibCalendar'>
             <CalendarHeader />
+            <div className="ibCalendarMyCalendarsRow">
+                <MyCalendarsFilter hasShop={Boolean(shopId)} />
+            </div>
             {/* Was a flex-row wrapper around <Sidebar /> (Create Event + the mini month-picker)
                 and this container - the sidebar's gone (see CalendarHeader.jsx, which now hosts
                 Create Event in the header itself), so the grid no longer needs a row partner to

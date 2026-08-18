@@ -4,14 +4,17 @@ import "./login.css";
 // path that doesn't pick up the automatic runtime the same way (confirmed: an esbuild.jsx config
 // override in vite.config.js had no effect, since plugin-react transforms JSX via Babel, not
 // esbuild), throwing "React is not defined" without this import. See Login.test.jsx.
-import { useRef, useState, useContext } from "react";
+import { useRef, useContext } from "react";
 import React from "react";
 import { ALERT_CONSTANTS, ROUTE_CONSTANTS } from "../../constants";
 import { gql, useMutation } from "@apollo/client";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "../../context/auth";
-import { DialogContentText, CircularProgress } from "@mui/material";
+import { Button, CircularProgress } from "@mui/material";
 import { CURRENT_USER_FIELDS } from "../../services/UserService";
+import IBCardWrapper from "../../components/card/ibCard/IBCardWrapper";
+import IBInput from "../../components/inputs/IBInput";
+import FormField from "../../components/formField/FormField";
 
 // EXPORTED, and defined at module scope rather than inside the component.
 //
@@ -73,43 +76,65 @@ const Login = () => {
 
 	return (
 		<div className="login">
-			<form className="loginForm" onSubmit={handleLogin}>
-				<input
-					type="text"
-					placeholder="email"
-					className="loginInput"
-					ref={email}
-				/>
-				<input
-					type="password"
-					placeholder="password"
-					className="loginInput"
-					ref={password}
-				/>
-				<button className="loginButton" type="submit">
-					{loading ? (
-						<CircularProgress color="inherit" size="20px" />
-					) : (
-						"Login In"
-					)}
-				</button>
-				<Link to="/resetPassword">
-					<div className="loginForgotContainer">
-						<div className="loginForgot">
-							Forgot Password?
+			<div className="loginCardOuter">
+				{/* Same building blocks as everywhere else in the app now (IBCardWrapper, IBInput,
+				    FormField, a themed MUI Button) - this page predated all of them and was still on
+				    plain <input>/<button> tags styled by App.css's generic element rules, which is
+				    why it read as visually disconnected from the rest of the app: a different
+				    border-radius, a different input height, and a submit button with no background
+				    colour of its own (see the removed .loginButton rule in login.css - it had one,
+				    commented out, and fell through to App.css's global `button`, not the theme's
+				    copper primary every other primary action uses). */}
+				<IBCardWrapper>
+					<form className="loginForm" onSubmit={handleLogin}>
+						<h1 className="loginTitle">Log in</h1>
+						<div className="ibFieldGroup">
+							<FormField id="loginEmail" label="Email">
+								<IBInput
+									id="loginEmail"
+									type="text"
+									placeholder="email"
+									inputRef={email}
+								/>
+							</FormField>
+							<FormField id="loginPassword" label="Password">
+								<IBInput
+									id="loginPassword"
+									type="password"
+									placeholder="password"
+									inputRef={password}
+								/>
+							</FormField>
 						</div>
-					</div>
-				</Link>
-				<Link to="/register">
-					<button className="loginRegisterButton">
-						{loading ? (
-							<CircularProgress color="inherit" size="20px" />
-						) : (
-							"Create a New Account"
-						)}
-					</button>
-				</Link>
-			</form>
+						<Button
+							type="submit"
+							variant="contained"
+							fullWidth
+							disabled={loading}
+							className="loginSubmit"
+						>
+							{loading ? (
+								<CircularProgress color="inherit" size="20px" />
+							) : (
+								"Login In"
+							)}
+						</Button>
+						<Link to="/resetPassword" className="loginForgot">
+							Forgot Password?
+						</Link>
+					</form>
+					<div className="loginDivider" />
+					{/* Was its own loading spinner, tied to the LOGIN mutation's loading state even
+					    though clicking this button doesn't submit anything - it just navigates to
+					    /register. Static now; the spinner belongs on the button whose click actually
+					    starts an async request. */}
+					<Link to="/register" className="loginRegisterLink">
+						<Button variant="outlined" fullWidth>
+							Create a New Account
+						</Button>
+					</Link>
+				</IBCardWrapper>
+			</div>
 		</div>
 	);
 };

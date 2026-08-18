@@ -4,6 +4,8 @@ import moment from "moment";
 import { Button } from "@mui/material";
 import { Add } from "@mui/icons-material";
 import ClientService from "../../services/ClientService";
+import FormService from "../../services/FormService";
+import FormFillOut from "../forms/FormFillOut";
 import IBCardWrapper from "../card/ibCard/IBCardWrapper";
 import IBPageLoader from "../ibPageLoader/IBPageLoader";
 import IBMultilineInput from "../inputs/IBMultilineInput";
@@ -11,21 +13,29 @@ import EntityListPager from "../entityList/EntityListPager";
 import { useAuth } from "../../context/auth";
 import { ALERT_CONSTANTS } from "../../constants";
 import { formatCents } from "../../utils/money";
+import { businessScopeFor } from "../../utils/businessScope";
 import "./clientDashboard.css";
 
-// These three lists (Projects/Appointments/Notes below) come back as full arrays on client.projects
-// etc - see the Client.projects/appointments field resolvers in resolvers/index.js, which return
-// everything with no page/limit args at all. Paging them for real would mean turning each into a
-// paginated connection server-side; this is a lighter fix that slices the array that's already in
-// hand and reuses the app's own EntityListPager for the controls, so a client with years of history
-// gets a scrollable page instead of one long list, without a schema change.
+// Projects and appointments are real server-paged connections now (Client.projects/appointments
+// in typeDefs.js take page: PageInput and return a *Page) - a client with years of history used
+// to ship every project and every appointment it ever had on every dashboard visit, then get
+// paged in the browser over an array that was already fully downloaded. Notes are the one list
+// still paged client-side below - see buildClientSidePageInfo's own comment on why that one
+// stayed as-is.
 const DASHBOARD_LIST_PAGE_SIZE = 10;
 const DASHBOARD_LIST_PAGE_SIZE_OPTIONS = [10, 25, 50];
 
 /**
  * Turns a plain in-memory array + an offset/limit into the {totalCount, hasMore, limit, offset}
- * shape EntityListPager expects from a server response - built here instead of there, since the
- * server never sees offset/limit for these three fields.
+ * shape EntityListPager expects from a server response.
+ *
+ * Only NOTES still needs this. Notes are embedded sub-documents on Client (see models/Client.js),
+ * not a separate collection paginate() can query with its own skip/limit - turning them into a
+ * real paged connection would mean either a Mongo $slice-based resolver or splitting them into
+ * their own collection, neither of which this pass touches. A shop's notes on one client are also
+ * the smallest of the three lists in practice (they're typed by hand, not generated per session),
+ * so the download-everything cost this same fix removed from projects/appointments is much
+ * smaller here to begin with.
  */
 const buildClientSidePageInfo = (fullLength, offset, limit) => ({
 	totalCount: fullLength,
@@ -61,8 +71,18 @@ const buildClientSidePageInfo = (fullLength, offset, limit) => ({
  * - isSelf: true when the viewer is the client themselves.
  */
 const ClientDashboard = ({ clientId, isSelf = false }) => {
-	const { user, setAlert } = useAuth();
-	const { loading, data } = ClientService.fetchClientDashboard(clientId);
+	const { user, setAlert, modal, setModal } = useAuth();
+	// Published forms this viewer's own shop/artist scope owns - only meaningful for the staff/
+	// artist view (see this file's own header comment on why Notes/Flags are also !isSelf-only):
+	// businessScopeFor(user) resolves to the LOGGED-IN staff/artist's own scope, which is correct
+	// here (they're the one who'd be sending a waiver), but would be nonsense on a client's own
+	// dashboard - a client has no shop/artist scope of their own to look up forms by. Self-service
+	// fill-out (a client filling out their own copy of a form) isn't wired up from here - see
+	// HANDOFF.md.
+	const scope = businessScopeFor(user);
+	const { data: formsData } = FormService.getForms(scope, "published", { limit: 25, offset: 0 }, {
+		skip: isSelf,
+	});
 	const [newNote, setNewNote] = useState("");
 	const [showNoteForm, setShowNoteForm] = useState(false);
 	const [projectsOffset, setProjectsOffset] = useState(0);
@@ -71,9 +91,21 @@ const ClientDashboard = ({ clientId, isSelf = false }) => {
 	const [appointmentsPageSize, setAppointmentsPageSize] = useState(DASHBOARD_LIST_PAGE_SIZE);
 	const [notesOffset, setNotesOffset] = useState(0);
 	const [notesPageSize, setNotesPageSize] = useState(DASHBOARD_LIST_PAGE_SIZE);
+	const [showFlagForm, setShowFlagForm] = useState(false);
+	const [flagTypeKey, setFlagTypeKey] = useState("");
+	const [flagNote, setFlagNote] = useState("");
+	const { loading, data } = ClientService.fetchClientDashboard(
+		clientId,
+		{ limit: projectsPageSize, offset: projectsOffset },
+		{ limit: appointmentsPageSize, offset: appointmentsOffset }
+	);
 	const [updateClientNotes, { loading: savingNote }] = useMutation(
 		ClientService.UPDATE_CLIENT_NOTES
 	);
+	// See models/ClientFlag.js: flags are shop-side only, same rule as notes - skipped entirely on
+	// the client's own view rather than fetched and hidden, since there's no picker to show them.
+	const { data: flagTypesData } = ClientService.getClientFlagTypes(undefined, { skip: isSelf });
+	const [raiseClientFlag, { loading: savingFlag }] = useMutation(ClientService.RAISE_CLIENT_FLAG);
 
 	// `loading` alone would flash the spinner on every background refetch, because the query runs
 	// cache-and-network. Gating on "loading AND nothing cached yet" keeps the first load behaving
@@ -86,36 +118,33 @@ const ClientDashboard = ({ clientId, isSelf = false }) => {
 	}
 
 	const client = data.getClient;
-	const projects = client.projects || [];
-	const appointments = client.appointments || [];
+	const projects = client.projects?.items || [];
+	const projectsPageInfo = client.projects?.pageInfo;
+	const appointments = client.appointments?.items || [];
+	const appointmentsPageInfo = client.appointments?.pageInfo;
 	const notes = client.notes || [];
-
-	// Only completed sessions count as money spent. A scheduled session has a price attached but
-	// nothing has changed hands - counting it would inflate "total spent" with work that hasn't
-	// happened and might be cancelled.
-	const paidAppointments = appointments.filter(
-		(a) => a.appointmentStatus === "completed"
+	const flags = client.flags || [];
+	// systemGenerated types (NO_SHOWED) are excluded from the picker - they can only ever be
+	// raised by an appointment's own status changing (utils/client-flags.js's syncNoShowFlag), and
+	// raiseClientFlag itself refuses one typed in by hand. Offering it in this list would just be
+	// an option that always fails.
+	const manualFlagTypes = (flagTypesData?.getClientFlagTypes || []).filter(
+		(type) => !type.systemGenerated
 	);
 
-	const totalSpentCents = paidAppointments.reduce(
-		(sum, a) => sum + (a.totalCents || 0),
-		0
-	);
-	const totalTipsCents = paidAppointments.reduce(
-		(sum, a) => sum + (a.tipCents || 0),
-		0
-	);
-	// Averaged over sessions that were ACTUALLY tipped, not all of them - dividing by every
-	// completed session would drag the figure toward zero with untipped ones and answer a
-	// different question. Same reasoning as ArtistPerformancePanel's own tip average.
-	const tippedAppointments = paidAppointments.filter((a) => (a.tipCents || 0) > 0);
-	const averageTipCents = tippedAppointments.length
-		? Math.round(totalTipsCents / tippedAppointments.length)
-		: 0;
-
-	const upcoming = appointments
-		.filter((a) => new Date(a.appointmentDate) >= new Date())
-		.sort((a, b) => new Date(a.appointmentDate) - new Date(b.appointmentDate));
+	// Every figure below comes from Client.stats (server-side aggregation over the client's FULL
+	// history, see resolvers/index.js) rather than being derived from the `projects`/
+	// `appointments` arrays above - those two are now one page each, and summing a page would
+	// make "Total spent" quietly wrong for anyone with more than one page of history.
+	const stats = client.stats || {
+		totalSpentCents: 0,
+		totalTipsCents: 0,
+		averageTipCents: 0,
+		tippedSessionCount: 0,
+		completedSessionCount: 0,
+		projectCount: 0,
+		upcomingAppointmentCount: 0,
+	};
 
 	const handleAddNote = async (e) => {
 		e.preventDefault();
@@ -163,6 +192,52 @@ const ClientDashboard = ({ clientId, isSelf = false }) => {
 		}
 	};
 
+	const handleRaiseFlag = async (e) => {
+		e.preventDefault();
+		if (!flagTypeKey) {
+			return;
+		}
+		try {
+			await raiseClientFlag({
+				variables: { input: { clientId, typeKey: flagTypeKey, note: flagNote.trim() } },
+				// raiseClientFlag returns the new ClientFlag on its own, not the whole Client, so
+				// there's no field on the response matching Client's cache entry for Apollo to merge
+				// automatically. cache.modify prepends it into the SAME cached Client.flags array
+				// this component reads - update it here, once, rather than reaching for a refetch or
+				// a piece of component state that would drift from the cache the next time this
+				// query's own cache-and-network refetch lands.
+				update: (cache, { data: mutationData }) => {
+					const newFlag = mutationData?.raiseClientFlag;
+					if (!newFlag) {
+						return;
+					}
+					// toReference(..., true) both writes newFlag into the normalized store as its own
+					// ClientFlag:<id> entity (it already has __typename + id from the mutation
+					// response) and hands back the Reference this field wants, rather than embedding
+					// the raw object where a reference belongs.
+					const newFlagRef = cache.toReference(newFlag, true);
+					cache.modify({
+						id: cache.identify({ __typename: "Client", id: clientId }),
+						fields: {
+							flags: (existing = []) => [newFlagRef, ...existing],
+						},
+					});
+				},
+			});
+			setFlagTypeKey("");
+			setFlagNote("");
+			setShowFlagForm(false);
+		} catch (err) {
+			setAlert({
+				isAlert: true,
+				severity: ALERT_CONSTANTS.SEVERITY.ERROR,
+				message: err.graphQLErrors?.[0]?.message || err.message,
+				timeout: ALERT_CONSTANTS.TIMEOUT,
+				location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
+			});
+		}
+	};
+
 	return (
 		<div className="clientDashboard">
 			<div className="clientDashboardStats">
@@ -170,33 +245,33 @@ const ClientDashboard = ({ clientId, isSelf = false }) => {
 					<div className="clientStatLabel">
 						{isSelf ? "Total spent" : "Lifetime value"}
 					</div>
-					<div className="clientStatValue">{formatCents(totalSpentCents)}</div>
+					<div className="clientStatValue">{formatCents(stats.totalSpentCents)}</div>
 					<div className="clientStatSubLabel">
-						across {paidAppointments.length} completed session
-						{paidAppointments.length === 1 ? "" : "s"}
+						across {stats.completedSessionCount} completed session
+						{stats.completedSessionCount === 1 ? "" : "s"}
 					</div>
 				</div>
 				<div className="clientStatCard">
 					<div className="clientStatLabel">
 						{isSelf ? "Total tipped" : "Total tips"}
 					</div>
-					<div className="clientStatValue">{formatCents(totalTipsCents)}</div>
+					<div className="clientStatValue">{formatCents(stats.totalTipsCents)}</div>
 				</div>
 				<div className="clientStatCard">
 					<div className="clientStatLabel">Average tip</div>
-					<div className="clientStatValue">{formatCents(averageTipCents)}</div>
+					<div className="clientStatValue">{formatCents(stats.averageTipCents)}</div>
 					<div className="clientStatSubLabel">
-						across {tippedAppointments.length} tipped session
-						{tippedAppointments.length === 1 ? "" : "s"}
+						across {stats.tippedSessionCount} tipped session
+						{stats.tippedSessionCount === 1 ? "" : "s"}
 					</div>
 				</div>
 				<div className="clientStatCard">
 					<div className="clientStatLabel">Projects</div>
-					<div className="clientStatValue">{projects.length}</div>
+					<div className="clientStatValue">{stats.projectCount}</div>
 				</div>
 				<div className="clientStatCard">
 					<div className="clientStatLabel">Upcoming</div>
-					<div className="clientStatValue">{upcoming.length}</div>
+					<div className="clientStatValue">{stats.upcomingAppointmentCount}</div>
 				</div>
 			</div>
 
@@ -207,28 +282,22 @@ const ClientDashboard = ({ clientId, isSelf = false }) => {
 				) : (
 					<>
 						<ul className="clientDashboardList">
-							{projects
-								.slice(projectsOffset, projectsOffset + projectsPageSize)
-								.map((project) => (
-									<li key={project.id} className="clientDashboardListRow">
-										<span className="clientDashboardListPrimary">
-											{project.title || "Untitled project"}
-										</span>
-										<span className="clientDashboardListMeta">
-											{project.status || "unknown"}
-											{project.createdAt
-												? ` - started ${moment(project.createdAt).format("MMM D, YYYY")}`
-												: ""}
-										</span>
-									</li>
-								))}
+							{projects.map((project) => (
+								<li key={project.id} className="clientDashboardListRow">
+									<span className="clientDashboardListPrimary">
+										{project.title || "Untitled project"}
+									</span>
+									<span className="clientDashboardListMeta">
+										{project.status || "unknown"}
+										{project.createdAt
+											? ` - started ${moment(project.createdAt).format("MMM D, YYYY")}`
+											: ""}
+									</span>
+								</li>
+							))}
 						</ul>
 						<EntityListPager
-							pageInfo={buildClientSidePageInfo(
-								projects.length,
-								projectsOffset,
-								projectsPageSize
-							)}
+							pageInfo={projectsPageInfo}
 							onChange={setProjectsOffset}
 							onPageSizeChange={(size) => {
 								setProjectsPageSize(size);
@@ -248,37 +317,31 @@ const ClientDashboard = ({ clientId, isSelf = false }) => {
 				) : (
 					<>
 						<ul className="clientDashboardList">
-							{appointments
-								.slice(appointmentsOffset, appointmentsOffset + appointmentsPageSize)
-								.map((appointment) => (
-									<li key={appointment.id} className="clientDashboardListRow">
-										<span className="clientDashboardListPrimary">
-											{appointment.title ||
-												appointment.project?.title ||
-												"Untitled"}
-										</span>
-										<span className="clientDashboardListMeta">
-											{moment
-												.utc(appointment.appointmentDate)
-												.format("MMM D, YYYY h:mma")}
-											{" - "}
-											{appointment.appointmentStatus}
-											{appointment.totalCents
-												? ` - ${formatCents(appointment.totalCents)}`
-												: ""}
-											{appointment.tipCents
-												? ` (incl. ${formatCents(appointment.tipCents)} tip)`
-												: ""}
-										</span>
-									</li>
-								))}
+							{appointments.map((appointment) => (
+								<li key={appointment.id} className="clientDashboardListRow">
+									<span className="clientDashboardListPrimary">
+										{appointment.title ||
+											appointment.project?.title ||
+											"Untitled"}
+									</span>
+									<span className="clientDashboardListMeta">
+										{moment
+											.utc(appointment.appointmentDate)
+											.format("MMM D, YYYY h:mma")}
+										{" - "}
+										{appointment.appointmentStatus}
+										{appointment.totalCents
+											? ` - ${formatCents(appointment.totalCents)}`
+											: ""}
+										{appointment.tipCents
+											? ` (incl. ${formatCents(appointment.tipCents)} tip)`
+											: ""}
+									</span>
+								</li>
+							))}
 						</ul>
 						<EntityListPager
-							pageInfo={buildClientSidePageInfo(
-								appointments.length,
-								appointmentsOffset,
-								appointmentsPageSize
-							)}
+							pageInfo={appointmentsPageInfo}
 							onChange={setAppointmentsOffset}
 							onPageSizeChange={(size) => {
 								setAppointmentsPageSize(size);
@@ -290,6 +353,57 @@ const ClientDashboard = ({ clientId, isSelf = false }) => {
 					</>
 				)}
 			</IBCardWrapper>
+
+			{/* Staff/artist view only - see this file's own header comment on why. Task #146: the
+			    authenticated "staff filling this out on a client's behalf" path - see
+			    components/forms/FormFillOut.jsx and resolvers/forms.js's submitFormResponse for the
+			    clientId branch this drives. Only PUBLISHED forms are offered (submitFormResponse
+			    itself refuses anything else), and only this viewer's own shop/artist scope's forms -
+			    a shop-connected artist sees their shop's forms, an independent artist sees their own. */}
+			{!isSelf && (formsData?.getForms?.items || []).length > 0 && (
+				<IBCardWrapper>
+					<h2 className="clientDashboardSectionTitle">Forms</h2>
+					<p className="clientDashboardNotesHint">
+						Send a waiver, consent form, or intake questionnaire - fill it out here on
+						their behalf, or read it to them and enter what they say.
+					</p>
+					<ul className="clientDashboardList">
+						{formsData.getForms.items.map((form) => (
+							<li key={form.id} className="clientDashboardListRow">
+								<span className="clientDashboardListPrimary">{form.title}</span>
+								<Button
+									size="small"
+									onClick={() =>
+										setModal({
+											isOpen: true,
+											title: form.title,
+											content: (
+												<FormFillOut
+													formId={form.id}
+													clientId={clientId}
+													onSubmitted={() => {
+														setModal({ ...modal, isOpen: false });
+														setAlert({
+															isAlert: true,
+															severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
+															message: "Response submitted.",
+															timeout: ALERT_CONSTANTS.TIMEOUT,
+															location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
+														});
+													}}
+													onCancel={() => setModal({ ...modal, isOpen: false })}
+												/>
+											),
+										})
+									}
+								>
+									Fill Out
+								</Button>
+							</li>
+						))}
+					</ul>
+				</IBCardWrapper>
+			)}
 
 			{/* Shop-side only. See this file's header comment on why a client doesn't see notes
 			    written about them. */}
@@ -369,6 +483,77 @@ const ClientDashboard = ({ clientId, isSelf = false }) => {
 								</>
 							);
 						})()
+					)}
+				</IBCardWrapper>
+			)}
+
+			{/* Shop-side only, same rule as Notes above - see models/ClientFlag.js's own
+			    "NEVER CLIENT-VISIBLE" comment. */}
+			{!isSelf && (
+				<IBCardWrapper>
+					<div className="clientDashboardNotesHeader">
+						<h2 className="clientDashboardSectionTitle">Flags</h2>
+						<Button
+							size="small"
+							startIcon={<Add />}
+							onClick={() => setShowFlagForm((open) => !open)}
+						>
+							{showFlagForm ? "Cancel" : "Add flag"}
+						</Button>
+					</div>
+					<p className="clientDashboardNotesHint">
+						A candid record about this client's conduct - never shown to them.
+					</p>
+
+					{showFlagForm && (
+						<form className="clientDashboardFlagForm" onSubmit={handleRaiseFlag}>
+							<select
+								className="clientDashboardFlagTypeSelect"
+								value={flagTypeKey}
+								onChange={(e) => setFlagTypeKey(e.target.value)}
+							>
+								<option value="">Select a flag type...</option>
+								{manualFlagTypes.map((type) => (
+									<option key={type.key} value={type.key}>
+										{type.label}
+									</option>
+								))}
+							</select>
+							<IBMultilineInput
+								id="newClientFlagNote"
+								label="Note (optional)"
+								helperText=" "
+								defaultValue=""
+								onChange={(e) => setFlagNote(e.target.value)}
+							/>
+							<Button type="submit" variant="contained" disabled={savingFlag || !flagTypeKey}>
+								Save flag
+							</Button>
+						</form>
+					)}
+
+					{flags.length === 0 ? (
+						<p className="clientDashboardEmpty">No flags on this client.</p>
+					) : (
+						<ul className="clientDashboardList">
+							{flags.map((flag) => (
+								<li key={flag.id} className="clientDashboardNoteRow">
+									<p className="clientDashboardNoteBody">
+										{flag.type?.label || flag.typeKey}
+										{flag.systemGenerated ? " (automatic)" : ""}
+									</p>
+									{flag.note && <p className="clientDashboardFlagNote">{flag.note}</p>}
+									<span className="clientDashboardListMeta">
+										{flag.createdBy
+											? `${flag.createdBy.firstName} ${flag.createdBy.lastName}`
+											: "System"}
+										{flag.createdAt
+											? ` - ${moment(flag.createdAt).format("MMM D, YYYY")}`
+											: ""}
+									</span>
+								</li>
+							))}
+						</ul>
 					)}
 				</IBCardWrapper>
 			)}

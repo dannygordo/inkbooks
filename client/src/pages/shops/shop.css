@@ -88,6 +88,15 @@
     align-items: center;
     gap: 14px;
 }
+/* The read-only figure itself - see Shop.jsx's own comment on why this is display, not an input,
+   now that Settings' ShopPanel is the one place that edits it. Sized like the money totals
+   elsewhere in the app (ProjectSessions' sessionDetailMoneyLabelValue), not like body text, so it
+   still reads as the important number on this row despite no longer being a field. */
+.shopCutReadout {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--ib-text-primary);
+}
 
 /* Shop name + the shared autosave status for every field on this page (Shop Info panel and the
    Shop cut field below it) - same pattern as Project.jsx's Details panel. */

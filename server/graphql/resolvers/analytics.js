@@ -22,6 +22,9 @@ const MONEY_FIELDS = [
   'depositsCollectedCents',
   'depositsAppliedCents',
   'depositsOutstandingCents',
+  'expensesCents',
+  'otherIncomeCents',
+  'netCents',
 ];
 
 const ARTIST_ROW_MONEY_FIELDS = [

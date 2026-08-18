@@ -16,6 +16,7 @@ const express = require('express');
 const { createLoaders } = require('./utils/loaders');
 const { startScheduler } = require('./utils/scheduler');
 const { notificationJobs } = require('./utils/notification-jobs');
+const { businessJobs } = require('./utils/business-jobs');
 const ClientFlagType = require('./models/ClientFlagType');
 const cors = require('cors');
 const mongoose = require('mongoose');
@@ -29,6 +30,7 @@ const ibTypeDefs = require('./graphql/typeDefs');
 const resolvers = require('./graphql/resolvers');
 const { Constants } = require('./utils/constants');
 const bookingUploadsRouter = require('./routes/bookingUploads');
+const formUploadsRouter = require('./routes/formUploads');
 const { router: squareOAuthRouter } = require('./routes/squareOAuth');
 const squareWebhooksRouter = require('./routes/squareWebhooks');
 const squarePaymentsRouter = require('./routes/squarePayments');
@@ -108,6 +110,7 @@ app.set('trust proxy', 1);
 // multer's multipart parsing on the upload route or express.json()'s parsing on the GraphQL one.
 app.use(cors({ origin: [Constants.URLS.INKBOOKS_WEBAPP] }));
 app.use(bookingUploadsRouter);
+app.use(formUploadsRouter);
 // squareWebhooksRouter uses express.raw() internally (needs the raw, unparsed body for HMAC
 // signature verification - see routes/squareWebhooks.js) and squareOAuthRouter's callback is a
 // plain GET with no body at all - neither one is affected by the '/' route's express.json()
@@ -218,7 +221,10 @@ async function start() {
   // into up to eight. Every job still declares its own period and the lock decides what actually
   // runs, so the extra ticks cost one indexed upsert each - which is the trade the lock was built
   // to make (see utils/scheduler.js).
-  startScheduler(notificationJobs(), { tickMs: 60 * 1000 });
+  // Combined into the same scheduler instance as the notification jobs rather than a second
+  // startScheduler call - one interval, one set of ticks, jobs from both files claimed by the
+  // same lock (models/ScheduledRun.js). See utils/business-jobs.js for what this one does.
+  startScheduler([...notificationJobs(), ...businessJobs()], { tickMs: 60 * 1000 });
   console.log('Scheduler started');
 
   // The flag types the app ships with. Idempotent and $setOnInsert-only, so re-running never

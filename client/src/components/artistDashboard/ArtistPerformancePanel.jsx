@@ -436,6 +436,30 @@ const ArtistPerformancePanel = ({ artistUserId, isSelf = false }) => {
 									value={formatCents(analytics.depositsOutstandingCents)}
 									subLabel="held against work not yet done"
 								/>
+								{/* The shop's actual financial picture - see the user's own framing:
+								    "total tattoo related income, total expenses, and total other
+								    income giving a grand total of what the shop is actually doing
+								    financially across the board". Sourced from Expense/Income
+								    (server/models/Expense.js, Income.js) scoped to this shop - see
+								    server/utils/analytics.js's own header on expensesCents/
+								    otherIncomeCents/netCents. "Total Revenue" above is tattoo income
+								    only (completed sessions); these three turn that into the shop's
+								    whole P&L rather than just its tattoo side. */}
+								<StatCard
+									label="Expenses"
+									value={formatCents(analytics.expensesCents)}
+									subLabel="rent, supplies, everything logged as an expense"
+								/>
+								<StatCard
+									label="Other income"
+									value={formatCents(analytics.otherIncomeCents)}
+									subLabel="non-tattoo income - retail, booth rent, etc."
+								/>
+								<StatCard
+									label="Grand total"
+									value={formatCents(analytics.netCents)}
+									subLabel="tattoo revenue + other income − expenses"
+								/>
 								{/* Deliberately NOT here: Tips/Average tip (an artist's own money,
 								    never the shop's - kept on the artist's own dashboard only, see
 								    the else branch below) and Sessions completed/Active projects
@@ -486,6 +510,28 @@ const ArtistPerformancePanel = ({ artistUserId, isSelf = false }) => {
 								<StatCard
 									label="Shop cut owed"
 									value={formatCents(analytics.shopCutOutstandingCents)}
+								/>
+								{/* Your own financial picture, same three figures as the shop-wide
+								    view above (see that branch's comment) but scoped to YOUR own
+								    books - server/utils/analytics.js's computeAnalytics reads
+								    Expense/Income rows by artistUserId here, not shopId. Shown for
+								    every artist, not just an independent one with no shop - a
+								    shop-connected artist simply never has any (Settings' Expenses &
+								    Income category is shop-admin/independent-artist only), so these
+								    render as the honest $0.00 rather than being hidden. */}
+								<StatCard
+									label="Expenses"
+									value={formatCents(analytics.expensesCents)}
+								/>
+								<StatCard
+									label="Other income"
+									value={formatCents(analytics.otherIncomeCents)}
+									subLabel="non-tattoo income"
+								/>
+								<StatCard
+									label="Grand total"
+									value={formatCents(analytics.netCents)}
+									subLabel="revenue + other income − expenses"
 								/>
 								{/* Shop cut awaiting confirmation is deliberately NOT shown here -
 								    it's the shop-wide reconciliation view's card (see the shopWide

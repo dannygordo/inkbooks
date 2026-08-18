@@ -1,5 +1,6 @@
 import React from "react";
 import {
+	AccountBalance,
 	AccountCircle,
 	AttachMoney,
 	Assignment,
@@ -13,6 +14,7 @@ import {
 	Receipt,
 	Security,
 	Storefront,
+	TrendingUp,
 } from "@mui/icons-material";
 import AccountPanel from "../../components/settings/AccountPanel";
 import AppearancePanel from "../../components/settings/AppearancePanel";
@@ -26,6 +28,10 @@ import NotificationSettingsPanel from "../../components/notifications/Notificati
 import EventLogPanel from "../../components/settings/EventLogPanel";
 import RemindersPanel from "../../components/settings/RemindersPanel";
 import ComingSoonPanel from "../../components/settings/ComingSoonPanel";
+import ExpenseTypesPanel from "../../components/settings/ExpenseTypesPanel";
+import IncomeTypesPanel from "../../components/settings/IncomeTypesPanel";
+import RecurringExpensesPanel from "../../components/settings/RecurringExpensesPanel";
+import FormsPanel from "../../components/settings/FormsPanel";
 import { ROLES } from "../../constants/auth";
 
 /**
@@ -103,6 +109,34 @@ const CATEGORIES = [
 		render: () => <RatesPanel />,
 	},
 	{
+		key: "expenses",
+		label: "Expenses",
+		icon: AccountBalance,
+		// Same floor as Security/Taxes/Analytics: shop-admin-or-better, or an independent artist
+		// with no shop at all - matching the server's own gate (assertCanManageBusinessRecord in
+		// utils/shop-membership.js). A plain shop-connected artist or Staff member manages neither
+		// their shop's books nor has a personal ledger of their own here.
+		//
+		// Split from "income" below into its own category (was one combined "Expenses & Income"
+		// entry) - each now matches its own sidebar link and its own /expenses or /income page,
+		// so a shop that only cares about one side of the ledger isn't stuck scrolling past the
+		// other one to reach it.
+		isVisible: (user) => hasAuditAuthority(user),
+		render: () => (
+			<>
+				<ExpenseTypesPanel />
+				<RecurringExpensesPanel />
+			</>
+		),
+	},
+	{
+		key: "income",
+		label: "Income",
+		icon: TrendingUp,
+		isVisible: (user) => hasAuditAuthority(user),
+		render: () => <IncomeTypesPanel />,
+	},
+	{
 		key: "square",
 		label: "Square Config",
 		icon: CreditCard,
@@ -175,13 +209,13 @@ const CATEGORIES = [
 		key: "forms",
 		label: "Forms",
 		icon: Assignment,
-		isVisible: (user) => isArtist(user),
-		render: () => (
-			<ComingSoonPanel
-				label="Forms"
-				description="Custom intake and consent forms are on the way here."
-			/>
-		),
+		// Was isArtist - narrowed to match the feature's actual ownership model (models/Form.js:
+		// shopId XOR artistUserId, gated server-side by assertCanManageBusinessRecord), the same
+		// floor Expenses/Income/Security/Taxes/Analytics already use. A plain shop-connected artist
+		// or Staff member manages neither their shop's forms nor has an independent set of their
+		// own here, same reasoning as those categories.
+		isVisible: (user) => hasAuditAuthority(user),
+		render: () => <FormsPanel />,
 	},
 	{
 		key: "analytics",

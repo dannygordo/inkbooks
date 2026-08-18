@@ -11,6 +11,7 @@ import {
 } from "../appointments/DurationPicker";
 import IBInput from "../inputs/IBInput";
 import IBMultilineInput from "../inputs/IBMultilineInput";
+import IBSelect from "../inputs/IBSelect";
 import IBProjectsByArtistSelect from "../inputs/IBProjectsByArtistSelect";
 import IBPageLoader from "../ibPageLoader/IBPageLoader";
 import FormField from "../formField/FormField";
@@ -36,8 +37,21 @@ import UtilsService from "../../services/UtilsService";
 //   - Session can *also* attach to an already-existing Project instead (no client step needed -
 //     the project already has one) - that path is unchanged, simple, and direct
 //     (pick project -> date/time -> createAppointment).
-//   - Other: unchanged, fast, single step - blocked time/non-client entries shouldn't cost three
-//     screens.
+//
+// CALENDAR: SHOP vs PERSONAL. A new dropdown on the type step, defaulting to Shop. Personal has no
+// Consult/Session choice at all - a private calendar entry ("dentist", "kid's recital") isn't
+// either one, and asking would just be a question with no right answer. Picking Personal replaces
+// the "what are you scheduling?" prompt with a single Continue button straight into a flat title/
+// description/date form (personal-form below), skipping the client-intake/booking-request
+// pipeline entirely - that pipeline creates real Clients and Projects and sends real confirmation
+// emails, and forcing a private entry through machinery built for a client relationship would
+// create records that don't belong to any real work, or worse, send a confirmation email for an
+// appointment that was never a booking. createAppointment is called directly with isPersonal:
+// true, appointmentType: 'other' (an internal bucket only - see AppointmentTypeChip.jsx, which
+// renders the label "Personal" for any personal appointment regardless of this value) and no
+// shopId/projectId - the same call shape the old "Other" TYPE used to make, which this replaces
+// (see this file's git history - "Other" as a selectable type for a SHOP appointment is gone; the
+// appointments page only offers Consult/Session there now).
 //
 // Email-lookup client step: replaces the old radio-button "existing client (dropdown) / new
 // client" picker for both Consult and new-Session. A real user testing this reported the dropdown
@@ -59,8 +73,12 @@ const AppointmentWizard = ({ selectedDay }) => {
 	const { setModal, modal, user, setAlert } = useAuth();
 	const shopId = user.userInfo?.shop?.id;
 
-	const [type, setType] = useState(null); // 'consult' | 'session' | 'other' | null
+	const [type, setType] = useState(null); // 'consult' | 'session' | null
 	const [step, setStep] = useState("type");
+	// Shop vs personal - see this file's header comment. Defaults to Shop: that's the common case
+	// (booking real client work), and a default that silently hid an appointment from the shop's
+	// own calendar would be a much worse mistake to make by accident than the reverse.
+	const [calendarChoice, setCalendarChoice] = useState("shop");
 	// LOCAL, not moment.utc(). A utc-mode moment makes the picker interpret whatever the artist
 	// picks as a UTC wall clock, so "10:00" is stored as 10:00Z - seven hours early in PDT. The
 	// appointment is an INSTANT; the picker works in the viewer's zone and toISOString() converts.
@@ -74,9 +92,9 @@ const AppointmentWizard = ({ selectedDay }) => {
 	const [submitting, setSubmitting] = useState(false);
 	const [error, setError] = useState(null);
 
-	// --- Other ---
-	const [otherTitle, setOtherTitle] = useState("");
-	const [otherDescription, setOtherDescription] = useState("");
+	// --- Personal (see this file's header comment) ---
+	const [personalTitle, setPersonalTitle] = useState("");
+	const [personalDescription, setPersonalDescription] = useState("");
 
 	// --- Shared client-email step (Consult, and a brand-new-project Session) ---
 	const [clientEmail, setClientEmail] = useState("");
@@ -181,27 +199,35 @@ const AppointmentWizard = ({ selectedDay }) => {
 		});
 	};
 
+	// Shop path only - Personal has no type choice at all (see this file's header comment and
+	// handleContinuePersonal just below), so this is never reached when calendarChoice is
+	// "personal".
 	const handleTypeSelect = (selectedType) => {
 		setType(selectedType);
 		setError(null);
 		// Seed the length from the type, since that is the only thing known at this point and it is
-		// a much better guess than a constant. "other" keeps the consult default - a blocked-out
-		// hour is the common case, and it is the one type with no useful pattern to infer from.
+		// a much better guess than a constant.
 		setDurationMinutes(
 			selectedType === "session" ? SESSION_DEFAULT_MINUTES : CONSULT_DEFAULT_MINUTES
 		);
-		if (selectedType === "other") {
-			setStep("other-form");
-		} else if (selectedType === "consult") {
+		if (selectedType === "consult") {
 			setStep("client-email");
 		} else {
 			setStep("session-project");
 		}
 	};
 
-	const handleSubmitOther = async (e) => {
+	// Personal's only path forward from the type step - no Consult/Session question, since neither
+	// answer means anything for a private calendar entry. Straight to the flat title/description/
+	// date form.
+	const handleContinuePersonal = () => {
+		setError(null);
+		setStep("personal-form");
+	};
+
+	const handleSubmitPersonal = async (e) => {
 		e.preventDefault();
-		if (!otherTitle.trim()) {
+		if (!personalTitle.trim()) {
 			setError("Give it a title first.");
 			return;
 		}
@@ -213,11 +239,22 @@ const AppointmentWizard = ({ selectedDay }) => {
 				variables: {
 					appointmentInput: {
 						userId: user.id,
-						shopId,
-						title: otherTitle,
-						description: otherDescription,
+						// Deliberately NO shopId and NO projectId - the server rejects a personal
+						// appointment carrying either (see mutations/appointments.js). Omitting them
+						// here rather than sending null/undefined explicitly is the same thing as far
+						// as the resolver's own checks are concerned, but matches how every other
+						// field this form doesn't collect is already handled below.
+						isPersonal: true,
+						title: personalTitle,
+						description: personalDescription,
 						shopCutStatus: "none",
 						appointmentStatus: "scheduled",
+						// An internal bucket only - a personal appointment has no Consult/Session
+						// question to answer (see handleContinuePersonal above), and the chip never
+						// reads this for a personal appointment anyway: AppointmentTypeChip renders
+						// the label "Personal" whenever its `personal` prop is set, regardless of
+						// appointmentType. 'other' rather than a new enum value because the schema
+						// already has one for "not consult, not session" - see utils/validation.js.
 						appointmentType: "other",
 						createdAt: now,
 						updatedAt: now,
@@ -228,7 +265,7 @@ const AppointmentWizard = ({ selectedDay }) => {
 				refetchQueries: appointmentsRefetch,
 				awaitRefetchQueries: true,
 			});
-			showSuccessAlert("Appointment saved.");
+			showSuccessAlert("Personal appointment saved.");
 			closeModal();
 		} catch (err) {
 			setError(err.message);
@@ -341,28 +378,72 @@ const AppointmentWizard = ({ selectedDay }) => {
 		}
 	};
 
+	// Every step below returns its own root element keyed on `step`. Without it, React reconciles
+	// by tree POSITION and component type, not by which step this visually is - and two unrelated
+	// steps can have identical shapes at the top (e.g. client-email's first field is an IBInput
+	// FormField, and so is intake-details' Project Title field when type is 'session'). That match
+	// let React reuse the same underlying <input> DOM node across the step change instead of
+	// mounting a fresh one - and since these are UNCONTROLLED inputs (defaultValue, not value - see
+	// IBInput.jsx), a changed defaultValue prop does nothing to a node that already exists, so
+	// whatever the artist typed as their client's email was still sitting in the DOM when they
+	// started typing a project title next, silently prefixing it. Found via AppointmentWizard's own
+	// tests, not by inspection - this codebase's usual pattern for a real functional bug (see e.g.
+	// the getChargeQuote incident this file's header comment references).
 	if (step === "type") {
+		const isPersonalChoice = calendarChoice === "personal";
 		return (
-			<DialogContent dividers className="appointmentWizardDialogContent">
-				<p>What are you scheduling?</p>
-				<div className="appointmentWizardTypeButtons">
-					<button type="button" className="ibButton" onClick={() => handleTypeSelect("consult")}>
-						Consult
-					</button>
-					<button type="button" className="ibButton" onClick={() => handleTypeSelect("session")}>
-						Session
-					</button>
-					<button type="button" className="ibButton" onClick={() => handleTypeSelect("other")}>
-						Other
-					</button>
-				</div>
+			<DialogContent key={step} dividers className="appointmentWizardDialogContent">
+				{/* Shop vs Personal - see this file's header comment. IBSelect, not a bare <select> -
+				    every control in this app that has an IB equivalent uses it, so a future styling
+				    or behaviour fix to IBSelect reaches this dropdown automatically. */}
+				<FormField id="wizardCalendarChoice" label="Calendar">
+					<IBSelect
+						id="wizardCalendarChoice"
+						data={[
+							{ value: "shop", label: "Shop" },
+							{ value: "personal", label: "Personal" },
+						]}
+						label="Calendar"
+						selectedVal={calendarChoice}
+						onChange={(e) => setCalendarChoice(e.target.value)}
+					/>
+				</FormField>
+				{isPersonalChoice ? (
+					// No Consult/Session question for a personal entry - neither answer means
+					// anything for it (see this file's header comment). Just move on.
+					<div className="appointmentWizardTypeButtons">
+						<button type="button" className="ibButton" onClick={handleContinuePersonal}>
+							Continue
+						</button>
+					</div>
+				) : (
+					<>
+						<p>What are you scheduling?</p>
+						<div className="appointmentWizardTypeButtons">
+							<button
+								type="button"
+								className="ibButton"
+								onClick={() => handleTypeSelect("consult")}
+							>
+								Consult
+							</button>
+							<button
+								type="button"
+								className="ibButton"
+								onClick={() => handleTypeSelect("session")}
+							>
+								Session
+							</button>
+						</div>
+					</>
+				)}
 			</DialogContent>
 		);
 	}
 
-	if (step === "other-form") {
+	if (step === "personal-form") {
 		return (
-			<form onSubmit={handleSubmitOther}>
+			<form key={step} onSubmit={handleSubmitPersonal}>
 				<DialogContent dividers className="appointmentWizardDialogContent">
 					<AppointmentSlotPicker
 						label="Select Date"
@@ -372,17 +453,17 @@ const AppointmentWizard = ({ selectedDay }) => {
 						onDurationChange={setDurationMinutes}
 						artistUserId={user.id}
 					/>
-					<FormField id="otherTitle" label="Title">
+					<FormField id="personalTitle" label="Title">
 						<IBInput
-							id="otherTitle"
-							placeholder="e.g. Out of office"
-							onChange={(e) => setOtherTitle(e.target.value)}
+							id="personalTitle"
+							placeholder="e.g. Dentist appointment"
+							onChange={(e) => setPersonalTitle(e.target.value)}
 						/>
 					</FormField>
-					<FormField id="otherDescription" label="Description">
+					<FormField id="personalDescription" label="Description">
 						<IBMultilineInput
-							id="otherDescription"
-							onChange={(e) => setOtherDescription(e.target.value)}
+							id="personalDescription"
+							onChange={(e) => setPersonalDescription(e.target.value)}
 						/>
 					</FormField>
 					{error && <div className="bookingRequestError">{error}</div>}
@@ -404,7 +485,7 @@ const AppointmentWizard = ({ selectedDay }) => {
 		// after the field is typed and only ever adds a "Found:" line - blocking the step on it
 		// would make the user wait to type.
 		return (
-			<DialogContent dividers className="appointmentWizardDialogContent">
+			<DialogContent key={step} dividers className="appointmentWizardDialogContent">
 				<FormField id="clientEmail" label="Client email">
 					<IBInput
 						id="clientEmail"
@@ -497,7 +578,7 @@ const AppointmentWizard = ({ selectedDay }) => {
 
 	if (step === "intake-details") {
 		return (
-			<DialogContent dividers className="appointmentWizardDialogContent">
+			<DialogContent key={step} dividers className="appointmentWizardDialogContent">
 				{type === "session" && (
 					<FormField id="projectTitle" label="Project Title">
 						<IBInput
@@ -569,7 +650,7 @@ const AppointmentWizard = ({ selectedDay }) => {
 
 	if (step === "datetime") {
 		return (
-			<form onSubmit={handleSubmitIntake}>
+			<form key={step} onSubmit={handleSubmitIntake}>
 				<DialogContent dividers className="appointmentWizardDialogContent">
 					<AppointmentSlotPicker
 						label="Select Date"
@@ -598,7 +679,7 @@ const AppointmentWizard = ({ selectedDay }) => {
 			return <IBPageLoader />;
 		}
 		return (
-			<DialogContent dividers className="appointmentWizardDialogContent">
+			<DialogContent key={step} dividers className="appointmentWizardDialogContent">
 				<div className="appointmentWizardRadioRow">
 					<label>
 						<input
@@ -656,7 +737,7 @@ const AppointmentWizard = ({ selectedDay }) => {
 
 	if (step === "session-existing-datetime") {
 		return (
-			<form onSubmit={handleSubmitExistingProjectSession}>
+			<form key={step} onSubmit={handleSubmitExistingProjectSession}>
 				<DialogContent dividers className="appointmentWizardDialogContent">
 					<AppointmentSlotPicker
 						label="Select Date"

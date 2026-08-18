@@ -1,3 +1,9 @@
+// React imported explicitly: under Vitest, @vitejs/plugin-react compiles JSX with the CLASSIC
+// runtime, so a component rendered by a test needs React in scope or it throws "React is not
+// defined" - in that test's file, not this one. See vite.config.js and
+// scripts/check-react-in-tested-components.mjs. Added along with Day.test.jsx - this component was
+// never directly under a test before.
+import React from "react";
 import "./ibCalendar.css";
 import moment from "moment";
 import { useCalendar } from "../../context/calendar";
@@ -103,15 +109,35 @@ const Day = ({ day, rowIdx }) => {
 											.format("h:mma")} - ${displayTitle(evt)}`
 							}
 						>
-							{/* Everything except backgroundColor moved to .ibCalendarEventChip in
-							    ibCalendar.css - backgroundColor has to stay inline because it's the
-							    artist's own tagColor, resolved per event at runtime. */}
+							{/* Everything except colour moved to .ibCalendarEventChip in ibCalendar.css -
+							    colour has to stay inline because it's the artist's own tagColor,
+							    resolved per event at runtime.
+
+							    A personal appointment (see models/Appointment.js's isPersonal) gets the
+							    same outlined-not-filled treatment AppointmentTypeChip already uses on
+							    the list view - border in the owner's tagColor, transparent fill - rather
+							    than the solid tagColor fill every shop event gets. Text colour switches
+							    to var(--ib-text-primary) instead of the filled chip's fixed white: white
+							    text was chosen to read against an arbitrary solid tagColor fill, but a
+							    transparent chip sits directly on the app's own background, so the text
+							    needs to track the CURRENT appearance setting (light/dark - see
+							    theme/tokens.css) instead of assuming a dark chip is always behind it. */}
 							<div
-								className="ibCalendarEventChip"
+								className={`ibCalendarEventChip${
+									evt.isPersonal ? " ibCalendarEventChipPersonal" : ""
+								}`}
 								onClick={(e) => {
 									handleUpdateEvent(e, evt);
 								}}
-								style={{ backgroundColor: resolveTagColor(evt.user?.tagColor) }}
+								style={
+									evt.isPersonal
+										? {
+												backgroundColor: "transparent",
+												borderColor: resolveTagColor(evt.user?.tagColor),
+												color: "var(--ib-text-primary)",
+										  }
+										: { backgroundColor: resolveTagColor(evt.user?.tagColor) }
+								}
 							>
 								{evt.projectId ? `${moment(evt.appointmentDate)
 									.format("h:mma")} ${
