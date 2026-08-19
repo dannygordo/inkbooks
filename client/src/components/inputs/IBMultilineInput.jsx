@@ -3,7 +3,7 @@ import React from "react";
 
 /**
  * Multi line input with some defaults set
- * @param {inputRef, id, label, placeholder, defaultValue, disabled, error, helperText, autoFocus, onChange} optionsObject
+ * @param {inputRef, id, label, placeholder, defaultValue, value, disabled, error, helperText, autoFocus, onChange} optionsObject
  * @returns
  */
 const IBMultilineInput = ({
@@ -12,6 +12,18 @@ const IBMultilineInput = ({
 	label,
 	placeholder,
 	defaultValue,
+	// CONTROLLED when provided, uncontrolled otherwise - same fix, same reasoning, as IBInput.jsx's
+	// own `value` prop (see that file's comment). This component never got it: every caller that
+	// passed `value` here (FormBuilder.jsx's form description, FormFieldsRenderer.jsx's "paragraph"
+	// field answers) had it silently dropped on the floor - not forwarded to MUI's TextField at
+	// all, since this component only ever destructured `defaultValue`. onChange still fired and
+	// still updated the caller's own state correctly (which is why SAVING worked and the server had
+	// the right value), but the box itself rendered with `defaultValue={undefined}` every time,
+	// i.e. always blank on mount, regardless of what state held. Concretely: FormBuilder's Consent
+	// form description looked empty every time the edit page was reopened, even though `getForm`
+	// was returning the saved text correctly - the bug was never in the data, only in this
+	// component silently ignoring the prop that was supposed to display it.
+	value,
 	disabled = false,
     error = false,
 	helperText,
@@ -39,7 +51,7 @@ const IBMultilineInput = ({
 			placeholder={placeholder}
 			inputRef={inputRef}
 			variant={variant}
-			defaultValue={defaultValue}
+			{...(value !== undefined ? { value } : { defaultValue })}
 			multiline
 			minRows={minRows}
 			disabled={disabled}

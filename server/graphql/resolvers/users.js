@@ -30,6 +30,7 @@ const { DEFAULT_NO_SHOP_TAG_COLOR, isUnsetTagColor, pickDefaultTagColor } = requ
 const { findArtistsForShops } = require('../../utils/artist-shop');
 const { assertSlugAvailable } = require('../../utils/booking-slug');
 const { setShopCutRate } = require('../../utils/shop-cut');
+const { seedDefaultForms } = require('../../utils/seed-default-forms');
 
 // A real bcrypt hash of a value nobody knows, compared against when no account matches, so a
 // missing account and a wrong password take the same time to answer. Generated once at module
@@ -276,6 +277,13 @@ module.exports = {
           note: 'Shop owner - does not owe their own shop a cut.',
         });
       }
+
+      // Every account gets its own default Booking Request + Consent forms - the shop's (shared
+      // across every artist there) if this signup created one, or this person's own if it didn't,
+      // i.e. a genuinely independent artist. See utils/seed-default-forms.js's own header comment
+      // on why a shop-affiliated artist added later via createArtist does NOT get a second,
+      // redundant copy of their own.
+      await seedDefaultForms(shop ? { shopId: shop._id } : { artistUserId: newUser._id }, newUser._id);
 
       const token = generateToken(newUser);
       const firebaseToken = await mintFirebaseToken(newUser.id, {

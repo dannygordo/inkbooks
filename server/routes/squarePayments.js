@@ -14,6 +14,7 @@ const { actorName } = require('../utils/notification-copy');
 const { formatCents } = require('../utils/money');
 const { Constants } = require('../utils/constants');
 const { recordEvent } = require('../utils/event-log');
+const { sendAutoResponsesForTrigger } = require('../utils/auto-responses');
 
 const router = express.Router();
 
@@ -228,6 +229,18 @@ router.post('/square/process-payment', express.json(), async (req, res) => {
       await applyShopCut(appointment);
     }
     await appointment.save();
+
+    // Auto-Responses: a card charge auto-completing a session is the other way a
+    // SESSION_COMPLETED transition happens (see mutations/appointments.js's own copy of this same
+    // guard, for the "Close Session" button) - this path never goes through that mutation at all,
+    // so it needs its own call. Best-effort: never undoes the payment/save that already happened.
+    if (
+      !isDeposit &&
+      previousAppointmentStatus !== 'completed' &&
+      appointment.appointmentType === 'session'
+    ) {
+      await sendAutoResponsesForTrigger({ trigger: 'SESSION_COMPLETED', appointment });
+    }
 
     await recordEvent({
       entityType: 'Appointment',

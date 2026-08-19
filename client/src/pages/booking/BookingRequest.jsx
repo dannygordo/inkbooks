@@ -4,6 +4,24 @@ import { CircularProgress } from "@mui/material";
 import { gql, useMutation, useQuery } from "@apollo/client";
 import "./bookingRequest.css";
 import { apiUrl } from "../../utils/apiUrl";
+import FormService from "../../services/FormService";
+
+// The fixed, non-extensible set of BookingRequestInput's optional slots (server/graphql/
+// typeDefs.js) - order/label/required/hidden here is only ever the FALLBACK, used when the
+// booking_request system form's own config (fetched below via getPublicFormBySlug) hasn't loaded
+// or doesn't exist yet for some reason (e.g. an account that predates this feature and hasn't run
+// the migration - see server/scripts/migrate-seed-default-forms.js). createBookingRequest itself
+// never sees or cares about this array; it always takes the same six named arguments it always
+// has (see handleSubmit below) - this only decides what's SHOWN, and in what order.
+const DEFAULT_BOOKING_FIELDS = [
+	{ key: "placement", label: "Placement (e.g. forearm)", required: false, hidden: false },
+	{ key: "size", label: "Size (e.g. 4in x 6in)", required: false, hidden: false },
+	{ key: "budget", label: "Budget range", required: false, hidden: false },
+	{ key: "availability", label: "Availability", required: false, hidden: false },
+	{ key: "howHeard", label: "How did you hear about us?", required: false, hidden: false },
+	{ key: "isCoverUp", label: "This is a cover-up or touch-up", required: false, hidden: false },
+	{ key: "referenceImages", label: "Reference images (optional, up to 5)", required: false, hidden: false },
+];
 
 // /booking-uploads is a plain Express route on the same server as GraphQL, not a separate host,
 // so it reuses that base rather than introducing a second env-specific constant.
@@ -26,6 +44,7 @@ const GET_PUBLIC_ARTIST_PROFILE = gql`
       lastName
       avatar
       bookingSlug
+      archived
     }
   }
 `;
@@ -68,14 +87,20 @@ const BookingRequest = () => {
   const email = useRef();
   const phone = useRef();
   const description = useRef();
-  const placement = useRef();
-  const size = useRef();
-  const budget = useRef();
-  const availability = useRef();
-  const howHeard = useRef();
-  const isCoverUp = useRef();
   const fileInput = useRef();
 
+  // The six optional slots' current values, keyed the same way the booking_request Form's own
+  // field.key values are (see typeDefs.js's BookingRequestInput) - state rather than refs, since
+  // which of these actually render, and in what order, is itself dynamic (see fieldsToRender
+  // below), which plain DOM refs don't handle cleanly.
+  const [answers, setAnswers] = useState({
+    placement: "",
+    size: "",
+    budget: "",
+    availability: "",
+    howHeard: "",
+    isCoverUp: false,
+  });
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [errors, setErrors] = useState({});
   const [uploadError, setUploadError] = useState(null);
@@ -90,6 +115,22 @@ const BookingRequest = () => {
     variables: { artistHandle },
     skip: !artistHandle,
   });
+
+  // The booking_request system form's own display config (order/labels/required/hidden) - see
+  // models/Form.js's own comment on why this exists despite the pipeline itself being untouched.
+  // Deliberately best-effort: a missing/unpublished/unreadable config here falls back to
+  // DEFAULT_BOOKING_FIELDS above rather than blocking the page - a booking request must never
+  // fail to load just because nobody has visited Settings > Forms yet.
+  const { data: fieldsData } = useQuery(FormService.GET_PUBLIC_FORM_BY_SLUG, {
+    variables: { formSlug: "book", ownerHandle: artistHandle },
+    skip: !artistHandle,
+  });
+  const fetchedFields = fieldsData?.getPublicFormBySlug;
+  const fieldsToRender =
+    fetchedFields?.state === "ok" && fetchedFields.form?.fields?.length
+      ? fetchedFields.form.fields
+      : DEFAULT_BOOKING_FIELDS;
+  const visibleFields = fieldsToRender.filter((f) => !f.hidden);
 
   const [createBookingRequest, { loading: submitting }] = useMutation(CREATE_BOOKING_REQUEST, {
     onCompleted() {
@@ -110,6 +151,57 @@ const BookingRequest = () => {
   const handleFileChange = (e) => {
     setSelectedFiles([...e.target.files]);
     setUploadError(null);
+  };
+
+  const setAnswer = (key, value) => setAnswers((prev) => ({ ...prev, [key]: value }));
+
+  // Dispatches purely on `key`, never on anything the config itself controls (type isn't even
+  // read from it) - the six slots plus referenceImages are the only keys this ever sees, matching
+  // BookingRequestInput exactly. label/required come from config (or DEFAULT_BOOKING_FIELDS);
+  // everything about HOW each one renders is still fixed here, on purpose - see this file's own
+  // header comment.
+  const renderField = (field) => {
+    if (field.key === "isCoverUp") {
+      return (
+        <label className="bookingRequestCheckbox" key={field.key}>
+          <input
+            type="checkbox"
+            checked={answers.isCoverUp}
+            onChange={(e) => setAnswer("isCoverUp", e.target.checked)}
+          />
+          {field.label}
+        </label>
+      );
+    }
+    if (field.key === "referenceImages") {
+      return (
+        <div className="bookingRequestUpload" key={field.key}>
+          <label className="bookingRequestUploadLabel">{field.label}</label>
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            multiple
+            ref={fileInput}
+            onChange={handleFileChange}
+          />
+          {selectedFiles.length > 0 && (
+            <div className="bookingRequestFileList">{selectedFiles.length} file(s) selected</div>
+          )}
+          {uploadError && <div className="bookingRequestFieldError">{uploadError}</div>}
+        </div>
+      );
+    }
+    // placement / size / budget / availability / howHeard - the only keys left.
+    return (
+      <input
+        key={field.key}
+        placeholder={field.label}
+        className="bookingRequestInput"
+        value={answers[field.key] || ""}
+        onChange={(e) => setAnswer(field.key, e.target.value)}
+        required={Boolean(field.required)}
+      />
+    );
   };
 
   const handleSubmit = async (e) => {
@@ -143,12 +235,18 @@ const BookingRequest = () => {
           phone: phone.current.value || null,
           description: description.current.value,
           referenceImages,
-          placement: placement.current.value || null,
-          size: size.current.value || null,
-          budget: budget.current.value || null,
-          availability: availability.current.value || null,
-          isCoverUp: isCoverUp.current.checked,
-          howHeard: howHeard.current.value || null,
+          // Always sent, regardless of which of these six actually rendered - a HIDDEN field is
+          // hidden, not removed, so it's simply omitted from what the guest could have filled in
+          // and reaches createBookingRequest as null/false, the same as it always has when a
+          // guest just left one blank. This is the one place createBookingRequest's own six
+          // argument names are still spelled out explicitly, on purpose - see this file's own
+          // header comment on why nothing about the mutation itself is dynamic.
+          placement: answers.placement || null,
+          size: answers.size || null,
+          budget: answers.budget || null,
+          availability: answers.availability || null,
+          isCoverUp: answers.isCoverUp,
+          howHeard: answers.howHeard || null,
         },
       },
     });
@@ -186,6 +284,20 @@ const BookingRequest = () => {
 
   const artist = artistData.getPublicArtistProfile;
 
+  // Task #165: an artist who once existed but has since been archived reads differently than a
+  // plain dead link - see typeDefs.js's PublicArtistProfile.archived comment. Checked before
+  // `submitted` deliberately can't happen for an archived artist (createBookingRequest still runs
+  // its own createArtist/status checks - not reached here at all before this early return).
+  if (artist.archived) {
+    return (
+      <div className="bookingRequest">
+        <div className="bookingRequestWrapper">
+          <p>This artist is no longer on the platform.</p>
+        </div>
+      </div>
+    );
+  }
+
   if (submitted) {
     return (
       <div className="bookingRequest">
@@ -222,34 +334,7 @@ const BookingRequest = () => {
             className="bookingRequestTextarea"
             required
           />
-          <input placeholder="Placement (e.g. forearm)" ref={placement} className="bookingRequestInput" />
-          <input placeholder="Size (e.g. 4in x 6in)" ref={size} className="bookingRequestInput" />
-          <input placeholder="Budget range" ref={budget} className="bookingRequestInput" />
-          <input placeholder="Availability" ref={availability} className="bookingRequestInput" />
-          <input placeholder="How did you hear about us?" ref={howHeard} className="bookingRequestInput" />
-          <label className="bookingRequestCheckbox">
-            <input type="checkbox" ref={isCoverUp} />
-            This is a cover-up or touch-up
-          </label>
-
-          <div className="bookingRequestUpload">
-            <label className="bookingRequestUploadLabel">
-              Reference images (optional, up to 5)
-            </label>
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              multiple
-              ref={fileInput}
-              onChange={handleFileChange}
-            />
-            {selectedFiles.length > 0 && (
-              <div className="bookingRequestFileList">
-                {selectedFiles.length} file(s) selected
-              </div>
-            )}
-            {uploadError && <div className="bookingRequestFieldError">{uploadError}</div>}
-          </div>
+          {visibleFields.map((field) => renderField(field))}
 
           <button className="bookingRequestButton" type="submit" disabled={uploading || submitting}>
             {uploading ? "Uploading images..." : submitting ? <CircularProgress color="inherit" size="20px" /> : "Send Request"}

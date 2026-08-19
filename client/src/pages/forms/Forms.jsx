@@ -201,59 +201,82 @@ const Forms = () => {
 			) : (
 				<>
 					<ul className="formsList">
-						{forms.map((form) => (
-							<li key={form.id} className="formRow">
-								<div className="formRowMain">
-									<RouterLink
-										to={`${ROUTE_CONSTANTS.FORM}${form.id}`}
-										className="formRowTitle"
-									>
-										{form.title}
-									</RouterLink>
-									<span className="formRowMeta">
-										<Chip label={STATUS_LABEL[form.status] || form.status} size="small" />
-										{" · "}
-										{form.fields.length} field{form.fields.length === 1 ? "" : "s"}
-										{form.allowGuestSubmissions ? " · Public link on" : ""}
-										{" · created "}
-										{moment(form.createdAt).format("MMM D, YYYY")}
-									</span>
-								</div>
-								<div className="formRowActions">
-									{form.status !== "published" && (
-										<Button size="small" onClick={() => handlePublish(form)}>
-											Publish
-										</Button>
-									)}
-									{form.status === "published" && (
-										<Button size="small" onClick={() => handleArchive(form)}>
-											Archive
-										</Button>
-									)}
-									<Button
-										size="small"
-										component={RouterLink}
-										to={`${ROUTE_CONSTANTS.FORM}${form.id}/responses`}
-									>
-										Responses
-									</Button>
-									<Button size="small" onClick={() => handleToggleGuestAccess(form)}>
-										{form.allowGuestSubmissions ? "Turn off link" : "Turn on link"}
-									</Button>
-									{form.allowGuestSubmissions && (
-										<Button size="small" onClick={() => handleCopyLink(form)}>
-											Copy link
-										</Button>
-									)}
-									<Button size="small" onClick={() => handleDuplicate(form)}>
-										Duplicate
-									</Button>
-									<Button size="small" color="error" onClick={() => handleDelete(form)}>
-										Delete
-									</Button>
-								</div>
-							</li>
-						))}
+						{forms.map((form) => {
+							// The booking_request system form is a stand-in for the real, untouched
+							// BookingRequest pipeline (see models/Form.js's own comment) - it has no
+							// FormResponse submissions, no meaningful guest-link/publicToken (the real
+							// pipeline is always public at /book/:artistHandle regardless of this
+							// record), and isn't duplicable in any way that would mean anything. Its
+							// "Edit" goes to the restricted intake-fields editor (task #162), not the
+							// generic FormBuilder, and it gets a narrower action set than every other row.
+							const isBookingRequest = form.systemKey === "booking_request";
+							const editHref = isBookingRequest
+								? `${ROUTE_CONSTANTS.FORM}${form.id}/booking-fields`
+								: `${ROUTE_CONSTANTS.FORM}${form.id}`;
+							return (
+								<li key={form.id} className="formRow">
+									<div className="formRowMain">
+										<RouterLink to={editHref} className="formRowTitle">
+											{form.title}
+										</RouterLink>
+										<span className="formRowMeta">
+											<Chip label={STATUS_LABEL[form.status] || form.status} size="small" />
+											{form.systemKey && (
+												<Chip label="Default" size="small" variant="outlined" />
+											)}
+											{" · "}
+											{form.fields.length} field{form.fields.length === 1 ? "" : "s"}
+											{!isBookingRequest && form.allowGuestSubmissions ? " · Public link on" : ""}
+											{" · created "}
+											{moment(form.createdAt).format("MMM D, YYYY")}
+										</span>
+									</div>
+									<div className="formRowActions">
+										{form.status !== "published" && (
+											<Button size="small" onClick={() => handlePublish(form)}>
+												Publish
+											</Button>
+										)}
+										{form.status === "published" && (
+											<Button size="small" onClick={() => handleArchive(form)}>
+												Archive
+											</Button>
+										)}
+										{isBookingRequest ? (
+											<Button size="small" component={RouterLink} to={editHref}>
+												Edit intake fields
+											</Button>
+										) : (
+											<>
+												<Button
+													size="small"
+													component={RouterLink}
+													to={`${ROUTE_CONSTANTS.FORM}${form.id}/responses`}
+												>
+													Responses
+												</Button>
+												<Button size="small" onClick={() => handleToggleGuestAccess(form)}>
+													{form.allowGuestSubmissions ? "Turn off link" : "Turn on link"}
+												</Button>
+												{form.allowGuestSubmissions && (
+													<Button size="small" onClick={() => handleCopyLink(form)}>
+														Copy link
+													</Button>
+												)}
+												<Button size="small" onClick={() => handleDuplicate(form)}>
+													Duplicate
+												</Button>
+											</>
+										)}
+										{!form.systemKey && (
+											<Button size="small" color="error" onClick={() => handleDelete(form)}>
+												Delete
+											</Button>
+										)}
+									</div>
+								</li>
+							);
+						})}
 					</ul>
 
 					<EntityListPager

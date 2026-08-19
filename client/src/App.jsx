@@ -44,7 +44,9 @@ import Income from "./pages/income/Income";
 import Forms from "./pages/forms/Forms";
 import FormBuilder from "./pages/forms/FormBuilder";
 import FormResponses from "./pages/forms/FormResponses";
+import BookingRequestFieldsEditor from "./pages/forms/BookingRequestFieldsEditor";
 import PublicFormFillOut from "./pages/forms/PublicFormFillOut";
+import PublicFormBySlugFillOut from "./pages/forms/PublicFormBySlugFillOut";
 import { hasShop } from "./utils/businessScope";
 
 // An artist keeps access to their own /artist/:artistId page (and its edit form) even though the
@@ -281,15 +283,24 @@ function App() {
 								</AuthRoute>
 							}
 						/>
-						{/* Shop admin, or an independent artist with no shop at all - matching the
-						    server's own gate (assertCanManageBusinessRecord, utils/shop-membership.js)
-						    and Settings' own "Expenses"/"Income" categories (settingsCategories.jsx's
-						    hasAuditAuthority). A plain shop-connected artist or Staff member has
-						    neither a shop's books nor a personal ledger to see here. */}
+						{/* CHANGED (per explicit request): used to be shop admin, or an independent
+						    artist with no shop at all - which meant a plain shop-connected artist had
+						    no ledger of their own even though the server always supported it
+						    (resolveBusinessOwner/assertCanManageBusinessRecord, utils/shop-membership.js,
+						    scope to the CALLER's own artistUserId whenever shopId is omitted - see
+						    utils/businessScope.js's businessScopeFor, which already returned
+						    {artistUserId: user.id} for this exact case before this route ever let
+						    anyone reach it). Now any artist - shop-connected or independent - manages
+						    their OWN personal ledger here; a shop admin still separately manages the
+						    SHOP's ledger via the same businessScopeFor (shopId, when they're a shop
+						    admin AND have a shop). allowIf checked first, so this doesn't need
+						    minRole to change - a Staff member or Client still has neither. Same gate as
+						    Settings' own "Expenses"/"Income" categories (settingsCategories.jsx) and
+						    Sidebar.jsx's own Expenses/Income links - keep all three in sync. */}
 						<Route
 							path="/expenses"
 							element={
-								<RoleRoute minRole={ROLES.SHOP_ADMIN} allowIf={(user) => !hasShop(user)}>
+								<RoleRoute minRole={ROLES.SHOP_ADMIN} allowIf={(user) => user.userType === "artist"}>
 									<Expenses />
 								</RoleRoute>
 							}
@@ -297,7 +308,7 @@ function App() {
 						<Route
 							path="/income"
 							element={
-								<RoleRoute minRole={ROLES.SHOP_ADMIN} allowIf={(user) => !hasShop(user)}>
+								<RoleRoute minRole={ROLES.SHOP_ADMIN} allowIf={(user) => user.userType === "artist"}>
 									<Income />
 								</RoleRoute>
 							}
@@ -328,6 +339,17 @@ function App() {
 							element={
 								<RoleRoute minRole={ROLES.SHOP_ADMIN} allowIf={(user) => !hasShop(user)}>
 									<FormResponses />
+								</RoleRoute>
+							}
+						/>
+						{/* The booking_request system form's own restricted editor (task #162) - see
+						    BookingRequestFieldsEditor.jsx's own header comment. Same auth gate as every
+						    other /forms/* route above. */}
+						<Route
+							path="/forms/:formId/booking-fields"
+							element={
+								<RoleRoute minRole={ROLES.SHOP_ADMIN} allowIf={(user) => !hasShop(user)}>
+									<BookingRequestFieldsEditor />
 								</RoleRoute>
 							}
 						/>
@@ -399,6 +421,15 @@ function App() {
 						Intentionally public/no AuthRoute: the whole point is a guest with no
 						account can reach this. */}
 						<Route path="/booking/:token" element={<GuestConversation />} />
+						{/* Public, unauthenticated by design - the new slug-based form links,
+						/<formSlug>/<ownerHandle> (e.g. /consent/dana-wolfe). Deliberately declared
+						AFTER /book/:artistHandle above: React Router ranks a static path segment
+						("book") above a dynamic one (":formSlug") at the same position, so a real
+						/book/dana-wolfe request still matches the untouched BookingRequest route
+						and never falls through to here - see server/utils/public-form-lookup.js's
+						own header comment on why the two links coexist on purpose rather than one
+						replacing the other. */}
+						<Route path="/:formSlug/:ownerHandle" element={<PublicFormBySlugFillOut />} />
 						{/* Was routed through IBCard with cardType ROUTE_NOT_FOUND - a switch in
 						    that component whose only job for this case was to render
 						    IBRouteNotFound and pass along an empty cardData it never read. Points

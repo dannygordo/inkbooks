@@ -37,6 +37,22 @@ const ShopSchema = new mongoose.Schema({
 	billingType: {type: String, default: ""},
 	status: {type: Number},
 
+	// The shop's own public link handle - same idea as Artist.bookingSlug (see utils/booking-slug.js's
+	// own header comment on why this is a PROFILE concern, not an AUTH one), added so a shop-use-only
+	// form (Form.shopUseOnly) has somewhere to put a public link that isn't tied to any one artist.
+	// Sparse + unique for the same reason bookingSlug is: most shops won't set one until they actually
+	// publish a shop-wide form, and every shop that hasn't must not collide on the empty string.
+	// Validated/reserved-checked via utils/shop-slug.js, which also cross-checks Artist.bookingSlug -
+	// the two live in different collections but share the same second-path-segment position in a form
+	// URL (/<formSlug>/<ownerHandle>), so a real collision between them would be silently ambiguous.
+	formSlug: {
+		type: String,
+		unique: true,
+		sparse: true,
+		lowercase: true,
+		trim: true,
+	},
+
 	// THE SQUARE CONNECTION IS NOT HERE ANY MORE. It lives on models/SquareAccount.js, keyed
 	// {ownerType: 'SHOP', ownerId: this shop's _id} - see DECISIONS.md M9. It moved because a
 	// connection belongs to an OWNER, and an independent artist is an owner too: with these fields

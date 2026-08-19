@@ -22,6 +22,7 @@ const ShopService = (() => {
                     logo
                     billingType
                     status
+                    formSlug
                     squareConnected
                     squareLocationId
                     squareConnectedAt
@@ -105,6 +106,19 @@ const ShopService = (() => {
 		`;
         return UPDATE_SHOP_MUTATION;
 	};
+
+	// The shop's own public link handle - Shop.formSlug's client counterpart to Artist's
+	// updateMyBookingSlug (ArtistService.js). Self-service, shop_admin-or-better of THIS shop only
+	// (see mutations/shops.js) - takes shopId explicitly, unlike updateMyBookingSlug, because a
+	// shop (unlike "my own artist profile") isn't implicitly "the caller's own" the same way.
+	const _UPDATE_MY_SHOP_FORM_SLUG_MUTATION = gql`
+		mutation UpdateMyShopFormSlug($shopId: ID!, $slug: String!) {
+			updateMyShopFormSlug(shopId: $shopId, slug: $slug) {
+				id
+				formSlug
+			}
+		}
+	`;
 
 	// --- Square connection (shop-cut ledger) ---
 	// See PRODUCTION_ROADMAP.md's "Shop-cut ledger" section. Lazy query, not eager - only fetched
@@ -209,6 +223,7 @@ const ShopService = (() => {
 		useLazyShop: _useLazyShop,
 		fetchShops: _fetchShops,
         updateShop: _updateShop,
+        UPDATE_MY_SHOP_FORM_SLUG_MUTATION: _UPDATE_MY_SHOP_FORM_SLUG_MUTATION,
         useSquareAuthorizationUrl: _useSquareAuthorizationUrl,
         DISCONNECT_SHOP_SQUARE: _DISCONNECT_SHOP_SQUARE,
         fetchMySquareConnection: _fetchMySquareConnection,

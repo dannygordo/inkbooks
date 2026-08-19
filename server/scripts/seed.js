@@ -32,9 +32,42 @@ const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 const BookingRequest = require('../models/BookingRequest');
 const PasswordToken = require('../models/PasswordToken');
+const Form = require('../models/Form');
+const FormResponse = require('../models/FormResponse');
+// Everything below this line was added later than everything above it (gift cards, adjustments,
+// client flags, expenses/income, the shop-cut-rate override table, Square, event/reminder logging)
+// and was never folded into the wipe/syncIndexes lists below - same class of gap that BookingRequest/
+// PasswordToken already got fixed for (see the wipe comment). Left alone, every one of these
+// accumulates orphaned rows pointing at a shop/artist/client id this script just deleted, on every
+// single re-run, forever - none of it crashes, so nothing forced the issue until now.
+const Adjustment = require('../models/Adjustment');
+const ClientFlag = require('../models/ClientFlag');
+const ClientFlagType = require('../models/ClientFlagType');
+const ExpenseType = require('../models/ExpenseType');
+const Expense = require('../models/Expense');
+const IncomeType = require('../models/IncomeType');
+const Income = require('../models/Income');
+const GiftCard = require('../models/GiftCard');
+const GiftCardRedemption = require('../models/GiftCardRedemption');
+const ShopCutRate = require('../models/ShopCutRate');
+const SquareAccount = require('../models/SquareAccount');
+const EventLog = require('../models/EventLog');
+const ReminderSettings = require('../models/ReminderSettings');
+const ReminderLog = require('../models/ReminderLog');
+const ClientScheduleEmail = require('../models/ClientScheduleEmail');
+const Notification = require('../models/Notification');
+const AutoResponse = require('../models/AutoResponse');
+const AutoResponseLog = require('../models/AutoResponseLog');
 const { Constants } = require('../utils/constants');
 const { pickDefaultTagColor } = require('../utils/tag-color');
 const { setShopCutRate } = require('../utils/shop-cut');
+// Standing convention (per explicit request): a migration script written for existing data is
+// ALSO folded into both seed scripts, not left as a separate step someone has to remember to run.
+// seedDefaultForms is itself idempotent and additive-only (see its own header comment), so calling
+// it here costs nothing extra even though this script also wipes+recreates everything from
+// scratch every run - the point is that `npm run seed`/`node scripts/seed-large.js` are always a
+// complete, currently-correct database on their own, with no second script to chase down.
+const { seedDefaultForms } = require('../utils/seed-default-forms');
 
 // Every seeded account uses this same password - it's local dev data, not real credentials.
 const DEV_PASSWORD = 'devpass123';
@@ -100,6 +133,37 @@ async function seed() {
     // gone can't be redeemed - but there's no reason to keep them either.
     BookingRequest.deleteMany({}),
     PasswordToken.deleteMany({}),
+    // Form/FormResponse are wiped for the same reason - without this, re-running the script would
+    // hit the partial unique index on {shopId/artistUserId, systemKey} the moment
+    // seedDefaultForms tries to write the shop's Booking Request/Consent forms a second time
+    // (harmless there, since seedDefaultForms treats that as "already has it" and skips), but any
+    // FormResponse left behind from a previous run would still reference a formId/clientId this
+    // wipe just deleted.
+    Form.deleteMany({}),
+    FormResponse.deleteMany({}),
+    // Everything below is the same orphan-avoidance wipe, extended to every model added since this
+    // list was last updated - see the import comment above. ClientFlagType is the one exception
+    // worth calling out: it's platform-wide (shopId: null for every row this script or the app
+    // itself ever writes), not scoped to the shop/artists this run just deleted, so wiping it is
+    // just clearing the slate before ensureSeeded() rewrites it below, not orphan cleanup.
+    Adjustment.deleteMany({}),
+    ClientFlag.deleteMany({}),
+    ClientFlagType.deleteMany({}),
+    ExpenseType.deleteMany({}),
+    Expense.deleteMany({}),
+    IncomeType.deleteMany({}),
+    Income.deleteMany({}),
+    GiftCard.deleteMany({}),
+    GiftCardRedemption.deleteMany({}),
+    ShopCutRate.deleteMany({}),
+    SquareAccount.deleteMany({}),
+    EventLog.deleteMany({}),
+    ReminderSettings.deleteMany({}),
+    ReminderLog.deleteMany({}),
+    ClientScheduleEmail.deleteMany({}),
+    Notification.deleteMany({}),
+    AutoResponse.deleteMany({}),
+    AutoResponseLog.deleteMany({}),
   ]);
 
   // deleteMany empties collections but leaves their INDEXES behind, and a stale unique index is a
@@ -118,9 +182,20 @@ async function seed() {
   await Promise.all(
     [
       User, Shop, Staff, Artist, Client, ArtistShopConnection, Project,
-      Appointment, Conversation, Message, BookingRequest, PasswordToken,
+      Appointment, Conversation, Message, BookingRequest, PasswordToken, Form, FormResponse,
+      Adjustment, ClientFlag, ClientFlagType, ExpenseType, Expense, IncomeType, Income,
+      GiftCard, GiftCardRedemption, ShopCutRate, SquareAccount, EventLog, ReminderSettings,
+      ReminderLog, ClientScheduleEmail, Notification, AutoResponse, AutoResponseLog,
     ].map((model) => model.syncIndexes()),
   );
+
+  // The app's platform-wide default client-flag types (NO_SHOWED/MOVED_APPOINTMENT/NO_TIP) - see
+  // models/ClientFlagType.js. There is no createClientFlagType mutation and no admin UI for these;
+  // ClientFlagType.ensureSeeded() (idempotent, $setOnInsert-only) is the ONLY place in the entire
+  // codebase that writes them, and until now nothing called it - not this script, not seed-large.js
+  // (which hand-rolled its own, different set instead - see that file), and not server boot either.
+  // A fresh dev database had zero rows here and the Client Flags feature had nothing to offer.
+  await ClientFlagType.ensureSeeded();
 
   const hashedPassword = await bcrypt.hash(DEV_PASSWORD, 12);
 
@@ -222,6 +297,20 @@ async function seed() {
     setByUserId: shopAdminUser._id,
     note: 'Shop owner - does not owe their own shop a cut.',
   });
+
+  // The shop's own Booking Request / Consent forms - what createShop/registerAccount write for
+  // real at signup (see utils/seed-default-forms.js). Every shop-affiliated artist below (Maya,
+  // Jonas) reaches these through the shop's own forms, not a personal copy - see that file's own
+  // header comment on why only the shop and the INDEPENDENT artist further down get their own.
+  await seedDefaultForms({ shopId: shop._id }, shopAdminUser._id);
+
+  // A SquareAccount row, DISCONNECTED - matching seed-large.js's own fixture and its own comment on
+  // why (no seed can produce a WORKING Square connection; a row that claims one fails with a 500 at
+  // charge time instead of a clear "not connected" in Settings). This script previously created no
+  // SquareAccount row at all for its shop, which HANDOFF.md flagged as an unresolved question -
+  // resolved here in favor of matching seed-large.js rather than leaving the two scripts to disagree
+  // on whether "no row" and "disconnected row" are the same thing to every reader of this data.
+  await new SquareAccount({ ownerType: 'SHOP', ownerId: shop._id, connected: false }).save();
 
   // --- Shop Staff (front desk) ----------------------------------------------
   const staffUser = await new User({
@@ -325,6 +414,16 @@ async function seed() {
     hourlyRate: 140,
     status: Constants.ARTIST_STATUS.ACTIVE,
     startDate: daysAgo(60),
+  }).save();
+  // Her own Booking Request / Consent forms - independent artists have no shop to reach a set
+  // through, so they get their own, exactly like registerAccount's no-shop branch does.
+  await seedDefaultForms({ artistUserId: independentArtistUser._id }, independentArtistUser._id);
+  // Same disconnected SquareAccount as the shop above - an independent artist is their own owner
+  // (ownerType: 'ARTIST', ownerId: their own User._id, per SquareAccount's own header comment).
+  await new SquareAccount({
+    ownerType: 'ARTIST',
+    ownerId: independentArtistUser._id,
+    connected: false,
   }).save();
 
   // --- Clients ---------------------------------------------------------------
@@ -614,6 +713,10 @@ async function seed() {
   console.log('  http://localhost:3000/book/jonas-petrov');
   console.log('  http://localhost:3000/book/robin-ashby   - independent artist, no shop');
   console.log('\nSubmitted requests land in that artist\'s Booking Requests inbox.');
+  console.log('\nPublic consent form pages (same idea, seeded by default for every shop/artist):');
+  console.log('  http://localhost:3000/consent/maya-chen');
+  console.log('  http://localhost:3000/consent/jonas-petrov');
+  console.log('  http://localhost:3000/consent/robin-ashby   - independent artist, own copy');
   console.log(`\nShop: Copper Wolf Tattoo Co. (${shop._id})`);
 }
 

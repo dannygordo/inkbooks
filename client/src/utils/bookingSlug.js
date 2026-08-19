@@ -52,3 +52,16 @@ export function bookingUrl(slug) {
 		typeof window !== "undefined" && window.location ? window.location.origin : "";
 	return `${origin}/book/${slug || ""}`;
 }
+
+/**
+ * The full public URL for a FORM's link - /<formSlug>/<ownerHandle> (see server/utils/
+ * public-form-lookup.js's own header comment on this being a deliberately predictable, shareable
+ * link rather than a secret token). ownerHandle is an artist's own bookingSlug for a per-artist
+ * link, or a shop's own formSlug for a shopUseOnly one - this helper doesn't care which, it just
+ * joins the two the same way bookingUrl() above joins "book" and a slug.
+ */
+export function formUrl(formSlug, ownerHandle) {
+	const origin =
+		typeof window !== "undefined" && window.location ? window.location.origin : "";
+	return `${origin}/${formSlug || ""}/${ownerHandle || ""}`;
+}

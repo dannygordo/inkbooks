@@ -8,6 +8,7 @@ const { queueProjectScheduleEmail } = require('../../utils/client-booking-emails
 const { syncNoShowFlag } = require('../../utils/client-flags');
 const { canManageArtist, assertCanManageArtist } = require('../../utils/shop-membership');
 const { recordEvent, diffFields } = require('../../utils/event-log');
+const { sendAutoResponsesForTrigger } = require('../../utils/auto-responses');
 
 // Fields worth an audit-trail line when they change on an Appointment - see
 // models/EventLog.js's own comment on why this is a deliberate subset rather than every field.
@@ -344,6 +345,20 @@ module.exports = {
               previousStatus,
               actingUserId: user.id,
             });
+          }
+          // Auto-Responses: a session-type appointment's transition into 'completed' is the
+          // SESSION_COMPLETED trigger (see utils/auto-responses.js and the plan this shipped
+          // from). Same transition guard as the appointmentDate stamp above, additionally scoped
+          // to 'session' - a completed consult or "Other" appointment has no aftercare to send.
+          // Best-effort by the same contract as syncNoShowFlag just above: never undoes the save
+          // that already happened.
+          if (
+            'appointmentStatus' in appointment &&
+            appointment.appointmentStatus === 'completed' &&
+            previousStatus !== 'completed' &&
+            res.appointmentType === 'session'
+          ) {
+            await sendAutoResponsesForTrigger({ trigger: 'SESSION_COMPLETED', appointment: res });
           }
           // Recompute the shop cut whenever the figure it's derived from changes. Only on an
           // actual subtotalCents change - not on every save - because applyShopCut is a write to

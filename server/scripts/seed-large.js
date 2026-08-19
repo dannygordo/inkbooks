@@ -51,10 +51,33 @@ const ClientFlag = require('../models/ClientFlag');
 const ClientFlagType = require('../models/ClientFlagType');
 const PasswordToken = require('../models/PasswordToken');
 const Notification = require('../models/Notification');
+const Form = require('../models/Form');
+const FormResponse = require('../models/FormResponse');
+// Same gap as seed.js (see its own comment on this): added later, never folded into MODELS below,
+// so a re-run left every one of these accumulating orphans against a shop/artist this run just
+// deleted and recreated with fresh ids. Nothing here crashed on it, which is exactly why it went
+// unnoticed - no unique index on these collides across runs the way User.username once did.
+const Adjustment = require('../models/Adjustment');
+const ExpenseType = require('../models/ExpenseType');
+const Expense = require('../models/Expense');
+const IncomeType = require('../models/IncomeType');
+const Income = require('../models/Income');
+const GiftCard = require('../models/GiftCard');
+const GiftCardRedemption = require('../models/GiftCardRedemption');
+const EventLog = require('../models/EventLog');
+const ReminderSettings = require('../models/ReminderSettings');
+const ReminderLog = require('../models/ReminderLog');
+const ClientScheduleEmail = require('../models/ClientScheduleEmail');
+const AutoResponse = require('../models/AutoResponse');
+const AutoResponseLog = require('../models/AutoResponseLog');
 const { Constants } = require('../utils/constants');
 const { TAG_COLORS } = require('../utils/tag-color');
 const { computeChargeBreakdown } = require('../utils/square-pricing');
 const { applyShopCut, setShopCutRate } = require('../utils/shop-cut');
+// Standing convention (per explicit request): a migration script written for existing data is
+// ALSO folded into both seed scripts, not left as a separate step someone has to remember to run
+// - see seed.js's own header comment on this same import for the full reasoning.
+const { seedDefaultForms } = require('../utils/seed-default-forms');
 
 // ---------------------------------------------------------------------------------------------
 // CONFIG - the numbers this was asked for, in one place so they can be turned up or down.
@@ -166,7 +189,9 @@ async function main() {
   const MODELS = [
     User, Shop, Staff, Artist, Client, ArtistShopConnection, ShopCutRate, SquareAccount,
     Project, Appointment, Conversation, Message, BookingRequest, ClientFlag, ClientFlagType,
-    PasswordToken, Notification,
+    PasswordToken, Notification, Form, FormResponse,
+    Adjustment, ExpenseType, Expense, IncomeType, Income, GiftCard, GiftCardRedemption,
+    EventLog, ReminderSettings, ReminderLog, ClientScheduleEmail, AutoResponse, AutoResponseLog,
   ];
 
   console.log('Wiping existing collections ...');
@@ -215,10 +240,19 @@ async function main() {
   }).save();
 
   // --- Client flag types (C2) ------------------------------------------------------------------
-  // NO_SHOWED is system-generated; the rest are the admin-managed table the design calls for.
+  // The app's own canonical set first (NO_SHOWED/MOVED_APPOINTMENT/NO_TIP - see
+  // models/ClientFlagType.js's ClientFlagType.SEEDED/ensureSeeded). This used to be hand-rolled
+  // here instead, with only NO_SHOWED matching what the model actually ships and MOVED_APPOINTMENT/
+  // NO_TIP missing entirely - the one and only place in the whole codebase that wrote these rows
+  // was quietly out of sync with the list resolveClientFlagsForAppointment and the client-flags
+  // GraphQL layer actually resolve against. ensureSeeded() is $setOnInsert-only, so calling it here
+  // can never clobber a label an admin has since edited - see seed.js's own note on the same call.
+  await ClientFlagType.ensureSeeded();
+  // Extra demo-only types on top, purely so this larger fixture has more than three flag kinds to
+  // show on a dashboard - these are NOT part of the app's own shipped set, just local vocabulary a
+  // shop invented for itself (shopId: null here only because this script has no per-shop variant
+  // of this insert; a real shop-invented type would carry its own shopId once that path exists).
   await ClientFlagType.insertMany([
-    { key: 'NO_SHOWED', label: 'No-showed', systemGenerated: true, active: true,
-      description: 'Raised automatically when a session is marked no-show.', createdAt: new Date() },
     { key: 'CHRONIC_LATE', label: 'Often late', systemGenerated: false, active: true,
       description: 'Turns up 20+ minutes late.', createdAt: new Date() },
     { key: 'HAGGLES', label: 'Haggles on price', systemGenerated: false, active: true,
@@ -300,6 +334,57 @@ async function main() {
   const owner = artists.find((a) => a.key === 'owner');
   const independent = artists.find((a) => a.independent);
   const shopArtists = artists.filter((a) => !a.independent);
+
+  // The shop's own Booking Request / Consent forms, and the independent artist's own copy - what
+  // createShop/registerAccount write for real at signup (see utils/seed-default-forms.js). The
+  // four other shop-affiliated artists (Mika/Andre/Beatriz/Soren) reach the shop's forms, not a
+  // personal copy - same reasoning as seed.js's own comment on this.
+  await seedDefaultForms({ shopId: shop._id }, owner.user._id);
+  await seedDefaultForms({ artistUserId: independent.user._id }, independent.user._id);
+
+  // --- Auto-Responses (Settings > Messages) ----------------------------------------------------
+  // A shop-wide SESSION_COMPLETED aftercare response, enabled - see utils/auto-responses.js's
+  // resolveAutoResponseForTrigger. This is what fires for any shop artist who has NOT enabled a
+  // personal one of their own for this trigger.
+  await new AutoResponse({
+    shopId: shop._id,
+    name: 'Shop aftercare (default)',
+    trigger: 'SESSION_COMPLETED',
+    enabled: true,
+    emailEnabled: true,
+    smsEnabled: false,
+  }).save();
+
+  // Mika (artist2) has her own aftercare wording, enabled - the precedence rule picks THIS row
+  // for her sessions instead of the shop's above. Andre/Beatriz/Soren deliberately have no
+  // personal row at all, so their sessions fall through to the shop's - the absence is the demo,
+  // there's nothing to seed for that half of the rule.
+  const mika = artists.find((a) => a.key === 'artist2');
+  await new AutoResponse({
+    artistUserId: mika.user._id,
+    name: "Mika's aftercare",
+    trigger: 'SESSION_COMPLETED',
+    enabled: true,
+    emailEnabled: true,
+    smsEnabled: true,
+    emailBodyTemplate:
+      'Hey {{clientFirstName}}! Thanks for sitting with me today. Keep it clean and moisturized, ' +
+      'and skip the sun and swimming for two weeks - text me if anything looks off.\n\n- Mika',
+  }).save();
+
+  // A MANUAL library entry - never auto-fires, just available in the "Send a message" picker.
+  // Owned by the independent artist, who has no shop set to fall back to at all.
+  await new AutoResponse({
+    artistUserId: independent.user._id,
+    name: 'Out of studio',
+    trigger: 'MANUAL',
+    enabled: false,
+    emailEnabled: true,
+    smsEnabled: true,
+    emailBodyTemplate:
+      "Hi {{clientFirstName}}, just a heads up that I'm out of the studio right now - I'll get " +
+      "back to you as soon as I'm back. Thanks for your patience!",
+  }).save();
 
   // The owner is an admin AND an artist - both records, exactly as registerAccount writes them.
   await new Staff({
@@ -787,6 +872,10 @@ async function main() {
   console.log('  artist       mika@copperwolf.dev');
   console.log('  independent  june@independent.dev');
   console.log('  front desk   frontdesk@copperwolf.dev');
+  console.log('\nPublic booking + consent form pages (seeded by default for every shop/artist):');
+  console.log('  http://localhost:3000/book/dana-wolfe        http://localhost:3000/consent/dana-wolfe');
+  console.log('  http://localhost:3000/book/mika-sorensen      http://localhost:3000/consent/mika-sorensen');
+  console.log('  http://localhost:3000/book/june-haddad        http://localhost:3000/consent/june-haddad   - independent, own copy');
 
   await mongoose.disconnect();
 }

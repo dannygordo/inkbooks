@@ -794,19 +794,25 @@ export default function Sidebar() {
 							/>
 						</ListItemButton>
 					)}
-					{/* Shop admin, or an independent artist with no shop at all - same gate as the
-					    /expenses and /income routes (App.jsx) and Settings' own "Expenses" and
-					    "Income" categories (settingsCategories.jsx's hasAuditAuthority).
-					    Deliberately NOT isShopAdminOrBetter alone, unlike Shops/Booking Requests/
-					    Shop Cut Confirmations above - an independent artist with no shop manages
-					    their own books here too, and isShopAdminOrBetter is false for a plain
-					    ARTIST role.
+					{/* CHANGED (per explicit request): used to be hasAuditAuthority (shop admin, or
+					    an independent artist with no shop at all) - same gate as the /expenses and
+					    /income routes (App.jsx) and Settings' own "Expenses"/"Income" categories
+					    (settingsCategories.jsx), which this block used to share verbatim with both.
+					    That excluded a plain shop-connected artist even though the server always
+					    supported their own personal ledger (resolveBusinessOwner scopes to the
+					    caller's own artistUserId whenever shopId is omitted - utils/shop-
+					    membership.js). Now isArtistUser: every artist gets their own books here,
+					    shop-connected or not, same floor as the Rates/Square Config links above. A
+					    shop admin still separately manages the SHOP's own books through the same
+					    pages (businessScopeFor resolves them to {shopId} instead of
+					    {artistUserId} - see utils/businessScope.js). Keep App.jsx's and
+					    settingsCategories.jsx's own Expenses/Income gates in sync with this.
 
 					    Two separate entries, not one "Expenses & Income" combined link - each
 					    points at its own page (/expenses, /income) and its own Settings category,
 					    so a shop tracking only one side of the ledger isn't stuck landing on the
 					    other one first. */}
-					{hasAuditAuthority && (
+					{isArtistUser && (
 						<ListItemButton
 							selected={selectedIndex === 13}
 							onClick={(event) =>
@@ -834,7 +840,7 @@ export default function Sidebar() {
 							/>
 						</ListItemButton>
 					)}
-					{hasAuditAuthority && (
+					{isArtistUser && (
 						<ListItemButton
 							selected={selectedIndex === 14}
 							onClick={(event) =>
@@ -862,9 +868,15 @@ export default function Sidebar() {
 							/>
 						</ListItemButton>
 					)}
-					{/* Same gate as Expenses/Income directly above and the /forms route (App.jsx) -
-					    shop admin, or an independent artist with no shop at all (see models/Form.js's
-					    own header comment on why Forms follows that exact ownership model). */}
+					{/* Same gate as the /forms route (App.jsx) - shop admin, or an independent artist
+					    with no shop at all (see models/Form.js's own header comment on why Forms
+					    follows that exact ownership model). NO LONGER the same gate Expenses/Income
+					    use directly above - those were widened to isArtistUser (any artist) per
+					    explicit request; Forms was not part of that change and keeps its original
+					    shop-admin-or-independent-artist floor, matching Form.js's own ownership
+					    model (shopId XOR artistUserId, with a shop-connected artist reaching the
+					    shop's shared form rather than owning one personally - a different shape
+					    than Expenses/Income's now-per-artist-always ownership). */}
 					{hasAuditAuthority && (
 						<ListItemButton
 							selected={selectedIndex === 15}

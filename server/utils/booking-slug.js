@@ -1,4 +1,5 @@
 const Artist = require('../models/Artist');
+const Shop = require('../models/Shop');
 const { UserInputError } = require('./errors');
 
 /**
@@ -125,6 +126,14 @@ function normalizeSlug(slug) {
 /**
  * Is this slug free? `exceptArtistId` lets an artist re-save their own profile without their own
  * slug reading as taken.
+ *
+ * Also checks Shop.formSlug - added alongside Form.shopUseOnly's own shop-level link
+ * (utils/shop-slug.js), since both an artist's bookingSlug and a shop's formSlug occupy the same
+ * "second path segment" position in a form URL (/<formSlug>/<ownerHandle>). A real collision
+ * between the two collections would make that URL silently resolve to the wrong owner - see
+ * shop-slug.js's own matching check for the reverse direction. Same courtesy-check caveat as
+ * always: the unique index on Artist.bookingSlug is the real guarantee for the Artist-vs-Artist
+ * race; there's no race-safe guarantee available across two different Mongo collections.
  */
 async function isSlugAvailable(slug, exceptArtistId = null) {
   const value = normalizeSlug(slug);
@@ -135,7 +144,11 @@ async function isSlugAvailable(slug, exceptArtistId = null) {
   if (exceptArtistId) {
     query._id = { $ne: exceptArtistId };
   }
-  return !(await Artist.exists(query));
+  const [takenByArtist, takenByShop] = await Promise.all([
+    Artist.exists(query),
+    Shop.exists({ formSlug: value }),
+  ]);
+  return !takenByArtist && !takenByShop;
 }
 
 /**

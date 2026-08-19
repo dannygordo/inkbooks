@@ -6,6 +6,7 @@ const { UserInputError, AuthenticationError, rethrow } = require('../../utils/er
 const { updateMessageInputSchema, createMessageInputSchema, validate } = require('../../utils/validation');
 const { notifyNewMessage, logNotifyOutcomes } = require('../../utils/message-notifications');
 const { canAccessConversation } = require('../../utils/shop-membership');
+const { sendAutoResponseForIncomingMessage } = require('../../utils/auto-responses');
 
 module.exports = {
     // Had no ownership check at all - any authenticated user could pass an arbitrary
@@ -79,6 +80,14 @@ module.exports = {
         conversationId,
         await notifyNewMessage({ conversationId, senderId, messageText: message }),
       );
+
+      // The MESSAGE_RECEIVED Auto-Response trigger (out-of-studio style away-replies) - see
+      // utils/auto-responses.js's sendAutoResponseForIncomingMessage for the full resolution/dedup
+      // logic. Same best-effort contract as notifyNewMessage above and never throws: this message
+      // is what the client actually asked to send, and it must not be lost because an away-reply
+      // couldn't be resolved or sent. A no-op for every message that isn't from a client (an
+      // artist/staff reply, including the away-reply this itself posts, never re-triggers it).
+      await sendAutoResponseForIncomingMessage({ conversationId, senderId, messageId: msg._id });
 
       return msg;
     }),

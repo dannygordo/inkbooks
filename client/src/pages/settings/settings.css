@@ -472,3 +472,94 @@
 	gap: 4px;
 	flex-shrink: 0;
 }
+
+/* Autosave-on-blur status text (ShopPanel's shop cut % and shop link fields) - the base class was
+   already in use with no rule at all, so every save/error state rendered as plain unstyled text.
+   Not introduced by this pass, but the new shop-link field (task #163) uses the exact same
+   pattern, so fixed here rather than shipping a second unstyled instance. */
+.settingsSaveState {
+	display: inline-block;
+	margin-top: 6px;
+	font-size: 12.5px;
+	min-height: 1em;
+}
+.settingsSaveState--saving {
+	color: var(--ib-text-muted);
+}
+.settingsSaveState--saved {
+	color: var(--ib-success);
+}
+.settingsSaveState--error {
+	color: var(--ib-error);
+}
+
+/* --- Auto-Responses (components/settings/AutoResponsesPanel.jsx) -------------------------- */
+.autoResponseRow {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 12px 0;
+	border-bottom: 1px solid var(--ib-surface-subtle);
+}
+.autoResponseRow:last-child {
+	border-bottom: none;
+}
+.autoResponseRowMain {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	flex: 1;
+	min-width: 0;
+}
+.autoResponseRowName {
+	font-weight: 600;
+	color: var(--ib-text-primary);
+}
+.autoResponseRowMeta {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 12px;
+	color: var(--ib-text-muted);
+}
+.autoResponseRowActions {
+	display: flex;
+	gap: 4px;
+	flex-shrink: 0;
+}
+
+/* --- Forms links (components/settings/FormsPanel.jsx, components/settings/ShopPanel.jsx) --
+   task #163: both the per-artist link list and the shop-wide link list render this same shape -
+   a title, the full URL, and a copy button - so one set of classes covers both. */
+.formLinksList {
+	margin-top: 16px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.formLinksRow {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 10px 12px;
+	border: 1px solid var(--ib-surface-subtle);
+	border-radius: 6px;
+}
+.formLinksRowLabel {
+	font-weight: 600;
+	color: var(--ib-text-primary);
+	flex: 0 0 auto;
+	white-space: nowrap;
+}
+.formLinksRowUrl {
+	color: var(--ib-text-secondary);
+	font-size: 13px;
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.formLinksRow button {
+	flex: 0 0 auto;
+}

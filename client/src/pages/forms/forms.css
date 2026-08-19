@@ -117,6 +117,23 @@
 	word-break: break-all;
 }
 
+/* The always-on guest identity block's own explanation in the builder - NOT one of the form's
+   editable fields, so deliberately not styled like .fieldEditorRow (no drag handle, no remove
+   button, nothing that reads as interactive). Tinted rather than bordered-plain so it reads as
+   "informational" rather than as another card in the field list below it. */
+.formBuilderGuestFieldsNotice {
+	background: var(--ib-surface-inset, rgba(127, 127, 127, 0.1));
+	border-radius: 6px;
+	padding: 12px 16px;
+	margin: 16px 0;
+	font-size: 13px;
+	line-height: 1.5;
+	color: var(--ib-text-secondary);
+}
+.formBuilderGuestFieldsNotice strong {
+	color: var(--ib-text-primary, inherit);
+}
+
 .fieldEditorList {
 	display: flex;
 	flex-direction: column;
@@ -136,11 +153,34 @@
 	align-items: center;
 	gap: 10px;
 }
-.fieldEditorTopLine > *:first-child {
+.fieldEditorTopLine > *:nth-child(2) {
 	flex: 2;
 }
-.fieldEditorTopLine > *:nth-child(2) {
+.fieldEditorTopLine > *:nth-child(3) {
 	flex: 1;
+}
+/* The drag handle - a real <button> (keyboard-focusable, matches dnd-kit's KeyboardSensor) rather
+   than a bare styled <div>, sized as a small fixed square so it never competes with the row's own
+   text inputs for drag-vs-select-text ambiguity (see FormFieldEditorRow.jsx's own comment). */
+.fieldEditorDragHandle {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	flex-shrink: 0;
+	border: none;
+	background: transparent;
+	color: var(--ib-text-secondary);
+	cursor: grab;
+	border-radius: 4px;
+	touch-action: none;
+}
+.fieldEditorDragHandle:hover {
+	background: var(--ib-surface-inset, rgba(127, 127, 127, 0.1));
+}
+.fieldEditorDragHandle:active {
+	cursor: grabbing;
 }
 .fieldEditorRowButtons {
 	display: flex;
@@ -230,6 +270,18 @@
 	margin-bottom: 20px;
 	padding-bottom: 20px;
 	border-bottom: 1px solid var(--ib-border);
+}
+/* A NEW class rather than reusing .settingsPanelHelp - that one is a single-line meta caption
+   everywhere else it's used, never a multi-paragraph block. The Consent Form's description (see
+   utils/seed-default-forms.js) is real legal text with an intro paragraph and eight bullet-style
+   points joined by blank lines - pre-line is what turns those \n\n's back into actual paragraph
+   breaks instead of one run-on line. */
+.publicFormDescriptionText {
+	white-space: pre-line;
+	font-size: 13px;
+	line-height: 1.6;
+	color: var(--ib-text-secondary);
+	margin-bottom: 20px;
 }
 
 /* --- Responses + analytics ---------------------------------------------------------------*/

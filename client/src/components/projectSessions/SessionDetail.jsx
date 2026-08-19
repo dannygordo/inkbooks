@@ -9,6 +9,7 @@ import IBMultilineInput from "../inputs/IBMultilineInput";
 import IBDateTimePicker from "../inputs/IBDateTimePicker";
 import IBSquarePaymentForm from "../IBSquarePayments/IBSquarePaymentForm";
 import FormField from "../formField/FormField";
+import SendAutoResponseButton from "../autoResponses/SendAutoResponseButton";
 import { useAuth } from "../../context/auth";
 import { ALERT_CONSTANTS } from "../../constants";
 import { formatCents, centsToDollars, dollarsToCents } from "../../utils/money";
@@ -792,6 +793,13 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 				>
 					Close Session
 				</Button>
+				{/* The manual half of Auto-Responses (decision #7 - see that component's own header
+				    comment) - aftercare, a receipt note, or anything else in the viewer's library,
+				    sent to this session's own client on demand. project.clientId is the Client
+				    document's own _id (see models/Project.js - NOT the client's User._id), the same
+				    id ClientDashboard.jsx passes for its own copy of this button. Renders nothing if
+				    there's nothing to send, so this is safe even before project.clientId exists. */}
+				<SendAutoResponseButton clientId={project?.clientId} appointmentId={appointment.id} />
 				<Button
 					variant="text"
 					color="error"

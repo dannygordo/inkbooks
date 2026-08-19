@@ -1,5 +1,6 @@
 const Artist = require('../../models/Artist');
 const ArtistShopConnection = require('../../models/ArtistShopConnection');
+const User = require('../../models/User');
 const withAuth = require('../../utils/with-auth');
 const { Constants } = require('../../utils/constants');
 const { AuthenticationError, UserInputError, rethrow } = require('../../utils/errors');
@@ -209,6 +210,25 @@ module.exports = {
         { ...payload, ...slugUpdate },
         { new: true },
       );
+      // Artist.firstName/lastName and the linked User.firstName/lastName are two separate stored
+      // copies of "this person's name" - Artist's is what the client-facing side of the app shows
+      // (bookings, aftercare templates' {{artistName}}, this very edit screen); User's is what
+      // login() returns and what the sidebar/Home welcome message read via AuthContext, since
+      // neither of those has any reason to look past the identity it already has cached. They
+      // start equal at signup (see registerAccount/createArtistAccount) and NOTHING kept them in
+      // sync after that - editing an artist's name here left the sidebar showing the old one
+      // indefinitely, even after a fresh page load, because the mismatch lived in the database,
+      // not just in a stale client cache. Every name edit now writes through to the User row too,
+      // regardless of who made it (self-edit or a shop admin editing someone else's profile) - the
+      // person's own next login, and any other tab of theirs already open, will show the corrected
+      // name once their client re-reads User. Only fires when a name field was actually part of
+      // this save, same "undefined means don't touch" rule bookingSlug/shopId already follow above.
+      if (artist.firstName !== undefined || artist.lastName !== undefined) {
+        const nameUpdate = {};
+        if (artist.firstName !== undefined) nameUpdate.firstName = artist.firstName;
+        if (artist.lastName !== undefined) nameUpdate.lastName = artist.lastName;
+        await User.updateOne({ _id: existing.userId }, { $set: nameUpdate });
+      }
       return res;
     } catch (err) {
         // A duplicate-key error here means two artists claimed the same slug between the

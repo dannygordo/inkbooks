@@ -41,6 +41,12 @@ export const ROUTE_CONSTANTS = {
 	EXPENSES: '/expenses',
 	INCOME: '/income',
 	FORMS: '/forms',
+	// FORM + formId + "/booking-fields" (same ad hoc suffix pattern as FORM + formId + "/responses"
+	// below) is the booking_request system form's own RESTRICTED editor - reorder/relabel/required/
+	// hide only, fixed 7-slot set, never the generic FormBuilder that FORM + formId alone opens. See
+	// BookingRequestFieldsEditor.jsx's own header comment on why. Forms.jsx routes that one row's
+	// "Edit" action to the suffixed path; FormBuilder.jsx redirects there itself if somehow loaded
+	// with that form's id directly.
 	FORM: '/forms/',
 	// Public, unauthenticated - same shape as /book/:artistHandle. A guest link is
 	// /form/:publicToken (singular "form", not "forms"), so it can never collide with the

@@ -1,7 +1,13 @@
 import { gql, useQuery, useLazyQuery, useMutation } from "@apollo/client";
 export const ArtistService = (() => {
 
-	const _fetchArtist = (artistId) => {
+	// skip defaults to !artistId (not just an explicit opt-in) - a null/undefined artistId means
+	// "no artist to look up yet" for every current caller (Artist.jsx passes a route param that's
+	// always present; RatesPanel/BookingLinkPanel/FormsPanel pass user.userInfo?.id, which is only
+	// ever null for a non-artist user rendering the same shared settings component). Without this,
+	// FormsPanel.jsx (task #163) - rendered for shop_admins who aren't artists, not just artists -
+	// would fire this query with a null $artistId (ID!) on every load.
+	const _fetchArtist = (artistId, options = {}) => {
 		const FETCH_ARTIST_QUERY = gql`
 			query ($artistId: ID!) {
 				getArtist(artistId: $artistId) {
@@ -34,6 +40,8 @@ export const ArtistService = (() => {
 			variables: {
 				artistId,
 			},
+			skip: !artistId,
+			...options,
 		});
 	};
 

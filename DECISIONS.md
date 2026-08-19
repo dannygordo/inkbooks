@@ -540,6 +540,45 @@ meaning rather than grant a permission.
 
 ---
 
+## Messaging and Auto-Responses
+
+### MSG1. An Auto-Response can post into the conversation thread, not just email/SMS
+
+`trigger: 'MESSAGE_RECEIVED'` (the away-message/out-of-studio trigger) posts a real `Message` into
+the client's conversation, authored as the artist, in addition to whatever the response's own
+`emailEnabled`/`smsEnabled` toggles send separately. This is the one exception to the feature's
+original scoping ("Messages" = email/SMS, not the in-app Messenger) - confirmed directly, not
+assumed, after building the first version without it: the auto-reply-into-the-thread behavior was
+"literally the point of the feature" for the person who requested it, an out-of-office responder
+in the same sense a mail client's is.
+
+Rejected: email/SMS only, matching SESSION_COMPLETED/PAYMENT_RECEIVED. A client messaging in-app
+and getting only an email back reads as broken, not as a feature.
+
+### MSG2. MESSAGE_RECEIVED replies once per incoming message, with no throttle
+
+Every qualifying client message gets its own reply - not one per conversation, not one per day.
+Confirmed directly: "it should generate one response to each message sent in from a client... just
+like an email out of office response," which does answer every inbound message rather than muting
+itself after the first. Implemented as a claim-before-send dedup keyed to the triggering Message's
+own id (`AutoResponseLog.messageId`), parallel to how SESSION_COMPLETED dedups on `appointmentId` -
+same mechanism, different key, so a retried call still can't double-reply to one message.
+
+Rejected: a 24-hour (or "once per toggle-on period") throttle per conversation. Both were on the
+table and explicitly turned down in favor of the above.
+
+### MSG3. MESSAGE_RECEIVED only fires on a thread with exactly one artist member
+
+The triggering message's sender must be a Client, and the conversation's other members must resolve
+to exactly one Artist. Zero (a staff-only thread) or more than one (a group thread) is left alone
+rather than guessed at. `Conversation` carries no `artistId`/`shopId` field to resolve this any
+other way - membership is the only relationship it has (see `utils/conversations.js`) - and every
+ordinary client/artist Messages thread already has this shape. Not directly asked, but necessary to
+implement anything: **OPEN** whether group threads need their own rule if they turn out to be
+common.
+
+---
+
 ## Sequencing
 
 UI standardisation onto the register-page aesthetic goes **last**, as a design-token and shared
@@ -585,3 +624,6 @@ Nothing is blocking. Two things are parked rather than undecided:
   confirmed as the cause and should not be recorded as the fix.
 - **S2's uneven gates** are known work, not an open question. The rule is decided; the
   `withAuth(fn, SHOP_ADMIN)` call sites have not been moved onto it yet.
+- **MSG3's group-thread gap.** `MESSAGE_RECEIVED` currently skips any conversation with more than
+  one Artist member rather than picking one. Parked until group threads (a shop general inbox with
+  multiple staff, say) actually exist in practice - no rule has been asked for yet.

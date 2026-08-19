@@ -4,6 +4,8 @@ const { Constants } = require('../../utils/constants');
 const { assertCanAccessShop } = require('../../utils/shop-membership');
 const { findAccountForOwner } = require('../../utils/square-account');
 const { UserInputError, rethrow } = require('../../utils/errors');
+const { normalizeSlug: normalizeShopSlug, assertSlugAvailable: assertShopSlugAvailable } = require('../../utils/shop-slug');
+const { seedDefaultForms } = require('../../utils/seed-default-forms');
 
 module.exports = {
     createShop: withAuth(async (
@@ -25,6 +27,9 @@ module.exports = {
         billingType,
         status,
       },
+      context,
+      info,
+      user,
     ) => {
       const newShop = new Shop({
         name,
@@ -44,6 +49,11 @@ module.exports = {
         status,
       });
       const shop = await newShop.save();
+      // Every shop gets its own Booking Request + Consent forms from the moment it exists - see
+      // utils/seed-default-forms.js's own header comment. registerAccount's shop branch (the more
+      // common path) does the same thing for the same reason; this covers the other way a Shop
+      // row comes into existence.
+      await seedDefaultForms({ shopId: shop._id }, user.id);
       return shop;
     }, Constants.ROLES.SHOP_ADMIN),
     updateShop: withAuth(async (_, args, context, info, user) => {
@@ -56,6 +66,30 @@ module.exports = {
         return res;
       } catch (err) {
           rethrow(err);
+      }
+    }, Constants.ROLES.SHOP_ADMIN),
+    // Self-service - see typeDefs.js's comment on why this is separate from updateShop. Mirrors
+    // updateMyBookingSlug (mutations/artists.js) shape-for-shape: courtesy-check via
+    // assertSlugAvailable, empty string unsets, and the unique index on Shop.formSlug is the real
+    // guarantee behind the courtesy check - two shop admins racing both pass assertSlugAvailable
+    // and one lands in the catch below.
+    updateMyShopFormSlug: withAuth(async (_, { shopId, slug }, context, info, user) => {
+      // Same authority as updateShop: must be shop_admin-or-better OF THIS SHOP, not just anyone
+      // holding the SHOP_ADMIN role at a different shop.
+      await assertCanAccessShop(user, shopId);
+      const value = normalizeShopSlug(slug);
+      const update = value === ''
+        ? { $unset: { formSlug: '' } }
+        : { $set: { formSlug: await assertShopSlugAvailable(value, shopId) } };
+      try {
+        return await Shop.findByIdAndUpdate(shopId, update, { new: true });
+      } catch (err) {
+        if (err && err.code === 11000 && err.keyPattern && err.keyPattern.formSlug) {
+          throw new UserInputError('Errors', {
+            errors: { formSlug: 'That shop link is already taken.' },
+          });
+        }
+        rethrow(err);
       }
     }, Constants.ROLES.SHOP_ADMIN),
     // Clears the stored Square connection - doesn't touch any Appointment already invoiced under

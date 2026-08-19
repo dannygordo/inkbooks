@@ -1,14 +1,27 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams, Link as RouterLink } from "react-router-dom";
 import { useMutation } from "@apollo/client";
-import { Button, Checkbox, Chip, IconButton } from "@mui/material";
-import { ArrowDownward, ArrowUpward, Close } from "@mui/icons-material";
+import { Button, Checkbox, Chip } from "@mui/material";
+import {
+	DndContext,
+	KeyboardSensor,
+	PointerSensor,
+	closestCenter,
+	useSensor,
+	useSensors,
+} from "@dnd-kit/core";
+import {
+	SortableContext,
+	arrayMove,
+	sortableKeyboardCoordinates,
+	verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 import FormService from "../../services/FormService";
 import IBPageLoader from "../../components/ibPageLoader/IBPageLoader";
 import IBInput from "../../components/inputs/IBInput";
 import IBMultilineInput from "../../components/inputs/IBMultilineInput";
-import IBSelect from "../../components/inputs/IBSelect";
 import FormField from "../../components/formField/FormField";
+import FormFieldEditorRow from "../../components/forms/FormFieldEditorRow";
 import { useAuth } from "../../context/auth";
 import { ALERT_CONSTANTS, ROUTE_CONSTANTS, APP_SETTINGS_CONSTANTS } from "../../constants";
 import { businessScopeFor, createScopeFor } from "../../utils/businessScope";
@@ -63,6 +76,8 @@ const FormBuilder = () => {
 	const [title, setTitle] = useState("");
 	const [description, setDescription] = useState("");
 	const [fields, setFields] = useState([]);
+	const [slug, setSlug] = useState("");
+	const [shopUseOnly, setShopUseOnly] = useState(false);
 	const [loadedForm, setLoadedForm] = useState(null);
 
 	useEffect(() => {
@@ -71,7 +86,21 @@ const FormBuilder = () => {
 			setTitle(form.title);
 			setDescription(form.description || "");
 			setFields(form.fields.map(fieldFromServer));
+			setSlug(form.slug || "");
+			setShopUseOnly(Boolean(form.shopUseOnly));
 			setLoadedForm(form);
+		}
+	}, [data]);
+
+	// The booking_request system form is edited through a separate, RESTRICTED panel (task #162) -
+	// never this generic builder, which allows adding/removing/retyping fields the real
+	// BookingRequest pipeline has no way to honor. Nothing in this app links here for that form any
+	// more (Forms.jsx routes its "Edit" to /forms/:id/booking-fields instead), but a stale
+	// bookmark or a typed URL could still land here directly - redirect rather than let someone
+	// edit a form whose fields the pipeline will silently ignore.
+	useEffect(() => {
+		if (data?.getForm?.systemKey === "booking_request") {
+			navigate(`${ROUTE_CONSTANTS.FORM}${formId}/booking-fields`, { replace: true });
 		}
 	}, [data]);
 
@@ -101,6 +130,21 @@ const FormBuilder = () => {
 		});
 	};
 
+	// Pointer for a normal mouse/touch drag, Keyboard for the same reorder via arrow keys while the
+	// drag handle is focused (see FormFieldEditorRow.jsx's own handle button) - dnd-kit does not
+	// give keyboard support for free unless this sensor is registered.
+	//
+	// Rules of Hooks: this call MUST stay above the early returns below. useSensors/useSensor call
+	// useMemo internally, so gating them behind the loading/not-found checks meant this component
+	// called a different number of hooks on the "still loading" render than on the "form loaded"
+	// render - React detected the mismatch (`Rendered more hooks than during the previous render`)
+	// and crashed the whole editor. Every hook call in a component must run on every render,
+	// unconditionally, in the same order - see the same fix in BookingRequestFieldsEditor.jsx.
+	const sensors = useSensors(
+		useSensor(PointerSensor),
+		useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+	);
+
 	if (!isNew && loading && !data) {
 		return <IBPageLoader />;
 	}
@@ -116,15 +160,18 @@ const FormBuilder = () => {
 		setFields((prev) => prev.filter((f) => f._localId !== localId));
 	};
 
-	const moveField = (index, direction) => {
+	const handleDragEnd = (event) => {
+		const { active, over } = event;
+		if (!over || active.id === over.id) {
+			return;
+		}
 		setFields((prev) => {
-			const next = [...prev];
-			const target = index + direction;
-			if (target < 0 || target >= next.length) {
+			const oldIndex = prev.findIndex((f) => f._localId === active.id);
+			const newIndex = prev.findIndex((f) => f._localId === over.id);
+			if (oldIndex === -1 || newIndex === -1) {
 				return prev;
 			}
-			[next[index], next[target]] = [next[target], next[index]];
-			return next;
+			return arrayMove(prev, oldIndex, newIndex);
 		});
 	};
 
@@ -175,6 +222,8 @@ const FormBuilder = () => {
 							...createScopeFor(user),
 							title: title.trim(),
 							description: description.trim(),
+							slug: slug.trim() || null,
+							shopUseOnly,
 							fields: fieldsForInput(),
 						},
 					},
@@ -191,6 +240,8 @@ const FormBuilder = () => {
 							formId,
 							title: title.trim(),
 							description: description.trim(),
+							slug: slug.trim() || null,
+							shopUseOnly,
 							fields: fieldsForInput(),
 						},
 					},
@@ -249,6 +300,9 @@ const FormBuilder = () => {
 						label={STATUS_LABEL[loadedForm.status] || loadedForm.status}
 					/>
 				)}
+				{!isNew && loadedForm?.systemKey && (
+					<Chip className="formBuilderStatusChip" label="Default form" variant="outlined" />
+				)}
 			</div>
 
 			{!isNew && loadedForm && (
@@ -294,95 +348,72 @@ const FormBuilder = () => {
 						onChange={(e) => setDescription(e.target.value)}
 					/>
 				</FormField>
+				<FormField id="formSlug" label="Link (optional)">
+					<IBInput
+						id="formSlug"
+						value={slug}
+						onChange={(e) => setSlug(e.target.value)}
+						placeholder="e.g. consent, intake"
+					/>
+				</FormField>
+				<p className="settingsPanelHelp">
+					Sets the first part of this form's public link - {window.location.origin}/
+					<strong>{slug || "your-link"}</strong>
+					{scope.shopId ? "/your-shop-or-artist-link" : "/your-booking-link"}. Leave blank
+					until you're ready to publish a public link for it.
+				</p>
+				{scope.shopId && (
+					<label className="fieldEditorRequiredRow">
+						<Checkbox
+							size="small"
+							checked={shopUseOnly}
+							onChange={(e) => setShopUseOnly(e.target.checked)}
+						/>
+						Shop use only - one shared link for the whole shop, instead of a link per artist
+					</label>
+				)}
 
-				<div className="fieldEditorList">
-					{fields.map((field, index) => (
-						<div className="fieldEditorRow" key={field._localId}>
-							<div className="fieldEditorTopLine">
-								<IBInput
-									label="Question"
-									value={field.label}
-									onChange={(e) => updateFieldAt(field._localId, { label: e.target.value })}
-									required
-								/>
-								<IBSelect
-									id={`fieldType-${field._localId}`}
-									label="Type"
-									data={APP_SETTINGS_CONSTANTS.FORM_FIELD_TYPES}
-									selectedVal={field.type}
-									onChange={(e) => updateFieldAt(field._localId, { type: e.target.value })}
-								/>
-								<div className="fieldEditorRowButtons">
-									<IconButton
-										size="small"
-										disabled={index === 0}
-										onClick={() => moveField(index, -1)}
-										aria-label="Move field up"
-									>
-										<ArrowUpward fontSize="small" />
-									</IconButton>
-									<IconButton
-										size="small"
-										disabled={index === fields.length - 1}
-										onClick={() => moveField(index, 1)}
-										aria-label="Move field down"
-									>
-										<ArrowDownward fontSize="small" />
-									</IconButton>
-									<IconButton
-										size="small"
-										onClick={() => removeFieldAt(field._localId)}
-										aria-label="Remove field"
-									>
-										<Close fontSize="small" />
-									</IconButton>
-								</div>
-							</div>
-
-							<IBInput
-								label="Help text (optional)"
-								value={field.helpText}
-								onChange={(e) => updateFieldAt(field._localId, { helpText: e.target.value })}
-							/>
-
-							<label className="fieldEditorRequiredRow">
-								<Checkbox
-									size="small"
-									checked={field.required}
-									onChange={(e) => updateFieldAt(field._localId, { required: e.target.checked })}
-								/>
-								Required
-							</label>
-
-							{CHOICE_TYPES.includes(field.type) && (
-								<div className="fieldEditorOptions">
-									{(field.options || []).map((option, idx) => (
-										<div className="fieldEditorOptionRow" key={idx}>
-											<IBInput
-												label={`Option ${idx + 1}`}
-												value={option}
-												onChange={(e) => updateOption(field._localId, idx, e.target.value)}
-											/>
-											<IconButton
-												size="small"
-												onClick={() => removeOption(field._localId, idx)}
-												aria-label="Remove option"
-											>
-												<Close fontSize="small" />
-											</IconButton>
-										</div>
-									))}
-									<Button size="small" onClick={() => addOption(field._localId)}>
-										Add option
-									</Button>
-									{(field.options || []).filter((o) => o.trim()).length < 2 && (
-										<p className="formFieldError">A choice field needs at least two options.</p>
-									)}
-								</div>
-							)}
-						</div>
-					))}
+				{/* Not editable, deliberately - this isn't a field on the form, it's a description of
+				    something that already happens outside the fields below and can't be turned off from
+				    here. Public/guest form links (both the /:formSlug/:ownerHandle and /form/:publicToken
+				    kinds - see PublicFormBySlugFillOut.jsx/PublicFormFillOut.jsx) always collect these
+				    four before anything below them, so the same client record resolves whether a guest
+				    reaches this shop/artist through this form or through a booking request. Adding your
+				    own First Name/Last Name/Email/Phone field below duplicates this, not replaces it -
+				    see HANDOFF.md's 2026-08-19 entry, found from exactly that happening on the Consent
+				    Form. */}
+				<div className="formBuilderGuestFieldsNotice">
+					<strong>Every public link for this form always asks first, before your questions
+						below:</strong> First name, Last name, Email, and Phone. This isn't one of your
+					fields and can't be edited or removed here - it's how a guest's response gets matched
+					to the right client record, the same way a booking request works. You don't need to
+					(and shouldn't) add your own First Name/Last Name/Email/Phone question below - it'll
+					just ask twice.
 				</div>
+
+				<DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+					<SortableContext
+						items={fields.map((f) => f._localId)}
+						strategy={verticalListSortingStrategy}
+					>
+						<div className="fieldEditorList">
+							{fields.map((field) => (
+								<FormFieldEditorRow
+									key={field._localId}
+									field={field}
+									onLabelChange={(value) => updateFieldAt(field._localId, { label: value })}
+									onTypeChange={(value) => updateFieldAt(field._localId, { type: value })}
+									onHelpTextChange={(value) => updateFieldAt(field._localId, { helpText: value })}
+									onRequiredChange={(value) => updateFieldAt(field._localId, { required: value })}
+									onRemove={() => removeFieldAt(field._localId)}
+									onAddOption={() => addOption(field._localId)}
+									onOptionChange={(idx, value) => updateOption(field._localId, idx, value)}
+									onRemoveOption={(idx) => removeOption(field._localId, idx)}
+								/>
+							))}
+						</div>
+					</SortableContext>
+				</DndContext>
 
 				<div className="formBuilderAddFieldRow">
 					<Button variant="outlined" onClick={() => setFields((prev) => [...prev, newField()])}>

@@ -4,11 +4,343 @@
 has not been verified. `DECISIONS.md` is *rules* — the settled calls and why. They change at
 different rates, which is why they are separate files.
 
-Last updated: 2026-08-16.
+Last updated: 2026-08-19.
 
 ---
 
+### 2026-08-19: consent form duplicate fields, then "No client record found for this account."
+
+Two related reports on the same Consent Form, in sequence - the first led directly to the second
+being found.
+
+**1 - Danny added his own First Name/Last Name/Email/Phone # fields to the Consent Form**, which
+duplicated the always-present, hardcoded guest-identity block every public fill-out page already
+renders above `form.fields` (see `PublicFormBySlugFillOut.jsx`/`PublicFormFillOut.jsx` - both have
+an identical `.publicFormFillOutGuestFields` block, submitted as top-level `firstName`/`lastName`/
+`email`/`phone` args, never part of `answers`; `utils/seed-default-forms.js`'s own comment on
+`CONSENT_FORM_FIELDS` explains why those four are deliberately excluded from the default field set).
+Asked whether to just delete the 4 duplicates; the follow-up question ("why are those fields not
+showing up when i go to edit it?") turned out to mean something different than it first read - the
+fields DID show in the `FormBuilder` editor. What was actually missing was any indication in the
+editor that the built-in block exists at all, so it reads as safe to duplicate. Fixed by adding a
+permanent, non-editable notice block to `FormBuilder.jsx` (right before the field list) describing
+the block, why it's there, and that it can't be edited/removed from this screen - plus its styling
+in `forms.css` (`.formBuilderGuestFieldsNotice`). The 4 duplicate fields themselves were removed
+directly on the live form - not by me (never got an explicit go-ahead in chat), confirmed after the
+fact via a `getPublicFormBySlug` query showing the Consent Form back down to its original 2 fields.
+
+**2 - Submitting the Consent Form threw `"No client record found for this account."`
+(`BAD_USER_INPUT`, `resolvers/forms.js:734`)** for Danny himself, logged in as Shop Admin, visiting
+his own shop's public `/consent/dana-wolfe` link. Root cause: `submitFormResponse` picked its
+branch (guest / staff-entered / self-service) off `authenticatedCaller` truthiness alone - "is this
+browser logged in at all" - not off which shape of request was actually made. A public guest link
+always sends `formSlug`+`ownerHandle`+`firstName`/`lastName`/`email`, whether or not the visitor
+happens to be logged in; a logged-in visitor with no `Client` record (any artist or staff account,
+not just Danny's) got routed into the self-service branch regardless, which requires
+`Client.findOne({userId: authenticatedCaller.id})` to succeed and throws exactly this error when it
+doesn't. A logged-in visitor who *does* have a Client record would have hit a quieter version of the
+same bug - typed-in guest info silently discarded in favor of their own account.
+
+Fixed by deciding the guest branch from how the form was resolved (`data.publicToken` set, or
+resolved via `formSlug`+`ownerHandle`) rather than from `authenticatedCaller`, checked first and
+independent of login state; the staff-entered (`data.clientId`) and self-service branches are
+otherwise unchanged and still require `authenticatedCaller`. **Verified live**: schema rebuild +
+`check-graphql-documents.js` (325 documents, unchanged), then reproduced the exact scenario in the
+browser - Danny, still logged in as Shop Admin, submitted `/consent/dana-wolfe` with a test guest
+identity and file upload, got `"Thanks, Verify"` instead of the error. **`npm test` confirmed green
+on a real machine** (see Test status) after this fix - no new test file added for this one, unlike
+the entries below.
+
+Housekeeping: that browser verification created a real guest `Client` (Verify Testclient,
+`verify-testclient-20260819@example.com`) in the live database - not deleted, since removing client
+records isn't something to do without being asked. Worth deleting from Clients if it's not wanted.
+
+**Files**: `graphql/resolvers/forms.js` (`submitFormResponse` branch selection),
+`pages/forms/FormBuilder.jsx` (guest-block notice), `pages/forms/forms.css`
+(`.formBuilderGuestFieldsNotice`).
+
+---
+
+### 2026-08-19: three real bugs found using Auto-Responses for the first time, all fixed
+
+All three surfaced from actually using the feature (real `npm test` runs plus clicking through the
+UI), not from review - see the Auto-Responses entry below for the feature itself.
+
+**1 and 2 - `models/AutoResponse.js`'s pre-validate hook and `models/AutoResponseLog.js`'s dedup
+index.** Covered in detail further down (search "next is not a function" and "has no dedup
+constraint"); both fixed, both closed out the full 907-test suite.
+
+**3 - `createAutoResponse` rejected every save from Settings** with `Field "artistUserId" is not
+defined by type "CreateAutoResponseInput"`. `CreateAutoResponseInput` never had an `artistUserId`
+field, deliberately - `resolveBusinessOwner` resolves the personal scope from the caller's own
+identity server-side (see the resolver's own comment). But
+`components/settings/AutoResponsesPanel.jsx`'s `handleSave` spread the SAME `scope` prop into both
+the `getAutoResponses` query (where `{artistUserId}` is a real, needed arg) and the
+`createAutoResponse` mutation (where it isn't a field at all). Fixed by only forwarding
+`scope.shopId` into the create input, never `scope.artistUserId`.
+
+**4 - an artist's name change didn't show up in the sidebar or the Home welcome message,** even
+after a full page reload. Root cause was NOT a stale client cache - `Artist.firstName/lastName`
+(what `pages/artists/Artist.jsx`'s profile editor writes) and `User.firstName/lastName` (what
+`login()` returns, cached into `AuthContext`, and what `Sidebar.jsx`/`Home.jsx` both read) are two
+separate stored copies of the same fact. They start equal at signup and nothing kept them in sync
+after that - editing one has never touched the other, for anyone, ever. Fixed in two parts:
+`updateArtist` (`graphql/mutations/artists.js`) now writes any changed firstName/lastName through
+to the linked `User` row too, so the database itself stops disagreeing with itself, regardless of
+whether the editor is the artist or a shop admin editing someone else. `Artist.jsx` additionally
+calls `useAuth()`'s `updateCurrentUser` right after a self-edit succeeds, so the CURRENT tab updates
+immediately rather than waiting for a fresh login to re-read `User`.
+**Not verified beyond `node --check`/`esbuild`** - this sandbox can't run the Mongo-backed suite
+(see Test status); worth confirming with a real save-and-look before trusting it fully.
+
+---
+
+### 2026-08-19: MESSAGE_RECEIVED - the auto-reply-to-incoming-messages trigger
+
+**This was the actual point of the feature, per direct correction from the person who requested
+it** - the original plan's decision #1 scoped Auto-Responses to email/SMS only, "not the in-app
+Messenger," on the assumption that was the whole ask. It wasn't: "the auto reply to incoming
+message is literally the point of the feature... an auto-reply message that is automatically sent
+to anyone who messages the artist while that flag is turned on." This entry adds that trigger
+without reopening anything already built - SESSION_COMPLETED/PAYMENT_RECEIVED/MANUAL, the
+precedence rule, and the manual send picker are all unchanged.
+
+**Two decisions confirmed directly, not assumed:**
+- **Delivery is BOTH**: the response posts as a real `Message` into the client's conversation
+  thread (so it reads as an actual reply, the way a human's would) AND, per the response's own
+  `emailEnabled`/`smsEnabled` toggles, goes out as a standalone email/SMS too - an away-message is
+  meant to reach someone who isn't actively watching the thread, which in-app-only can't do.
+- **Throttle is NONE - once per message, not once per conversation or per day.** A client who
+  sends 3 messages while the flag is on gets 3 replies, matching a real email out-of-office
+  responder (which answers every inbound message) rather than a "one nudge per day" pattern. The
+  dedup key is the triggering Message's own id, not the conversation - see
+  `models/AutoResponseLog.js`'s new `messageId` field and partial index, parallel to the existing
+  `appointmentId` one.
+
+**Routing rule, not directly asked but necessary to implement anything**: fires only when the
+message's sender is a Client AND the conversation has EXACTLY ONE other member who resolves to an
+Artist. Zero (staff-only thread) or more than one (group thread) is left alone rather than guessed
+at - every ordinary client/artist Messages thread is this shape, and `Conversation` has no
+artistId/shopId field to resolve it any other way (membership-only, see `utils/conversations.js`'s
+own comment). Worth reconsidering if group threads become common.
+
+**Files**: `models/AutoResponse.js` (new `MESSAGE_RECEIVED` trigger value),
+`models/AutoResponseLog.js` (`messageId` field, `channel: 'thread'`, new partial unique index),
+`utils/auto-responses.js` (new `sendAutoResponseForIncomingMessage`, best-effort/never-throws, same
+`sendEmailFn`/`sendSmsFn` DI pattern as the other two send paths; new `DEFAULT_TEMPLATES.
+MESSAGE_RECEIVED`), `graphql/mutations/messages.js` (wired into `createMessage`, right after the
+existing `notifyNewMessage` call), `utils/validation.js` (`autoResponseTriggerSchema`),
+`components/settings/AutoResponsesPanel.jsx` (trigger picker option + explanatory helper text -
+this is the one trigger whose behavior isn't obvious from its label alone).
+
+**New test file**: `test/integration/autoResponseMessages.test.js` - six cases covering the
+in-thread-post-plus-email happy path, replying to every message in a back-and-forth (not just the
+first), messageId-keyed dedup against a retried call, never firing for an artist's own reply (also
+what stops this from ever triggering itself off its own auto-reply), skipping a staff-only/group
+thread, and doing nothing when the flag is actually off. **Confirmed green on a real machine**
+(see Test status) - all six cases pass.
+
+No typeDefs change was needed: `trigger` is a plain `String!`, not a GraphQL enum, so
+`MESSAGE_RECEIVED` only had to be added to the model's own enum and to `validation.js`'s Zod schema
+(both confirmed via schema rebuild + `check-graphql-documents.js`, 325 documents, unchanged).
+
+---
+
+### 2026-08-18: Rules-of-Hooks crash in the Forms editors, seed script completeness, tests reported green
+
+Danny reports both server and client suites green on a real machine — the first time either has
+been confirmed outside this sandbox's standing `fastdl.mongodb.org` block (see Test status below,
+still accurate for what a cloud session can verify on its own). Taken at face value; not
+independently re-run from here.
+
+**Fixed: `BookingRequestFieldsEditor.jsx` and `FormBuilder.jsx` both crashed on open** with `Rendered
+more hooks than during the previous render`, reported from the browser console when clicking either
+the Booking Request or Consent form from the Forms page. Root cause was identical in both files:
+`useSensors(useSensor(...), useSensor(...))` (dnd-kit, needed for the field-reorder drag handle) was
+called AFTER an early `if (loading) return <IBPageLoader />` / not-found return. `useSensors`/
+`useSensor` call `useMemo` internally, so the "still loading" render skipped those hook calls
+entirely while the "form loaded" render did not — a textbook Rules-of-Hooks violation, not a dnd-kit
+bug. Fixed by moving both `useSensors` calls above every early return in both files, so they run
+unconditionally on every render. Grepped the rest of `client/src` for `useSensor` first — only these
+two files use it, so this is the complete fix, not a partial one. Syntax-verified with `esbuild`
+(this sandbox has no route to run the client suite itself — see Test status); not yet re-clicked in
+a browser from here.
+
+**Fixed: `scripts/seed.js` and `scripts/seed-large.js` were missing roughly a dozen models added
+after they were last updated** — `Adjustment`, `ClientFlag`, `ClientFlagType`, `ExpenseType`,
+`Expense`, `IncomeType`, `Income`, `GiftCard`, `GiftCardRedemption`, `ShopCutRate` (in `seed.js`
+only — `seed-large.js` already had it), `SquareAccount` (`seed.js` only), `EventLog`,
+`ReminderSettings`, `ReminderLog`, `ClientScheduleEmail`. None were in either script's wipe/
+`syncIndexes` list, so every re-run left them behind as orphans pointing at a shop/artist/client id
+that run had just deleted and recreated with a fresh id — same class of gap `BookingRequest`/
+`PasswordToken` were already fixed for (see the 2026-08-1x note further down), just never extended
+to what shipped afterward. Nothing in this class of bug ever crashed a re-seed, which is exactly why
+it went unnoticed for this long.
+
+**Found in the process, and fixed where it was in scope: `ClientFlagType.ensureSeeded()` — the
+model's own idempotent helper for writing the app's platform-wide default flag types (`NO_SHOWED`/
+`MOVED_APPOINTMENT`/`NO_TIP`), explicitly documented in `models/ClientFlagType.js` as "safe to run on
+every boot and from a seed script" — was called from NEITHER.** `seed.js` had no `ClientFlagType`
+handling at all. `seed-large.js` hand-rolled its own different list instead (`NO_SHOWED`,
+`CHRONIC_LATE`, `HAGGLES`, `GREAT_SITTER` — matching the model's canonical set only on `NO_SHOWED`).
+Both now call `ensureSeeded()` first (`seed-large.js` keeps its extra three as demo-only additions on
+top). **Bigger finding, left unresolved and out of scope of what was asked: nothing in application
+boot code (`index.js`) calls `ensureSeeded()` either**, which on the evidence gathered here means
+`ClientFlagType` currently has zero rows in any environment that wasn't hand-seeded locally —
+i.e., the Client Flags feature has nothing to offer in a real deploy today. Worth its own item; see
+Next.
+
+**Also added to `seed.js` only, resolving an already-flagged open question from 2026-08-17 (see the
+migration note further down): a disconnected `SquareAccount` row for the shop and for the
+independent artist**, matching `seed-large.js`'s existing pattern and its own comment on why
+disconnected is the honest fixture. `seed.js` previously created none at all.
+
+**Fixed, found right after the above: the Consent form's Description field went blank every time
+the edit page was reopened, even though `getForm` was correctly returning the saved text** (Danny
+confirmed this by inspecting the query response directly). Root cause was in
+`components/inputs/IBMultilineInput.jsx`, not in the Forms feature at all: the component only ever
+accepted a `defaultValue` prop (uncontrolled) and had no `value` prop, so when a caller passed
+`value` — `FormBuilder.jsx`'s description field (`value={description}`) — it was silently dropped,
+never reaching the underlying MUI `TextField`. `onChange` still fired and still updated the
+caller's own React state correctly, which is why SAVING always worked and the server always had the
+right text; only the on-screen box itself rendered blank, unconditionally, on every mount. This is
+the exact `value`/`defaultValue` gap `IBInput.jsx` was already fixed for (see that file's own
+comment, `{...(value !== undefined ? { value } : { defaultValue })}`) — `IBMultilineInput.jsx` just
+never got the same pass. Fixed by applying the identical pattern there. Same bug, second live site:
+`FormFieldsRenderer.jsx`'s "paragraph" field type in form fill-out also passes `value` to this same
+component for the same reason (visible right next to a working `IBInput` `value={...}` for the
+"short_text" case) — never separately reported, but was equally broken, and is fixed by the same
+one-file change with no edit needed at that call site. Every other caller of
+`IBMultilineInput` (`ClientDashboard.jsx` x2, `AppointmentWizard.jsx` x2, `UpdateEventDialog.jsx`,
+`SessionDetail.jsx`) already used `defaultValue`, which this change leaves untouched — confirmed by
+grepping every caller before making the change, not just the one that was reported. No test file
+exists for `IBMultilineInput.jsx` today (unlike its sibling `IBInput.test.jsx`) — worth adding one
+that exercises both the controlled and uncontrolled paths, given this is exactly the kind of
+regression a render-output assertion would have caught immediately.
+
+**Changed, per explicit request: Expenses/Income are no longer shop-admin-or-independent-artist
+only — every artist now manages their own personal ledger.** The server already supported this
+(`resolveBusinessOwner`/`assertCanManageBusinessRecord`, `utils/shop-membership.js`, scope to the
+caller's own `artistUserId` whenever `shopId` is omitted) and this exact gap was already flagged
+below under Known gaps as "deliberate scope, not a bug" — Danny asked for it to change. Fixed by
+widening three client-side visibility gates that all shared the old `hasAuditAuthority`/`!hasShop`
+check verbatim: `App.jsx`'s `/expenses`/`/income` route `allowIf`, `settingsCategories.jsx`'s
+`isVisible` for both categories, and `Sidebar.jsx`'s two `ListItemButton` gates — all now
+`isArtist`/`user.userType === "artist"`, matching the same floor `Rates`/`Square Config` already
+use. No server change and no `businessScopeFor` change were needed — `utils/businessScope.js`
+already returned `{ artistUserId: user.id }` correctly for this exact case; only the UI was hiding
+the door. `Forms`' own gate on the same Sidebar/Settings surfaces was deliberately left untouched —
+Forms follows a different ownership model (shop-shared, not per-artist-always) and wasn't part of
+this request. Syntax-verified with `esbuild`; not yet re-clicked in a browser from here.
+
+### 2026-08-18: Auto-Responses (Settings > Messages) — new feature, built end to end
+
+Requested: a place to manage message templates (aftercare after a session, receipt/out-of-studio
+text) that vary by artist, toggleable on/off, and attachable to a message sent by hand. Planned via
+`AskUserQuestion` (channel = email + SMS, placement = inside the existing "Messages" Settings
+category, ownership = **both** a shop's set and an artist's own personal set coexisting, not one or
+the other) and built per the resulting plan. Full design record and the "why" behind every decision
+below lives in the plan file this shipped from; `DECISIONS.md` should get its own entry the next
+time it's touched, since this is now a standing rule, not just a build log.
+
+**Data model.** `models/AutoResponse.js` — `shopId` XOR `artistUserId` (same shape as
+`Expense`/`Form`), `trigger` (`SESSION_COMPLETED` | `PAYMENT_RECEIVED` | `MANUAL`), `enabled`
+(governs automatic firing only — a disabled response still shows in the manual send picker as long
+as `active` is true), `emailEnabled`/`smsEnabled`, three nullable template fields (null = built-in
+default, same convention as `ReminderSettings`), `active` (deactivate, never delete). At most one
+ENABLED non-`MANUAL` row per owner per trigger, enforced by a partial unique index — **worth
+knowing:** MongoDB partial indexes don't support `$ne`/`$in`/`$or`, so excluding `MANUAL` from that
+constraint isn't done with a filter at all — a `pre('validate')` hook forces `enabled: false`
+whenever `trigger === 'MANUAL'` (meaningless for a trigger that never auto-fires anyway), so a plain
+`enabled: true` partial filter already excludes every `MANUAL` row. `models/AutoResponseLog.js`
+mirrors `ReminderLog.js`'s claim-before-send shape, with `appointmentId` nullable (a manual send
+isn't always tied to one) and no dedup constraint on the manual path — every manual send is a
+deliberate action, never something to collapse against a previous one.
+
+**Precedence rule (decision #4): the artist's own enabled response for a trigger wins; the shop's
+fires only when the artist has none.** `utils/auto-responses.js`'s `resolveAutoResponseForTrigger`
+is the one place this is decided, unit-and-integration-tested in isolation (see Test status).
+
+**Backend.** `renderTemplate` extracted out of `utils/reminders.js` into a new shared
+`utils/message-templates.js` (re-exported from `reminders.js` unchanged, so nothing else had to
+change its import) — this is what a second feature needing the identical `{{field}}` substitution
+looked like. `utils/auto-responses.js` holds `DEFAULT_TEMPLATES`, the precedence resolver, the
+automatic send path (`sendAutoResponsesForTrigger` — best-effort, never throws, same contract as
+`syncNoShowFlag` at its own call sites), and the manual send path (`sendManualAutoResponse` — throws
+real errors, since it's behind a deliberate mutation). Both send paths take injectable
+`sendEmailFn`/`sendSmsFn` for testability, matching `client-booking-emails.js`'s own precedent.
+Trigger wiring is two call sites, both best-effort and both restricted to `appointmentType ===
+'session'`: `mutations/appointments.js`'s `updateAppointment` (the "Close Session" transition) and
+`routes/squarePayments.js` (a card charge auto-completing a session) — same duplication reasoning
+as the existing `appointmentDate`-stamping logic right next to each, since a session can complete
+either way. `PAYMENT_RECEIVED` is modeled in the schema (a Receipt template can be created and
+toggled today) but **has no auto-fire hook** — deliberately deferred, since real Square payments are
+already a separate deferred item (see Next #1) and this shouldn't get ahead of that verification.
+GraphQL: `typeDefs.js` additions, `utils/validation.js` zod schemas, a new
+`resolvers/autoResponses.js` (same two-step authorization shape as `resolvers/expenses.js` —
+`resolveBusinessOwner` on create, `assertCanManageBusinessRecord` re-checked on every read/update),
+registered in `resolvers/index.js`. Both seed scripts updated (`AutoResponse`/`AutoResponseLog` in
+the wipe/`syncIndexes` lists from the start — the gap fixed for other models earlier this session
+isn't repeated here); `seed-large.js` also seeds a shop-wide aftercare response, one shop artist's
+personal override of it (demonstrating the precedence rule), and an independent artist's `MANUAL`
+"Out of studio" template.
+
+**Frontend.** `components/settings/AutoResponsesPanel.jsx` — two independently-gated sections
+(`isArtist` for "Your Auto-Responses", `hasAuditAuthority`-and-actually-has-a-shop for the shop-wide
+one) that can BOTH render for the same shop-connected artist at once — deliberately not a toggle
+between them, since that's the whole point of the shop-can-set-policy-artist-can-override model.
+Wired into `settingsCategories.jsx`'s existing `"messages"` category alongside `RemindersPanel`.
+`components/autoResponses/SendAutoResponseButton.jsx` — the manual "Send a message" picker, grouped
+"Yours"/"From [shop]"; wired into `ClientDashboard.jsx` (staff/artist view only, same rule as
+Notes/Flags) and `SessionDetail.jsx`'s action row. `services/AutoResponseService.js` follows
+`ExpenseService.js`'s shape. New CSS in `settings.css` (`.autoResponseRow*`) and
+`clientDashboard.css` (`.clientDashboardSendAutoResponse`) — small additions, not called out in the
+original file list, needed once the panel/button actually had somewhere to render.
+
+**Verified from this sandbox:** `node --check` on every new/edited server file, a full
+`makeExecutableSchema` rebuild, and `scripts/check-graphql-documents.js` (325 documents checked, up
+from 320 — the five new `AutoResponseService.js` documents all matched the schema on the first try).
+`esbuild` syntax checks on every new/edited client file. **Not verified from this sandbox:** actually
+clicking through the Settings panel or the send picker in a browser (this environment cannot reach
+`fastdl.mongodb.org`, unlike the user's own machine — see below).
+
+**New test files, run for real on 2026-08-18, one real bug found and fixed:** `test/unit/
+message-templates.test.js` (pure `renderTemplate` cases) and `test/integration/
+autoResponses.test.js` (the precedence rule in all four directions, the MANUAL-forces-`enabled:false`
+schema hook, the enabled-uniqueness partial index actually rejecting a duplicate, the automatic
+path's claim-before-send dedup firing exactly once across two calls for the same appointment, and the
+manual path's lack of a dedup constraint). The real `npm test` run surfaced `TypeError: next is not a
+function` thrown from `models/AutoResponse.js`'s `forceManualDisabled` pre-`validate` hook on every
+single `AutoResponse.save()` call (11 of the 11 new integration tests failed on this, all before
+reaching their own assertions) — the hook was written in the traditional
+`function(next) { ...; next(); }` callback style, but this repo's Mongoose/Kareem version does not
+supply a callback for this hook registration. Fixed by dropping the `next` parameter and callback
+entirely (a plain zero-arg synchronous hook function is the correct modern-Mongoose form here — see
+`models/AutoResponse.js`'s current source). This bug was universal, not integration-test-only: it
+broke every code path that ever saves an `AutoResponse` document, including the `createAutoResponse`
+mutation, the Settings UI, and `seed-large.js`'s three sample rows.
+
+**Second real bug, found on the next `npm test` run after the fix above (906/907 passing, one
+failure left):** `AutoResponseLog`'s dedup unique index (`{autoResponseId, appointmentId, channel}`,
+partial on `appointmentId` existing) was meant to constrain the automatic path only, but its partial
+filter didn't actually say that — it just said "appointmentId is set," which is also true of a manual
+send made from a session page (`SessionDetail.jsx` passes `appointmentId` for audit context even
+though the send is manual). Two manual sends for the same appointment/channel hit the same unique
+key and the second `AutoResponseLog.create` threw `E11000 duplicate key error`, contradicting
+decision #7/#8 ("manual sends have no dedup constraint at all"). Fixed by adding
+`triggeredByUserId: { $eq: null }` to the partial filter — `triggeredByUserId` is only ever null on
+the automatic path (`sendAutoResponsesForTrigger` never sets it; `sendManualAutoResponse` always
+does), so the index now only ever fires for a genuinely automatic row, regardless of whether a
+manual send happens to also carry an `appointmentId`. See `models/AutoResponseLog.js`'s updated
+header comment and index definition. Re-run `npm test` after pulling this fix to confirm all 907
+tests are green.
+
 ## Test status
+
+**2026-08-19: Danny reports the full suite green on a real machine**, after the Auto-Responses
+fixes, the new `MESSAGE_RECEIVED` trigger (including its new `test/integration/
+autoResponseMessages.test.js`, six cases), and the `submitFormResponse` guest-routing fix above.
+Taken at face value, same as the 2026-08-18 report below — not independently re-run from here.
 
 The server suite is green — 781 tests across 52 files, run on a real machine (this environment
 cannot reach `fastdl.mongodb.org` for `mongodb-memory-server`, so the integration half has to run
@@ -123,6 +455,20 @@ convention as `adjustments.test.js`/`clientFlags.test.js`/`expenses.test.js` bel
 own header comment says so explicitly. Run the whole server suite — old files included — on a real
 machine before trusting any of it.
 
+### 2026-08-17: default Booking Request / Consent forms, slug-based public links, Settings > Forms
+
+Same environment limitation as every entry above — this sandbox still cannot reach
+`fastdl.mongodb.org`, so nothing in this round has ever run against a real `mongod`, and unlike the
+2026-08-15/16 pushes **no new integration or unit test files were written for this feature at all**
+(see Known gaps). What is verified, every step: `node --check` on every touched/new server file, a
+full schema rebuild via `makeExecutableSchema({ typeDefs, resolvers })`, `server/scripts/
+check-graphql-documents.js` (320 documents, zero mismatches — up from 316), and a full production-mode
+`esbuild` bundle of `client/src/App.jsx` (4.0mb, clean) plus targeted bundles of every individual
+touched/new `.jsx` file. Treat the authorization logic (`updateBookingRequestFields`'s exact-key-set
+enforcement, `getMyFormLinks`'s self-scoping, the slug resolver's `ARTIST_STATUS.ARCHIVED` short-
+circuit, `submitFormResponse`'s new slug-resolved guest path) as unverified by a real test run, same
+as the standing caveat on every other feature in this file.
+
 ### Every failure so far has been in a test, never in the code
 
 Worth knowing, because it should change how the next one is read — though the gift-card
@@ -146,6 +492,23 @@ Across three integration runs:
 has the connection on `Shop`, so a previously connected shop reads as *disconnected* until
 `scripts/migrate-square-accounts.js` runs there. That applies to a local dev database as much as to
 production — see Next item 1.
+
+**Standing convention, as of 2026-08-17: a migration written for existing data also gets folded
+into BOTH `scripts/seed.js` and `scripts/seed-large.js`, not left as a separate step.** This was
+missed for `scripts/migrate-seed-default-forms.js` (see Done below) — both seed scripts build their
+fixtures by constructing Mongoose documents directly (`new Shop(...).save()`), never through
+`createShop`/`registerAccount`, so a hook wired only into those resolvers silently never fires for
+seeded data, and the gap is invisible until someone notices a feature "isn't there" in a freshly
+seeded database. `seed.js`/`seed-large.js` now both call `seedDefaultForms` directly after creating
+their shop and independent artist, so `npm run seed`/`node scripts/seed-large.js` are a complete,
+currently-correct database on their own — no second script to remember. `scripts/migrate-square-accounts.js` is NOT yet folded in this same way — it predates this
+convention, and checking while fixing the forms gap turned up the same class of miss: `seed-large.js`
+writes a `SquareAccount` row directly (disconnected, by design — see that script's own comment), so
+it never needs the migration; but `seed.js`, the small one, creates NO `SquareAccount` row for its
+shop or artists at all, migrated or not — a `npm run seed` database has never had one. Whether that
+is itself worth fixing (either seed it disconnected, matching `seed-large.js`, or confirm the app
+tolerates a shop/artist with no `SquareAccount` row at all) is unresolved; flagged here rather than
+silently left for someone to trip over the same way the forms gap was found.
 
 ### Running them
 
@@ -512,8 +875,11 @@ executable bit, git skips it with a hint on stderr rather than an error — whic
   "create an empty form" — `createFormInputSchema` requires at least one field — so "New Form"
   hands off to `pages/forms/FormBuilder.jsx` at `/forms/new`, one component that covers both
   not-yet-created (local-only state until Save calls `createForm`) and editing-in-place
-  (`updateForm`), with add/remove/reorder(up-down)/type-picker/required-toggle/choice-option editing
-  and, once the form is real, inline publish/archive/guest-link controls. `components/forms/
+  (`updateForm`), with add/remove/reorder/type-picker/required-toggle/choice-option editing and,
+  once the form is real, inline publish/archive/guest-link controls. Reordering was plain up/down
+  buttons at first; see the 2026-08-17 entry below for the `dnd-kit` drag-and-drop rewrite, and note
+  that the "Settings' 'Forms' category gate...`hasAuditAuthority`" sentence a few lines up was
+  loosened again the same day — see below for the current gate. `components/forms/
   FormFieldsRenderer.jsx` is the one dynamic-field renderer shared by both fill-out paths — an
   `answers` map keyed by `fieldKey`, owned by the caller, matching `FormAnswerInput`'s shape exactly
   so it can be submitted with no reshaping; file fields upload straight to `/form-uploads` before
@@ -534,18 +900,163 @@ executable bit, git skips it with a hint on stderr rather than an error — whic
   clean. The full client `vitest` suite times out in this sandbox before finishing (a pre-existing
   environment constraint, not something this change caused — a targeted subset covering the touched
   areas passed); see Test status above for the same limitation on the server side.
+- **Default Booking Request and Consent forms, generalized slug-based public links
+  (`/<formSlug>/<ownerHandle>`), and Settings folded into "Forms."** Three decisions locked in up
+  front: (1) the real `BookingRequest` pipeline (`createBookingRequest`, its model, the static
+  `/book/:artistHandle` route) stays completely untouched byte-for-byte — the `booking_request`
+  system form only controls order/label/required/hidden on its fixed 7 optional slots, through a
+  RESTRICTED editor, never the generic `FormBuilder`; (2) a shop-use-only form gets ONE shop-wide
+  link (`Shop.formSlug` as the URL's own `ownerHandle` segment) instead of one per artist; (3) form
+  management stays gated to shop-admin-or-better and independent artists, unchanged.
+
+  **Server.** `Shop.formSlug` + `utils/shop-slug.js`, generalizing the same slug/reserved-word/
+  partial-unique-index pattern `utils/booking-slug.js` already used for `Artist.bookingSlug` — now a
+  third instance, `utils/form-slug.js`, for `Form.slug` itself. `Form` gained `slug`, `shopUseOnly`
+  (meaningless, left false, on an artist-owned form), `systemKey` (`'booking_request'` | `'consent'`
+  | `null`, non-deletable, one-per-owner via a partial unique index), and `fields[].hidden` (settable
+  ONLY through `updateBookingRequestFields`, never the generic `createForm`/`updateForm` —
+  `FormFieldInput` has no `hidden` argument at all, since a generic form's only way to remove a field
+  is real deletion, but the `booking_request` form's 7 slots can't be deleted). `"book"` is reserved
+  in `form-slug.js`'s `RESERVED_SLUGS` to everyone except the seed script, which writes it directly:
+  the seeded `booking_request` form is *displayed* with slug `"book"`, but its real public URL is
+  still the untouched static route, never the new dynamic resolver — React Router ranks a static
+  first segment above a dynamic one at the same position, so the two coexist with zero special-
+  casing in `App.jsx`.
+
+  `utils/seed-default-forms.js` provisions both defaults — idempotent, called from `createShop`, the
+  shop branch of `registerAccount`, and the independent-artist branch of `registerAccount` (NOT for
+  a shop-affiliated artist joining an existing shop, who is already covered by that shop's own
+  forms). The Consent Form's description is the full legal text captured verbatim from
+  `thecopperwolf.com/pages/consent-form`, plus a required ID-photo upload and a required typed
+  signature field. **Fixed in this pass**: the seed originally left `allowGuestSubmissions` at its
+  schema default of `false` on the Consent Form, which would have made every fresh `/consent/<handle>`
+  link render fine (the slug resolver only checks `status`, not guest-access) but fail at actual
+  submission with "Action not allowed" — a broken default for the one form whose entire point is a
+  guest signing before their account exists. Now seeded with `allowGuestSubmissions: true` and a
+  minted `publicToken`, mirroring `setFormGuestAccess`'s own side effect exactly.
+  `scripts/migrate-seed-default-forms.js --dry-run`/`(apply)` backfills every shop/independent-artist
+  row that predates this feature, reusing the same `seedDefaultForms`/`DEFAULT_FORM_DEFS` so the
+  `allowGuestSubmissions` fix applies there too with no separate change needed.
+
+  `utils/public-form-lookup.js`'s `resolvePublicFormBySlug` is the one place both the new
+  `getPublicFormBySlug` query and `submitFormResponse`'s guest path decide what `/<formSlug>/
+  <ownerHandle>` actually points at: `ownerHandle` checked against `Artist.bookingSlug` first
+  (archived artist short-circuits to `'artist_gone'` before even looking for a form — only ARCHIVED
+  counts as gone, INACTIVE/BOOKS_CLOSED still resolve, matching what `createBookingRequest` itself
+  already tolerates for the same artist), then that artist's own form, then their shop's non-
+  `shopUseOnly` form of that slug; failing that, `Shop.formSlug` matched only against `shopUseOnly:
+  true` forms. Four states — `ok`/`not_found`/`inactive`/`artist_gone` — a deliberate departure from
+  the older `getPublicForm`/`publicToken` mechanism's single generic dead end. `submitFormResponse`
+  now accepts a guest via EITHER a `publicToken` OR a resolved `formSlug`+`ownerHandle` pair, both
+  still gated by the real authorization boundary, `Form.allowGuestSubmissions`, re-checked server-side
+  regardless of which path resolved the form.
+
+  `PublicArtistProfile` (the OLDER `getPublicArtistProfile` query the untouched `/book/:artistHandle`
+  page itself uses) gained a matching `archived: Boolean!` field, extending the same "don't collapse
+  ARCHIVED into generic not-found" fix to that pipeline too — it used to return `null` for an
+  archived artist exactly like a mistyped link, and now `BookingRequest.jsx` shows "This artist is no
+  longer on the platform." instead of "We couldn't find this artist," while a genuinely nonexistent
+  handle still gets the generic message (`null` now means only that).
+
+  A new self-scoped `getMyFormLinks` query closes an access gap the existing `getForms(shopId)`
+  had: that query requires shop-admin-or-better (`assertCanManageBusinessRecord`), so a plain
+  shop-connected artist (not an admin) could never see even their own shop's default form links.
+  `getMyFormLinks` takes no scope argument at all — server-derives from the caller's own `user.id` +
+  `getShopIdsForUser` — and returns only `{title, slug}`, never enough to manage or delete anything.
+
+  **Client.** `FormBuilder.jsx`'s field list is now drag-and-drop (`@dnd-kit/core`/`sortable`/
+  `utilities`, newly installed — `useSortable` rows with a dedicated small drag-handle button rather
+  than the whole row, so dragging doesn't fight with editing a label mid-drag) in place of the old
+  up/down buttons, plus new `slug`/`shopUseOnly` fields and a "Default form" badge; a `useEffect`
+  redirects straight to a dedicated `/forms/:formId/booking-fields` editor
+  (`BookingRequestFieldsEditor.jsx`) the instant a `booking_request` form is opened there instead —
+  that restricted editor exposes only label/required/hidden per fixed slot (no type, no add/remove),
+  saving through `updateBookingRequestFields`. `Forms.jsx` hides Delete for any `systemKey` form and
+  links a `booking_request` row to its own editor instead of the generic one.
+  `PublicFormBySlugFillOut.jsx` is the new guest fill-out page at `/:formSlug/:ownerHandle`. renders
+  the right one of the 4 states above, styled after the older `PublicFormFillOut.jsx` it mirrors.
+
+  **Settings: "Booking" absorbed into "Forms," not just renamed.** Booking became one form among
+  several sharing the same link scheme, so the old standalone "Booking" category
+  (`BookingLinkPanel.jsx` — its `isArtist(user)` gate, and its slug field + copy button, both moved)
+  is gone from `settingsCategories.jsx`; `BookingLinkPanel.jsx` itself is left in place, unreferenced
+  by any route or category, rather than deleted (touched-once-written files under this project's own
+  folder can't be silently removed — see the file-deletion convention). `FormsPanel.jsx` is rewritten
+  around two independently-gated sections, so folding Booking in doesn't regress the artist who used
+  to see it: "Your link" (the same `BookingSlugField`/save/copy pattern `BookingLinkPanel.jsx` had,
+  relabeled — visible to any artist, matching Booking's old gate exactly) plus a list of that artist's
+  own published, non-`shopUseOnly` form links (from `getMyFormLinks`, each rendered via a new
+  `formUrl(slug, ownerHandle)` helper mirroring `bookingUrl`'s exact shape), and "Manage Forms" (an
+  on-ramp button, `hasAuditAuthority`-gated, unchanged from before). `settingsCategories.jsx`'s
+  `"forms"` category `isVisible` is now `isArtist(user) || hasAuditAuthority(user)` — the union of
+  both sections' own floors, so the category itself doesn't vanish for someone who can only see one
+  half. `ShopPanel.jsx` gained the shop-wide counterpart: an editable `Shop.formSlug` field (via the
+  new `updateMyShopFormSlug` mutation) plus a list of the shop's own `shopUseOnly` form links, built
+  the same way. New shared CSS (`.formLinksList`/`.formLinksRow*` in `settings.css`) covers both link
+  lists; `.settingsSaveState`'s base class had been in use with no actual rule since the shop-cut-%
+  autosave field was built (2026-08-11-ish) — every save/error state rendered as unstyled plain text —
+  fixed in the same pass rather than shipping a second unstyled instance for the new link field.
+
+  A pre-existing gap, unrelated to this feature but hit while wiring the new `ShopPanel.jsx` query:
+  `ArtistService.fetchArtist(artistId)` had no `skip` option at all, so any caller without a
+  guaranteed non-null id (every existing caller happened to always have one, since each was only ever
+  rendered when `isArtist(user)` was already true) would fire the query with a null `$artistId` on
+  every render. `FormsPanel.jsx` is the first caller that ISN'T `isArtist`-gated at the component
+  level (it renders for shop-admins who aren't artists too), so this was fixed at the source —
+  `_fetchArtist` now defaults `skip: !artistId` and accepts an `options` override — rather than
+  worked around locally.
+
+  **Known, deliberate gap, matching an existing pattern**: same as Expense/Income's own documented
+  gap below, `createForm`'s `resolveBusinessOwner(user, data.shopId)` gives ANY authenticated user a
+  personal `artistUserId`-scoped form when `shopId` is omitted — a Client- or Staff-typed account
+  could call `createForm` directly (not through any UI, which stays gated to
+  `hasAuditAuthority`/`isArtist`) and own a form nobody else can see. Confirmed still present, not
+  fixed here (task #159 in this round's plan) — same "server is more permissive than the UI exposes"
+  tradeoff this codebase already accepts for Expense/Income, not a new decision.
+- **Both dev seed scripts now seed the two default forms too — found because they didn't, on a
+  real account.** Reported directly: a shop that already existed before 2026-08-17 had neither
+  form, which traced to the expected cause (`scripts/migrate-seed-default-forms.js` never run
+  against it — see that script's own header). But checking `npm run seed`/`node scripts/
+  seed-large.js` turned up a second, more surprising instance of the same root problem: BOTH seed
+  scripts build their fixtures with `new Shop(...).save()`/`new Artist(...).save()` directly, never
+  through `createShop`/`registerAccount` — so `seedDefaultForms`, wired only into those two
+  resolvers, silently never ran for seeded data either. A brand-new `npm run seed` database has
+  never had the two default forms, since the feature shipped, and nothing said so.
+
+  Fixed by calling `seedDefaultForms` directly from both scripts — once for the shop (right after
+  `setShopCutRate` zeroes the owner's own cut in `seed.js`; right after `owner`/`independent` are
+  resolved from the artists loop in `seed-large.js`) and once for the independent artist in each.
+  `Form`/`FormResponse` were also missing from both scripts' wipe-and-`syncIndexes` passes — added,
+  for the same "a stale unique index makes a re-seed fail for a reason nothing explains" reason
+  those two passes already exist. Both scripts' closing console output now prints the seeded
+  `/consent/<slug>` links alongside the existing `/book/<slug>` ones.
+
+  **This is now a standing convention, not a one-off fix** — see the note in Test status above
+  ("Standing convention, as of 2026-08-17"): going forward, a migration written for existing data is
+  folded into both seed scripts in the same change, specifically so `npm run seed`/`node scripts/
+  seed-large.js` are always a complete, currently-correct database, and nobody has to remember a
+  second script exists. `scripts/migrate-square-accounts.js` predates this convention and was
+  checked while fixing this — still not folded in, and `seed.js` (not `seed-large.js`) turned out to
+  create no `SquareAccount` row at all, migrated or not. See Test status above for the open question
+  on whether that's worth fixing.
 
 ## Next
 
-0. **Run both suites on a real machine, then the shop-admin migration.** Neither suite completes in
-   every environment: the server integration half needs a route to `fastdl.mongodb.org` for
-   `mongodb-memory-server`, and the full client suite needs roughly five minutes of wall time that
-   at least one CI-style sandbox in use on this project cannot give a single command. Then
-   `node scripts/migrate-shop-admins-to-artists.js --dry-run` first. Until it runs, a `STAFF`-typed
-   shop admin still has no Settings page — which is how this was found. See `DECISIONS.md` S0 for
-   what the migration costs.
+**0 and 1 below (the shop-admin migration, and a real Square payment) are explicitly deferred as of
+2026-08-18 — Danny said not to worry about either yet and will say when to pick them back up.** Left
+written out below rather than deleted, since the "Run it once, for real" suite item is now reported
+done (see 2026-08-18 note above) and the rest of each item's own detail is still accurate and will
+still be needed whenever this is picked up again.
 
-1. **Take one real payment end to end.** Nothing in the charge path has ever touched Square. It was
+0. ~~Run both suites on a real machine~~ — **done, reported green 2026-08-18** (see above). **Then
+   the shop-admin migration** — deferred, not urgent: `node scripts/migrate-shop-admins-to-artists.js
+   --dry-run` first. Until it runs, a `STAFF`-typed shop admin still has no Settings page — which is
+   how this was found. See `DECISIONS.md` S0 for what the migration costs. Explicitly NOT migration-
+   script work right now per Danny (this is dev data he can reseed at will) — this item is about
+   *production/pre-existing* data specifically, which is why it's still deferred rather than dropped.
+
+1. **DEFERRED — take one real payment end to end**, when told to pick it back up. Nothing in the
+   charge path has ever touched Square. It was
    built against their published REST docs, and `utils/square.js` has said so at the top since it
    was written. The sequence: run `scripts/migrate-square-accounts.js`, connect a Square **sandbox**
    seller through the OAuth flow, set a tax rate and offset in Settings, then charge a session and a
@@ -578,10 +1089,35 @@ executable bit, git skips it with a hint on stderr rather than an error — whic
 
 Gift cards, adjustment records, and the client-flags GraphQL surface (previously items 3/4 here)
 are all done — see Done above. What's actually left before this app could take real money is items
-1 (a real Square payment) and 0 (the two suites, then the migration) — there is no other queued
-feature work right now. A resolve-by-id mutation for a manually-raised client flag is a real,
-stated gap (see Known gaps) but nobody has asked for it yet; worth raising as a candidate next item
-when there's nothing higher-priority queued.
+1 (a real Square payment) and 0 (the two suites — done — then the migration) — both deferred, see
+above, not because there's other feature work queued ahead of them. A resolve-by-id mutation for a
+manually-raised client flag is a real, stated gap (see Known gaps) but nobody has asked for it yet.
+
+**New candidate item, found 2026-08-18: wire `ClientFlagType.ensureSeeded()` into application boot
+(`index.js`), or some other real call site outside the dev seed scripts.** It's currently called from
+nowhere except `scripts/seed.js`/`scripts/seed-large.js` (both fixed today — see above), despite the
+model's own header comment describing it as safe "on every boot." On the evidence gathered fixing the
+seed scripts, this means `ClientFlagType` likely has zero rows in production and any other
+non-locally-seeded environment right now — the Client Flags feature has nothing to flag with. Not
+independently confirmed against a real deploy, and not touched here since it's a production boot-code
+change, out of scope of "fix the seed scripts." Worth a look next time client flags come up.
+
+**New candidate item, found 2026-08-18: wire the `PAYMENT_RECEIVED` Auto-Response trigger to an
+actual auto-fire hook once real Square payments (item 1 above) are picked back up.** The trigger
+value already exists in the schema and a Receipt template can be created/toggled in Settings today
+— see the Auto-Responses entry above — but nothing calls
+`sendAutoResponsesForTrigger({ trigger: 'PAYMENT_RECEIVED', ... })` anywhere yet, deliberately, since
+wiring a receipt to a charge path that's never been verified against real Square would be building
+on top of an unverified foundation. The natural call site is the same success path in
+`routes/squarePayments.js` that `SESSION_COMPLETED` already hooks into — add a parallel best-effort
+call there once item 1 is unblocked.
+
+**Resolved 2026-08-18: `npm test` was run for real on the new Auto-Responses test files and found a
+real bug**, now fixed — see the Auto-Responses entry above for the full account
+(`models/AutoResponse.js`'s `forceManualDisabled` hook was throwing `TypeError: next is not a
+function` on every `AutoResponse.save()`). Still worth a confirming re-run of the full suite after
+pulling the fix, same as any bug fix, but this is no longer an unexecuted-test gap — it's a fixed
+regression.
 
 ## Known gaps, not bugs
 
@@ -631,14 +1167,8 @@ when there's nothing higher-priority queued.
   `ibCalendar`/`appointments` components not yet covered (`AppointmentSlotPicker`, `DaySchedule`,
   `DurationPicker`, `CalendarHeader`, `Month`, `ViewEventDialog`) and from auditing the remaining
   ~46 `server/utils/*.js` files against the 14 that now have unit tests.
-- **A shop-connected plain artist's personal expense/income ledger has no UI**, even though the
-  server permits it (`resolveBusinessOwner` scopes to the caller's own `artistUserId` whenever
-  `shopId` is omitted, for any authenticated user — see `utils/shop-membership.js`'s header comment).
-  `settingsCategories.jsx`, the `/expenses`/`/income` routes, and both sidebar entries all gate on
-  shop-admin-or-better-or-no-shop, matching the explicit "Both shop admins and independent artists"
-  scope this feature was built for. Reachable today only by calling the mutations directly (e.g. via
-  a GraphQL client) — deliberate scope, not a bug, but worth knowing before assuming "no UI" means
-  "no data can exist there."
+- ~~A shop-connected plain artist's personal expense/income ledger has no UI~~ — **resolved
+  2026-08-18, see the note near the top of this file.** Was deliberate scope, changed on request.
 - **`ExpenseType`/`IncomeType` have no delete, only deactivate** — matching `ClientFlagType`'s own
   pattern (see the answer to "where do the flag types get managed?" earlier this session: seeded
   defaults, no admin UI to add/edit those either). A category already referenced by an `Expense`/
@@ -669,17 +1199,24 @@ when there's nothing higher-priority queued.
   calls `createForm` with the source form's own fields (keys stripped, so the copy gets fresh stable
   keys of its own), there is no server `duplicateForm` mutation. Functionally complete, just worth
   knowing where the logic actually lives if it ever needs to move server-side.
-- **No drag-and-drop field reordering in the form builder** — `FormBuilder.jsx` uses plain up/down
-  buttons (`moveField`), because nothing in this codebase already has a drag-reorder pattern to
-  reuse and none of `react-beautiful-dnd`/`dnd-kit`/`react-dnd` is an existing dependency. Adding one
-  of those is a reasonable follow-up if a form ever has enough fields for up/down clicking to be
-  tedious.
 - **The Forms client code has no automated tests yet** (no `FormBuilder.test.jsx`,
-  `FormFillOut.test.jsx`, etc.), and the full client `vitest` suite could not be run end-to-end in
-  the sandbox that built it (times out before finishing — see Test status above). Verified instead
-  via a production `vite build`, `check-graphql-documents.js` (316 documents, clean), the complete
-  pre-commit hook, and a targeted `vitest` run over files actually touched. Continuing the testing
-  initiative (see the `isPersonal`/unit-test gaps above) into this feature is real, queued work.
+  `FormFillOut.test.jsx`, `PublicFormBySlugFillOut.test.jsx`, `BookingRequestFieldsEditor.test.jsx`,
+  `FormsPanel.test.jsx`, etc.), and the full client `vitest` suite could not be run end-to-end in the
+  sandbox that built any of it (times out before finishing — see Test status above). Verified instead
+  via a production `vite build`/`esbuild` bundle, `check-graphql-documents.js` (320 documents, clean),
+  and the complete pre-commit hook where applicable. Continuing the testing initiative (see the
+  `isPersonal`/unit-test gaps above) into this feature — both the 2026-08-14 Forms base and the
+  2026-08-17 default-forms/slug-link/Settings work on top of it — is real, queued work with zero
+  coverage today, not just thin coverage.
+- **The 2026-08-17 default-forms/slug-link feature has no server test coverage either** — unlike
+  `adjustments.test.js`/`clientFlags.test.js`/`expenses.test.js` (written but unrun, see above), no
+  test file was even written for `utils/form-slug.js`, `utils/shop-slug.js`, `utils/
+  public-form-lookup.js`, `utils/seed-default-forms.js`, `updateBookingRequestFields`'s exact-key-set
+  enforcement, `getMyFormLinks`'s self-scoping, or the new `getPublicArtistProfile.archived`/
+  `getPublicFormBySlug` state logic. `node --check`, a full schema rebuild, and
+  `check-graphql-documents.js` all pass, but none of the actual behavior — including the authorization
+  logic — has run against a database even once. Highest-priority gap to close before trusting this
+  feature with a real shop's forms.
 
 ## How this repo carries context
 

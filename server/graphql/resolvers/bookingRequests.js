@@ -19,8 +19,11 @@ module.exports = {
     // explicit allowlist (id/firstName/lastName/avatar) via PublicArtistProfile rather than the
     // full Artist/User type - the full type carries email, phone, and other fields that have no
     // business being reachable by an unauthenticated caller who only has a User id. Returns null
-    // (not a thrown error) for both "no such user" and "that id isn't an artist" - deliberately
-    // not distinguishing the two, so this can't be used to probe which ids exist in the system.
+    // (not a thrown error) for "no such user" and "that id isn't an artist" - deliberately not
+    // distinguishing those two, so this can't be used to probe which ids exist in the system.
+    // ARCHIVED is different (task #165): that artist unambiguously exists, so returning null
+    // there would be indistinguishable from a mistyped link - see PublicArtistProfile.archived's
+    // own comment in typeDefs.js.
     //
     // Takes EITHER a bookingSlug or a raw artist ObjectId under the same `artistId` argument.
     // Slug first, because that is what a shared link contains now; the ObjectId path stays so
@@ -61,6 +64,7 @@ module.exports = {
         lastName: user.lastName,
         avatar: user.avatar,
         bookingSlug: artist ? artist.bookingSlug || null : null,
+        archived: artist ? artist.status === Constants.ARTIST_STATUS.ARCHIVED : false,
       };
     },
     // Artist-only (withAuth) - the artist's own dashboard list, not the guest-facing side.

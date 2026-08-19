@@ -10,6 +10,7 @@ import IBCardWrapper from "../card/ibCard/IBCardWrapper";
 import IBPageLoader from "../ibPageLoader/IBPageLoader";
 import IBMultilineInput from "../inputs/IBMultilineInput";
 import EntityListPager from "../entityList/EntityListPager";
+import SendAutoResponseButton from "../autoResponses/SendAutoResponseButton";
 import { useAuth } from "../../context/auth";
 import { ALERT_CONSTANTS } from "../../constants";
 import { formatCents } from "../../utils/money";
@@ -274,6 +275,16 @@ const ClientDashboard = ({ clientId, isSelf = false }) => {
 					<div className="clientStatValue">{stats.upcomingAppointmentCount}</div>
 				</div>
 			</div>
+
+			{/* Staff/artist view only - same rule as Notes/Flags below. A client sending themselves
+			    an Auto-Response isn't a real action, and SendAutoResponseButton renders nothing
+			    anyway once nobody can be sending on this viewer's own behalf (see that component's
+			    own comment). */}
+			{!isSelf && (
+				<div className="clientDashboardSendAutoResponse">
+					<SendAutoResponseButton clientId={clientId} />
+				</div>
+			)}
 
 			<IBCardWrapper>
 				<h2 className="clientDashboardSectionTitle">Projects</h2>

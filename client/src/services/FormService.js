@@ -31,6 +31,7 @@ const FormService = (() => {
 		helpText
 		required
 		options
+		hidden
 	`;
 
 	const _FORM_FIELDS = `
@@ -42,6 +43,9 @@ const FormService = (() => {
 		status
 		allowGuestSubmissions
 		publicToken
+		slug
+		shopUseOnly
+		systemKey
 		fields {
 			key
 			type
@@ -49,6 +53,7 @@ const FormService = (() => {
 			helpText
 			required
 			options
+			hidden
 		}
 		createdByUserId
 		createdBy {
@@ -114,6 +119,41 @@ const FormService = (() => {
 		}
 	`;
 
+	// PUBLIC - the slug-based counterpart, /<formSlug>/<ownerHandle> (see server/utils/
+	// public-form-lookup.js's own header comment). Unlike GET_PUBLIC_FORM above, this ALWAYS
+	// resolves to a result - state distinguishes "no such link" from "turned off" from "artist
+	// gone" so PublicFormBySlugFillOut.jsx can show the right message instead of one generic dead
+	// end.
+	const GET_PUBLIC_FORM_BY_SLUG = gql`
+		query GetPublicFormBySlug($formSlug: String!, $ownerHandle: String!) {
+			getPublicFormBySlug(formSlug: $formSlug, ownerHandle: $ownerHandle) {
+				state
+				form {
+					id
+					title
+					description
+					fields {
+						${_FORM_FIELD_FIELDS}
+					}
+				}
+			}
+		}
+	`;
+
+	// SELF-SCOPED - see server/graphql/resolvers/forms.js's getMyFormLinks for why this is a
+	// separate, deliberately narrow query rather than getForms with a scope: a plain
+	// shop-connected artist (not shop_admin) has no authority to call getForms(shopId: ...) at
+	// all, so this is the only way they can ever see their own shop's published form links.
+	const _GET_MY_FORM_LINKS = gql`
+		query GetMyFormLinks {
+			getMyFormLinks {
+				title
+				slug
+			}
+		}
+	`;
+	const _getMyFormLinks = (options = {}) => useQuery(_GET_MY_FORM_LINKS, options);
+
 	const CREATE_FORM = gql`
 		mutation CreateForm($input: CreateFormInput!) {
 			createForm(input: $input) {
@@ -152,6 +192,17 @@ const FormService = (() => {
 	const DELETE_FORM = gql`
 		mutation DeleteForm($formId: ID!) {
 			deleteForm(formId: $formId)
+		}
+	`;
+
+	// The booking_request system form's RESTRICTED editor (task #162) - see server/typeDefs.js's
+	// BookingRequestFieldInput comment. $fields is [BookingRequestFieldInput!]!, not
+	// [FormFieldInput!] - type/options are never sent from this mutation at all.
+	const UPDATE_BOOKING_REQUEST_FIELDS = gql`
+		mutation UpdateBookingRequestFields($formId: ID!, $fields: [BookingRequestFieldInput!]!) {
+			updateBookingRequestFields(formId: $formId, fields: $fields) {
+				${_FORM_FIELDS}
+			}
 		}
 	`;
 
@@ -281,12 +332,15 @@ const FormService = (() => {
 		getForm: _getForm,
 		FETCH_FORM: _FETCH_FORM,
 		GET_PUBLIC_FORM,
+		GET_PUBLIC_FORM_BY_SLUG,
+		getMyFormLinks: _getMyFormLinks,
 		CREATE_FORM,
 		UPDATE_FORM,
 		PUBLISH_FORM,
 		ARCHIVE_FORM,
 		SET_FORM_GUEST_ACCESS,
 		DELETE_FORM,
+		UPDATE_BOOKING_REQUEST_FIELDS,
 		getFormResponses: _getFormResponses,
 		getFormResponse: _getFormResponse,
 		getFormAnalytics: _getFormAnalytics,

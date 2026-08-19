@@ -10,6 +10,7 @@ const {
   assertCanManageBusinessRecord,
   assertCanAccessClient,
   linkClientToUsersShops,
+  getShopIdsForUser,
 } = require('../../utils/shop-membership');
 const { findOrCreateGuestClient } = require('../../utils/guest-client');
 const { checkRateLimit, getClientIp } = require('../../utils/rate-limit');
@@ -18,9 +19,12 @@ const { recordEvent } = require('../../utils/event-log');
 const {
   createFormInputSchema,
   updateFormInputSchema,
+  updateBookingRequestFieldsInputSchema,
   submitFormResponseInputSchema,
   validate,
 } = require('../../utils/validation');
+const { normalizeSlug: normalizeFormSlug, assertSlugAvailable: assertFormSlugAvailable } = require('../../utils/form-slug');
+const { STATES: PUBLIC_FORM_STATES, resolvePublicFormBySlug } = require('../../utils/public-form-lookup');
 
 /**
  * Forms - consent forms, waivers, custom intake questionnaires. See models/Form.js and
@@ -211,6 +215,35 @@ module.exports = {
       return Form.findOne({ publicToken, status: 'published', allowGuestSubmissions: true });
     },
 
+    // PUBLIC - see typeDefs.js's own comment on state values, and utils/public-form-lookup.js's
+    // header comment on why this exists alongside getPublicForm rather than replacing it.
+    async getPublicFormBySlug(_, { formSlug, ownerHandle }) {
+      const { state, form } = await resolvePublicFormBySlug(formSlug, ownerHandle);
+      return { state, form: state === PUBLIC_FORM_STATES.OK ? form : null };
+    },
+
+    // SELF-SCOPED - see typeDefs.js's own comment on why this exists alongside getForms rather
+    // than reusing it: a plain shop-connected artist has no authority to call
+    // getForms(shopId: ...) (assertCanManageBusinessRecord requires shop_admin-or-better for a
+    // shopId scope), so without this, they'd have no way to ever learn their OWN shop's book/
+    // consent link. Returns only title+slug - never enough to manage or delete anything, matching
+    // PublicForm's own "narrow, explicit allowlist" reasoning.
+    getMyFormLinks: withAuth(async (_, __, context, info, user) => {
+      const shopIds = await getShopIdsForUser(user.id);
+      const forms = await Form.find({
+        status: 'published',
+        shopUseOnly: false,
+        slug: { $type: 'string' },
+        $or: [
+          { artistUserId: user.id },
+          ...(shopIds.length > 0 ? [{ shopId: { $in: shopIds } }] : []),
+        ],
+      })
+        .select('title slug')
+        .sort({ createdAt: 1 });
+      return forms.map((f) => ({ title: f.title, slug: f.slug }));
+    }),
+
     getFormResponses: withAuth(async (_, { formId, page }, context, info, user) => {
       const form = await Form.findById(formId);
       if (!form) {
@@ -310,13 +343,36 @@ module.exports = {
         throw new UserInputError('Errors', { errors });
       }
       const owner = await resolveBusinessOwner(user, data.shopId);
-      const form = await new Form({
-        ...owner,
-        title: data.title,
-        description: data.description || '',
-        fields: fieldsFromInput(data.fields),
-        createdByUserId: user.id,
-      }).save();
+      // shopUseOnly only means anything on a shop-owned form - see models/Form.js's own comment.
+      // Silently ignored rather than rejected on an artist-owned one, the same "meaningless value,
+      // not an error" treatment applyFeeOffset gets on a cash charge.
+      const shopUseOnly = Boolean(owner.shopId) && Boolean(data.shopUseOnly);
+      const slugValue = normalizeFormSlug(data.slug);
+      const slug = slugValue
+        ? await assertFormSlugAvailable(slugValue, { shopId: owner.shopId, artistUserId: owner.artistUserId })
+        : null;
+      let form;
+      try {
+        form = await new Form({
+          ...owner,
+          title: data.title,
+          description: data.description || '',
+          slug,
+          shopUseOnly,
+          fields: fieldsFromInput(data.fields),
+          createdByUserId: user.id,
+        }).save();
+      } catch (err) {
+        // assertFormSlugAvailable above is a courtesy check - the partial unique indexes on
+        // models/Form.js are the real guarantee. Two saves racing on the same owner+slug both
+        // pass the check and one lands here.
+        if (err && err.code === 11000 && err.keyPattern && err.keyPattern.slug) {
+          throw new UserInputError('Errors', {
+            errors: { slug: 'This owner already has a form using that link.' },
+          });
+        }
+        throw err;
+      }
       await recordEvent({
         entityType: 'Form',
         entityId: form._id,
@@ -344,10 +400,34 @@ module.exports = {
       if (data.description !== undefined) {
         form.description = data.description || '';
       }
+      if (data.shopUseOnly !== undefined && data.shopUseOnly !== null) {
+        // Only means anything on a shop-owned form - see createForm's own comment above.
+        form.shopUseOnly = Boolean(form.shopId) && Boolean(data.shopUseOnly);
+      }
+      if (data.slug !== undefined) {
+        const slugValue = normalizeFormSlug(data.slug);
+        form.slug = slugValue
+          ? await assertFormSlugAvailable(slugValue, {
+            shopId: form.shopId,
+            artistUserId: form.artistUserId,
+            exceptFormId: form._id,
+          })
+          : null;
+      }
       if (data.fields) {
         form.fields = fieldsFromInput(data.fields);
       }
-      await form.save();
+      try {
+        await form.save();
+      } catch (err) {
+        // Same race-safety net as createForm - see its own comment.
+        if (err && err.code === 11000 && err.keyPattern && err.keyPattern.slug) {
+          throw new UserInputError('Errors', {
+            errors: { slug: 'This owner already has a form using that link.' },
+          });
+        }
+        throw err;
+      }
       await recordEvent({
         entityType: 'Form',
         entityId: form._id,
@@ -434,6 +514,15 @@ module.exports = {
         return true;
       }
       await assertCanManageBusinessRecord(user, { shopId: form.shopId, artistUserId: form.artistUserId });
+      if (form.systemKey) {
+        // The two auto-provisioned defaults (utils/seed-default-forms.js) - editable, never
+        // deletable. Most pointed for 'booking_request': it's the only Forms-list entry standing
+        // in for the real BookingRequest pipeline, which has no "form" to delete in the first
+        // place - see models/Form.js's own comment.
+        throw new UserInputError('Errors', {
+          errors: { formId: 'This is a default form and cannot be deleted.' },
+        });
+      }
       const hasResponses = await FormResponse.exists({ formId: form._id });
       if (hasResponses) {
         throw new UserInputError('Errors', {
@@ -452,6 +541,74 @@ module.exports = {
         summary: `Deleted the form "${form.title}"`,
       });
       return true;
+    }),
+
+    // The booking_request system form's RESTRICTED editor - see typeDefs.js's
+    // BookingRequestFieldInput comment. Reorder/relabel/required/hidden ONLY: type and options are
+    // never accepted here and are always carried over unchanged from the existing field, and the
+    // exact-key-set check below is what actually makes "no add/remove" a guarantee rather than
+    // just a documented intent - the real BookingRequestInput mutation (mutations/
+    // bookingRequests.js) has exactly these seven optional slots and no others, so a mismatch here
+    // would silently orphan whatever the client rendered against a slot that no longer exists.
+    updateBookingRequestFields: withAuth(async (_, { formId, fields }, context, info, user) => {
+      const { valid, errors, data } = validate(updateBookingRequestFieldsInputSchema, { formId, fields });
+      if (!valid) {
+        throw new UserInputError('Errors', { errors });
+      }
+      const form = await Form.findById(data.formId);
+      if (!form) {
+        throw new UserInputError('Errors', { errors: { formId: 'Form not found' } });
+      }
+      await assertCanManageBusinessRecord(user, { shopId: form.shopId, artistUserId: form.artistUserId });
+      if (form.systemKey !== 'booking_request') {
+        throw new UserInputError('Errors', {
+          errors: { formId: "This isn't the booking request form." },
+        });
+      }
+
+      const existingKeys = new Set(form.fields.map((f) => f.key));
+      const incomingKeys = data.fields.map((f) => f.key);
+      const incomingKeySet = new Set(incomingKeys);
+      if (
+        incomingKeys.length !== existingKeys.size
+        || incomingKeySet.size !== incomingKeys.length
+        || ![...existingKeys].every((k) => incomingKeySet.has(k))
+      ) {
+        throw new UserInputError('Errors', {
+          errors: { fields: 'Fields cannot be added or removed here.' },
+        });
+      }
+
+      const byKey = new Map(form.fields.map((f) => [f.key, f]));
+      // The INCOMING array's order becomes the stored order - this is how a drag-reorder in the
+      // client actually persists, the same "array order is the only order" design models/Form.js's
+      // own header comment describes for the generic case.
+      form.fields = data.fields.map((input) => {
+        const existing = byKey.get(input.key);
+        return {
+          key: existing.key,
+          type: existing.type,
+          label: input.label.trim(),
+          helpText: existing.helpText,
+          required:
+            input.required === undefined || input.required === null
+              ? existing.required
+              : Boolean(input.required),
+          options: existing.options,
+          hidden:
+            input.hidden === undefined || input.hidden === null ? existing.hidden : Boolean(input.hidden),
+        };
+      });
+      await form.save();
+      await recordEvent({
+        entityType: 'Form',
+        entityId: form._id,
+        action: 'update',
+        actorUserId: user.id,
+        shopId: form.shopId,
+        summary: 'Updated the booking request intake fields',
+      });
+      return form;
     }),
 
     // See this file's own header comment on why this is not withAuth-wrapped, and
@@ -477,13 +634,15 @@ module.exports = {
         throw new UserInputError('Errors', { errors });
       }
 
-      // Resolved by publicToken (the guest path - proof of holding the real shareable link, the
-      // same role BookingRequest.guestToken plays) OR by formId (every authenticated path, where
-      // the caller already has real access to ask "which form is this"). A guest is NEVER allowed
-      // to resolve a form by formId alone - a Mongo ObjectId is guessable/enumerable in a way a
-      // random publicToken deliberately isn't, and formId-only would let an anonymous caller
-      // submit to any guest-allowed form without ever having seen its actual link.
+      // Resolved by publicToken OR formSlug+ownerHandle (the two guest paths - see typeDefs.js's
+      // own comment on SubmitFormResponseInput) OR by formId (every authenticated path, where the
+      // caller already has real access to ask "which form is this"). A guest is NEVER allowed to
+      // resolve a form by formId alone - a Mongo ObjectId is guessable/enumerable in a way a
+      // publicToken deliberately isn't and a slug+handle deliberately IS (that's the whole point
+      // of the newer path) - formId-only would let an anonymous caller submit to any guest-allowed
+      // form without ever having gone through either resolution path at all.
       let form;
+      let resolvedViaSlug = false;
       if (data.publicToken) {
         form = await Form.findOne({
           publicToken: data.publicToken,
@@ -493,6 +652,18 @@ module.exports = {
         if (!form) {
           throw new UserInputError('Errors', { errors: { publicToken: 'Invalid or expired link' } });
         }
+      } else if (data.formSlug && data.ownerHandle) {
+        const { state, form: resolved } = await resolvePublicFormBySlug(data.formSlug, data.ownerHandle);
+        // Every non-'ok' state (not_found/inactive/artist_gone - see utils/public-form-lookup.js)
+        // collapses to the SAME generic error here, on purpose - the distinct states exist for
+        // getPublicFormBySlug to show a real page-level message before anyone starts filling
+        // anything out; by the time a submission is being attempted, "why" doesn't change what a
+        // guest should do (nothing - the form isn't accepting responses).
+        if (state !== PUBLIC_FORM_STATES.OK) {
+          throw new UserInputError('Errors', { errors: { formSlug: 'This form is not currently accepting responses.' } });
+        }
+        form = resolved;
+        resolvedViaSlug = true;
       } else if (data.formId) {
         form = await Form.findById(data.formId);
         if (!form) {
@@ -512,12 +683,29 @@ module.exports = {
       let submittedByUserId;
       let source;
 
-      if (!authenticatedCaller) {
-        // The guest path. Only reachable at all via a real publicToken (see above), which already
-        // proves allowGuestSubmissions - re-checked here anyway rather than trusted from the
-        // lookup, the same defense-in-depth reasoning getAppointmentsByShop's own isPersonal
+      // THE GUEST PATH IS DECIDED BY HOW THE FORM WAS RESOLVED, NOT BY WHETHER THE CALLER HAPPENS
+      // TO BE LOGGED IN. Originally this branched on `!authenticatedCaller`, which meant a shop
+      // admin/artist/staff member who opened the public /:formSlug/:ownerHandle or
+      // /form/:publicToken link while still signed into their own dashboard (testing it, or
+      // filling it out at the counter for a walk-in via the shareable link rather than the
+      // staff-authenticated "enter on this client's behalf" flow) got routed into the SELF-SERVICE
+      // branch below instead - the wrong branch, since it isn't their own consent form to fill out.
+      // That either threw "No client record found for this account" (an artist/staff has none) or,
+      // for a caller who does have one, silently used THEIR OWN client record and discarded
+      // whatever name/email the guest fields actually collected. A publicToken or a resolved
+      // slug+handle already proves this request came in through the public page - the guest page,
+      // which always shows its own first/last/email/phone inputs (see
+      // PublicFormBySlugFillOut.jsx/PublicFormFillOut.jsx) regardless of the visitor's own session
+      // state - so that alone is what decides the branch, exactly like it decided resolvedViaSlug
+      // above. findOrCreateGuestClient still resolves to the SAME existing Client when the typed
+      // email already has one (see its own header comment) - an already-registered client using
+      // their own public link is not creating a duplicate here, this only changes who a
+      // logged-in-elsewhere caller resolves as.
+      if (data.publicToken || resolvedViaSlug) {
+        // allowGuestSubmissions is re-checked here anyway rather than trusted from the lookup
+        // above - the same defense-in-depth reasoning getAppointmentsByShop's own isPersonal
         // exclusion uses.
-        if (!data.publicToken || !form.allowGuestSubmissions) {
+        if (!form.allowGuestSubmissions) {
           throw new AuthenticationError('Action not allowed');
         }
         if (!data.firstName || !data.lastName || !data.email) {
@@ -538,6 +726,11 @@ module.exports = {
         clientDoc = client;
         submittedByUserId = guestUser._id;
         source = 'guest_public';
+      } else if (!authenticatedCaller) {
+        // formId-only, with no session and no publicToken/slug resolution behind it - a guest is
+        // never allowed to resolve a form by formId alone (see this function's own comment above
+        // form resolution on why), so an unauthenticated caller has no path left at this point.
+        throw new AuthenticationError('Action not allowed');
       } else if (data.clientId) {
         // Staff (or the artist themselves) filling this out on a specific client's behalf - e.g.
         // handing a tablet to a client standing at the counter. Requires BOTH that this caller

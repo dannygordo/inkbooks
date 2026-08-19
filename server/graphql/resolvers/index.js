@@ -33,6 +33,7 @@ const clientFlagResolvers = require('./clientFlags');
 const expenseResolvers = require('./expenses');
 const incomeResolvers = require('./income');
 const formResolvers = require('./forms');
+const autoResponseResolvers = require('./autoResponses');
 const passwordResolvers = require('./passwords');
 const passwordMutations = require('../mutations/passwords');
 const accountMutations = require('../mutations/accounts');
@@ -100,6 +101,7 @@ module.exports = {
     ...expenseResolvers.Query,
     ...incomeResolvers.Query,
     ...formResolvers.Query,
+    ...autoResponseResolvers.Query,
     ...passwordResolvers.Query,
     ...notificationResolvers.Query,
     ...eventLogResolvers.Query,
@@ -127,6 +129,7 @@ module.exports = {
     ...expenseResolvers.Mutation,
     ...incomeResolvers.Mutation,
     ...formResolvers.Mutation,
+    ...autoResponseResolvers.Mutation,
     ...depositMutations,
     ...passwordMutations,
     ...accountMutations,

@@ -23,7 +23,7 @@ const Artist = (props) => {
 	let params = useParams();
 	// The VIEWER, not the artist being viewed - the two are the same person when an artist opens
 	// their own page, which is exactly the case the rate panel has to tell apart.
-	const { user, setAlert } = useAuth();
+	const { user, setAlert, updateCurrentUser } = useAuth();
 	/**
 	 * Gets artist by id
 	 */
@@ -93,6 +93,21 @@ const Artist = (props) => {
 		try {
 			await updateArtist({ variables: { artist: payload } });
 			setIdentitySaveState("saved");
+			// updateArtist now writes the same firstName/lastName through to this person's User row
+			// too (see the server mutation's own comment on why), so the change is permanent - but
+			// the AuthContext `user` this tab already has in memory was read once at login and has
+			// no reason to notice a database write it wasn't told about. Only relevant when the
+			// person editing IS the artist being edited: a shop admin renaming someone else has no
+			// reason to touch their own cached identity, and doesn't have that artist's session to
+			// update anyway. updateCurrentUser (not setSession) is deliberate - see its own comment
+			// in context/auth.jsx: this is the same person, re-read, not a new session.
+			if (isSelf) {
+				updateCurrentUser({
+					...user,
+					firstName: payload.firstName,
+					lastName: payload.lastName,
+				});
+			}
 		} catch (err) {
 			lastSavedIdentityRef.current = null;
 			setIdentitySaveState("error");

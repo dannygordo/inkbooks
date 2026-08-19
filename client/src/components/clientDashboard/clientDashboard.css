@@ -13,6 +13,14 @@
 	gap: 16px;
 }
 
+/* SendAutoResponseButton.jsx's own trigger - a lone action row, left-aligned like every other
+   settingsActions-style button row rather than stretched full width by the parent's own flex
+   column. */
+.clientDashboardSendAutoResponse {
+	display: flex;
+	align-self: flex-start;
+}
+
 .clientStatCard {
 	flex: 1 1 160px;
 	min-width: 160px;

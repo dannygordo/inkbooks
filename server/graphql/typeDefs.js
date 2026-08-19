@@ -157,6 +157,10 @@ module.exports = gql`
     logo: String
     billingType: String
     status: Int
+    # The shop's own public link handle - see models/Shop.js's own comment. Only ever set via
+    # updateMyShopFormSlug (self-service, shop_admin-or-better of THIS shop only), never via the
+    # generic updateShop.
+    formSlug: String
     # Square connection status - deliberately exposes only non-secret fields. The encrypted
     # access/refresh tokens never leave the server.
     #
@@ -649,6 +653,14 @@ module.exports = gql`
     lastName: String!
     avatar: String
     bookingSlug: String
+    # Task #165: an ARCHIVED artist is still returned here (never null - null now means "no such
+    # artist at all", not "gone"), so BookingRequest.jsx can show 'This artist is no longer on the
+    # platform.' instead of the generic 'we couldn't find this artist' it can't tell apart from a
+    # mistyped link. Mirrors the distinction utils/public-form-lookup.js's own STATES.ARTIST_GONE
+    # already makes for the newer slug-based form links - see that file's header comment. Only
+    # ARCHIVED counts as gone; INACTIVE/BOOKS_CLOSED still resolve with archived: false, same as
+    # createBookingRequest itself still accepts requests for either of those statuses unchanged.
+    archived: Boolean!
   }
   # See PRODUCTION_ROADMAP.md's "Booking request & guest correspondence" section for the full
   # design. This is the structured intake content only - back-and-forth correspondence after
@@ -1286,6 +1298,64 @@ module.exports = gql`
     active: Boolean
   }
 
+  # --- Auto-Responses (see models/AutoResponse.js) ---------------------------------------------
+  # Same ownership shape as Expenses/Income/Forms directly above - shopId XOR artistUserId - but
+  # UNLIKE those, a shop-connected artist does not choose one scope over the other: they own a
+  # personal set (artistUserId) AND see their shop's set (shopId) at the same time, continuously.
+  # See utils/auto-responses.js's resolveAutoResponseForTrigger for how the two coexist: the
+  # artist's own enabled response for a trigger wins, the shop's fires only when the artist has
+  # none enabled for that trigger.
+  type AutoResponse {
+    id: ID!
+    shopId: ID
+    artistUserId: ID
+    name: String!
+    trigger: String!
+    # Governs automatic firing only - a disabled response stays visible in the manual "Send a
+    # message" picker as long as active is true. Always false when trigger is MANUAL - see
+    # models/AutoResponse.js's header comment.
+    enabled: Boolean!
+    emailEnabled: Boolean!
+    smsEnabled: Boolean!
+    # Null means "use the built-in default" - see utils/auto-responses.js's DEFAULT_TEMPLATES,
+    # which the UI shows as placeholder text when these come back null rather than leaving the
+    # box looking empty. Merge fields: {{clientFirstName}}, {{artistName}}, {{appointmentDate}},
+    # {{appointmentTime}}.
+    emailSubjectTemplate: String
+    emailBodyTemplate: String
+    smsTemplate: String
+    active: Boolean!
+    createdAt: DateTime!
+    updatedAt: DateTime!
+  }
+  input CreateAutoResponseInput {
+    # Omit for the caller's own personal scope - see resolveBusinessOwner. Shop admin only when
+    # provided.
+    shopId: ID
+    name: String!
+    trigger: String!
+    enabled: Boolean
+    emailEnabled: Boolean
+    smsEnabled: Boolean
+    emailSubjectTemplate: String
+    emailBodyTemplate: String
+    smsTemplate: String
+  }
+  input UpdateAutoResponseInput {
+    autoResponseId: ID!
+    name: String
+    enabled: Boolean
+    emailEnabled: Boolean
+    smsEnabled: Boolean
+    # Each nullable template field is applied only when the caller actually sends the key at all -
+    # same "omitted leaves it alone, explicit null resets to the built-in default" convention as
+    # updateReminderSettings.
+    emailSubjectTemplate: String
+    emailBodyTemplate: String
+    smsTemplate: String
+    active: Boolean
+  }
+
   # --- Forms (consent/waiver/intake - see models/Form.js and models/FormResponse.js) -----------
   # Same ownership model as Expenses/Income directly above: shopId XOR artistUserId, gated through
   # the same resolveBusinessOwner/assertCanManageBusinessRecord. A separate feature from
@@ -1298,6 +1368,11 @@ module.exports = gql`
     required: Boolean!
     # Only meaningful when type is single_choice/multi_choice - empty on every other field type.
     options: [String!]!
+    # ALWAYS false for a field on a generic form - createForm/updateForm have no way to set this
+    # (see FormFieldInput below, which has no hidden argument at all). Only ever true on the
+    # booking_request system form's fixed slots, via updateBookingRequestFields - see
+    # models/Form.js's own comment on why deletion isn't an option there.
+    hidden: Boolean!
   }
   type Form {
     id: ID!
@@ -1310,6 +1385,16 @@ module.exports = gql`
     # Null until allowGuestSubmissions has been turned on at least once - see setFormGuestAccess.
     # Never exposed on PublicForm below - a guest holding a link has no business learning it.
     publicToken: ID
+    # The public link's first path segment - see utils/form-slug.js. Null on a form that hasn't
+    # had one set yet (a brand-new draft, most commonly).
+    slug: String
+    # Shop-owned forms only - excludes this form from every affiliated artist's own forms list and
+    # gives it one shop-wide link instead of one per artist. See models/Form.js's own comment.
+    shopUseOnly: Boolean!
+    # Set only on the two auto-provisioned defaults (utils/seed-default-forms.js) - null on every
+    # form a shop/artist built themselves. Read-only: never accepted on CreateFormInput/
+    # UpdateFormInput, and deleteForm refuses any form where this is set.
+    systemKey: String
     fields: [FormField!]!
     createdByUserId: ID!
     createdBy: User
@@ -1325,6 +1410,29 @@ module.exports = gql`
     title: String!
     description: String
     fields: [FormField!]!
+  }
+  # The result of resolving /<formSlug>/<ownerHandle> - see utils/public-form-lookup.js's own
+  # header comment for the full design. 'state' is one of:
+  #   'ok'          - form is set and ready to render/fill out.
+  #   'not_found'   - no such link (bad slug, bad handle, or a real handle with no form at that
+  #                   slug). Deliberately as uninformative as a 404 - nothing here should let a
+  #                   guest distinguish "typo" from "handle exists but that slug doesn't."
+  #   'inactive'    - the link is real but the form has been unpublished. Show
+  #                   "This form has been marked as inactive."
+  #   'artist_gone' - the handle belonged to an artist who has since been archived. Show
+  #                   "This artist is no longer on the platform."
+  type PublicFormLookup {
+    state: String!
+    form: PublicForm
+  }
+  # getMyFormLinks' own row - deliberately just enough to build a URL and a label, never the full
+  # Form. See resolvers/forms.js's getMyFormLinks for why this exists: a plain shop-connected
+  # artist (not shop_admin) has no authority to call getForms(shopId: ...) at all (see
+  # assertCanManageBusinessRecord), so without a self-scoped read like this one, they would have no
+  # way to ever see their OWN shop's book/consent links in their own Settings.
+  type FormLinkSummary {
+    title: String!
+    slug: String!
   }
   type FormPage {
     items: [Form!]!
@@ -1398,6 +1506,18 @@ module.exports = gql`
     responsesByDay: [FormResponsesByDay!]!
     fields: [FormFieldAnalytics!]!
   }
+  # updateBookingRequestFields' own input - deliberately NOT FormFieldInput. type/options are
+  # absent on purpose: the booking_request system form's seven fields (utils/seed-default-forms.js)
+  # keep whatever type/options they were seeded with forever, and this input has no way to say
+  # otherwise. key is required (not optional the way FormFieldInput's is for a brand-new field) -
+  # every field here must already exist; see resolvers/forms.js's updateBookingRequestFields for
+  # the exact-same-key-set check that backs this up server-side, not just this schema.
+  input BookingRequestFieldInput {
+    key: ID!
+    label: String!
+    required: Boolean
+    hidden: Boolean
+  }
 
   input FormFieldInput {
     # Omit for a brand-new field; supply an EXISTING field's key to preserve its identity across an
@@ -1414,15 +1534,24 @@ module.exports = gql`
     shopId: ID
     title: String!
     description: String
+    # Optional at creation - a form can be built and saved before its link is picked. Validated +
+    # scoped-uniqueness-checked via utils/form-slug.js.
+    slug: String
+    # Only meaningful when shopId is set - see models/Form.js's own comment. Ignored (left false)
+    # on an artist-owned form.
+    shopUseOnly: Boolean
     fields: [FormFieldInput!]!
   }
   # status and allowGuestSubmissions are NOT here - see publishForm/archiveForm/setFormGuestAccess
   # in the Mutation block below for why each is its own explicit action rather than a value this
-  # generic PATCH could flip unremarked-on alongside a title typo fix.
+  # generic PATCH could flip unremarked-on alongside a title typo fix. systemKey is likewise not
+  # here - it is never client-settable, see the Form.systemKey field comment.
   input UpdateFormInput {
     formId: ID!
     title: String
     description: String
+    slug: String
+    shopUseOnly: Boolean
     fields: [FormFieldInput!]
   }
   input FormAnswerInput {
@@ -1438,12 +1567,19 @@ module.exports = gql`
     signedName: String
   }
   input SubmitFormResponseInput {
-    # Exactly one of these identifies the form. formId for every authenticated path (the caller
-    # already has real access); publicToken for the guest path - proof of holding the actual
-    # shareable link, the same role BookingRequest.guestToken plays. A guest is never allowed to
-    # resolve a form by formId alone - see resolvers/forms.js's submitFormResponse.
+    # Exactly one of THREE things identifies the form:
+    #   - formId for every authenticated path (the caller already has real access).
+    #   - publicToken for the OLDER guest path - proof of holding a secret, opaque shareable link.
+    #   - formSlug + ownerHandle TOGETHER for the NEWER guest path, resolved the same way
+    #     getPublicFormBySlug resolves them (utils/public-form-lookup.js) - a predictable business
+    #     link rather than a secret one, gated on the resolved form's own allowGuestSubmissions
+    #     exactly like the publicToken path is, not on the link being guessable-or-not.
+    # A guest is never allowed to resolve a form by formId alone - see resolvers/forms.js's
+    # submitFormResponse.
     formId: ID
     publicToken: String
+    formSlug: String
+    ownerHandle: String
     # Only meaningful for an authenticated caller submitting THIS response on a specific existing
     # client's behalf (e.g. staff at the counter) - see resolvers/forms.js for the full branching.
     # Omitted for a guest, and omitted for a logged-in client filling out their own copy.
@@ -1874,6 +2010,12 @@ module.exports = gql`
     # isn't expected to need paging, and if it ever does that's a symptom worth seeing.
     getRecurringExpenses(shopId: ID, artistUserId: ID, includeInactive: Boolean): [RecurringExpense!]!
 
+    ######### Auto-Responses ###########
+    # Exactly one of shopId/artistUserId is required, same as the Expenses/Income queries above.
+    # includeInactive defaults to false - a deactivated response has no reason to appear in
+    # Settings or the manual send picker, only in a "show deactivated" toggle if one is ever added.
+    getAutoResponses(shopId: ID, artistUserId: ID, includeInactive: Boolean): [AutoResponse!]!
+
     ######### Forms (consent/waiver/intake) ###########
     # See the type block's own header comment (models/Form.js) for the ownership model - identical
     # to Expenses/Income above, reusing the same resolveBusinessOwner/assertCanManageBusinessRecord.
@@ -1886,6 +2028,19 @@ module.exports = gql`
     # dead/typo'd link and a deliberately-closed form should look identical to whoever's holding it,
     # not confirm which one it is.
     getPublicForm(publicToken: String!): PublicForm
+    # PUBLIC - the slug-based counterpart, /<formSlug>/<ownerHandle> (see utils/
+    # public-form-lookup.js's own header comment on why this is a DELIBERATELY predictable,
+    # shareable link rather than a secret token like getPublicForm's, and how the two still agree
+    # on the one thing that actually matters: allowGuestSubmissions gates writing either way).
+    # ALWAYS returns a result (never null) - unlike getPublicForm, this distinguishes "no such
+    # link" from "this form was turned off" from "this artist is no longer on the platform",
+    # because a real, predictable link deserves a real answer about why it stopped working.
+    getPublicFormBySlug(formSlug: String!, ownerHandle: String!): PublicFormLookup!
+    # SELF-SCOPED, not the management getForms above - every authenticated artist may call this
+    # for themselves regardless of role (see resolvers/forms.js's getMyFormLinks), which is what
+    # lets a plain shop-connected artist (not shop_admin) see their own shop's published form
+    # links in their own Settings without needing management authority over the shop's forms.
+    getMyFormLinks: [FormLinkSummary!]!
     getFormResponses(formId: ID!, page: PageInput): FormResponsePage!
     getFormResponse(formResponseId: ID!): FormResponse!
     getFormAnalytics(formId: ID!): FormAnalytics!
@@ -2040,6 +2195,11 @@ module.exports = gql`
       status: Int
     ): Shop!
     updateShop(shop: ShopInput): Shop
+    # Self-service, shop_admin-or-better OF THIS SHOP only - see mutations/shops.js. Separate from
+    # updateShop for the same reason updateMyBookingSlug is separate from updateArtist: this is the
+    # one field a shop admin sets about the shop's own public link, not a generic profile edit.
+    # Pass an empty string to remove it. Mirrors Artist.bookingSlug/updateMyBookingSlug.
+    updateMyShopFormSlug(shopId: ID!, slug: String!): Shop!
     disconnectShopSquare(shopId: ID!): Shop!
     # The artist's own account, for an artist who owns one. Refuses when a shop holds the
     # connection - it is not theirs to disconnect. See DECISIONS.md M9.
@@ -2285,6 +2445,17 @@ module.exports = gql`
     # every list forever.
     deleteRecurringExpense(recurringExpenseId: ID!): Boolean!
 
+    ######### Auto-Responses ###########
+    # See the Query section's own header for the shared ownership/authorization model -
+    # resolvers/autoResponses.js. archiveAutoResponse is deactivate-not-delete, same convention as
+    # ExpenseType/Form (see models/AutoResponse.js) - AutoResponseLog rows keep referencing it by
+    # id. sendAutoResponseNow is the manual "Send a message" action - appointmentId is optional,
+    # since a manual send is not always tied to one (see models/AutoResponseLog.js).
+    createAutoResponse(input: CreateAutoResponseInput!): AutoResponse!
+    updateAutoResponse(input: UpdateAutoResponseInput!): AutoResponse!
+    archiveAutoResponse(autoResponseId: ID!): AutoResponse!
+    sendAutoResponseNow(autoResponseId: ID!, clientId: ID!, appointmentId: ID): Boolean!
+
     ######### Forms (consent/waiver/intake) ###########
     # See getForm's own header comment above for the ownership model. createForm/updateForm never
     # touch status or allowGuestSubmissions - see UpdateFormInput's own comment for why those are
@@ -2304,6 +2475,11 @@ module.exports = gql`
     # comment on why responses keep their own title/field snapshot independent of the Form). Use
     # archiveForm instead; deleteForm only ever removes a form nobody has actually filled out yet.
     deleteForm(formId: ID!): Boolean!
+    # The booking_request system form's own RESTRICTED editor - see BookingRequestFieldInput's own
+    # comment and resolvers/forms.js's updateBookingRequestFields for the exact-key-set guarantee.
+    # Refuses any formId that isn't systemKey 'booking_request' - this is not a second way to edit
+    # a generic form, use updateForm for those.
+    updateBookingRequestFields(formId: ID!, fields: [BookingRequestFieldInput!]!): Form!
     # Works both authenticated (an existing Client, or staff filling one out on their behalf) and,
     # when the form's allowGuestSubmissions is true, unauthenticated via a public link - see
     # resolvers/forms.js for the shared find-or-create-guest-client path this takes from

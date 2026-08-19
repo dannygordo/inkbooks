@@ -9,6 +9,7 @@ const User = require('../models/User');
 const { sendEmail } = require('./email');
 const { sendSms } = require('./sms');
 const { Constants } = require('./constants');
+const { renderTemplate } = require('./message-templates');
 
 /**
  * Appointment reminders: text and email nudges sent to a CLIENT ahead of an appointment.
@@ -34,16 +35,9 @@ const DEFAULT_SMS_TEMPLATE =
   'Hi {{clientFirstName}}, this is a reminder from {{artistName}} for your appointment on ' +
   '{{appointmentDate}} at {{appointmentTime}}. {{link}}';
 
-/**
- * {{mergeField}} substitution. Deliberately not a templating engine - five known fields, no
- * loops/conditionals, so a regex swap is the whole implementation rather than a dependency and an
- * injection surface for something an artist types into a settings box.
- */
-function renderTemplate(template, vars) {
-  return String(template || '').replace(/{{\s*(\w+)\s*}}/g, (match, key) =>
-    Object.prototype.hasOwnProperty.call(vars, key) ? String(vars[key]) : match,
-  );
-}
+// renderTemplate itself moved to utils/message-templates.js the moment Auto-Responses needed the
+// identical {{field}} substitution (see that file's header comment) - imported above and
+// re-exported below unchanged, so nothing outside this file has to change its import.
 
 /**
  * A client has no timezone of their own on file (Client has no timezone field, unlike User - see

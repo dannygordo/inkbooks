@@ -2,8 +2,12 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { useMutation } from "@apollo/client";
 import ShopService from "../../services/ShopService";
+import FormService from "../../services/FormService";
 import IBCardWrapper from "../card/ibCard/IBCardWrapper";
 import IBInput from "../inputs/IBInput";
+import { ALERT_CONSTANTS } from "../../constants";
+import { useAuth } from "../../context/auth";
+import { formUrl } from "../../utils/bookingSlug";
 
 /**
  * Shop-wide configuration, for an owner who is also an artist.
@@ -28,10 +32,21 @@ import IBInput from "../inputs/IBInput";
  * editable. /shop/:shopId shows it read-only with a link back here - see that file's own comment.
  */
 const ShopPanel = ({ shopId, shopName }) => {
+	const { setAlert } = useAuth();
 	const [updateShop] = useMutation(ShopService.updateShop());
+	const [updateFormSlug, { loading: savingSlug }] = useMutation(
+		ShopService.UPDATE_MY_SHOP_FORM_SLUG_MUTATION
+	);
 	const { loading, data } = ShopService.fetchShop(shopId);
+	// shopUseOnly forms only - see server/utils/public-form-lookup.js: a shop-wide link
+	// (/<formSlug>/<shop.formSlug>) only ever resolves for forms marked shopUseOnly, same forms
+	// that getMyFormLinks (used by FormsPanel's per-artist link list) deliberately excludes.
+	const { data: formsData } = FormService.getForms({ shopId }, "published");
 	const [editedCut, setEditedCut] = React.useState(undefined);
 	const [saveState, setSaveState] = React.useState("idle");
+	const [editedFormSlug, setEditedFormSlug] = React.useState(undefined);
+	const [formSlugSaveState, setFormSlugSaveState] = React.useState("idle");
+	const [copiedSlug, setCopiedSlug] = React.useState(null);
 
 	if (loading || !data?.getShop) {
 		return null;
@@ -39,6 +54,44 @@ const ShopPanel = ({ shopId, shopName }) => {
 
 	const shop = data.getShop;
 	const cutValue = editedCut !== undefined ? editedCut : String(shop.shopCutPercent ?? 0);
+	const formSlugValue = editedFormSlug !== undefined ? editedFormSlug : shop.formSlug || "";
+	const shopWideLinks = (formsData?.getForms?.items || []).filter((f) => f.shopUseOnly);
+
+	const handleFormSlugBlur = async () => {
+		const normalized = formSlugValue.trim().toLowerCase();
+		if (normalized === (shop.formSlug || "")) {
+			setFormSlugSaveState("idle");
+			return;
+		}
+		if (!normalized) {
+			setFormSlugSaveState("idle");
+			return;
+		}
+		setFormSlugSaveState("saving");
+		try {
+			await updateFormSlug({ variables: { shopId, slug: normalized } });
+			setFormSlugSaveState("saved");
+		} catch (err) {
+			setFormSlugSaveState("error");
+			setAlert({
+				isAlert: true,
+				severity: ALERT_CONSTANTS.SEVERITY.ERROR,
+				message: err.graphQLErrors?.[0]?.extensions?.errors?.slug || err.message,
+				timeout: ALERT_CONSTANTS.TIMEOUT,
+				location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
+			});
+		}
+	};
+
+	const handleCopy = (slug) => {
+		navigator.clipboard
+			?.writeText(formUrl(slug, shop.formSlug))
+			.then(() => {
+				setCopiedSlug(slug);
+				setTimeout(() => setCopiedSlug(null), 2000);
+			})
+			.catch(() => setCopiedSlug(null));
+	};
 
 	// Saved on blur, matching the autosave convention every other editable field in the app uses
 	// (Project's Details panel, Shop's own name/contact fields) rather than a separate Save
@@ -86,6 +139,44 @@ const ShopPanel = ({ shopId, shopName }) => {
 				{saveState === "saved" && "Saved"}
 				{saveState === "error" && "Enter a whole number between 0 and 100"}
 			</span>
+
+			{/* The shop's own handle - see server/utils/public-form-lookup.js: this is the
+			    <ownerHandle> half of a "shop use only" form's link (/<formSlug>/<shop.formSlug>),
+			    the shop-wide counterpart to an individual artist's Artist.bookingSlug. Only
+			    meaningful once the shop actually has a shop-use-only form to link to, but editable
+			    ahead of that so a shop can pick and reserve its handle early. */}
+			<IBInput
+				id="shopFormSlug"
+				label="Shop link"
+				defaultValue={formSlugValue}
+				onChange={(e) => setEditedFormSlug(e.target.value)}
+				onBlur={handleFormSlugBlur}
+				disabled={savingSlug}
+				helperText="Lowercase letters, numbers and hyphens - used for forms shared shop-wide, not tied to one artist."
+			/>
+			<span className={`settingsSaveState settingsSaveState--${formSlugSaveState}`}>
+				{formSlugSaveState === "saving" && "Saving..."}
+				{formSlugSaveState === "saved" && "Saved"}
+				{formSlugSaveState === "error" && "That link couldn't be saved - it may already be taken."}
+			</span>
+
+			{shop.formSlug && shopWideLinks.length > 0 && (
+				<div className="formLinksList">
+					{shopWideLinks.map((form) => (
+						<div className="formLinksRow" key={form.id}>
+							<span className="formLinksRowLabel">{form.title}</span>
+							<span className="formLinksRowUrl">{formUrl(form.slug, shop.formSlug)}</span>
+							<button
+								className="ibButtonSecondary"
+								type="button"
+								onClick={() => handleCopy(form.slug)}
+							>
+								{copiedSlug === form.slug ? "Copied" : "Copy"}
+							</button>
+						</div>
+					))}
+				</div>
+			)}
 
 			{/* Everything else about the shop stays where it is. A link beats a second copy of a
 			    form - two editors for a name is how two shops end up with different ones. Used to

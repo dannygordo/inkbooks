@@ -616,6 +616,47 @@ const updateRecurringExpenseInputSchema = z.object({
   active: z.boolean().nullish(),
 });
 
+// --- Auto-Responses (see models/AutoResponse.js) -----------------------------------------------
+// shopId nullish on create, same resolveBusinessOwner convention as Expenses/Income above.
+// trigger is NOT editable on update - see typeDefs.js's UpdateAutoResponseInput comment: changing
+// it after creation would silently reinterpret an existing enabled/uniqueness guarantee for a
+// different trigger than the one it was created and validated against. Template fields are
+// nullish so a caller can explicitly reset one to the built-in default, same as
+// updateReminderSettingsInputSchema above.
+const autoResponseTriggerSchema = z.enum([
+  'SESSION_COMPLETED',
+  'PAYMENT_RECEIVED',
+  'MESSAGE_RECEIVED',
+  'MANUAL',
+]);
+const createAutoResponseInputSchema = z.object({
+  shopId: objectIdSchema.nullish(),
+  name: z.string().trim().min(1, 'A name is required'),
+  trigger: autoResponseTriggerSchema,
+  enabled: z.boolean().nullish(),
+  emailEnabled: z.boolean().nullish(),
+  smsEnabled: z.boolean().nullish(),
+  emailSubjectTemplate: z.string().trim().max(200).nullish(),
+  emailBodyTemplate: z.string().trim().max(4000).nullish(),
+  smsTemplate: z.string().trim().max(1000).nullish(),
+});
+const updateAutoResponseInputSchema = z.object({
+  autoResponseId: objectIdSchema,
+  name: z.string().trim().min(1, 'A name is required').nullish(),
+  enabled: z.boolean().nullish(),
+  emailEnabled: z.boolean().nullish(),
+  smsEnabled: z.boolean().nullish(),
+  emailSubjectTemplate: z.string().trim().max(200).nullish(),
+  emailBodyTemplate: z.string().trim().max(4000).nullish(),
+  smsTemplate: z.string().trim().max(1000).nullish(),
+  active: z.boolean().nullish(),
+});
+const sendAutoResponseNowInputSchema = z.object({
+  autoResponseId: objectIdSchema,
+  clientId: objectIdSchema,
+  appointmentId: objectIdSchema.nullish(),
+});
+
 // --- Forms (custom consent/waiver/intake forms - see models/Form.js) --------------------------
 // Separate feature from booking requests/BookingRequest.js - see that model's own header comment
 // on why "booking requests" as an example form TYPE didn't become a migration of the existing
@@ -666,7 +707,28 @@ const createFormInputSchema = z.object({
   shopId: objectIdSchema.nullish(),
   title: z.string().trim().min(1, 'Give the form a title'),
   description: z.string().nullish(),
+  // Format/reserved-word/scoped-uniqueness is all checked in utils/form-slug.js, not here - this
+  // schema only guards the wire shape (a string or nothing), same division of labor as everywhere
+  // else in this file that hands a value off to a dedicated assert*Available check.
+  slug: z.string().trim().nullish(),
+  shopUseOnly: z.boolean().nullish(),
   fields: z.array(formFieldInputSchema).min(1, 'Add at least one field'),
+});
+
+// updateBookingRequestFields' own field shape - see typeDefs.js's BookingRequestFieldInput comment
+// on why this is deliberately not formFieldInputSchema: type/options can never change here, and
+// key is REQUIRED (not nullish) because every field in this call must already exist - the exact-
+// key-set check that actually enforces "no add/remove" lives in resolvers/forms.js, this schema
+// only guards the wire shape.
+const bookingRequestFieldInputSchema = z.object({
+  key: z.string().trim().min(1),
+  label: z.string().trim().min(1, 'Every field needs a label'),
+  required: z.boolean().nullish(),
+  hidden: z.boolean().nullish(),
+});
+const updateBookingRequestFieldsInputSchema = z.object({
+  formId: objectIdSchema,
+  fields: z.array(bookingRequestFieldInputSchema).min(1),
 });
 
 // Status (draft/published/archived) and allowGuestSubmissions are deliberately NOT here - both
@@ -679,6 +741,8 @@ const updateFormInputSchema = z.object({
   formId: objectIdSchema,
   title: z.string().trim().min(1, 'Give the form a title').nullish(),
   description: z.string().nullish(),
+  slug: z.string().trim().nullish(),
+  shopUseOnly: z.boolean().nullish(),
   fields: z.array(formFieldInputSchema).min(1, 'Add at least one field').nullish(),
 });
 
@@ -714,6 +778,12 @@ const formAnswerInputSchema = z.object({
 const submitFormResponseInputSchema = z.object({
   formId: objectIdSchema.nullish(),
   publicToken: z.string().trim().min(1).nullish(),
+  // Resolved together via utils/public-form-lookup.js - see resolvers/forms.js's submitFormResponse
+  // for the branching. Wire-shape only here; slug format/reserved-word checks already happened at
+  // write time (utils/form-slug.js), and a bad handle just resolves to nothing, which the resolver
+  // turns into the same generic error a bad publicToken gets.
+  formSlug: z.string().trim().nullish(),
+  ownerHandle: z.string().trim().nullish(),
   clientId: objectIdSchema.nullish(),
   answers: z.array(formAnswerInputSchema),
   firstName: z.string().trim().nullish(),
@@ -765,9 +835,14 @@ module.exports = {
   updateIncomeInputSchema,
   createRecurringExpenseInputSchema,
   updateRecurringExpenseInputSchema,
+  createAutoResponseInputSchema,
+  updateAutoResponseInputSchema,
+  sendAutoResponseNowInputSchema,
   formFieldInputSchema,
   createFormInputSchema,
   updateFormInputSchema,
+  bookingRequestFieldInputSchema,
+  updateBookingRequestFieldsInputSchema,
   formAnswerInputSchema,
   submitFormResponseInputSchema,
   validate,
