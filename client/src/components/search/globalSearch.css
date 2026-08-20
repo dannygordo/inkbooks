@@ -74,6 +74,37 @@
 	margin-top: 1px;
 }
 
+/* A matched shared-image is the one result type where a thumbnail says more than its own text
+   ever could - a tag match tells you a word, the thumbnail tells you which image. Overrides the
+   base row's column layout with a row layout (thumbnail beside the text) rather than adding a
+   second unrelated row component. */
+.globalSearchResultRowImage {
+	flex-direction: row;
+	align-items: center;
+	gap: 10px;
+}
+
+.globalSearchResultThumb {
+	width: 36px;
+	height: 36px;
+	border-radius: 6px;
+	object-fit: cover;
+	flex-shrink: 0;
+	background-color: var(--ib-surface-subtle);
+}
+
+.globalSearchResultImageInfo {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.globalSearchResultImageInfo .globalSearchResultPrimary {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 .globalSearchSeeAll {
 	display: block;
 	width: 100%;

@@ -50,6 +50,14 @@ const SearchService = (() => {
 					}
 					createdAt
 				}
+				images {
+					id
+					url
+					clientId
+					tags
+					assignedProjectId
+					createdAt
+				}
 			}
 		}
 	`;

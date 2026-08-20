@@ -41,7 +41,13 @@ module.exports = gql`
     conversationId: ID!
     senderId: ID!
     user: User
-    message: String!
+    # No longer String! - an image-only message (see createMessage) stores no text at all, and a
+    # non-null field on a genuinely absent value would fail the whole response's serialization
+    # rather than just this field.
+    message: String
+    # Already-uploaded image URLs - see models/Message.js and routes/messageUploads.js. Empty
+    # array on a text-only message, never null (matches the model's own default: []).
+    imageUrls: [String!]!
     createdAt: DateTime
     updatedAt: DateTime
 
@@ -449,6 +455,35 @@ module.exports = gql`
     createdAt: DateTime
     updatedAt: DateTime
   }
+  # An image shared via a message in a client-artist conversation, indexed for the client
+  # dashboard's triage list - see models/SharedImage.js and resolvers/sharedImages.js.
+  #
+  # userInfo/tags/createdAt/updatedAt deliberately mirror IBImage's own field names above rather
+  # than inventing new ones - client/src/components/ibImagesList/IBImagesList.jsx (the same
+  # tag/lightbox/delete-menu component the project image lists already use) reads exactly this
+  # shape, so the client-dashboard panel can feed it a SharedImage array with no reshaping.
+  type SharedImage {
+    id: ID!
+    url: String!
+    conversationId: ID!
+    messageId: ID!
+    clientId: ID!
+    artistId: ID!
+    senderId: ID!
+    # Whoever actually sent this image - resolved from senderId, same as IBImage.userInfo.
+    userInfo: User
+    tags: [String!]!
+    # Null until an artist/shop admin files this image onto a project. Deliberately NOT cleared
+    # from the list once set (see the model's own header comment) - the client-dashboard panel
+    # shows a badge instead, so "where did this end up" stays answerable without a second lookup.
+    assignedProjectId: ID
+    assignedImageType: String
+    assignedProject: Project
+    assignedAt: DateTime
+    assignedByUserId: ID
+    createdAt: DateTime!
+    updatedAt: DateTime!
+  }
   type IBNote {
     id: ID!
     author: String!
@@ -496,8 +531,12 @@ module.exports = gql`
     id: ID!
     artistId: ID!
     shopId: ID!
-    # Percentage, e.g. 40 for 40%.
+    # Percentage, e.g. 40 for 40%. Meaningless (always 0) when compensationModel is BOOTH_RENT -
+    # see models/ShopCutRate.js.
     percent: Int!
+    # PERCENTAGE or BOOTH_RENT - which model this dated row represents. A booth-rent row's own
+    # terms (amount, due day) live on BoothRentPlan, not here - see that type below.
+    compensationModel: String!
     # Inclusive lower bound. The rate in force for a date is the row with the greatest
     # effectiveFrom at or before it. Stored rather than derived from createdAt because they answer
     # different questions - when it started applying, versus when somebody typed it in.
@@ -505,6 +544,46 @@ module.exports = gql`
     setByUserId: ID!
     note: String
     createdAt: DateTime!
+  }
+  # A booth-rent artist's flat monthly fee, and from when - the flat-fee counterpart to
+  # ShopCutRate above, for artists whose current ShopCutRate.compensationModel is BOOTH_RENT.
+  # APPEND-ONLY, same reasoning (DECISIONS.md M7 applies here too): a rent change must never
+  # reprice a month whose charge already generated. See models/BoothRentPlan.js.
+  type BoothRentPlan {
+    id: ID!
+    artistId: ID!
+    shopId: ID!
+    amountCents: Int!
+    dueDayOfMonth: Int!
+    effectiveFrom: DateTime!
+    setByUserId: ID!
+    active: Boolean!
+    createdAt: DateTime!
+  }
+  # One real month of booth rent - generated automatically (see utils/booth-rent.js), never
+  # created directly. status moves due -> marked_paid -> confirmed, the same dual-control shape as
+  # Appointment.shopCutStatus (see mutations/shopCutPayments.js) - the artist's own claim of "I
+  # paid" isn't enough, the shop confirms independently. expenseId/incomeId are set only once
+  # confirmed - see models/BoothRentCharge.js.
+  type BoothRentCharge {
+    id: ID!
+    artistId: ID!
+    shopId: ID!
+    amountCents: Int!
+    periodMonth: DateTime!
+    dueDate: DateTime!
+    status: String!
+    markedPaidAt: DateTime
+    markedPaidByUserId: ID
+    confirmedAt: DateTime
+    confirmedByUserId: ID
+    expenseId: ID
+    incomeId: ID
+    createdAt: DateTime!
+  }
+  type BoothRentChargePage {
+    items: [BoothRentCharge!]!
+    pageInfo: PageInfo!
   }
   # The audit trail - see models/EventLog.js for what this does and doesn't cover, and why. One
   # field-level change; getEventLogs below returns these as a plain list, oldest changes first
@@ -595,15 +674,24 @@ module.exports = gql`
     offsetMinutes: Int!
     enabled: Boolean!
   }
-  # Global search - see utils/search.js. Reuses the existing Client/Project/Message types rather
-  # than inventing narrower search-result shapes, since a result IS the real record (clicking one
-  # navigates straight to it) and there's nothing about being a search hit that changes its shape.
-  # Grouped by type deliberately, not one interleaved/ranked list - see the chat thread this
-  # shipped from: "grouped by type" was the explicit ask.
+  # Global search - see utils/search.js. Reuses the existing Client/Project/Message/SharedImage
+  # types rather than inventing narrower search-result shapes, since a result IS the real record
+  # (clicking one navigates straight to it) and there's nothing about being a search hit that
+  # changes its shape. Grouped by type deliberately, not one interleaved/ranked list - see the chat
+  # thread this shipped from: "grouped by type" was the explicit ask.
+  #
+  # "images" is SharedImage, not IBImage - a tag on an image already filed onto a Project matches
+  # through that Project's own text index instead (see models/Project.js) and surfaces as a
+  # matched Project, same as any other project-field match; there's no standalone "which image"
+  # result for those, since IBImage isn't its own collection to $text-search. SharedImage IS its
+  # own collection (the client-dashboard triage list, pre-project-assignment), so a tag match
+  # there gets its own group - see utils/search.js on why the same projectScopeFilter that scopes
+  # Projects also scopes this.
   type SearchResults {
     clients: [Client!]!
     projects: [Project!]!
     messages: [Message!]!
+    images: [SharedImage!]!
   }
   type ReminderSettings {
     emailEnabled: Boolean!
@@ -1356,6 +1444,73 @@ module.exports = gql`
     active: Boolean
   }
 
+  # --- Response-time settings (Feature 3 - unanswered-message nudges; see
+  # models/ResponseTimeSettings.js and utils/response-time.js) ----------------------------------
+  # A shop's row is a CEILING an artist's own row is clamped to (min), never a value the artist
+  # may exceed - see resolveResponseTimeThresholds. One row per owner (shopId XOR artistUserId),
+  # lazily created on first read or write, same convention as ReminderSettings.
+  type ResponseTimeSettings {
+    id: ID!
+    shopId: ID
+    artistUserId: ID
+    # How long a client's message may sit unanswered before it first counts as "unanswered" -
+    # both in the passive inbox condition and to start the repeat-nudge clock. Minutes, matching
+    # ReminderRule's own offsetMinutes convention.
+    initialThresholdMinutes: Int!
+    # Once unanswered, how often the artist is re-notified until they reply.
+    repeatIntervalMinutes: Int!
+    # Set only when this row is an ARTIST's own (always null on a shop row): the shop's row, if
+    # one exists, as the ceiling this artist's two fields above are clamped to - resolved the same
+    # way the server itself resolves it, so the UI can validate against the exact number that will
+    # actually apply. Null when the artist has no shop, or their shop has never set one.
+    shopCeiling: ResponseTimeCeiling
+    setByUserId: ID
+    createdAt: DateTime!
+    updatedAt: DateTime!
+  }
+  type ResponseTimeCeiling {
+    initialThresholdMinutes: Int!
+    repeatIntervalMinutes: Int!
+  }
+  input UpdateResponseTimeSettingsInput {
+    # Omit for the caller's own personal scope - see resolveBusinessOwner. Shop admin only when
+    # provided.
+    shopId: ID
+    initialThresholdMinutes: Int
+    repeatIntervalMinutes: Int
+  }
+
+  # --- System message templates (Feature 2 - manageable system-generated text; see
+  # models/SystemMessageTemplate.js and utils/system-message-templates.js) ---------------------
+  # An owner-editable override for one of the app's hardcoded outbound emails. Absence of a row
+  # for a given key means "use the built-in default" - there is no null-fields-on-a-lazily-
+  # created-row convention here the way ResponseTimeSettings has, since every field on this type
+  # is only ever an override (see the model's own header comment).
+  type SystemMessageTemplate {
+    id: ID!
+    shopId: ID
+    artistUserId: ID
+    key: String!
+    emailSubjectTemplate: String
+    emailBodyTemplate: String
+    # Only ever populated for key: "BOOKING_CONFIRMATION" - see
+    # utils/client-booking-emails.js's own comment on why that one email's body stays
+    # code-generated and only its subject and this one appendable note are editable.
+    extraNoteTemplate: String
+    setByUserId: ID
+    createdAt: DateTime!
+    updatedAt: DateTime!
+  }
+  input UpdateSystemMessageTemplateInput {
+    # Omit for the caller's own personal scope - see resolveBusinessOwner. Shop admin only when
+    # provided.
+    shopId: ID
+    key: String!
+    emailSubjectTemplate: String
+    emailBodyTemplate: String
+    extraNoteTemplate: String
+  }
+
   # --- Forms (consent/waiver/intake - see models/Form.js and models/FormResponse.js) -----------
   # Same ownership model as Expenses/Income directly above: shopId XOR artistUserId, gated through
   # the same resolveBusinessOwner/assertCanManageBusinessRecord. A separate feature from
@@ -1936,6 +2091,26 @@ module.exports = gql`
     # Rate history for one artist at one shop, newest first. Readable by the artist themselves and
     # by a shop admin there - an artist must be able to see what they are being charged.
     getShopCutRates(artistId: ID!, shopId: ID!): [ShopCutRate!]!
+
+    ######### Shared images (client-dashboard message-image triage) #########
+    # Every image shared in this client's message conversation(s), newest first, whether the
+    # client or the artist sent it - artist/shop-admin only, see
+    # utils/shop-membership.js's canManageClientSharedImages. See resolvers/sharedImages.js.
+    getSharedImagesForClient(clientId: ID!): [SharedImage!]!
+    # This client's projects, unpaginated title/status only - feeds the "assign to project"
+    # picker on the shared-images panel. Same auth as getSharedImagesForClient above.
+    getProjectsForClient(clientId: ID!): [Project!]!
+
+    ######### Booth rent (Feature 5 - booth rent vs. percentage cut) #########
+    # Booth-rent plan history for one artist at one shop, newest first - same read floor as
+    # getShopCutRates above (the artist themselves, or a shop admin there). See
+    # resolvers/boothRent.js.
+    getBoothRentPlans(artistId: ID!, shopId: ID!): [BoothRentPlan!]!
+    # A page of one owner's booth-rent charges, newest period first. Exactly one of
+    # artistId/shopId is required - the artist's own history, or a shop's full roster of
+    # booth-rent artists. status optionally narrows to one lifecycle stage (e.g. "due" for an
+    # overdue-rent view, "marked_paid" for a shop admin's confirmation queue).
+    getBoothRentCharges(artistId: ID, shopId: ID, status: String, page: PageInput): BoothRentChargePage!
     # The audit trail. Scoping is enforced in the resolver, not by the filter argument here - a
     # shop admin gets their own shop's rows regardless of what shopId they pass, a plain Admin's
     # filter is honored as given, and an independent artist (no shop) is scoped to their own
@@ -1944,10 +2119,10 @@ module.exports = gql`
     # Always the caller's own row (created on first read if none exists yet) - see
     # resolvers/reminders.js.
     getReminderSettings: ReminderSettings!
-    # Global search across Clients, Projects, and Messages - grouped by type, scoped to exactly
-    # what the caller could otherwise list/read (see utils/search.js). Blank/whitespace-only
-    # returns all three lists empty rather than erroring - the client fires this on every
-    # keystroke, and "nothing typed yet" is a normal state, not a bad request.
+    # Global search across Clients, Projects, Messages, and shared-images-by-tag - grouped by
+    # type, scoped to exactly what the caller could otherwise list/read (see utils/search.js).
+    # Blank/whitespace-only returns all four lists empty rather than erroring - the client fires
+    # this on every keystroke, and "nothing typed yet" is a normal state, not a bad request.
     #
     # limit is PER TYPE, not total, and optional - omitted, it's the app bar dropdown's small
     # default; the dedicated /search results page passes a larger one explicitly. Clamped
@@ -2016,6 +2191,17 @@ module.exports = gql`
     # Settings or the manual send picker, only in a "show deactivated" toggle if one is ever added.
     getAutoResponses(shopId: ID, artistUserId: ID, includeInactive: Boolean): [AutoResponse!]!
 
+    ######### Response-time settings (Feature 3 - unanswered-message nudges) ###########
+    # Exactly one of shopId/artistUserId is required, same as getAutoResponses above. Lazily
+    # created on first read - see resolvers/responseTimeSettings.js's findOrCreateSettings.
+    getResponseTimeSettings(shopId: ID, artistUserId: ID): ResponseTimeSettings!
+
+    ######### System message templates (Feature 2 - manageable system-generated text) #########
+    # Exactly one of shopId/artistUserId is required, same as getAutoResponses above. Returns
+    # only the overrides that actually exist for that owner - an empty list means every one of
+    # the 7 keys is still using its built-in default.
+    getSystemMessageTemplates(shopId: ID, artistUserId: ID): [SystemMessageTemplate!]!
+
     ######### Forms (consent/waiver/intake) ###########
     # See the type block's own header comment (models/Form.js) for the ownership model - identical
     # to Expenses/Income above, reusing the same resolveBusinessOwner/assertCanManageBusinessRecord.
@@ -2046,6 +2232,24 @@ module.exports = gql`
     getFormAnalytics(formId: ID!): FormAnalytics!
   }
   type Mutation {
+    ######### Shared images (client-dashboard message-image triage) #########
+    # Files a client-shared image onto one of a project's three image lists (REFERENCE, DESIGN,
+    # or BODY - matching Project's own referenceImages/designImages/bodyImages). Copies the URL
+    # into that list (not a move - see models/SharedImage.js on why this stays in the
+    # client-dashboard list too, badged rather than removed) and stamps the assignment onto the
+    # SharedImage row. projectId must belong to the same client as the image, or this refuses.
+    assignSharedImageToProject(sharedImageId: ID!, projectId: ID!, imageType: String!): SharedImage!
+    # Replaces a shared image's tags wholesale, same "send the complete array" convention as
+    # updateProject's own image-tag path (client/src/pages/projects/Project.jsx's
+    # handleImageTagsUpdate).
+    updateSharedImageTags(sharedImageId: ID!, tags: [String!]!): SharedImage!
+    # Removes this row from the client-dashboard list ONLY - unlike the project image lists'
+    # own "Delete" (client/src/components/ibImagesList/IBImagesListOptions.jsx), this does NOT
+    # delete the underlying file or touch the original message: that image is still real chat
+    # history and deleting the file would break its thumbnail there too. This just stops
+    # surfacing it as something needing a decision.
+    removeSharedImageFromList(sharedImageId: ID!): Boolean!
+
     # Records a new shop cut rate for an artist, from a date forward. APPEND-ONLY - this never
     # edits an existing rate, so past work keeps the rate that applied when it was performed.
     #
@@ -2059,9 +2263,32 @@ module.exports = gql`
       artistId: ID!
       shopId: ID!
       percent: Int!
+      # PERCENTAGE (default) or BOOTH_RENT. Switching an artist to booth rent is a rate change
+      # like any other - see models/ShopCutRate.js - so it's this same append-only mutation, with
+      # percent conventionally 0 on a BOOTH_RENT row. Set the artist's own terms afterward (or in
+      # the same client action) via setBoothRentPlan below.
+      compensationModel: String
       effectiveFrom: DateTime
       note: String
     ): ShopCutRate!
+    # Records new booth-rent terms for an artist at a shop, from a date forward. APPEND-ONLY, same
+    # reasoning as setShopCutRate above. SHOP ADMIN ONLY - the artist reads it (getBoothRentPlans),
+    # never sets it, for the same reason they never set their own shop-cut percentage.
+    setBoothRentPlan(
+      artistId: ID!
+      shopId: ID!
+      amountCents: Int!
+      dueDayOfMonth: Int!
+      effectiveFrom: DateTime
+    ): BoothRentPlan!
+    # The artist's own claim that this month's rent is paid - does NOT settle it. See
+    # confirmBoothRentPaid below, the shop's independent half of this dual-control flow (mirrors
+    # markShopCutPaidManually/confirmShopCutPaid exactly).
+    markBoothRentPaidManually(boothRentChargeId: ID!): BoothRentCharge!
+    # The shop's independent confirmation. Creates the real Expense (the artist's own books) and
+    # Income (the shop's own books) rows and stamps their ids onto the charge - see
+    # utils/booth-rent.js and mutations/boothRentPayments.js.
+    confirmBoothRentPaid(boothRentChargeId: ID!): BoothRentCharge!
     # Archiving is what "remove this person" means. It sets a status and touches nothing else:
     # their projects, appointments and the money on those appointments are untouched, still count
     # toward revenue, and still render on the calendar. What changes is that they stop appearing
@@ -2380,13 +2607,23 @@ module.exports = gql`
     # Handled, not merely seen. See models/Notification.js on why these are different.
     markNotificationsDone(notificationIds: [ID!]!): Int!
     markConversationRead(conversationId: ID!): Conversation!
+    # The reverse of markConversationRead - see conversation-reads.js's markConversationUnreadForUser
+    # for why this needs no new storage. Idempotent on an already-unread conversation.
+    markConversationUnread(conversationId: ID!): Conversation!
     # No createdAt/updatedAt. The server stamps them - a message's timestamp decides where it sits
     # in the thread and whether it counts as unread, and neither may be caller-controlled. See
     # mutations/messages.js.
+    #
+    # message is no longer required - an image-only message (imageUrls set, no text) is a real
+    # case now. At least one of the two must be non-empty; enforced in
+    # utils/validation.js's createMessageInputSchema, which can see both fields at once.
+    # imageUrls are already-uploaded URLs from POST /message-uploads (routes/messageUploads.js) -
+    # never raw file data through GraphQL, matching how Form file_upload fields work.
     createMessage(
       conversationId: ID!
       senderId: ID!
-      message: String!
+      message: String
+      imageUrls: [String!]
     ): Message!
     updateMessage(message: MessageInput): Message
 
@@ -2455,6 +2692,22 @@ module.exports = gql`
     updateAutoResponse(input: UpdateAutoResponseInput!): AutoResponse!
     archiveAutoResponse(autoResponseId: ID!): AutoResponse!
     sendAutoResponseNow(autoResponseId: ID!, clientId: ID!, appointmentId: ID): Boolean!
+
+    ######### Response-time settings (Feature 3 - unanswered-message nudges) ###########
+    # See resolvers/responseTimeSettings.js. shopId inside the input is nullish, same
+    # resolveBusinessOwner convention as CreateAutoResponseInput - omit for the caller's own
+    # personal scope. Upserts, same as updateReminderSettings - there is no separate create step.
+    updateResponseTimeSettings(input: UpdateResponseTimeSettingsInput!): ResponseTimeSettings!
+
+    ######### System message templates (Feature 2 - manageable system-generated text) #########
+    # See resolvers/systemMessageTemplates.js. shopId nullish in both, same resolveBusinessOwner
+    # convention as CreateAutoResponseInput - omit for the caller's own personal scope.
+    # updateSystemMessageTemplate upserts by (owner, key) - there is no separate create step.
+    # resetSystemMessageTemplate deletes the override row outright, returning to the built-in
+    # default - see models/SystemMessageTemplate.js's own comment on why absence, not a null
+    # field, IS the reset state here.
+    updateSystemMessageTemplate(input: UpdateSystemMessageTemplateInput!): SystemMessageTemplate!
+    resetSystemMessageTemplate(shopId: ID, key: String!): Boolean!
 
     ######### Forms (consent/waiver/intake) ###########
     # See getForm's own header comment above for the ownership model. createForm/updateForm never

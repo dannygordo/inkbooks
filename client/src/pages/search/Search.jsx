@@ -34,6 +34,10 @@ const PROJECT_COLUMNS = [
 	{ key: "status", label: "Status", width: "120px" },
 ];
 const MESSAGE_COLUMNS = [{ key: "date", label: "Date", width: "160px" }];
+const IMAGE_COLUMNS = [
+	{ key: "status", label: "Status", width: "180px" },
+	{ key: "date", label: "Shared", width: "160px" },
+];
 
 const Search = () => {
 	const [searchParams, setSearchParams] = useSearchParams();
@@ -115,6 +119,23 @@ const Search = () => {
 		},
 	}));
 
+	// SharedImage isn't its own page - a match lands on the client's dashboard
+	// (SharedImagesPanel.jsx), assigned or not, same as the dropdown's own click-through.
+	// `avatar: image.url` is deliberate, not a placeholder - EntityList's avatar slot (IBAvatar)
+	// is exactly "the picture that identifies this row," which for an image result IS the image,
+	// not a person's headshot. Same component, same prop, doing the same job it always does.
+	const imageItems = (results?.images || []).map((image) => ({
+		key: image.id,
+		linkTo: `${ROUTE_CONSTANTS.CLIENT}${image.clientId}`,
+		avatar: image.url,
+		primary: image.tags && image.tags.length ? image.tags.join(", ") : "Shared image",
+		secondary: image.tags && image.tags.length ? null : "No tags yet",
+		values: {
+			status: image.assignedProjectId ? "Filed on a project" : "Not yet filed",
+			date: image.createdAt ? new Date(image.createdAt).toLocaleDateString() : "",
+		},
+	}));
+
 	// A capped result set that came back exactly at the cap COULD be hiding more matches - shown
 	// as a hint to narrow the search rather than as a bare count, which would otherwise be read as
 	// a total.
@@ -128,7 +149,7 @@ const Search = () => {
 				autoFocus
 				value={inputValue}
 				onChange={(e) => setInputValue(e.target.value)}
-				placeholder="Search clients, projects, messages…"
+				placeholder="Search clients, projects, messages, image tags…"
 				variant="outlined"
 				size="small"
 				className="searchPageInput"
@@ -185,6 +206,19 @@ const Search = () => {
 							emptyMessage="No matching messages."
 						/>
 						{showsMoreHint(messageItems) && (
+							<p className="searchPageMoreHint">
+								Showing the top {RESULTS_LIMIT} matches - refine your search to narrow further.
+							</p>
+						)}
+					</section>
+					<section className="searchPageSection">
+						<h2 className="searchPageSectionTitle">Shared Images</h2>
+						<EntityList
+							columns={IMAGE_COLUMNS}
+							items={imageItems}
+							emptyMessage="No matching image tags."
+						/>
+						{showsMoreHint(imageItems) && (
 							<p className="searchPageMoreHint">
 								Showing the top {RESULTS_LIMIT} matches - refine your search to narrow further.
 							</p>

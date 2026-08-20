@@ -39,9 +39,36 @@ const ProjectSchema = new mongoose.Schema({
 // Global search (utils/search.js). Title weighted highest since it's the piece's own name and the
 // thing someone searching for a project almost always remembers; tags next (deliberate, chosen
 // labels); description and placement lowest, as free text that's more likely to match by accident.
+//
+// referenceImages.tags/designImages.tags/bodyImages.tags reach INSIDE the three IBImage arrays -
+// Mongo text indexes do cover a field nested in an array of subdocuments, tokenizing every string
+// across every element, not just the array's own top level. A tag on any single image search-
+// matches the whole Project, same as a Project-level tag does; there's no separate "which image"
+// result for these (SharedImage, a genuinely standalone collection, is what gets its own search
+// group instead - see utils/search.js). Weighted just under Project.tags: still a deliberately
+// chosen label, but one step more specific/buried than a tag on the project as a whole.
 ProjectSchema.index(
-	{ title: 'text', description: 'text', tags: 'text', placement: 'text' },
-	{ weights: { title: 10, tags: 5, description: 2, placement: 1 }, name: 'ProjectTextIndex' }
+	{
+		title: 'text',
+		description: 'text',
+		tags: 'text',
+		placement: 'text',
+		'referenceImages.tags': 'text',
+		'designImages.tags': 'text',
+		'bodyImages.tags': 'text',
+	},
+	{
+		weights: {
+			title: 10,
+			tags: 5,
+			'referenceImages.tags': 4,
+			'designImages.tags': 4,
+			'bodyImages.tags': 4,
+			description: 2,
+			placement: 1,
+		},
+		name: 'ProjectTextIndex',
+	}
 );
 
 module.exports = mongoose.model('Project', ProjectSchema);

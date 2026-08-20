@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useMutation, useApolloClient } from "@apollo/client";
 import moment from "moment";
-import { Button, Chip } from "@mui/material";
+import { Button, Chip, DialogActions, DialogContent } from "@mui/material";
 import { PlayArrow, Stop, RestartAlt, Save, Delete } from "@mui/icons-material";
 import { AppointmentService } from "../../services/AppointmentService";
 import IBInput from "../inputs/IBInput";
@@ -500,7 +500,15 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 	const subtotalCentsEntered = dollarsToCents(subtotalDollars);
 
 	return (
-		<div className="sessionDetail">
+		// DialogContent dividers / DialogActions, not a bare div - the same MUI modal chrome
+		// EntityWizard.jsx/UpdateEventDialog.jsx/SharedImagesPanel's AssignImageForm already use.
+		// IBModal.jsx applies no padding of its own (see those components' own comments on why),
+		// so a plain "sessionDetail" div with 8px of padding was the entire margin between this
+		// form's densest content (the money rows, the adjustments block) and the dialog's edge -
+		// which is exactly what read as cramped. sessionDetailContent/sessionDetailActions below
+		// now carry the same 24px/28px and 16px/28px padding every other modal in this app uses.
+		<>
+			<DialogContent dividers className="sessionDetailContent">
 			<div className="sessionDetailStatusRow">
 				<Chip
 					label={isClosed ? "Completed" : "In progress"}
@@ -766,8 +774,9 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 					onChange={(e) => setNotes(e.target.value)}
 				/>
 			</FormField>
+			</DialogContent>
 
-			<div className="sessionDetailActions">
+			<DialogActions className="sessionDetailActions">
 				<Button
 					variant="outlined"
 					startIcon={<Save />}
@@ -810,8 +819,8 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 				>
 					Delete Session
 				</Button>
-			</div>
-		</div>
+			</DialogActions>
+		</>
 	);
 };
 

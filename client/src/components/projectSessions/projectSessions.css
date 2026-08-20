@@ -38,12 +38,19 @@
 	font-style: italic;
 }
 
-.sessionDetail {
+/* Mirrors EntityWizard's own modal chrome (entityWizard.css: .entityWizard/.entityWizardContent/
+   .entityWizardActions) - same fixed width and the same 24px/28px content padding every other
+   modal opened through the shared IBModal shell uses (IBModal.jsx applies none itself), so this
+   dialog is the same size and doesn't read as a different, cramped app bolted onto the rest. Was
+   `.sessionDetail`, a plain div with only 8px of padding - the entire margin this form's densest
+   content (money rows, the adjustments block) had between itself and the dialog's edge. */
+.sessionDetailContent {
+	box-sizing: border-box;
 	display: flex;
 	flex-direction: column;
 	gap: 16px;
-	min-width: 320px;
-	padding: 8px;
+	width: 560px;
+	padding: 24px 28px !important;
 }
 
 .sessionDetailStatusRow {
@@ -219,8 +226,9 @@
 
 .sessionDetailActions {
 	display: flex;
-	gap: 8px;
+	gap: 10px;
 	flex-wrap: wrap;
+	padding: 16px 28px !important;
 }
 
 .projectSessionAddForm {

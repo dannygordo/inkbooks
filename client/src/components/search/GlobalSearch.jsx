@@ -121,7 +121,11 @@ const GlobalSearch = () => {
 	const trimmedQuery = inputValue.trim();
 	const hasQuery = trimmedQuery.length >= MIN_QUERY_LENGTH;
 	const hasResults =
-		results && (results.clients.length || results.projects.length || results.messages.length);
+		results &&
+		(results.clients.length ||
+			results.projects.length ||
+			results.messages.length ||
+			results.images.length);
 
 	const goTo = (path) => {
 		navigate(path);
@@ -142,19 +146,38 @@ const GlobalSearch = () => {
 		setOpen(false);
 	};
 
+	// Clears the box once the person is done with it - clicking or Tab-ing away, not selecting a
+	// result (goTo/goToResultsPage above already handle those explicitly). relatedTarget is the
+	// element ABOUT to gain focus: null for a click on a non-focusable area (the page background,
+	// most static content) and populated for a real Tab-key move or a click on another focusable
+	// element. Checking it against containerRef, not just firing on every blur, matters for one
+	// specific case - the dropdown's own result rows are real <button>s sitting right after this
+	// input in the DOM, so Tab-ing off the input naturally lands on the first result, and a click
+	// on any result also blurs this input a beat before its own onClick fires (mousedown fires
+	// blur before the click event dispatches). Clearing/closing unconditionally on blur would
+	// unmount the dropdown out from under that click or keystroke - containment check is what lets
+	// "still inside this widget" (a result) stay open while "actually left it" clears the box.
+	const handleBlur = (e) => {
+		if (!e.relatedTarget || !containerRef.current?.contains(e.relatedTarget)) {
+			setOpen(false);
+			setInputValue("");
+		}
+	};
+
 	return (
 		<Search ref={containerRef} className="globalSearch">
 			<SearchIconWrapper>
 				<SearchIcon />
 			</SearchIconWrapper>
 			<StyledInputBase
-				placeholder="Search clients, projects, messages…"
+				placeholder="Search clients, projects, messages, image tags…"
 				value={inputValue}
 				onFocus={() => setOpen(true)}
 				onChange={(e) => {
 					setInputValue(e.target.value);
 					setOpen(true);
 				}}
+				onBlur={handleBlur}
 				onKeyDown={(e) => {
 					if (e.key === "Escape") {
 						setOpen(false);
@@ -225,6 +248,31 @@ const GlobalSearch = () => {
 									</span>
 									<span className="globalSearchResultSecondary">
 										{truncate(message.message)}
+									</span>
+								</button>
+							))}
+						</div>
+					)}
+					{!loading && results && results.images.length > 0 && (
+						<div className="globalSearchSection">
+							<div className="globalSearchSectionLabel">Shared Images</div>
+							{results.images.map((image) => (
+								<button
+									type="button"
+									key={image.id}
+									className="globalSearchResultRow globalSearchResultRowImage"
+									// SharedImage isn't its own page - it lives on the client's dashboard
+									// (SharedImagesPanel.jsx), assigned or not, so that's where a match lands.
+									onClick={() => goTo(`/client/${image.clientId}`)}
+								>
+									<img src={image.url} alt="" className="globalSearchResultThumb" />
+									<span className="globalSearchResultImageInfo">
+										<span className="globalSearchResultPrimary">
+											{image.tags && image.tags.length ? image.tags.join(", ") : "Shared image"}
+										</span>
+										<span className="globalSearchResultSecondary">
+											{image.assignedProjectId ? "Filed on a project" : "Not yet filed to a project"}
+										</span>
 									</span>
 								</button>
 							))}

@@ -2,18 +2,24 @@ const Client = require('../models/Client');
 const Project = require('../models/Project');
 const Message = require('../models/Message');
 const Conversation = require('../models/Conversation');
+const SharedImage = require('../models/SharedImage');
 const { clientScopeFilter, projectScopeFilter } = require('./shop-membership');
 
 /**
- * Global search: Clients, Projects, and Messages, grouped by type, scoped to what the caller
- * could otherwise already list.
+ * Global search: Clients, Projects, Messages, and shared-images-by-tag, grouped by type, scoped
+ * to what the caller could otherwise already list.
  *
  * NO NEW AUTHORIZATION RULES. Clients and Projects are scoped by clientScopeFilter/
  * projectScopeFilter (utils/shop-membership.js) - the exact same filters getClients/getProjects
  * apply, extracted specifically so search can reuse them rather than reimplement a second, subtly
- * different version of "what can this person see." Messages have no equivalent existing list
- * query to reuse, so conversationScopeFilter below is search-specific - see its own comment for
- * why it's the conservative reading rather than the fuller one canAccessConversation allows.
+ * different version of "what can this person see." SharedImage reuses projectScopeFilter's own
+ * {artistId}/{clientId} filter unchanged rather than a fourth scope function - SharedImage carries
+ * the same two field names Project does for exactly this reuse (see models/SharedImage.js), and
+ * that shape already matches canManageClientSharedImages' per-record rule (an artist with a project
+ * for this client, or a shop admin/staff at one of the client's shops) at the bulk-filter level.
+ * Messages have no equivalent existing list query to reuse, so conversationScopeFilter below is
+ * search-specific - see its own comment for why it's the conservative reading rather than the
+ * fuller one canAccessConversation allows.
  */
 
 // Per type, when the caller doesn't ask for a specific amount - the app bar's live dropdown,
@@ -74,7 +80,7 @@ function textSearch(model, scope, query, limit) {
 async function searchAll(user, rawQuery, rawLimit) {
   const query = String(rawQuery || '').trim();
   if (!query) {
-    return { clients: [], projects: [], messages: [] };
+    return { clients: [], projects: [], messages: [], images: [] };
   }
   const limit = clampLimit(rawLimit);
 
@@ -84,13 +90,15 @@ async function searchAll(user, rawQuery, rawLimit) {
     conversationScopeFilter(user),
   ]);
 
-  const [clients, projects, messages] = await Promise.all([
+  const [clients, projects, messages, images] = await Promise.all([
     clientScope ? textSearch(Client, clientScope, query, limit) : [],
     projectScope ? textSearch(Project, projectScope, query, limit) : [],
     conversationScope ? textSearch(Message, conversationScope, query, limit) : [],
+    // Same scope Projects use - see this file's own header comment on why that's valid reuse here.
+    projectScope ? textSearch(SharedImage, projectScope, query, limit) : [],
   ]);
 
-  return { clients, projects, messages };
+  return { clients, projects, messages, images };
 }
 
 module.exports = { searchAll, conversationScopeFilter, RESULTS_PER_TYPE, MAX_RESULTS_PER_TYPE };
