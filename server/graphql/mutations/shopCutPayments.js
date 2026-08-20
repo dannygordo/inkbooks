@@ -281,6 +281,7 @@ module.exports = {
         shopName: shop.name,
         artistName: artist ? `${artist.firstName} ${artist.lastName}` : 'An artist',
         amountCents: appointment.shopCutCents,
+        shopId: appointment.shopId,
       });
     }
 
@@ -347,6 +348,7 @@ module.exports = {
         to: artist.email,
         artistFirstName: artist.firstName,
         shopName: shop ? shop.name : 'the shop',
+        artistUserId: appointment.userId,
       });
     }
 

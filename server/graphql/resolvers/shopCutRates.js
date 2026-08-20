@@ -39,7 +39,13 @@ module.exports = {
 
   Mutation: {
     setShopCutRate: withAuth(
-      async (_, { artistId, shopId, percent, effectiveFrom, note }, context, info, user) => {
+      async (
+        _,
+        { artistId, shopId, percent, compensationModel, effectiveFrom, note },
+        context,
+        info,
+        user,
+      ) => {
         // The caller must be an admin AT THIS SHOP, not merely an admin somewhere. withAuth's role
         // floor below establishes the rank; this establishes that it is this shop's rank.
         await assertCanAccessShop(user, shopId);
@@ -57,6 +63,7 @@ module.exports = {
             artistUserId: artistId,
             shopId,
             percent,
+            compensationModel,
             setByUserId: user.id,
             effectiveFrom: effectiveFrom ? new Date(effectiveFrom) : undefined,
             note,
@@ -69,7 +76,10 @@ module.exports = {
             action: 'create',
             actorUserId: user.id,
             shopId,
-            summary: `Set shop cut to ${percent}% for an artist`,
+            summary:
+              rate.compensationModel === 'BOOTH_RENT'
+                ? 'Switched an artist to booth rent'
+                : `Set shop cut to ${percent}% for an artist`,
           });
           return rate;
         } catch (err) {

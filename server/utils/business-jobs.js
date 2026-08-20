@@ -1,4 +1,5 @@
 const { generateDueRecurringExpenses } = require('./recurring-expenses');
+const { generateDueBoothRentCharges } = require('./booth-rent');
 
 /**
  * The scheduled half of the expense/income feature - see utils/recurring-expenses.js. Kept in its
@@ -19,6 +20,18 @@ function businessJobs() {
       run: async () => {
         const result = await generateDueRecurringExpenses();
         return `templates=${result.templatesProcessed} generated=${result.generated} skipped=${result.skippedDuplicate}`;
+      },
+    },
+    {
+      // Feature 5 - see utils/booth-rent.js. Same hourly cadence and the same reasoning as
+      // recurring-expenses above: rent is due monthly at the finest, but an hourly tick costs
+      // nothing and means a newly-switched artist's first charge doesn't wait for a once-daily
+      // job's fixed hour.
+      name: 'booth-rent-charges',
+      everyMs: 60 * 60 * 1000,
+      run: async () => {
+        const result = await generateDueBoothRentCharges();
+        return `pairs=${result.pairsProcessed} generated=${result.generated} skipped=${result.skippedDuplicate}`;
       },
     },
   ];

@@ -89,3 +89,20 @@
     margin-left: -6px;
     color: #6b7280;
 }
+
+/* Feature 5 - the booth-rent charges awaiting a shop admin's confirmation (see
+   ShopCutRatePanel.jsx). Reuses .shopCutRateHistory's border/spacing rhythm rather than inventing
+   a new one - it's the same "a list of dated money rows" shape. */
+.boothRentPendingCharges {
+    margin-top: 16px;
+}
+
+.boothRentChargeRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--ib-surface-subtle);
+    font-size: 14px;
+}

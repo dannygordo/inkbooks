@@ -37,6 +37,21 @@ const shopCutRateSchema = new mongoose.Schema(
     // is expressed by having no row at all, not by a null inside one.
     percent: { type: Number, required: true, min: 0, max: 100 },
 
+    // Which compensation model this dated row represents - PERCENTAGE (the field above applies)
+    // or BOOTH_RENT (a flat monthly fee applies instead - see models/BoothRentPlan.js and
+    // BoothRentCharge.js). Booth rent IS 0% by construction: switching an artist writes a new row
+    // here with percent: 0, compensationModel: 'BOOTH_RENT', so utils/shop-cut.js's
+    // resolveShopCutPercentAt needs no changes at all - it already returns the right number for a
+    // booth-rent artist without knowing booth rent exists. This field is the only thing that DOES
+    // need to know which model applies, and only to answer that one question for Settings and for
+    // utils/booth-rent.js's generator (see resolveCompensationModelAt in utils/shop-cut.js).
+    compensationModel: {
+      type: String,
+      required: true,
+      enum: ['PERCENTAGE', 'BOOTH_RENT'],
+      default: 'PERCENTAGE',
+    },
+
     // Inclusive lower bound. The rate in force for a given date is the row with the greatest
     // effectiveFrom that is <= that date.
     //

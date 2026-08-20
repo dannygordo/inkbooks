@@ -117,6 +117,33 @@ async function resolveShopCutPercentAt(artistUserId, shopId, at = new Date()) {
 }
 
 /**
+ * Which compensation model applied for an artist at a shop, AS OF A DATE - the same "newest dated
+ * row wins" resolution as resolveShopCutPercentAt above, kept as its own function rather than
+ * folded into it because they answer different callers' questions: resolveShopCutPercentAt is read
+ * by every appointment that needs a number (and never needs to know WHY that number is 0),
+ * while this is read by Settings (which model is this artist currently shown as being on) and by
+ * utils/booth-rent.js's generator (is this artist/shop pair currently eligible to have booth-rent
+ * charges generated at all).
+ *
+ * No ArtistShopConnection/Shop fallback the way the percentage has one - compensationModel is a
+ * feature that postdates those fallback fields entirely, so "no dated row" always means
+ * PERCENTAGE, full stop.
+ */
+async function resolveCompensationModelAt(artistUserId, shopId, at = new Date()) {
+  if (!shopId) {
+    return 'PERCENTAGE';
+  }
+  const dated = await ShopCutRate.findOne({
+    artistId: artistUserId,
+    shopId,
+    effectiveFrom: { $lte: at },
+  })
+    .sort({ effectiveFrom: -1 })
+    .select('compensationModel');
+  return (dated && dated.compensationModel) || 'PERCENTAGE';
+}
+
+/**
  * The undated form, kept for callers that genuinely mean "right now".
  *
  * Deliberately a thin wrapper rather than a second implementation. It exists so the rename doesn't
@@ -212,12 +239,26 @@ async function applyShopCut(appointment) {
  *
  * @returns {Promise<object>} the created ShopCutRate document
  */
-async function setShopCutRate({ artistUserId, shopId, percent, setByUserId, effectiveFrom, note }) {
+async function setShopCutRate({
+  artistUserId,
+  shopId,
+  percent,
+  compensationModel,
+  setByUserId,
+  effectiveFrom,
+  note,
+}) {
   if (!artistUserId || !shopId) {
     throw new Error('setShopCutRate needs both an artist and a shop');
   }
   if (typeof percent !== 'number' || Number.isNaN(percent) || percent < 0 || percent > 100) {
     throw new Error(`setShopCutRate: percent must be a number between 0 and 100, got ${percent}`);
+  }
+  const resolvedModel = compensationModel || 'PERCENTAGE';
+  if (!['PERCENTAGE', 'BOOTH_RENT'].includes(resolvedModel)) {
+    throw new Error(
+      `setShopCutRate: compensationModel must be PERCENTAGE or BOOTH_RENT, got ${resolvedModel}`,
+    );
   }
   if (!setByUserId) {
     // A rate is money. A change with no author is not auditable, and the tempting default - the
@@ -229,6 +270,7 @@ async function setShopCutRate({ artistUserId, shopId, percent, setByUserId, effe
       artistId: artistUserId,
       shopId,
       percent,
+      compensationModel: resolvedModel,
       setByUserId,
       effectiveFrom: effectiveFrom || new Date(),
       note: note || '',
@@ -247,6 +289,7 @@ async function setShopCutRate({ artistUserId, shopId, percent, setByUserId, effe
 module.exports = {
   resolveShopCutPercent,
   resolveShopCutPercentAt,
+  resolveCompensationModelAt,
   setShopCutRate,
   applyShopCut,
 };
