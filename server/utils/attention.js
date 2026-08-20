@@ -5,9 +5,18 @@ const SquareAccount = require('../models/SquareAccount');
 const User = require('../models/User');
 const Staff = require('../models/Staff');
 const Artist = require('../models/Artist');
+const Client = require('../models/Client');
+const Conversation = require('../models/Conversation');
+const Message = require('../models/Message');
+const BoothRentCharge = require('../models/BoothRentCharge');
 const { Constants } = require('./constants');
 const { getShopIdsForUser } = require('./shop-membership');
 const { getConnectedArtistUserIds } = require('./artist-shop');
+const { formatCents } = require('./money');
+const {
+  resolveThresholdsForArtists,
+  DEFAULT_INITIAL_THRESHOLD_MINUTES,
+} = require('./response-time');
 
 /**
  * Things that are currently TRUE and want attention. Never stored.
@@ -252,6 +261,160 @@ async function squareHealth(shopIds) {
 }
 
 /**
+ * Client messages nobody has answered - the shared query behind both halves of Feature 3
+ * (unanswered-message nudges): the passive inbox condition below, and
+ * utils/notification-jobs.js's active sendMessageNudges sweep. Kept as its own function, separate
+ * from unansweredMessages, because the job needs the raw {artistUserId, clientUserId,
+ * latestMessage} rows to decide WHO to notify and dedupe against - the `condition()` shape below
+ * is deliberately display-only and has nowhere to put those.
+ *
+ * RESTRICTED TO THE SAME "CLEAN CLIENT <-> SINGLE ARTIST" THREAD SHAPE
+ * sendAutoResponseForIncomingMessage (utils/auto-responses.js) already requires for its
+ * MESSAGE_RECEIVED trigger - a staff-only thread (zero artist members) or a group thread (more
+ * than one) has no single unambiguous artist this condition could report against, so both are
+ * left alone rather than guessed at.
+ *
+ * `thresholdsByArtist` is a Map from utils/response-time.js's resolveThresholdsForArtists - each
+ * artist's OWN resolved (already shop-ceiling-clamped) initialThresholdMinutes decides whether
+ * their conversation is late, so two artists at the same shop with different personal settings
+ * can disagree about the same client's conversation timing out.
+ */
+async function findUnansweredMessages(artistUserIds, thresholdsByArtist, { now = new Date() } = {}) {
+  if (!artistUserIds || artistUserIds.length === 0) return [];
+
+  const conversations = await Conversation.find({ members: { $in: artistUserIds } }).select(
+    'members',
+  );
+  if (conversations.length === 0) return [];
+
+  const memberIds = Array.from(
+    new Set(conversations.flatMap((c) => (c.members || []).map(String))),
+  );
+  const [clientRows, artistRows] = await Promise.all([
+    Client.find({ userId: { $in: memberIds } }).select('userId'),
+    Artist.find({ userId: { $in: memberIds } }).select('userId'),
+  ]);
+  const clientUserIdSet = new Set(clientRows.map((c) => String(c.userId)));
+  const ourArtistIdSet = new Set(artistUserIds.map(String));
+  const artistUserIdSet = new Set(artistRows.map((a) => String(a.userId)));
+
+  const eligible = [];
+  for (const convo of conversations) {
+    const members = (convo.members || []).map(String);
+    const artistMembers = members.filter((m) => artistUserIdSet.has(m) && ourArtistIdSet.has(m));
+    const clientMembers = members.filter((m) => clientUserIdSet.has(m));
+    // Zero or more than one of either side - not a clean 1:1 client/artist thread. See this
+    // function's own header comment.
+    if (artistMembers.length !== 1 || clientMembers.length !== 1) {
+      continue;
+    }
+    eligible.push({
+      conversationId: convo._id,
+      artistUserId: artistMembers[0],
+      clientUserId: clientMembers[0],
+    });
+  }
+  if (eligible.length === 0) return [];
+
+  // Latest message per eligible conversation, in one aggregation rather than one query per
+  // conversation.
+  const conversationIds = eligible.map((e) => e.conversationId);
+  const latestRows = await Message.aggregate([
+    { $match: { conversationId: { $in: conversationIds } } },
+    { $sort: { createdAt: -1 } },
+    { $group: { _id: '$conversationId', message: { $first: '$$ROOT' } } },
+  ]);
+  const latestByConversation = new Map(latestRows.map((row) => [String(row._id), row.message]));
+
+  const nowMs = now.getTime();
+  const due = [];
+  for (const { conversationId, artistUserId, clientUserId } of eligible) {
+    const latestMessage = latestByConversation.get(String(conversationId));
+    // No messages at all yet, or the ARTIST sent the most recent one - answered, or nothing was
+    // ever asked in the first place.
+    if (!latestMessage || String(latestMessage.senderId) !== String(clientUserId)) {
+      continue;
+    }
+    const thresholds = (thresholdsByArtist && thresholdsByArtist.get(String(artistUserId))) || {
+      initialThresholdMinutes: DEFAULT_INITIAL_THRESHOLD_MINUTES,
+    };
+    const cutoff = nowMs - thresholds.initialThresholdMinutes * 60 * 1000;
+    if (new Date(latestMessage.createdAt).getTime() > cutoff) {
+      continue;
+    }
+    due.push({ conversationId, artistUserId, clientUserId, latestMessage });
+  }
+  return due;
+}
+
+/**
+ * Unanswered client messages, as a condition for the passive inbox - see findUnansweredMessages
+ * above for the query itself, shared with utils/notification-jobs.js's active nudge sweep.
+ */
+async function unansweredMessages(artistUserIds, thresholdsByArtist) {
+  const due = await findUnansweredMessages(artistUserIds, thresholdsByArtist);
+  return due.map(({ conversationId, latestMessage }) =>
+    condition({
+      key: `unanswered-message:${conversationId}`,
+      type: 'message_unanswered',
+      category: 'message',
+      subjectType: 'conversation',
+      subjectId: conversationId,
+      title: 'Client message still unanswered',
+      body:
+        (latestMessage.message || '').slice(0, 140) ||
+        (latestMessage.imageUrls && latestMessage.imageUrls.length > 0
+          ? 'They sent an image.'
+          : ''),
+      since: latestMessage.createdAt,
+    }),
+  );
+}
+
+/**
+ * Booth rent past its due date and not yet marked paid - the shared query behind both halves of
+ * Feature 5's escalation, the same split as findUnansweredMessages/unansweredMessages above: the
+ * passive inbox condition below, and utils/notification-jobs.js's active sendBoothRentNudges
+ * sweep. Kept as its own function, separate from overdueBoothRent, because the job needs the raw
+ * charge rows (artistId, shopId) to decide who to notify - the `condition()` shape below is
+ * deliberately display-only and has nowhere to put those.
+ *
+ * Deliberately does NOT check compensationModel/BoothRentPlan.active - a charge already exists
+ * (utils/booth-rent.js only ever generates one for an artist genuinely on BOOTH_RENT at the time),
+ * and if the artist has since switched back to PERCENTAGE the rent from before the switch is
+ * still real money owed, not a stale record to hide.
+ */
+async function findOverdueBoothRentCharges(artistUserIds, { now = new Date() } = {}) {
+  if (!artistUserIds || artistUserIds.length === 0) return [];
+  return BoothRentCharge.find({
+    artistId: { $in: artistUserIds },
+    status: 'due',
+    dueDate: { $lt: now },
+  }).select('_id artistId shopId amountCents dueDate periodMonth');
+}
+
+/**
+ * Overdue booth rent, as a condition for the passive inbox - see findOverdueBoothRentCharges
+ * above for the query itself, shared with utils/notification-jobs.js's active nudge sweep.
+ */
+async function overdueBoothRent(artistUserIds) {
+  const due = await findOverdueBoothRentCharges(artistUserIds);
+  return due.map((c) =>
+    condition({
+      key: `overdue-booth-rent:${c._id}`,
+      type: 'booth_rent_overdue',
+      category: 'money',
+      subjectType: 'boothRentCharge',
+      subjectId: c._id,
+      title: 'Booth rent is overdue',
+      body: `${formatCents(c.amountCents)} was due ${c.dueDate.toDateString()}.`,
+      amountCents: c.amountCents,
+      since: c.dueDate,
+    }),
+  );
+}
+
+/**
  * Everything currently wanting this user's attention.
  *
  * Scoped by who they are, using the same shop-membership helpers as every other query in this
@@ -278,17 +441,31 @@ async function attentionForUser(user) {
     artistUserIds = [String(user.id)];
   }
 
-  const [deposits, unpaid, unanswered, invites, square] = await Promise.all([
+  const [deposits, unpaid, unanswered, invites, square, unansweredMsgs, overdueRent] = await Promise.all([
     unappliedDeposits(artistUserIds),
     completedWithoutPayment(artistUserIds),
     unansweredBookingRequests(artistUserIds),
     isShopAdminOrBetter ? unredeemedInvites(shopIds) : [],
     isShopAdminOrBetter ? squareHealth(shopIds) : [],
+    // Each artist's OWN resolved threshold, not one shared number - see
+    // utils/response-time.js's resolveThresholdsForArtists.
+    artistUserIds.length > 0
+      ? resolveThresholdsForArtists(artistUserIds).then((thresholdsByArtist) =>
+          unansweredMessages(artistUserIds, thresholdsByArtist),
+        )
+      : [],
+    artistUserIds.length > 0 ? overdueBoothRent(artistUserIds) : [],
   ]);
 
-  return [...deposits, ...unpaid, ...unanswered, ...invites, ...square].sort(
-    (a, b) => b.createdAt - a.createdAt,
-  );
+  return [
+    ...deposits,
+    ...unpaid,
+    ...unanswered,
+    ...invites,
+    ...square,
+    ...unansweredMsgs,
+    ...overdueRent,
+  ].sort((a, b) => b.createdAt - a.createdAt);
 }
 
 module.exports = {
@@ -298,4 +475,8 @@ module.exports = {
   unansweredBookingRequests,
   unredeemedInvites,
   squareHealth,
+  findUnansweredMessages,
+  unansweredMessages,
+  findOverdueBoothRentCharges,
+  overdueBoothRent,
 };

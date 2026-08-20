@@ -1,9 +1,17 @@
 const Notification = require('../models/Notification');
 const User = require('../models/User');
+const Artist = require('../models/Artist');
 const { sendEmail } = require('./email');
 const { sendDailyDigests } = require('./digest');
 const { sendDueClientScheduleEmails } = require('./client-booking-emails');
 const { sendDueReminders } = require('./reminders');
+const { findUnansweredMessages, findOverdueBoothRentCharges } = require('./attention');
+const { resolveThresholdsForArtists, DEFAULT_REPEAT_INTERVAL_MINUTES } = require('./response-time');
+const { resolveBoothRentPlanAt } = require('./booth-rent');
+const { shopAdminUserIds } = require('./notification-audience');
+const { actorName } = require('./notification-copy');
+const { formatCents } = require('./money');
+const { notifySafely } = require('./notifications');
 
 /**
  * The scheduled half of the notification system.
@@ -148,6 +156,164 @@ async function findOrphanedEmails({ now = new Date() } = {}) {
 }
 
 /**
+ * Feature 3's active half: an artist whose client message has gone unanswered gets a real,
+ * stored Notification - first once the initial threshold passes, then again every
+ * repeatIntervalMinutes until they reply, at which point utils/attention.js's
+ * findUnansweredMessages simply stops returning that conversation and this sweep naturally stops
+ * creating rows for it (NOTIFICATIONS_DESIGN.md §2's derive-don't-store rule - there is no
+ * "resolved" flag to clear).
+ *
+ * DEDUPED BY QUERY, NOT BY A UNIQUE INDEX - unlike ReminderLog/AutoResponseLog's claim-before-send
+ * pattern, the repeat window here is per-artist-configurable (repeatIntervalMinutes), which
+ * doesn't fit a fixed period-bucket unique index the way "one reminder per offsetMinutes per
+ * appointment" does. Safe anyway: the scheduler's own lock (see index.js's startScheduler call)
+ * already guarantees this job never runs two-at-once, which is the same guarantee a unique index
+ * would be enforcing here.
+ *
+ * Every artist in the system is checked, not just ones with a ResponseTimeSettings row - the
+ * 480/180-minute defaults apply whether or not anyone ever visited Settings > Messages, the same
+ * way sendDueReminders checks appointment reminders regardless of whether an artist customized
+ * theirs.
+ */
+async function sendMessageNudges({ now = new Date() } = {}) {
+  const artists = await Artist.find({}).select('userId');
+  const artistUserIds = artists.map((a) => String(a.userId));
+  if (artistUserIds.length === 0) {
+    return { created: 0, considered: 0 };
+  }
+
+  const thresholdsByArtist = await resolveThresholdsForArtists(artistUserIds);
+  const due = await findUnansweredMessages(artistUserIds, thresholdsByArtist, { now });
+
+  let created = 0;
+  for (const { artistUserId, clientUserId, conversationId, latestMessage } of due) {
+    const thresholds = thresholdsByArtist.get(String(artistUserId));
+    const repeatIntervalMinutes =
+      (thresholds && thresholds.repeatIntervalMinutes) || DEFAULT_REPEAT_INTERVAL_MINUTES;
+    const repeatCutoff = new Date(now.getTime() - repeatIntervalMinutes * 60 * 1000);
+
+    // eslint-disable-next-line no-await-in-loop
+    const alreadyNudged = await Notification.exists({
+      userId: artistUserId,
+      type: 'message_unanswered',
+      subjectId: conversationId,
+      createdAt: { $gte: repeatCutoff },
+    });
+    if (alreadyNudged) {
+      continue;
+    }
+
+    // eslint-disable-next-line no-await-in-loop
+    const result = await notifySafely({
+      actorId: clientUserId,
+      recipientIds: [artistUserId],
+      type: 'message_unanswered',
+      category: 'message',
+      subjectType: 'conversation',
+      subjectId: conversationId,
+      title: 'A client message is still unanswered',
+      body:
+        (latestMessage.message || '').slice(0, 140) ||
+        (latestMessage.imageUrls && latestMessage.imageUrls.length > 0
+          ? 'They sent an image.'
+          : 'Reply when you get a chance.'),
+    });
+    if (result.ok) {
+      created += result.created;
+    }
+  }
+
+  return { created, considered: due.length };
+}
+
+// Not one of the four locked decisions (see PLAN.md's Feature 5 section) - decision #3 said
+// "escalate until marked paid" but left the cadence unspecified. 3 days, my own default: long
+// enough that nobody gets nagged daily over a bill that's a few hours late, short enough that a
+// genuinely ignored charge surfaces again well within the same month it was due.
+const BOOTH_RENT_REPEAT_INTERVAL_MS = 3 * 24 * 60 * 60 * 1000;
+
+/**
+ * Feature 5's active half: booth rent past due keeps re-notifying BOTH sides - the artist who
+ * owes it and the shop admins who are owed it - until it's marked paid (locked decision #3,
+ * "escalate until marked paid"). The same repeat-until-resolved shape as sendMessageNudges above,
+ * not shared with it: the audience here is two-directional, and there's no per-owner configurable
+ * interval to resolve (a flat cadence for everyone - see the constant above).
+ *
+ * TWO notify() CALLS PER OVERDUE CHARGE, not one, because notify()'s own actor rule (utils/
+ * notifications.js - "you didn't cause it, so you're never a recipient") means a single call can
+ * only ever reach one side: whichever party ISN'T the actor. There is no natural third party here
+ * the way an unanswered message has the client who sent it, so each direction borrows the OTHER
+ * side as its actor - the shop admin who set the rent (BoothRentPlan.setByUserId) is the actor
+ * when notifying the artist, and the artist themselves is the actor when notifying the shop.
+ *
+ * DEDUPED BY QUERY, NOT BY A UNIQUE INDEX, same reasoning and same safety as sendMessageNudges -
+ * the scheduler's own lock is what actually prevents a double-run, the query is just convenient
+ * shorthand for "have I already nudged about this specific charge recently".
+ */
+async function sendBoothRentNudges({ now = new Date() } = {}) {
+  const artists = await Artist.find({}).select('userId');
+  const artistUserIds = artists.map((a) => String(a.userId));
+  if (artistUserIds.length === 0) {
+    return { created: 0, considered: 0 };
+  }
+
+  const overdue = await findOverdueBoothRentCharges(artistUserIds, { now });
+  const repeatCutoff = new Date(now.getTime() - BOOTH_RENT_REPEAT_INTERVAL_MS);
+
+  let created = 0;
+  for (const charge of overdue) {
+    // eslint-disable-next-line no-await-in-loop
+    const alreadyNudged = await Notification.exists({
+      type: 'booth_rent_overdue',
+      subjectId: charge._id,
+      createdAt: { $gte: repeatCutoff },
+    });
+    if (alreadyNudged) {
+      continue;
+    }
+
+    // eslint-disable-next-line no-await-in-loop
+    const plan = await resolveBoothRentPlanAt(charge.artistId, charge.shopId, charge.dueDate);
+    if (plan) {
+      // eslint-disable-next-line no-await-in-loop
+      const artistResult = await notifySafely({
+        actorId: plan.setByUserId,
+        recipientIds: [charge.artistId],
+        type: 'booth_rent_overdue',
+        category: 'money',
+        subjectType: 'boothRentCharge',
+        subjectId: charge._id,
+        amountCents: charge.amountCents,
+        title: `Booth rent overdue: ${formatCents(charge.amountCents)}`,
+        body: `Was due ${charge.dueDate.toDateString()}. Mark it paid once it's settled.`,
+      });
+      if (artistResult.ok) {
+        created += artistResult.created;
+      }
+    }
+
+    // eslint-disable-next-line no-await-in-loop
+    const adminResult = await notifySafely({
+      actorId: charge.artistId,
+      recipientIds: await shopAdminUserIds(charge.shopId),
+      type: 'booth_rent_overdue',
+      category: 'money',
+      subjectType: 'boothRentCharge',
+      subjectId: charge._id,
+      amountCents: charge.amountCents,
+      // eslint-disable-next-line no-await-in-loop
+      title: `${await actorName(charge.artistId)}'s booth rent is overdue`,
+      body: `${formatCents(charge.amountCents)} was due ${charge.dueDate.toDateString()}.`,
+    });
+    if (adminResult.ok) {
+      created += adminResult.created;
+    }
+  }
+
+  return { created, considered: overdue.length };
+}
+
+/**
  * The jobs, as the scheduler wants them.
  *
  * Both cadences are deliberately shorter than they strictly need to be. The email sweep every five
@@ -207,6 +373,28 @@ function notificationJobs({ onReport = console.warn } = {}) {
       },
     },
     {
+      // Feature 3 - see sendMessageNudges above. Hourly, same cadence as notification-digests:
+      // the repeat interval is measured in hours by default (180 minutes) and nobody notices a
+      // few minutes of slop on a nudge the way they would on a booking confirmation.
+      name: 'message-nudges',
+      everyMs: 60 * 60 * 1000,
+      run: async () => {
+        const result = await sendMessageNudges();
+        return `created=${result.created} considered=${result.considered}`;
+      },
+    },
+    {
+      // Feature 5 - see sendBoothRentNudges above. Hourly, matching message-nudges' own cadence -
+      // the repeat interval here is measured in days (3), so a few minutes of slop between ticks
+      // is never noticeable.
+      name: 'booth-rent-nudges',
+      everyMs: 60 * 60 * 1000,
+      run: async () => {
+        const result = await sendBoothRentNudges();
+        return `created=${result.created} considered=${result.considered}`;
+      },
+    },
+    {
       name: 'notification-email-orphans',
       everyMs: 60 * 60 * 1000,
       run: async () => {
@@ -232,6 +420,8 @@ function notificationJobs({ onReport = console.warn } = {}) {
 module.exports = {
   sendDueEmails,
   findOrphanedEmails,
+  sendMessageNudges,
+  sendBoothRentNudges,
   notificationJobs,
   ORPHAN_AFTER_MS,
   DIGEST_ORPHAN_AFTER_MS,

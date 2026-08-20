@@ -20,12 +20,15 @@ import AppearancePanel from "../../components/settings/AppearancePanel";
 import ShopPanel from "../../components/settings/ShopPanel";
 import ShopConnectionPanel from "../../components/settings/ShopConnectionPanel";
 import RatesPanel from "../../components/settings/RatesPanel";
+import BoothRentPanel from "../../components/settings/BoothRentPanel";
 import SquarePanel from "../../components/settings/SquarePanel";
 import SquarePricingPanel from "../../components/settings/SquarePricingPanel";
 import NotificationSettingsPanel from "../../components/notifications/NotificationSettingsPanel";
 import EventLogPanel from "../../components/settings/EventLogPanel";
 import RemindersPanel from "../../components/settings/RemindersPanel";
 import AutoResponsesPanel from "../../components/settings/AutoResponsesPanel";
+import ResponseTimePanel from "../../components/settings/ResponseTimePanel";
+import SystemMessageTemplatesPanel from "../../components/settings/SystemMessageTemplatesPanel";
 import ComingSoonPanel from "../../components/settings/ComingSoonPanel";
 import ExpenseTypesPanel from "../../components/settings/ExpenseTypesPanel";
 import IncomeTypesPanel from "../../components/settings/IncomeTypesPanel";
@@ -98,7 +101,16 @@ const CATEGORIES = [
 		label: "Rates",
 		icon: AttachMoney,
 		isVisible: (user) => isArtist(user),
-		render: () => <RatesPanel />,
+		render: () => (
+			<>
+				<RatesPanel />
+				{/* Read-only on this side by design - the shop sets booth rent terms from the
+				artist's own page (components/artistDashboard/ShopCutRatePanel.jsx), same asymmetry
+				as the percentage cut. This renders nothing at all for an artist not currently on
+				booth rent, or with no shop - see the component's own header comment. */}
+				<BoothRentPanel />
+			</>
+		),
 	},
 	{
 		key: "expenses",
@@ -210,6 +222,8 @@ const CATEGORIES = [
 			<>
 				<RemindersPanel />
 				<AutoResponsesPanel />
+				<ResponseTimePanel />
+				<SystemMessageTemplatesPanel />
 			</>
 		),
 	},

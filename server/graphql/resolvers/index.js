@@ -22,6 +22,7 @@ const bookingRequestResolvers = require('./bookingRequests');
 const bookingRequestMutations = require('../mutations/bookingRequests');
 const artistShopConnectionResolvers = require('./artistShopConnections');
 const shopCutRateResolvers = require('./shopCutRates');
+const boothRentResolvers = require('./boothRent');
 const analyticsResolvers = require('./analytics');
 const eventLogResolvers = require('./eventLogs');
 const reminderResolvers = require('./reminders');
@@ -34,12 +35,16 @@ const expenseResolvers = require('./expenses');
 const incomeResolvers = require('./income');
 const formResolvers = require('./forms');
 const autoResponseResolvers = require('./autoResponses');
+const responseTimeSettingsResolvers = require('./responseTimeSettings');
+const systemMessageTemplateResolvers = require('./systemMessageTemplates');
 const passwordResolvers = require('./passwords');
+const sharedImageResolvers = require('./sharedImages');
 const passwordMutations = require('../mutations/passwords');
 const accountMutations = require('../mutations/accounts');
 const depositMutations = require('../mutations/deposits');
 const artistShopConnectionMutations = require('../mutations/artistShopConnections');
 const shopCutPaymentMutations = require('../mutations/shopCutPayments');
+const boothRentPaymentMutations = require('../mutations/boothRentPayments');
 const { Constants } = require('../../utils/constants');
 const Artist = require('../../models/Artist');
 const Client = require('../../models/Client');
@@ -94,6 +99,7 @@ module.exports = {
     ...bookingRequestResolvers.Query,
     ...artistShopConnectionResolvers.Query,
     ...shopCutRateResolvers.Query,
+    ...boothRentResolvers.Query,
     ...analyticsResolvers.Query,
     ...depositResolvers.Query,
     ...giftCardResolvers.Query,
@@ -102,7 +108,10 @@ module.exports = {
     ...incomeResolvers.Query,
     ...formResolvers.Query,
     ...autoResponseResolvers.Query,
+    ...responseTimeSettingsResolvers.Query,
+    ...systemMessageTemplateResolvers.Query,
     ...passwordResolvers.Query,
+    ...sharedImageResolvers.Query,
     ...notificationResolvers.Query,
     ...eventLogResolvers.Query,
     ...reminderResolvers.Query,
@@ -123,6 +132,8 @@ module.exports = {
     ...artistShopConnectionMutations,
     ...shopCutRateResolvers.Mutation,
     ...shopCutPaymentMutations,
+    ...boothRentResolvers.Mutation,
+    ...boothRentPaymentMutations,
     ...giftCardResolvers.Mutation,
     ...adjustmentResolvers.Mutation,
     ...clientFlagResolvers.Mutation,
@@ -130,6 +141,9 @@ module.exports = {
     ...incomeResolvers.Mutation,
     ...formResolvers.Mutation,
     ...autoResponseResolvers.Mutation,
+    ...responseTimeSettingsResolvers.Mutation,
+    ...systemMessageTemplateResolvers.Mutation,
+    ...sharedImageResolvers.Mutation,
     ...depositMutations,
     ...passwordMutations,
     ...accountMutations,
@@ -234,6 +248,20 @@ module.exports = {
       return (await User.findById(ibImage.userId));
     }
   },
+  SharedImage: {
+    // Same shape/reasoning as IBImage.userInfo above - resolved from senderId rather than
+    // stored, so a display-name change shows up immediately everywhere. See
+    // resolvers/sharedImages.js for the rest of this type's resolvers.
+    userInfo: async (sharedImage) => {
+      return User.findById(sharedImage.senderId);
+    },
+    assignedProject: async (sharedImage) => {
+      if (!sharedImage.assignedProjectId) {
+        return null;
+      }
+      return Project.findById(sharedImage.assignedProjectId);
+    },
+  },
   Staff: {
     shop: async(staff, args, context, info) => {
       return (await Shop.findById(staff.shopId));
@@ -327,6 +355,20 @@ module.exports = {
     },
     submittedBy: async(formResponse) => {
       return User.findById(formResponse.submittedByUserId);
+    },
+  },
+  // Feature 3 - unanswered-message nudges. See models/ResponseTimeSettings.js and
+  // utils/response-time.js.
+  ResponseTimeSettings: {
+    // Only meaningful on an ARTIST's own row - see resolvers/responseTimeSettings.js's
+    // resolveShopCeiling, called directly here rather than re-implemented so the number shown
+    // matches exactly what the server will actually clamp to. Null for a shop's own row (nothing
+    // sits above a shop) and null for an independent artist with no shop connection at all.
+    shopCeiling: async (parent) => {
+      if (!parent.artistUserId) {
+        return null;
+      }
+      return responseTimeSettingsResolvers.resolveShopCeiling(parent.artistUserId);
     },
   },
   // See models/GiftCard.js and DECISIONS.md M6.
