@@ -384,6 +384,48 @@ Tax and the offset collected on a deposit are recorded in `taxCents` and `feeCen
 `depositCents`. Both are real money taken, but neither is part of the deposit's face value and
 neither must become spendable credit.
 
+### M12. Booth rent is a second compensation model, not a percentage-of-zero hack
+
+An artist can owe their shop a flat monthly fee instead of a percentage of session work.
+Confirmed directly, via `AskUserQuestion`, on two sub-questions: overdue rent **"escalates until
+marked paid"** (not a one-time nudge), and confirming a charge **"generates real records
+monthly"** - a real `Expense`/`Income` pair, reusing `RecurringExpense`'s engine shape rather than
+a parallel bookkeeping path.
+
+**`ShopCutRate` gained one field, `compensationModel: 'PERCENTAGE' | 'BOOTH_RENT'`, rather than a
+whole second history table.** Switching an artist to booth rent writes a new dated `ShopCutRate`
+row with `percent: 0, compensationModel: 'BOOTH_RENT'` - `utils/shop-cut.js`'s
+`resolveShopCutPercentAt` needed **zero code changes**, since booth rent already IS 0% by
+construction. This is the same "append a dated row, never edit history" shape M7 already
+established, extended to cover which model applied, not just what number.
+
+**The terms themselves (amount, due day) live on a separate `BoothRentPlan`, not on `ShopCutRate`
+itself**, because a rent amount can change without the compensation model changing, and the two
+questions ("which model" and "how much, on what day") don't share a natural cardinality - an
+artist could plausibly have one `ShopCutRate` row spanning a year of `BOOTH_RENT` while the actual
+rent amount changed twice within it. `BoothRentPlan` is append-only for the identical M7 reason.
+
+**Real ledger rows generate only at `confirmed`, never at `due` or `marked_paid`** - an
+invoiced-but-unconfirmed shop cut isn't counted as revenue either (M9's dual-control flow), and
+booth rent follows the same timing. `confirmBoothRentPaid` creates an artist-owned `Expense` and a
+shop-owned `Income`, both against an owned (not seeded) "Booth Rent" `ExpenseType`/`IncomeType` -
+see `ExpenseType`/`IncomeType`'s own header comments on why this app never ships a universal
+expense vocabulary.
+
+**Eligibility for the generator is re-checked every run, never cached on the plan.** An artist can
+switch back to `PERCENTAGE` (a new `ShopCutRate` row) without anyone touching `BoothRentPlan` at
+all, and `utils/booth-rent.js`'s `generateDueBoothRentCharges` must stop generating the moment
+that happens - it re-resolves `ShopCutRate.compensationModel` for every {artist, shop} pair on
+every run rather than trusting a boolean set once at switch time.
+
+**The escalation cadence (3 days) is my own default, not one of the confirmed decisions** - "escalate
+until marked paid" said the *shape*, not the *interval*. Flagged here rather than presented as
+settled; easy to make configurable alongside `ResponseTimeSettings` (MSG4) if it ever needs to be.
+
+Rejected: a parallel expense/income engine for booth rent specifically, instead of reusing
+`RecurringExpense`'s cursor/catch-up/idempotent-index shape. Rejected: storing rent terms directly
+on `ShopCutRate` rather than a separate append-only `BoothRentPlan`.
+
 ---
 
 ## Membership and attribution
@@ -576,6 +618,90 @@ other way - membership is the only relationship it has (see `utils/conversations
 ordinary client/artist Messages thread already has this shape. Not directly asked, but necessary to
 implement anything: **OPEN** whether group threads need their own rule if they turn out to be
 common.
+
+### MSG4. Response-time thresholds: the shop sets a ceiling, an artist can only tighten it
+
+`ResponseTimeSettings` (Settings > Messages) governs how long a client message can sit unanswered
+before `utils/notification-jobs.js`'s `sendMessageNudges` sweep starts nagging the artist about it,
+and how often it repeats. Confirmed directly, via `AskUserQuestion`: "Shop admin sets a policy floor
+artists can tighten but not loosen" - not "one wins outright" the way every other owner-precedence
+resolver in this codebase works (`resolveShopCutPercentAt`, `resolveAutoResponseForTrigger`,
+`resolveSystemMessageTemplate` below). `utils/response-time.js`'s `clamp()` is the actual new shape:
+the shop's row, if any, is a CEILING - `min(artistValue, shopValue)` - never a value the artist's
+own setting can exceed. No shop row at all falls through to the artist's own value, or the built-in
+480/180-minute default. Worth remembering when adding a SIXTH owner-precedence resolver: check
+which shape the request actually describes before reaching for "one wins outright" as the default.
+
+### MSG5. System-generated text is manageable per-owner, except two identity/security emails
+
+Confirmed directly, via `AskUserQuestion`: "every hardcoded outbound email/SMS app-wide" becomes
+editable, not just the new-message notifications this was first scoped around. `SystemMessageTemplate`
+(one row per `{owner, key}`, 7 keys) follows the exact same owner precedence as `AutoResponse` -
+artist's own override wins outright, else the shop's, else `utils/system-message-templates.js`'s
+`DEFAULT_TEMPLATES` - and the same "absence means default" convention: `getSystemMessageTemplates`
+returns only rows that exist, never one synthesized per key, so an owner who has customized nothing
+sees an empty list rather than 7 rows all quietly already matching the default text.
+
+**`sendAccountInviteEmail` and `sendPasswordResetEmail` stay hardcoded, on purpose.** Both are
+identity/security emails the *platform* sends, not a shop or artist's own outreach - a password
+reset is looked up by email address alone, with no shop/artist ownership context at send time, and
+letting a shop admin edit the password-reset email their own artists receive is a phishing-adjacent
+surface this app's tenancy model has no business opening. Flagged explicitly rather than silently
+included, since "every hardcoded email" read literally would have swept these in too.
+
+`BOOKING_CONFIRMATION` (`client-booking-emails.js`) is narrower than the other 6 keys for a
+different reason: that email is assembled from arrays/conditionals (schedule table, deposit line,
+intake-form recap), not one string, and letting an owner override the whole body risks them
+accidentally deleting the schedule/deposit info the email exists to convey. Only the **subject**
+and one **appendable "extra note"** are template fields; the structural body stays code-generated.
+
+Rejected: scoping this to just the new-message notifications it was first noticed on. Rejected:
+letting `BOOKING_CONFIRMATION`'s body be fully overridden like the other 6.
+
+### MSG6. Shared images are indexed and badged, never removed on assignment or deleted from storage
+
+`SharedImage` (one row per image URL shared via a message, either direction) backs a
+client-dashboard triage list, feeding `IBImagesList.jsx` - the same tag/lightbox component the
+project image lists already use - by mirroring `IBImage`'s own field shape rather than inventing a
+new one. Three sub-decisions, each confirmed directly via `AskUserQuestion`:
+
+**Every shared image shows, always - no "unassigned only" filter.** Confirmed directly: "every
+shared image should be fine, because it's just pulling from a link to where the image is stored,
+not an actual duplicate image." No new "hidden once assigned" state was added - `SharedImage` rows
+persist indefinitely once created, an index rather than a queue to empty out.
+
+**Assigning an image to a project badges it; it does not disappear from the list.** Confirmed
+directly: "stays, with a badge showing where it went." `assignedProjectId`/`assignedImageType` stay
+on the row permanently once set (see the model's own header comment on why this is stored rather
+than derived by searching every project's image arrays for a matching URL) and the panel renders a
+"Added to `<project>`'s `<list>`" badge instead of filtering the row out.
+
+**Visible to the artist and shop admins, never the client themselves, never plain staff.**
+Confirmed directly: "Artist and shop admins." This is narrower than the existing
+`canAccessClient` (which also lets the client read their own record, and lets any shop member
+including front-desk staff in) - `canManageClientSharedImages` (`utils/shop-membership.js`) is a
+new, separate check rather than a reuse, since loosening `canAccessClient` itself for this one
+caller would have widened every OTHER thing gated on it too.
+
+**Assignment copies the URL into the project's image list; it does not move or reference it.**
+Not directly asked, but the necessary consequence of "just a link, not a duplicate" plus "stays
+badged" together: if `assignSharedImageToProject` moved the row instead of copying it, "delete
+this shared image" and "delete this project's copy of it" would become the same action by
+accident, and a project's own image list would depend on a client-dashboard row nobody browsing
+the project would know still needed to exist. A real `IBImage` subdocument is pushed onto
+`Project.referenceImages`/`designImages`/`bodyImages`, independent of the `SharedImage` row from
+that point on.
+
+**"Delete" on this list only drops the tracking row - it does not call `IBDeleteFile` the way the
+project image lists' own delete does.** Not directly asked, and flagged as a deliberate deviation
+from "same functionality as the image lists in projects, ie, ability to add tags, delete, etc"
+rather than silently narrowed: the project lists' delete permanently removes the file from Firebase
+Storage, which is safe there because that file exists only for the project. A shared image's URL is
+also the actual image rendered in the client's real chat history (`IBMessage.jsx`) - deleting the
+file would silently break that thread's own display for an action that reads, from this list, like
+"stop showing me this in my triage list." `IBImagesListOptions.jsx` gained an `onDelete` override
+and a `deleteLabel` prop precisely so this one caller could opt out of the destructive default
+without changing it for the two callers that still want it (`Project.jsx`'s three image lists).
 
 ---
 

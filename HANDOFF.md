@@ -4,9 +4,680 @@
 has not been verified. `DECISIONS.md` is *rules* — the settled calls and why. They change at
 different rates, which is why they are separate files.
 
-Last updated: 2026-08-19.
+Last updated: 2026-08-20.
 
 ---
+
+### 2026-08-20: Image tag editor - dark-mode-invisible input text, and cramped overlay spacing
+
+`IBImageTagEditor.jsx` (the "add tag" overlay on project images - References/Design/Body lists)
+had two issues, both in the same small component.
+
+**Unreadable text was a light/dark mode bug, not a styling typo.** This app has a real light/dark
+toggle (`theme/theme.js`, `ThemeModeProvider.jsx`); dark mode's `text.primary` is `#f3ece4` (near-
+white). The "Add tag" `TextField` hardcoded `background: "white"` - fine in light mode, but in dark
+mode that's near-white theme text on a literal white box, functionally invisible. Fixed by using
+`bgcolor: "background.paper"` instead of a literal color - that MUI theme token resolves to
+`#ffffff` in light mode and `#241c17` in dark mode, so it always pairs correctly with whatever
+`text.primary` the active mode is using. No text color needed setting directly - once the
+background is theme-aware, the existing default already has the right contrast in both modes.
+
+**Cramped spacing** - gaps and padding were 3px throughout (`Box` gap/padding, chip height 20px,
+add-tag button 22px, textfield padding 2px 6px). Loosened to 6px gaps/padding, 24px chips, 26px
+button, 8px textfield padding, plus a subtle `box-shadow` on the chips/button/textfield (matching
+the shadow weight already used on the chatbox's pending-image remove button) so the overlay reads
+as one deliberate control instead of a handful of tiny elements floating loose on the thumbnail.
+Deliberately still compact, not resized to `IBInput`/`FormField` scale - this sits on top of a
+121px-tall image thumbnail (`IBImagesList.jsx`'s `rowHeight`), and a full-size control would cover
+more of the image than the tag it's labeling.
+
+**Verified**: `esbuild` on `IBImageTagEditor.jsx`. **Not visually checked in light AND dark mode** -
+worth toggling the theme and opening a project's image tags in both to confirm the contrast fix
+actually holds (this session can't render the app to check visually).
+
+**Files**: `client/src/components/ibImagesList/IBImageTagEditor.jsx`.
+
+### 2026-08-20: App-bar search box clears on click-away or Tab-away
+
+Request: clear the search input when the user clicks or tabs away from it.
+
+Scoped to `GlobalSearch.jsx` (the app-bar dropdown) only, not `Search.jsx` (the `/search` results
+page) - that page's input is tied to the `?q=` URL param and represents "the query these results
+are for," so clearing it on blur would drop what you were looking at while the results underneath
+kept showing it. The app-bar box has no such contract; it already clears on selecting a result
+(`goTo()`), this just extends the same idea to leaving without selecting one.
+
+Implemented as a single `onBlur` handler rather than piggybacking on the existing mousedown-based
+"click outside" listener, and specifically checks `e.relatedTarget` (the element about to gain
+focus) against the search widget's own container before clearing. That check is load-bearing, not
+defensive dressing: the dropdown's result rows are real `<button>`s sitting right after the input
+in the DOM, so Tab-ing off the input lands on the first result, and clicking any result also blurs
+the input a beat before that click's own `onClick` fires (mousedown blurs before click dispatches).
+An unconditional clear-on-blur would unmount the dropdown out from under that Tab-press or click,
+breaking result selection entirely. Checking containment lets "still inside this widget" (a result)
+stay open while "actually left it" clears the box - the existing mousedown listener still owns
+closing the dropdown on an unrelated outside click; this only adds the clearing behavior.
+
+Side effect, not a special case: pressing Escape already called `e.target.blur()`, which now also
+runs through this same handler and clears the box - previously Escape only closed the dropdown and
+left the typed text in place. Left as-is rather than special-cased around, since "Escape clears"
+reads as more expected, not less.
+
+**Verified**: `esbuild` on `GlobalSearch.jsx`. **Not manually re-tested** - worth confirming
+Tab-ing from the input into a result row still works, and that clicking a result still navigates
+(the exact case the relatedTarget check exists to protect).
+
+**Files**: `client/src/components/search/GlobalSearch.jsx`.
+
+### 2026-08-20: Global search now covers image tags - both project images and shared images
+
+Feature request: "Search should also include looking through tags on images." Image tags live in
+two separate places, and both are now searchable, per the explicit "both" scope decision:
+
+**Project images** (`IBImage.tags` nested inside `Project.referenceImages`/`designImages`/
+`bodyImages`) - widened `Project`'s existing `ProjectTextIndex` (models/Project.js) to also index
+`referenceImages.tags`/`designImages.tags`/`bodyImages.tags`. Mongo text indexes DO reach inside
+arrays of subdocuments, tokenizing every string across every element - no aggregation pipeline or
+new collection needed. A tag match surfaces the whole Project, same as any other Project-field
+match; there is no separate "which image" result for these, since IBImage isn't its own searchable
+collection. Weighted at 4, just under Project's own top-level `tags` (5).
+
+**Shared images** (`SharedImage.tags`, the client-dashboard triage list, pre-project-assignment) -
+a genuinely separate top-level collection with no existing search coverage at all. Added a new
+`SharedImageTextIndex` on `tags`, and a new `images` result group scoped by `projectScopeFilter`
+reused UNCHANGED from Projects - `SharedImage` deliberately carries the same `artistId`/`clientId`
+field names `Project` does specifically for this kind of reuse (see the model's own header
+comment), and that filter shape already matches `canManageClientSharedImages`'s per-record rule at
+the bulk-query level. No new authorization logic was written.
+
+**Schema/API**: `SearchResults` (typeDefs.js) gained `images: [SharedImage!]!`, reusing the
+existing `SharedImage` GraphQL type (already had `userInfo`/`assignedProject` field resolvers from
+the shared-images feature - no resolver changes needed). `utils/search.js`'s `searchAll` now runs a
+fourth parallel `textSearch` call and returns the fourth list.
+
+**Client**: `GlobalSearch.jsx` (app-bar dropdown) and `Search.jsx` (`/search` results page) both
+gained a "Shared Images" section. The dropdown renders each match as a small thumbnail + tags +
+filed-or-not status, linking to the client's dashboard (`SharedImagesPanel.jsx` - a SharedImage
+isn't its own page). The results page reuses `EntityList` exactly as every other result type does,
+passing the image's own URL as the row's `avatar` - the same component, doing the same job it
+always does, just with a photo instead of a headshot.
+
+**Deployment gotcha - action needed on your end**: both text indexes changed their FIELD LIST under
+the SAME index name (`ProjectTextIndex` widened; `SharedImageTextIndex` is brand new but still a
+name-based add). Mongoose's default `autoIndex` only adds indexes missing by name - it does not
+notice an existing index's fields changed, and MongoDB refuses to silently redefine an index under
+its old name (`IndexKeySpecsConflict`). A new, NON-destructive script,
+`scripts/sync-search-indexes.js`, reconciles this (`Model.syncIndexes()` - drops what doesn't match
+the schema, creates what's missing, touches zero documents). **Run this once**, from `server/`:
+```
+node scripts/sync-search-indexes.js
+```
+Same reason I can't run this myself as every other DB script this session - `device_bash` can't
+reach your local Mongo.
+
+**Verified**: `node --check` on every touched/new server file; a live `makeExecutableSchema` build
+against the real `graphql-scalars`/resolvers on your machine (via `device_bash`) - confirmed the
+schema still constructs cleanly; `scripts/check-graphql-documents.js` - confirmed the client's
+widened Search query still matches the schema (341 documents, same as before - this only added
+fields to an existing document, not a new one). `esbuild` on every touched `.jsx`/`.js` client
+file. **Not yet run against live data** - needs `sync-search-indexes.js` run first, then a manual
+test: tag a project image and a shared image with the same word and confirm both show up.
+
+**Files**: `server/models/Project.js`, `server/models/SharedImage.js`, `server/utils/search.js`,
+`server/graphql/typeDefs.js`, `server/scripts/sync-search-indexes.js` (new),
+`client/src/services/SearchService.js`, `client/src/components/search/GlobalSearch.jsx`,
+`client/src/components/search/globalSearch.css`, `client/src/pages/search/Search.jsx`.
+
+### 2026-08-20: Per-image "Add tag" rebuilt as a Popover - was never going to fit inline
+
+Report: the add-tag control on a Project's image lists (References/Design/Body) was cramped and
+its text unreadable when adding a new tag.
+
+The unreadable-text half had actually already been attempted (`IBImageTagEditor.jsx` had its own
+comment explaining a switch from a hardcoded white background to theme-aware `background.paper`) -
+but the cramped half was the real, unfixed problem, and looking at `IBImagesList.jsx` explains why
+padding alone was never going to solve it: the tag editor is an absolutely-positioned overlay
+(`right: 32`) constrained to the underlying thumbnail's own pixel width, and on the grid's smaller
+1x1 tiles (`imageLayoutPattern`, `rowHeight: 121`) that leaves under 90px of usable width - nowhere
+near enough for a 120px-wide text input sitting next to existing tag chips. No amount of padding or
+color tuning fixes an input that's wider than the box it's forced into.
+
+Rebuilt the "add tag" input as a MUI `Popover` anchored to the tag button instead of an inline
+field squeezed into the overlay. A Popover renders in a portal (mounted at `document.body`), so its
+content lays out with real room regardless of the thumbnail's size, and - as a direct consequence -
+picks up the app's theme-aware `Paper` background/text color automatically, with no risk of
+inheriting anything from the dark image-overlay context around it. Removed the now-unneeded
+`ClickAwayListener` (Popover's own `onClose` already covers click-away) and the manual
+`background.paper`/inherited-color reasoning, since the Popover's own `Paper` already resolves that
+correctly.
+
+**Verified**: `esbuild` on `IBImageTagEditor.jsx`. **Not visually re-tested** - worth opening a
+Project's image list and confirming the popover positions itself sensibly on both a 1x1 and a 2x2
+tile, and reads cleanly in both light and dark mode.
+
+**Files**: `client/src/components/ibImagesList/IBImageTagEditor.jsx`.
+
+### 2026-08-20: notFuture() correction - clamp the timestamp, not the day-count
+
+Follow-up on the entry directly below. After re-running `seed-large.js` with the first version of
+`notFuture()`, Marta's conversation still showed 2 messages permanently unread - smaller than the
+original 3, but the same symptom. Cause: that first version clamped the *day offset* fed into
+`daysAgo()` (`daysAgo(Math.max(0, n))`), but `daysAgo()` also rolls a random hour between 10am-5pm
+onto whatever day it lands on - so `daysAgo(0)` ("today") could still land a few hours *later* than
+the actual moment someone was testing at. A message dated 3pm today is exactly as permanently
+unread at 11am today as one dated next month is right now, for the identical reason.
+
+Fixed by changing `notFuture()` to take the resulting `Date` and clamp that directly
+(`date > now ? now : date`), applied as `notFuture(daysAgo(n))` instead of `daysAgo(notFuture(n))`
+at all 7 call sites. This closes the gap regardless of the hour jitter - a seeded row can now never
+be dated later than the exact moment the seed script ran, full stop.
+
+**Verified**: `node --check`. **Not yet re-run against a live re-seed by me** - needs
+`node scripts/seed-large.js` run again and a fresh check that Marta's (or any) conversation clears
+normally now.
+
+**Files**: `server/scripts/seed-large.js`.
+
+### 2026-08-20: Marta's "stuck at 3 unread forever" traced to seed-large.js, not app code - fixed
+
+Closes the loop on the unread-badge report. The duplicate-Conversation theory (previous entry)
+turned out to be wrong - `merge-duplicate-conversations.js --dry-run` found zero duplicate
+member-sets. Rather than guess again, wrote a read-only diagnostic
+(`scripts/debug-conversation-unread.js`) that dumps the raw `Conversation.reads`/`Message` data and
+runs the actual production `unreadCountForConversation` function directly. That surfaced the real
+cause immediately: 3 of Marta's 5 seeded messages had `createdAt` timestamps in **September
+2026** - about three weeks *after* the actual current date. `unreadCount` is `createdAt >
+lastReadAt`; a message dated in the future can never be "read" by clicking or reloading, because
+`lastReadAt` gets stamped to the real current time, which cannot exceed a date that hasn't happened
+yet. Every prior click genuinely worked - it just could never be enough.
+
+**Root cause, precisely**: `scripts/seed-large.js` already computes every date relative to
+run-time (`daysAgo(n)` uses `new Date()`, not a hardcoded calendar date) - that part was never the
+problem. The actual bug: `CONFIG.weeksOfFuture` deliberately seeds some projects up to 3 weeks in
+the future (to populate upcoming bookings for testing), and several `createdAt`/`updatedAt` fields
+- Conversation, BookingRequest, Project, both Appointment records, the conversation's seeded
+Messages, and `shopCutMarkedPaidAt`/`shopCutConfirmedAt` - derived their offset from that same
+project's `consultDaysAgo`/`dayCursor`, which is allowed to go negative for a future project. A
+negative offset into `daysAgo()` produces a future date - meaning the DB ROW itself (not just the
+appointment it describes) could be seeded as "created" after right now, which nothing in the real
+app can ever do (`createMessage`/`createBookingRequest`/etc. all stamp these fields server-side at
+the actual moment of the call). `appointmentDate`/`consultDate`/`sessionDate` themselves are
+correctly still allowed to be future - that's the intended "three weeks of future bookings" -
+only the record-creation timestamps needed clamping.
+
+**Fix, first pass (incomplete - see Update below)**: added `notFuture(n) = Math.max(0, n)` next to
+`daysAgo()`, wrapped as `daysAgo(notFuture(n))` at every `createdAt`/`updatedAt` call site deriving
+from `consultDaysAgo`/`dayCursor` (conversation, booking request, project, both appointment
+records, the seeded messages, the two shop-cut-paid timestamps). `seed.js` (the small hand-written
+fixture) was checked too and never had this bug - every one of its `daysAgo()` calls uses a fixed
+positive constant.
+
+**Update, same day**: user re-ran the seed and reported Marta *still* stuck, now at 2 unread
+instead of 3 - "no matter what I do." The first pass only clamped the DAY integer fed into
+`daysAgo()`. `daysAgo()` also rolls a random hour (10am-5pm) onto whatever day it lands on, so
+`daysAgo(0)` ("today") can still come out a few hours *later* than the actual moment someone is
+testing at - the identical bug, just shrunk from weeks to hours. Rewrote `notFuture` to take and
+clamp the resulting `Date` instead of the day-count: `notFuture(date) { const now = new Date();
+return date > now ? now : date; }`, and flipped every call site from `daysAgo(notFuture(n))` to
+`notFuture(daysAgo(n))` (still the same 14 individual `createdAt`/`updatedAt` expressions - some
+call sites shared one expression string across multiple fields, e.g. all three of
+conversation/bookingRequest/project use `consultDaysAgo + 7`). This is a real, materially different
+fix, not a cosmetic rename - it clamps on the actual timestamp value now, so no hour/minute jitter
+can slip a "today" row past the real current moment either.
+
+**To pick up the fix**: re-run `node scripts/seed-large.js` to get a fresh dataset without any
+future-dated rows. (Not required for real user data - this only ever affected the local dev seed.)
+
+**Verified**: `node --check` on `seed-large.js` after both passes. **Not re-run against a live
+re-seed since the second pass** - worth confirming with `node scripts/seed-large.js` and then
+spot-checking that Marta's conversation (or any project seeded with `consultDaysAgo` deep in the
+future window) shows zero unread immediately after opening it, not just "fewer than before."
+
+**Files**: `server/scripts/seed-large.js`, `server/scripts/debug-conversation-unread.js` (new,
+read-only diagnostic - safe to keep and reuse for any future "one specific badge/count looks
+wrong" report).
+
+### 2026-08-20: Session-detail modal (Projects page) brought onto the same modal chrome; thumbnail clearance raised further
+
+Two follow-ups on the previous round's spacing pass.
+
+**1. "The session modal in the Projects page still doesn't have the proper spacing and looks
+cramped."** Correct call - the earlier pass covered `AssignImageForm` but missed
+`SessionDetail.jsx` (opened via `ProjectSessionsList.jsx`), which had exactly the same root cause:
+dropped directly into `IBModal`'s content slot (which applies no padding of its own) as a plain
+`<div className="sessionDetail">` with only `padding: 8px` - the sole margin between the dialog
+edge and this form's densest content (the timer, both money rows, the deposits/adjustments
+blocks). Rebuilt on the same `DialogContent dividers` / `DialogActions` pattern as
+`EntityWizard.jsx`/`UpdateEventDialog.jsx`/`AssignImageForm`: `sessionDetailContent` now carries
+`width: 560px` and `padding: 24px 28px` (matching `entityWizard.css` exactly, not reinvented),
+`sessionDetailActions` carries `padding: 16px 28px` and `gap: 10px`. Same width as every other
+modal in the app now, per the standing ask to keep modals uniform.
+
+Hit the exact clobbering hazard flagged earlier this session while pushing this: `SessionDetail.jsx`
+had been staged into this working copy in an earlier turn and never re-staged fresh at the start of
+this one, so my edit landed on a slightly stale cached copy. `device_commit_files` correctly
+rejected the push (mtime guard) rather than silently overwriting whatever was actually on disk.
+Re-staged, confirmed the live file was functionally identical to what I'd edited (a harmless mtime
+bump, not a real change - tail-diffed to be sure before touching anything), and reapplied the same
+edit cleanly. No data was lost, but worth knowing this can still happen with any file that sat in
+the cache across turns without an explicit re-stage.
+
+**2. "The chatbox thumbnail still touches the input's top border - needs another 10px."** The
+`margin-bottom: 8px` from the last pass wasn't enough. Raised to `18px` (total clearance ≈ 26px
+once `.ibChatBoxPendingImages`' own 8px bottom padding is added in) - same reserved-space-on-the-
+thumbnail approach as before, just more of it.
+
+**Verified**: `esbuild` on `SessionDetail.jsx`; brace-balance check on both touched CSS files.
+**Not re-tested in a real browser** - worth opening a session from the Projects page to confirm the
+modal now reads at the same visual weight as the others, and re-checking the chatbox thumbnail
+clearance with an actual attached image.
+
+**Files**: `client/src/components/projectSessions/SessionDetail.jsx`,
+`client/src/components/projectSessions/projectSessions.css`,
+`client/src/components/ibChatBox/ibChatBox.css`.
+
+### 2026-08-20: Migration script also needed a Web Crypto polyfill (`ReferenceError: crypto is not defined`)
+
+Fixing the MONGODB-not-set error (below) surfaced a second, unrelated environment problem the
+first run hit next: `ReferenceError: crypto is not defined` inside
+`mongoose/node_modules/mongodb/lib/utils.js`'s `uuidV4`, thrown from `ServerSession`/
+`ClientSession.endSession` while a cursor was cleaning up. Not a bug in this script's logic - the
+MongoDB Node driver bundled under mongoose reads `globalThis.crypto` directly for session ids, and
+Node only puts the Web Crypto API on the global object by default starting v19. Whatever Node
+version is actually running `node scripts/merge-duplicate-conversations.js` from a fresh terminal
+is apparently older than that (or at least older than whatever the app's own server process runs
+under via nodemon/an npm script, which pins its own version).
+
+Fixed by polyfilling `globalThis.crypto = require('crypto').webcrypto` at the very top of the
+script, before `mongoose` is required - `node:crypto`'s `webcrypto` export has had the same
+implementation available since Node 16.17, just not wired onto `global` before v19. If `webcrypto`
+itself is somehow unavailable (a much older Node), the script now exits with a clear message
+naming the actual Node version detected rather than the driver's own confusing internal
+`ReferenceError`.
+
+**Caught and fixed a mistake of my own before it reached you**: the first version of this comment
+had one continuation line missing its `//` prefix, which would have been an actual syntax error
+(a bare `#` token) rather than a comment - caught by the same `node --check` this project's
+verification step always runs before anything gets pushed. Fixed and re-verified before pushing.
+
+**Verified**: `node --check`; on-device (real Node, real `node_modules`), confirmed `require('mongoose')`
+no longer throws the crypto `ReferenceError` and the script proceeds to its connection attempt
+(this sandbox still can't reach your local Mongo to go further - same limitation as always). Try
+the dry-run again:
+```
+node scripts/merge-duplicate-conversations.js --dry-run
+```
+
+**Files**: `server/scripts/merge-duplicate-conversations.js`.
+
+### 2026-08-20: Assign-to-project modal rebuilt on the app's real modal pattern; thumbnail button clearance; migration script's MONGODB fix
+
+Four follow-up reports, all fixed.
+
+**1 & 2. "The sharedImagesAssignForm div isn't formatted properly... use the same controls you're
+using on the Edit Form across the entire application. You keep using different controls when
+adding new features."**
+
+Fair, and correct: `AssignImageForm` (`SharedImagesPanel.jsx`) was a hand-rolled `<form>` with two
+native `<select>` elements and bespoke CSS (`.sharedImagesAssignForm`/`.sharedImagesAssignSelect`)
+- visibly different fonts, borders, and focus states from every other modal in this app, and zero
+padding of its own. Root cause of "not formatted properly": `IBModal.jsx` (the shared `Dialog`
+every feature's modal content renders through) applies **no padding or width of its own** - it's a
+bare `<Dialog>`+`<DialogTitle>` with `{modal.content}` dropped in directly. Every modal that looks
+right (`EntityWizard.jsx`, `UpdateEventDialog.jsx`) supplies its own `DialogContent
+dividers`/`DialogActions` with real padding and a fixed width - that's not optional chrome IBModal
+hands you, it's each caller's job, and this one skipped it.
+
+Rebuilt `AssignImageForm` on that exact pattern: `DialogContent dividers` /
+`DialogActions`, `width: 560px` (matching `EntityWizard`'s own dialog width, so modals across the
+app are a consistent size), `padding: 24px 28px` / `16px 28px` (copied from `entityWizard.css`,
+not reinvented). The two native `<select>`s are now `IBSelect` - the same component
+`FormFieldEditorRow.jsx` already uses for the Edit Form's own field-type dropdown - forced to full
+width via `.sharedImagesAssignContent .MuiFormControl-root { width: 100% }` (`IBSelect` isn't
+`fullWidth` by default and has no prop for it; this targets its rendered MUI class the same way
+`ibChatBox.css` already strips a MUI internal border elsewhere, so `IBSelect`'s many *other*
+callers at their natural width are unaffected). `IBSelect` supplies its own MUI label internally,
+so it's deliberately **not** wrapped in `FormField` - that would be the two-labels-for-one-field
+mistake `FormField.jsx`'s own header comment warns against; `FormField` is for bare inputs
+(`IBInput`/`IBMultilineInput`) that don't already carry a label.
+
+**Noticed but out of scope for this pass**: `.clientDashboardFlagTypeSelect` (the Flag form,
+inline on the dashboard, not in a modal) is also a native `<select>` with its own bespoke CSS,
+predating this session's shared-images work. Left alone since it's inline-on-page rather than
+modal-hosted and wasn't part of what was reported, but flagging it now rather than let it sit
+quietly - happy to bring it onto `IBSelect` too if wanted.
+
+**3. "The delete button on the pending-image thumbnail overlaps the input's border."**
+
+`.ibChatBoxRemovePendingImage` sits at `top: -8px; right: -8px` relative to its 56px thumbnail, by
+design (it needs to poke out over the corner to read as "remove this," not "part of the image").
+It had no bottom clearance of its own - `.ibChatBoxPendingImages`' 8px bottom padding was the only
+thing separating the whole row from the input below it, and depending on wrap/content length that
+wasn't enough to keep the protruding button off the input's edge. Added `margin-bottom: 8px`
+directly on `.ibChatBoxPendingImage` (not the container's padding), so the clearance travels with
+each thumbnail even if a second row wraps.
+
+**4. "The migration script says MONGODB is not set."**
+
+`merge-duplicate-conversations.js` assumed `MONGODB` was already exported in the shell - every
+other one-off script in `scripts/` (`seed.js`, `seed-large.js`) instead loads
+`server/.env.development` itself via `dotenv`, precisely so this isn't required. Added the same
+`dotenv.config({ path: path.join(__dirname, '..', '.env.development') })` this file was missing.
+Also reworded the missing-`MONGODB` error to point at `.env.development` specifically rather than
+just "export it," since that's now the actual thing to check if it still fires.
+
+**You should be able to run this now** (from `server/`):
+```
+node scripts/merge-duplicate-conversations.js --dry-run
+```
+Still my ask from the entry below: run the dry-run first, tell me what it reports for Marta (and
+anyone else), then run it for real once you've reviewed the output. This is still the one piece of
+the duplicate-conversation fix I can't do for you.
+
+**Verified**: `node --check` on the migration script; `esbuild` on `SharedImagesPanel.jsx`; brace-
+balance check on both touched CSS files. **Not re-tested in a real browser** - worth opening the
+"Assign to project" modal and confirming it's the same visual weight as, say, the session-detail
+modal, and re-attaching an image in Messenger to confirm the remove button now clears the input.
+
+**Files**: `server/scripts/merge-duplicate-conversations.js`,
+`client/src/components/clientDashboard/SharedImagesPanel.jsx`,
+`client/src/components/clientDashboard/clientDashboard.css`,
+`client/src/components/ibChatBox/ibChatBox.css`.
+
+### 2026-08-20: Root cause of "the first client's unread count never clears" — duplicate Conversation documents from booking requests
+
+The Messenger fix below (item 1, "mark read on click") turned out to be insufficient — the user
+reported the top conversation's badge was still permanently stuck, even without clicking it, always
+the same conversation (Marta), and surviving a page reload. Those three answers (via
+`AskUserQuestion`) ruled out the original click-handler-no-op theory outright: a stuck badge that
+persists across reloads and doesn't depend on what gets clicked is a server-side data problem, not a
+React effect-dependency problem.
+
+**Root cause found**: `mutations/bookingRequests.js`'s `createBookingRequest` created a brand new
+`Conversation` unconditionally on every call — `new Conversation({members: [artist.id,
+clientUser.id]}).save()` — instead of reusing an existing thread the way every other conversation-
+opening path in this codebase already does, via `utils/conversations.js`'s
+`findOrCreateConversationForMembers` (used by `Project.conversation` and `getProjectConversation`;
+its own header comment specifically documents booking-request conversations as the canonical thread
+those other paths expect to reuse — a contract this mutation was silently violating). A client who
+submits a second booking request to an artist they already have a thread with — a genuine
+re-inquiry, or just testing the form twice — got a second, disconnected `Conversation` document for
+the exact same two people.
+
+**Why this produces exactly the reported symptom**: `getConversationsByMemberId`
+(`resolvers/conversations.js`) lists every `Conversation` a user belongs to as its own row.
+`IBConversation.jsx` only renders the other member's name, never a conversation id, so two
+duplicates for the same person render as two visually identical rows. Real message traffic keeps
+flowing through one of them; the other sits there with whatever unread state it was last left in.
+Marking "that row" read via a click always genuinely worked server-side — it just wasn't the row
+carrying the traffic, so the badge the user was actually looking at never moved.
+
+**Fixed**: `createBookingRequest` now calls `findOrCreateConversationForMembers([artist.id,
+clientUser.id])` instead of constructing a new `Conversation` directly. This prevents any *new*
+duplicates going forward but does nothing for duplicates that already exist in the live database
+(Marta's included, presumably).
+
+**New**: `server/scripts/merge-duplicate-conversations.js` — one-time cleanup for existing
+duplicates. Groups all `Conversation` documents by identical member set, keeps the oldest as
+canonical, reassigns every `Message.conversationId` / `BookingRequest.conversationId` /
+`SharedImage.conversationId` pointing at a duplicate over to the keeper, merges each member's read
+state (`Conversation.reads`) across every copy keeping whichever `lastReadAt`/`lastNotifiedAt` is
+*later* (merging can only make a thread look as read as either copy already genuinely was, never
+less), bumps the keeper's `updatedAt` to the newest across the merged copies, then deletes the
+duplicates.
+
+**I could not run this myself or confirm the theory against live data.** `device_bash` runs in an
+isolated Linux VM, not literally on this Mac — a direct-DB diagnostic attempt this session failed
+with `ECONNREFUSED 127.0.0.1:27017` against `MONGODB=mongodb://localhost:27017/inkbooks-dev`
+(`server/.env.development`), confirming it cannot reach a local dev MongoDB. **You need to run this
+yourself, from `server/`:**
+
+```
+node scripts/merge-duplicate-conversations.js --dry-run
+```
+
+first — it writes nothing, just reports what it *would* merge, including per-group message/
+booking-request/shared-image counts. If it reports a duplicate group for Marta (or anyone else),
+that confirms this theory against your real data. Once you've reviewed the dry-run output, run it
+again without `--dry-run` to apply the merge for real.
+
+**Verified**: `node --check` on both files; a full on-device `ApolloServer` schema rebuild
+(`typeDefs`/`resolvers` construct without error); `scripts/check-graphql-documents.js` (341
+documents, all still matching). **Not yet confirmed against live data** — that's what the dry-run
+above is for. Once you've run it, let me know what it found and I'll close the loop on this being
+the actual fix for "the first client is never marked read."
+
+**Files**: `server/graphql/mutations/bookingRequests.js`,
+`server/scripts/merge-duplicate-conversations.js` (new).
+
+### 2026-08-20: Client-dashboard shared-images list + "assign to project" (item 4 of the Messenger report)
+
+The fourth item from the same Messenger report below - now implemented, on top of a small new
+model. Scoped via three `AskUserQuestion` answers, all recorded in full in `DECISIONS.md`'s new
+MSG6: every shared image shows always (no "unassigned only" filter), assigning one to a project
+badges it rather than removing it from the list, and the list is artist-and-shop-admin visible
+only (never the client, never plain staff).
+
+**New**: `server/models/SharedImage.js` - one row per image URL shared via a message, either
+direction (client or artist), indexed for the client-dashboard list. Populated automatically by
+`server/utils/shared-images.js`'s `recordSharedImagesForMessage`, called as a best-effort side
+effect from `createMessage` (`mutations/messages.js`) right after a message with `imageUrls` is
+saved - same never-throws contract as the notify/auto-response calls already in that function. A
+no-op for any conversation that isn't a genuine one-client-one-artist thread (mirrors
+`sendAutoResponseForIncomingMessage`'s own guard in `utils/auto-responses.js`).
+
+**New GraphQL**: `getSharedImagesForClient(clientId)`, `getProjectsForClient(clientId)` (feeds the
+assign-picker), `assignSharedImageToProject`, `updateSharedImageTags`, `removeSharedImageFromList` -
+all in `resolvers/sharedImages.js`, authorized via a new `canManageClientSharedImages`
+(`utils/shop-membership.js`) that is deliberately narrower than the existing `canAccessClient`
+(excludes the client themselves and plain staff - see MSG6).
+
+**New client UI**: `SharedImagesPanel.jsx`, mounted on `ClientDashboard.jsx` next to Notes/Flags
+(same `!isSelf`-only gating). Reuses `IBImagesList.jsx` - the same tag-editor/lightbox component
+the project image lists already use - via three new optional, backward-compatible props
+(`onDelete`, `deleteLabel`, `extraActions` on `IBImagesList`/`IBImagesListOptions`; `renderBadge`
+on `IBImagesList`) so `Project.jsx`'s existing three image lists are completely unaffected.
+"Assign to project" opens the app's existing modal (`useAuth()`'s `modal`/`setModal`) with a small
+project + list-type picker.
+
+**Read `DECISIONS.md`'s MSG6 before touching this again** - in particular, "Delete" on this list
+calls a non-destructive `removeSharedImageFromList` (drops only the tracking row), NOT the
+`IBDeleteFile` Firebase-Storage delete the project image lists' own "Delete" uses. That divergence
+from "same functionality as the project image lists" was deliberate and flagged, not missed: this
+URL is also the image actually shown in the client's real chat history, and the project lists'
+delete would silently break that thread's display.
+
+**Not yet re-tested in a real browser** - verified via `esbuild`/schema-build/
+`check-graphql-documents.js` only (341 documents pass, including the new ones). Worth a real
+click-through before trusting it: share an image as a client and as an artist, confirm both show
+up on the client's dashboard tagged with the right sender, assign one to a project and confirm it
+lands in the right list (References/Design/Finished Tattoo) AND the badge appears, and confirm
+"Remove from this list" drops the row without touching the original message's own image.
+
+**Files**: `server/models/SharedImage.js` (new), `server/utils/shared-images.js` (new),
+`server/graphql/resolvers/sharedImages.js` (new), `server/graphql/resolvers/index.js`,
+`server/graphql/typeDefs.js`, `server/graphql/mutations/messages.js`,
+`server/utils/shop-membership.js`, `client/src/services/SharedImageService.js` (new),
+`client/src/components/clientDashboard/SharedImagesPanel.jsx` (new),
+`client/src/components/clientDashboard/ClientDashboard.jsx`,
+`client/src/components/clientDashboard/clientDashboard.css`,
+`client/src/components/ibImagesList/IBImagesList.jsx`,
+`client/src/components/ibImagesList/IBImagesListOptions.jsx`.
+
+### 2026-08-20: Messenger — Marta's conversation never marked read, no active-row highlight, image-only messages silently never sent
+
+Three related reports about the Messenger, all in `client/`. All three are fixed and pushed - the
+fourth item from the same message (the client-dashboard shared-images list above) is now also
+done, see the entry above this one.
+
+**1. "The first client in the list is never marked read when clicked."**
+
+`Messenger.jsx`'s mark-read `useEffect` only fires when `activeConversationId` (or the active
+conversation's `unreadCount`) actually *changes* — React skips an effect whose dependencies compare
+equal to the previous render. `handleConversationClick` called `setActiveConversationId(conversation.id)`
+unconditionally, which is a same-value no-op for whichever conversation the auto-select effect
+already picked on page load (`conversations[0]`, the most recently active thread — exactly whoever
+the user calls "the first in the list"). Clicking that specific row was therefore always invisible to
+the mark-read effect; every other row worked because clicking it genuinely changed the id.
+
+Fixed by also calling `markConversationRead` directly inside `handleConversationClick` when the
+clicked conversation has `unreadCount > 0`. Safe to double up with the effect on a real selection
+change — `markConversationRead` (`utils/conversation-reads.js`) is idempotent by design.
+
+**2. "Highlight the selected/loaded conversation, especially on initial load."**
+
+The wiring for this already existed (`isActive={conversation.id === activeConversationId}` in
+`Messenger.jsx`, rendered as `.ibConversationActive` in `IBConversation.jsx`) and the auto-select
+effect does pick a conversation on load — but `.ibConversationActive` was a flat 6% black tint,
+nearly identical to `.ibConversation:hover`'s own tint, so the "selected" state read as invisible in
+practice. Restyled with a left accent bar (`var(--ib-primary)`) plus the app's `--ib-primary-bg`
+tint (theme-aware, unlike the old hardcoded black), and added `.ibConversationActive:hover` so
+hovering the open thread doesn't visually demote it back to a plain hover state.
+
+**3. "Uploading an image gave no error, but it never shows up anywhere — disappears on refresh."**
+
+Not a upload or rendering bug — the `imageUrls` pipeline (upload → `pendingImageUrls` → `createMessage`
+mutation → server storage → `IBMessage.jsx`'s gallery rendering) is correct end to end. The actual
+bug: `IBChatBox.jsx` had **no visible Send button** — the only way to send anything, ever, was
+pressing Enter while focused in the text field. A user who attaches an image and never also types
+text has no discoverable reason to go click into an empty text box and press Enter, so the message
+is never created; the pending-preview thumbnail is local-only state that resets on refresh, matching
+exactly "I could see a thumbnail, then it disappeared and isn't available anywhere."
+
+Fixed by adding a real Send icon button next to the input (enabled whenever there's typed text or a
+pending image), tracked via a new `hasText` state fed by the input's `onChange` (the field itself
+stays uncontrolled — `messageRef` is still what actually gets read on send). Enter-to-send still
+works unchanged for anyone already used to it.
+
+**Not yet re-tested in a real browser** — verified via `esbuild` only, same limitation as the prior
+token-upload fix (this sandbox has no browser). Worth clicking through all three before trusting
+them fully: (a) open Messenger, confirm the top conversation's badge clears without a second click
+elsewhere first; (b) confirm the open thread is visibly highlighted on load; (c) attach an image
+with no text typed, hit Send, refresh, confirm the image is still there in the thread.
+
+**Files**: `client/src/pages/messenger/Messenger.jsx`,
+`client/src/components/ibConversation/ibConversation.css`,
+`client/src/components/ibChatBox/IBChatBox.jsx`.
+
+
+### 2026-08-20: "Invalid/expired token" on every message-image upload
+
+Reported directly: attaching an image to a message failed with `{"error": "Invalid/expired
+token"}` from `routes/messageUploads.js`. Not actually a token problem — `checkAuth`
+(`utils/check-auth.js`) throws that exact message for ANY reason `jwt.verify` rejects the string it
+was handed, including "this isn't a JWT at all."
+
+Root cause: `IBChatBox.jsx`'s hand-built `Authorization` header used
+`` `Bearer ${CacheService.getItem("token")}` `` directly. `CacheService.getItem("token")` returns
+the whole stored user object (`{id, email, accessToken, ...}`), not the raw JWT — every other
+caller that reads it for a token knows this: `index.jsx`'s Apollo `authLink` reads
+`token.accessToken`, and `IBSquarePaymentForm.jsx`'s own hand-built Authorization header (the only
+other authenticated plain-REST upload in the app) reads `user.accessToken`. Interpolating the bare
+object stringifies it to the literal text `"[object Object]"`, which is never a valid JWT under any
+circumstances — so this had been broken for every caller, not intermittently, since Feature 1
+(image attachments) shipped.
+
+Fixed by reading `token?.accessToken` instead of `token` in `IBChatBox.jsx`'s upload fetch, matching
+the other two call sites. **Not yet re-tested against a real upload** — verified via `esbuild` only
+(this sandbox has no browser to click through); worth a real "attach an image" click-through before
+trusting it fully.
+
+**Files**: `client/src/components/ibChatBox/IBChatBox.jsx`.
+
+### 2026-08-19: five feature requests from one message — images, manageable system text,
+unanswered-message nudges, mark-unread, booth rent
+
+All five confirmed via a single "do it" after the plan (`server/`/`client/`-spanning) was laid out
+and four sub-decisions were locked via `AskUserQuestion` (see `DECISIONS.md`'s MSG4, MSG5, and M12
+for the reasoning behind each). Shipped in the order recommended in the plan — smallest/most
+self-contained first, booth rent (touches real money) last:
+
+**Feature 4 — mark a conversation unread.** No schema change: `Conversation.reads[].lastReadAt`
+already treats "no row" as "everything unread", so `markConversationUnreadForUser`
+(`utils/conversation-reads.js`) just clears it. New `markConversationUnread` mutation, membership-
+checked the same way `updateMessage`/the read mutation already are; a "Mark as unread" action in
+the Messenger's conversation-list row menu.
+
+**Feature 1 — image attachments on messages.** Reuses the exact upload pipeline `Form`'s
+`file_upload` fields already share: `uploadMessageAttachment` in `firebase-admin.js`
+(`folder: 'message-uploads'`), a new `routes/messageUploads.js` mirroring `formUploads.js`'s
+multer/allowlist/rate-limit shape, `Message.imageUrls` (capped array, validated in
+`createMessageInputSchema`), never sent through GraphQL. Client compose box gets the same upload
+widget already built for `FormFieldsRenderer.jsx`; message bubbles render a small gallery above
+the text when `imageUrls` is present.
+
+**Feature 3 — unanswered-message nudges (8h default, then every 3h, shop sets a ceiling).**
+New `ResponseTimeSettings` model + `utils/response-time.js`'s `resolveResponseTimeThresholds` —
+the first **min-clamp** owner-precedence shape in this codebase (see MSG4), not "one wins
+outright" the way every other resolver here works. `utils/attention.js`'s `findUnansweredMessages`/
+`unansweredMessages` surface the passive inbox condition (restricted to clean 1:1 client/artist
+threads, mirroring `sendAutoResponseForIncomingMessage`'s own restriction); `utils/notification-
+jobs.js`'s new `sendMessageNudges` (hourly) is the **first job that actively escalates a derived
+condition into a real, stored `Notification` row on a repeating interval**, rather than just
+reporting it passively — deduped by query (`Notification.exists` on a time window) rather than a
+unique index, since the repeat interval is per-artist-configurable. New `ResponseTimePanel.jsx` in
+Settings > Messages.
+
+**Feature 2 — manageable system-generated text.** New `SystemMessageTemplate` model (7 keys) +
+`utils/system-message-templates.js`, extending the exact `AutoResponse`/`resolveAutoResponseForTrigger`
+owner-precedence shape (artist wins outright, else shop, else the built-in default) to the 7
+currently-hardcoded outbound emails that fire unconditionally rather than on an enable/disable
+toggle. Two identity/security emails (account invite, password reset) deliberately excluded — see
+MSG5. `BOOKING_CONFIRMATION` gets a narrower treatment (subject + one appendable note, not the
+whole body) since that email is assembled from arrays/conditionals a full override could break.
+Every real call site (`bookingRequests.js`, `shopCutPayments.js`, `message-notifications.js`'s
+`notifyNewMessage`) now resolves its shop/artist context and asks `resolveSystemMessageTemplate`
+instead of using a literal string. New `SystemMessageTemplatesPanel.jsx` in Settings > Messages.
+
+**Feature 5 — booth rent vs. percentage cut.** See M12 for the full design. `ShopCutRate` gained
+one field (`compensationModel`) rather than a parallel history table — booth rent IS 0% by
+construction, so `resolveShopCutPercentAt` needed no changes. New append-only `BoothRentPlan`
+(terms: amount, due day) and generated `BoothRentCharge` (one row per artist per due month, unique
+on `{artistId, periodMonth}` — the same idempotency role `Expense`'s `{recurringExpenseId, date}`
+index plays for `RecurringExpense`). New `utils/booth-rent.js`'s `generateDueBoothRentCharges`
+mirrors `generateDueRecurringExpenses`'s catch-up/idempotent shape, structured around resolving
+whichever `BoothRentPlan` row governed each missed period rather than a single live template — and
+re-checks `ShopCutRate.compensationModel` on every run rather than trusting a cached flag, so an
+artist switched back to `PERCENTAGE` stops accruing charges immediately. Payment lifecycle
+(`due -> marked_paid -> confirmed`) is a direct structural mirror of `shopCutPayments.js`'s
+`markShopCutPaidManually`/`confirmShopCutPaid`; `confirmBoothRentPaid` is the one mutation that
+actually writes ledger rows (an artist-owned `Expense` + a shop-owned `Income`, against an owned
+"Booth Rent" `ExpenseType`/`IncomeType`, found-or-created on first use). Overdue rent escalates via
+a new `sendBoothRentNudges` job (`utils/notification-jobs.js`, hourly, 3-day repeat — my own
+default, flagged in M12), notifying **both directions** per overdue charge since `notify()`'s own
+actor rule means one call can only ever reach the side that isn't the actor — the shop admin who
+set the plan (`BoothRentPlan.setByUserId`) is the actor when notifying the artist, and the artist
+is the actor when notifying the shop admins. Client: the compensation-model toggle + booth-rent
+plan history + a shop admin's "confirm paid" queue all live in
+`components/artistDashboard/ShopCutRatePanel.jsx` (extending the existing shop-cut panel rather
+than a new one, since the authorization/props it already has are exactly what booth rent needs
+too); a new `components/settings/BoothRentPanel.jsx` gives the artist their own read-only view of
+the current terms plus a "Mark this month's rent paid" action, rendering nothing at all for an
+artist with no booth-rent history.
+
+**Verification, every feature**: `node --check` on every new/touched server file, a full
+`makeExecutableSchema` rebuild, `scripts/check-graphql-documents.js` (328 → 331 → 336 GraphQL
+documents across the batch, each increase accounted for by the feature that added it), `esbuild`
+syntax checks on every new/touched `.jsx`/service file — all green. **`npm test` has NOT been run
+against this batch** — this sandbox still has no route to `fastdl.mongodb.org` (see Test status
+below); needs a real run on Danny's machine, same as every other change in this log. Worth
+particular attention: Feature 5's money paths (`confirmBoothRentPaid`'s ledger-row creation, the
+generator's catch-up loop across a mid-history rent change) and Feature 3's clamp direction
+(MSG4) are exactly the kind of logic a unit test catches and a read-through doesn't.
+
+**Files**: `models/ResponseTimeSettings.js`, `models/SystemMessageTemplate.js`,
+`models/BoothRentPlan.js`, `models/BoothRentCharge.js`, `models/ShopCutRate.js` (+`compensationModel`),
+`models/Message.js` (+`imageUrls`), `utils/response-time.js`, `utils/system-message-templates.js`,
+`utils/booth-rent.js`, `utils/shop-cut.js` (+`resolveCompensationModelAt`), `utils/attention.js`
+(+`unansweredMessages`, `overdueBoothRent`), `utils/notification-jobs.js`
+(+`sendMessageNudges`, `sendBoothRentNudges`), `utils/business-jobs.js` (+`booth-rent-charges`),
+`utils/conversation-reads.js`, `utils/firebase-admin.js`, `routes/messageUploads.js`,
+`graphql/resolvers/{responseTimeSettings,systemMessageTemplates,boothRent}.js`,
+`graphql/mutations/boothRentPayments.js`, `graphql/typeDefs.js`, `graphql/resolvers/index.js`,
+`client/src/components/settings/{ResponseTimePanel,SystemMessageTemplatesPanel,BoothRentPanel}.jsx`,
+`client/src/components/artistDashboard/ShopCutRatePanel.jsx`,
+`client/src/services/{ResponseTimeSettingsService,SystemMessageTemplateService,BoothRentService}.js`,
+`client/src/pages/settings/settingsCategories.jsx`.
 
 ### 2026-08-19: consent form duplicate fields, then "No client record found for this account."
 
