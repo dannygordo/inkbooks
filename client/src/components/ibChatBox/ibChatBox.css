@@ -1,14 +1,88 @@
 .ibChatBox {
 	flex: 6;
 }
+/* A column now, not a row - it can carry a pending-image strip and an upload error above the
+   actual input row. The row-level layout (attach button + input) moved to .ibChatBoxInputRow. */
 .ibChatBoxBottom {
 	margin-top: 5px;
 	display: flex;
-	align-items: center;
+	flex-direction: column;
+	gap: 6px;
+}
+.ibChatBoxInputRow {
+	display: flex;
+	/* flex-end, not center: .ibChatBoxComposeArea below grows taller than the attach/send
+	   buttons whenever a pending image is queued, and center would float those buttons up into
+	   the middle of that extra height instead of staying level with the text line. */
+	align-items: flex-end;
 	justify-content: space-between;
+	gap: 4px;
 }
 .chatMessageInput {
 	width: 80%;
+}
+
+/* Wraps the pending-image thumbnails together with the text field itself so they read as ONE
+   box - "this is what's about to be sent" - rather than a strip floating elsewhere on the page
+   with no visible connection to the input. The TextField's own outlined border is stripped
+   below so this wrapper's border is the only one visible; only .chatMessageInput nested in HERE
+   loses its border, so every other IBMultilineInput usage in the app (forms, notes, etc.) is
+   unaffected. */
+.ibChatBoxComposeArea {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	border: 1px solid var(--ib-border);
+	border-radius: 8px;
+	padding: 6px 6px 0;
+	background-color: var(--ib-surface-card);
+}
+.ibChatBoxComposeArea .chatMessageInput {
+	width: 100%;
+}
+.ibChatBoxComposeArea .chatMessageInput .MuiOutlinedInput-notchedOutline {
+	border: none;
+}
+
+/* Thumbnails for images chosen but not yet sent - see IBChatBox.jsx's pendingImageUrls. Sits
+   inside .ibChatBoxComposeArea, directly above the text field. */
+.ibChatBoxPendingImages {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	padding: 4px 4px 8px;
+}
+.ibChatBoxPendingImage {
+	position: relative;
+	width: 56px;
+	height: 56px;
+	/* The remove button below sits at top:-8px/right:-8px, poking out past the thumbnail's own
+	   box - fine against the compose area's top padding, but with no bottom clearance of its own
+	   a wrapped second row (or the row simply sitting close to .ibChatBoxComposeArea's padding-0
+	   bottom edge) put that protruding button right on top of the text input's border, making it
+	   hard to click without also clicking into the field. This margin is the thumbnail's own
+	   reserved space, not a tweak to .ibChatBoxPendingImages' padding, so it holds even if more
+	   thumbnails wrap onto a second row. First pass at 8px still wasn't enough clearance in
+	   practice - raised to 18px total. */
+	margin-bottom: 18px;
+}
+.ibChatBoxPendingImage img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	border-radius: 6px;
+}
+.ibChatBoxRemovePendingImage {
+	position: absolute;
+	top: -8px;
+	right: -8px;
+	background: var(--ib-surface-card, #fff) !important;
+	padding: 2px !important;
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+.ibChatBoxUploadError {
+	color: var(--ib-error, #c0392b);
+	font-size: 12px;
 }
 
 .ibChatBoxTop {

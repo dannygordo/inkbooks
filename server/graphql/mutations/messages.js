@@ -7,6 +7,7 @@ const { updateMessageInputSchema, createMessageInputSchema, validate } = require
 const { notifyNewMessage, logNotifyOutcomes } = require('../../utils/message-notifications');
 const { canAccessConversation } = require('../../utils/shop-membership');
 const { sendAutoResponseForIncomingMessage } = require('../../utils/auto-responses');
+const { recordSharedImagesForMessage } = require('../../utils/shared-images');
 
 module.exports = {
     // Had no ownership check at all - any authenticated user could pass an arbitrary
@@ -19,7 +20,7 @@ module.exports = {
     // preserve" reasoning).
     createMessage: withAuth(async (
       _,
-      { conversationId, senderId, message },
+      { conversationId, senderId, message, imageUrls },
       context,
       info,
       user,
@@ -34,7 +35,12 @@ module.exports = {
       if (!isMember) {
         throw new AuthenticationError('Action not allowed');
       }
-      const { valid, errors } = validate(createMessageInputSchema, { conversationId, senderId, message });
+      const { valid, errors, data } = validate(createMessageInputSchema, {
+        conversationId,
+        senderId,
+        message,
+        imageUrls,
+      });
       if (!valid) {
         throw new UserInputError('Errors', { errors });
       }
@@ -54,7 +60,10 @@ module.exports = {
       const newMessage = new Message({
         conversationId,
         senderId,
-        message,
+        // From the validated/defaulted output, not the raw args - data.message is '' rather than
+        // undefined for an image-only send, and data.imageUrls is always a real array.
+        message: data.message,
+        imageUrls: data.imageUrls,
         createdAt: now,
         updatedAt: now,
       });
@@ -75,10 +84,18 @@ module.exports = {
       // can see what actually happened.
       // Every outcome, not just failures - see logNotifyOutcomes on why logging only 'failed'
       // hid the two outcomes people actually report.
+      // An image-only send has no text for the email subject's snippet to use - falls back to a
+      // plain description rather than handing notifyNewMessage an empty string, which would just
+      // fall through to ITS OWN fixed wording anyway but with no hint that a picture is what
+      // actually arrived.
+      const messageTextForNotify = data.message
+        || (data.imageUrls.length > 0
+          ? `Sent ${data.imageUrls.length === 1 ? 'an image' : `${data.imageUrls.length} images`}`
+          : undefined);
       logNotifyOutcomes(
         'messages',
         conversationId,
-        await notifyNewMessage({ conversationId, senderId, messageText: message }),
+        await notifyNewMessage({ conversationId, senderId, messageText: messageTextForNotify }),
       );
 
       // The MESSAGE_RECEIVED Auto-Response trigger (out-of-studio style away-replies) - see
@@ -88,6 +105,12 @@ module.exports = {
       // couldn't be resolved or sent. A no-op for every message that isn't from a client (an
       // artist/staff reply, including the away-reply this itself posts, never re-triggers it).
       await sendAutoResponseForIncomingMessage({ conversationId, senderId, messageId: msg._id });
+
+      // Indexes any attached images into the client-dashboard shared-images triage list - see
+      // utils/shared-images.js and graphql/resolvers/sharedImages.js. Same best-effort contract
+      // as the two calls above: this is a side effect of the message, not the message itself, and
+      // must not be able to lose it.
+      await recordSharedImagesForMessage({ conversation, message: msg });
 
       return msg;
     }),

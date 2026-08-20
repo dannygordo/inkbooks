@@ -4,6 +4,12 @@ const MessageSchema = new mongoose.Schema({
     conversationId: {type: mongoose.Schema.Types.ObjectId, required: true},
 	senderId: {type: mongoose.Schema.Types.ObjectId, required: true},
     message: {type: String},
+    // Already-uploaded image URLs, same shape as FormResponse.answer.fileUrls - the upload itself
+    // happens out-of-band via POST /message-uploads (routes/messageUploads.js, the same
+    // uploadPublicFile()-backed pipeline form-uploads and booking-uploads already share), and this
+    // just holds the URLs it returned. A message can be text-only, image-only, or both - `message`
+    // stays optional for exactly that reason (unchanged from before this field existed).
+    imageUrls: {type: [String], default: []},
     createdAt: {type: Date, required: true},
     updatedAt: {type: Date, required: true}
 });

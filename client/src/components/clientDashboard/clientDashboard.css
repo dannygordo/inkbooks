@@ -157,3 +157,38 @@
 	color: var(--ib-text-secondary);
 	white-space: pre-wrap;
 }
+
+/* SharedImagesPanel.jsx's "Assign to project" modal body - a project + list-type picker via
+   IBSelect (see that component's own header comment on why it was rebuilt off native <select>
+   elements). Mirrors EntityWizard's own modal chrome (entityWizard.css: .entityWizard/
+   .entityWizardContent/.entityWizardActions) rather than a bespoke set of rules per modal, so
+   every dialog opened through the shared IBModal shell is the same width and carries the same
+   padding - IBModal.jsx itself applies none, so each caller matching this one is what makes the
+   app's modals read as one product instead of a different box per feature. */
+.sharedImagesAssignForm {
+	width: 560px;
+	display: flex;
+	flex-direction: column;
+	box-sizing: border-box;
+}
+
+.sharedImagesAssignContent {
+	box-sizing: border-box;
+	display: flex;
+	flex-direction: column;
+	padding: 24px 28px !important;
+}
+
+/* IBSelect isn't fullWidth by default (its own FormControl is sx={{minWidth: 120}}) - stretched
+   to the dialog's full content width here the same way ibChatBox.css already reaches into a MUI
+   internal class (.MuiOutlinedInput-notchedOutline) to fix one component's layout without
+   touching the shared component itself, since IBSelect has many other callers at their own
+   natural width (RatesPanel, IBProjectPalettesSelect, etc.) that this must not affect. */
+.sharedImagesAssignContent .MuiFormControl-root {
+	width: 100%;
+}
+
+.sharedImagesAssignActions {
+	padding: 16px 28px !important;
+	gap: 10px;
+}

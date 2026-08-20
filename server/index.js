@@ -31,6 +31,7 @@ const resolvers = require('./graphql/resolvers');
 const { Constants } = require('./utils/constants');
 const bookingUploadsRouter = require('./routes/bookingUploads');
 const formUploadsRouter = require('./routes/formUploads');
+const messageUploadsRouter = require('./routes/messageUploads');
 const { router: squareOAuthRouter } = require('./routes/squareOAuth');
 const squareWebhooksRouter = require('./routes/squareWebhooks');
 const squarePaymentsRouter = require('./routes/squarePayments');
@@ -111,6 +112,7 @@ app.set('trust proxy', 1);
 app.use(cors({ origin: [Constants.URLS.INKBOOKS_WEBAPP] }));
 app.use(bookingUploadsRouter);
 app.use(formUploadsRouter);
+app.use(messageUploadsRouter);
 // squareWebhooksRouter uses express.raw() internally (needs the raw, unparsed body for HMAC
 // signature verification - see routes/squareWebhooks.js) and squareOAuthRouter's callback is a
 // plain GET with no body at all - neither one is affected by the '/' route's express.json()

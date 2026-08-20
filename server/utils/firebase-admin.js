@@ -144,6 +144,14 @@ async function uploadGuestReferenceImage(buffer, { extension }) {
 async function uploadFormSubmissionFile(buffer, { extension }) {
   return uploadPublicFile(buffer, { extension, folder: 'form-uploads' });
 }
+// Third caller of uploadPublicFile - see routes/messageUploads.js. A message attachment isn't
+// guest/public in the sense the other two folders are (a real Conversation membership check gates
+// who ever sees the resulting URL, via createMessage/getMessagesByConversationId), but Storage
+// itself has no concept of that - the file just needs a folder of its own so a Storage-side
+// listing can tell the three upload kinds apart, same reasoning as the other two.
+async function uploadMessageAttachment(buffer, { extension }) {
+  return uploadPublicFile(buffer, { extension, folder: 'message-uploads' });
+}
 
 const EXTENSION_CONTENT_TYPES = {
   '.jpg': 'image/jpeg',
@@ -161,5 +169,6 @@ module.exports = {
   mintFirebaseToken,
   uploadGuestReferenceImage,
   uploadFormSubmissionFile,
+  uploadMessageAttachment,
   EXTENSION_CONTENT_TYPES,
 };

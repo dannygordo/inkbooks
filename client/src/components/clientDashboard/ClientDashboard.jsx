@@ -11,6 +11,7 @@ import IBPageLoader from "../ibPageLoader/IBPageLoader";
 import IBMultilineInput from "../inputs/IBMultilineInput";
 import EntityListPager from "../entityList/EntityListPager";
 import SendAutoResponseButton from "../autoResponses/SendAutoResponseButton";
+import SharedImagesPanel from "./SharedImagesPanel";
 import { useAuth } from "../../context/auth";
 import { ALERT_CONSTANTS } from "../../constants";
 import { formatCents } from "../../utils/money";
@@ -364,6 +365,12 @@ const ClientDashboard = ({ clientId, isSelf = false }) => {
 					</>
 				)}
 			</IBCardWrapper>
+
+			{/* Staff/artist view only - same rule as Notes/Flags below, and for the same reason:
+			    this triages what an artist DOES with a client's shared images (tagging, filing
+			    onto a project), which isn't a thing the client themselves has a reason to see.
+			    See SharedImagesPanel.jsx's own header comment. */}
+			{!isSelf && <SharedImagesPanel clientId={clientId} />}
 
 			{/* Staff/artist view only - see this file's own header comment on why. Task #146: the
 			    authenticated "staff filling this out on a client's behalf" path - see

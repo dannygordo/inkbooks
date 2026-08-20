@@ -36,7 +36,24 @@ function srcset(image) {
 	};
 }
 
-const IBImagesList = ({ imageData, updateCallback, imageType, onTagsUpdate }) => {
+const IBImagesList = ({
+	imageData,
+	updateCallback,
+	imageType,
+	onTagsUpdate,
+	// The three below are optional passthroughs to IBImagesListOptions, all undefined by default
+	// so every EXISTING caller (Project.jsx's References/Design/Body lists) keeps its current
+	// behavior unchanged - only a caller that supplies them (the client-dashboard shared-images
+	// panel) gets the different delete semantics/extra menu item. See IBImagesListOptions.jsx's
+	// own comments on why the shared-images context needs a non-destructive delete.
+	onDelete,
+	deleteLabel,
+	extraActions,
+	// Optional per-image overlay, rendered above the existing "x time ago" pill - e.g. the
+	// shared-images panel's "Added to References" badge once an image has been filed onto a
+	// project. Returns a node (or a falsy value to render nothing for that image).
+	renderBadge,
+}) => {
 	// -1 means closed - yet-another-react-lightbox's own convention (index is which slide to
 	// open on, not just a boolean), reused here rather than a separate open/close flag.
 	const [lightboxIndex, setLightboxIndex] = useState(-1);
@@ -81,7 +98,28 @@ const IBImagesList = ({ imageData, updateCallback, imageType, onTagsUpdate }) =>
 							img={item}
 							updateCallback={updateCallback}
                             imageType={imageType}
+							onDelete={onDelete}
+							deleteLabel={deleteLabel}
+							extraActions={extraActions}
 						/>
+						{renderBadge && renderBadge(item) && (
+							<Typography
+								variant="body2"
+								component="span"
+								sx={{
+									position: "absolute",
+									bottom: 22,
+									left: 0,
+									color: "white",
+									background: "rgba(0,0,0, .3)",
+									p: "5px",
+									fontSize: "11px",
+									borderTopRightRadius: 8,
+								}}
+							>
+								{renderBadge(item)}
+							</Typography>
+						)}
 						{onTagsUpdate && (
 							<IBImageTagEditor
 								img={item}

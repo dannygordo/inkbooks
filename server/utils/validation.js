@@ -248,17 +248,29 @@ const createConversationInputSchema = z.object({
   // reasoning that took them off createMessage.
 });
 
-const createMessageInputSchema = z.object({
-  conversationId: objectIdSchema,
-  senderId: objectIdSchema,
-  // GraphQL's `message: String!` only guarantees non-null, not non-empty - an empty string ""
-  // passes GraphQL fine. Message.js's Mongoose schema doesn't require this field at all.
-  message: z.string().trim().min(1, 'Message cannot be empty'),
-  // No createdAt/updatedAt. They used to be required here AND ignored by the resolver, which
-  // stamps its own (see mutations/messages.js on why a client-supplied message timestamp is
-  // unsound). Validating a field as required and then throwing it away is the worst of both:
-  // callers must supply something, and whatever they supply means nothing.
-});
+const createMessageInputSchema = z
+  .object({
+    conversationId: objectIdSchema,
+    senderId: objectIdSchema,
+    // No longer min(1) - an image-only message (no text, one or more imageUrls) is now a real,
+    // intended case, matching what an out-of-studio artist sending a design or a client sending
+    // reference photos actually wants to do. The "must have SOMETHING" rule moves to the
+    // .refine() below, where it can see both fields at once instead of just this one.
+    message: z.string().trim().optional().default(''),
+    // Already-uploaded URLs from POST /message-uploads - see models/Message.js. Capped at 5,
+    // matching MAX_FILES in routes/messageUploads.js (and formUploads.js before it) - the cap is
+    // enforced there too, but a request that never touched that route (or lied about what it
+    // returned) should not be able to attach an unbounded array to one message.
+    imageUrls: z.array(z.string().url()).max(5, 'At most 5 images per message').optional().default([]),
+  })
+  // GraphQL's `message: String` only guarantees it's a string when present, not non-empty, and
+  // Message.js's Mongoose schema requires neither field - this is the one place both are checked
+  // together, so an empty message with no images (the one combination that means nothing was
+  // actually sent) is rejected without also rejecting a real image-only message.
+  .refine((data) => data.message.length > 0 || data.imageUrls.length > 0, {
+    message: 'A message needs text, an image, or both.',
+    path: ['message'],
+  });
 
 /**
  * Runs a zod schema against input and returns { valid, errors } - the same shape
@@ -375,6 +387,15 @@ const createShopCutInvoiceInputSchema = z.object({
 
 const appointmentIdInputSchema = z.object({
   appointmentId: objectIdSchema,
+});
+
+// --- Booth rent (Feature 5) schema ---
+// Only the payment mutations validate here (markBoothRentPaidManually/confirmBoothRentPaid,
+// mutations/boothRentPayments.js) - setBoothRentPlan follows setShopCutRate's own convention of
+// validating shape/range directly at the resolver rather than through zod, see
+// resolvers/boothRent.js.
+const boothRentChargeIdInputSchema = z.object({
+  boothRentChargeId: objectIdSchema,
 });
 
 // Batch version of createShopCutInvoiceInputSchema above - see mutations/shopCutPayments.js's
@@ -657,6 +678,53 @@ const sendAutoResponseNowInputSchema = z.object({
   appointmentId: objectIdSchema.nullish(),
 });
 
+// --- Response-time settings (Feature 3 - unanswered-message nudges; see
+// models/ResponseTimeSettings.js and utils/response-time.js) -----------------------------------
+// shopId nullish, same resolveBusinessOwner convention as CreateAutoResponseInput above - omit
+// for the caller's own personal scope, shop admin only when provided. Both thresholds share
+// reminderRuleInputSchema's own 5-minute-to-30-day bounds; optional rather than required so a
+// caller can update just one without resending the other (see resolvers/responseTimeSettings.js).
+const updateResponseTimeSettingsInputSchema = z.object({
+  shopId: objectIdSchema.nullish(),
+  initialThresholdMinutes: z
+    .number()
+    .int('Must be a whole number of minutes')
+    .min(5, 'Must be at least 5 minutes')
+    .max(43200, 'Must be within 30 days')
+    .optional(),
+  repeatIntervalMinutes: z
+    .number()
+    .int('Must be a whole number of minutes')
+    .min(5, 'Must be at least 5 minutes')
+    .max(43200, 'Must be within 30 days')
+    .optional(),
+});
+
+// --- System message templates (Feature 2 - manageable system-generated text; see
+// models/SystemMessageTemplate.js and utils/system-message-templates.js) -----------------------
+// shopId nullish, same resolveBusinessOwner convention as CreateAutoResponseInput above - omit
+// for the caller's own personal scope, shop admin only when provided. key must match one of the
+// real send sites - see models/SystemMessageTemplate.js's own KEYS. Every template field is
+// nullish and applied whenever the key is present at all (empty string treated as "reset to
+// default") - same "omitted leaves it alone, explicit reset is distinct from untouched"
+// convention as UpdateAutoResponseInput's own template fields.
+const SYSTEM_MESSAGE_KEYS_TUPLE = [
+  'BOOKING_REQUEST_RECEIVED',
+  'NEW_MESSAGE_TO_GUEST',
+  'NEW_MESSAGE_TO_ARTIST',
+  'NEW_BOOKING_REQUEST_TO_ARTIST',
+  'SHOP_CUT_MARKED_PAID',
+  'SHOP_CUT_CONFIRMED',
+  'BOOKING_CONFIRMATION',
+];
+const updateSystemMessageTemplateInputSchema = z.object({
+  shopId: objectIdSchema.nullish(),
+  key: z.enum(SYSTEM_MESSAGE_KEYS_TUPLE),
+  emailSubjectTemplate: z.string().trim().max(200).nullish(),
+  emailBodyTemplate: z.string().trim().max(4000).nullish(),
+  extraNoteTemplate: z.string().trim().max(1000).nullish(),
+});
+
 // --- Forms (custom consent/waiver/intake forms - see models/Form.js) --------------------------
 // Separate feature from booking requests/BookingRequest.js - see that model's own header comment
 // on why "booking requests" as an example form TYPE didn't become a migration of the existing
@@ -815,6 +883,7 @@ module.exports = {
   createShopCutInvoiceInputSchema,
   createBatchShopCutInvoiceInputSchema,
   appointmentIdInputSchema,
+  boothRentChargeIdInputSchema,
   processSquarePaymentInputSchema,
   squarePricingSettingsInputSchema,
   reminderRuleInputSchema,
@@ -838,6 +907,8 @@ module.exports = {
   createAutoResponseInputSchema,
   updateAutoResponseInputSchema,
   sendAutoResponseNowInputSchema,
+  updateResponseTimeSettingsInputSchema,
+  updateSystemMessageTemplateInputSchema,
   formFieldInputSchema,
   createFormInputSchema,
   updateFormInputSchema,

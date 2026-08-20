@@ -10,7 +10,25 @@ import IBDeleteFile from "../../firebase/IBDeleteFile";
 import { useAuth } from "../../context/auth";
 import { ALERT_CONSTANTS, AUTH_SETTINGS_CONSTANTS } from "../../constants";
 
-const IBImagesListOptions = ({ img, updateCallback, imageType }) => {
+const IBImagesListOptions = ({
+	img,
+	updateCallback,
+	imageType,
+	// Overrides the delete action entirely when provided. The default behavior below
+	// (IBDeleteFile + updateCallback) permanently deletes the underlying Firebase Storage file -
+	// correct for a project's own image lists, where that file exists ONLY for the project, but
+	// wrong for the client-dashboard shared-images panel: that same URL is also the image
+	// actually shown in the client's chat history (IBMessage.jsx), and deleting the file would
+	// break it there too, silently, for a conversation nobody was trying to edit. Callers in that
+	// context pass their own onDelete (e.g. removeSharedImageFromList - see
+	// SharedImagesPanel.jsx) which drops the row from THIS list only.
+	onDelete,
+	deleteLabel = "Delete",
+	// Extra menu items rendered above Delete, e.g. the shared-images panel's "Assign to Project" -
+	// [{ label, icon, onClick(img) }]. Empty by default so every existing caller's menu is
+	// unchanged.
+	extraActions = [],
+}) => {
 	const { setAlert } = useAuth();
 	const [anchorEl, setAnchorEl] = React.useState(null);
 	const open = Boolean(anchorEl);
@@ -22,6 +40,29 @@ const IBImagesListOptions = ({ img, updateCallback, imageType }) => {
 	};
 
 	const handleDelete = async () => {
+		if (onDelete) {
+			try {
+				await onDelete(img);
+				setAlert({
+					isAlert: true,
+					severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
+					message:
+						AUTH_SETTINGS_CONSTANTS.RESPONSE_MESSAGES
+							.RECORD_UPDATE_SUCCESS,
+					timeout: ALERT_CONSTANTS.TIMEOUT,
+					location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
+				});
+			} catch (error) {
+				setAlert({
+					isAlert: true,
+					severity: ALERT_CONSTANTS.SEVERITY.ERROR,
+					message: error.message,
+					timeout: ALERT_CONSTANTS.TIMEOUT,
+					location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
+				});
+			}
+			return;
+		}
 		try {
 			await IBDeleteFile(img.url);
 		} catch (error) {
@@ -113,11 +154,17 @@ const IBImagesListOptions = ({ img, updateCallback, imageType }) => {
 				transformOrigin={{ horizontal: "right", vertical: "top" }}
 				anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
 			>
+				{extraActions.map((action) => (
+					<MenuItem key={action.label} onClick={() => action.onClick(img)}>
+						<ListItemIcon>{action.icon}</ListItemIcon>
+						{action.label}
+					</MenuItem>
+				))}
 				<MenuItem onClick={handleDelete}>
 					<ListItemIcon>
 						<Delete />
 					</ListItemIcon>
-					Delete
+					{deleteLabel}
 				</MenuItem>
 			</Menu>
 		</React.Fragment>

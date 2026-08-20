@@ -33,3 +33,27 @@
     color: var(--ib-primary-contrast);
     background-color: var(--ib-primary);
 }
+
+.ibMessageBody {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* A small gallery for attached images - wraps rather than a fixed grid, since a message can carry
+   anywhere from 1 to 5 (see routes/messageUploads.js's MAX_FILES). */
+.ibMessageImages {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-left: 10px;
+    max-width: 300px;
+}
+.ibMessageImageThumb {
+    width: 90px;
+    height: 90px;
+    object-fit: cover;
+    border-radius: 8px;
+    -webkit-box-shadow: 5px 5px 15px -12px rgba(var(--ib-shadow-color), 1);
+    box-shadow: 5px 5px 15px -12px rgba(var(--ib-shadow-color), 1);
+}

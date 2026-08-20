@@ -1,8 +1,14 @@
 import { useApolloClient, useMutation } from "@apollo/client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { IconButton, CircularProgress } from "@mui/material";
+import ImageIcon from "@mui/icons-material/Image";
+import SendIcon from "@mui/icons-material/Send";
+import CloseIcon from "@mui/icons-material/Close";
 import { useAuth } from "../../context/auth";
 import MessengerService from "../../services/MessengerService";
 import UtilsService from "../../services/UtilsService";
+import { CacheService } from "../../services/CacheService";
+import { apiUrl } from "../../utils/apiUrl";
 import IBMessage from "../ibMessage/IBMessage";
 import IBPageLoader from "../ibPageLoader/IBPageLoader";
 import IBMultilineInput from "../inputs/IBMultilineInput";
@@ -13,12 +19,92 @@ import { io } from "socket.io-client";
 import { APP_SETTINGS_CONSTANTS } from "../../constants";
 import { useSocket } from "../../context/SocketProvider";
 
+// Same allowlist as routes/messageUploads.js - kept in sync manually since the two run in
+// different processes. A mismatch here just means the server rejects something the client
+// thought was fine, not a security gap (the server's own fileFilter is the real enforcement).
+const ACCEPTED_IMAGE_TYPES = "image/jpeg,image/png,image/webp,image/gif";
+const MAX_IMAGES_PER_MESSAGE = 5;
+
 const IBChatBox = ({ widget, conversation, setActiveMessages, messages, isInputDisabled = false, loadingMessages = false }) => {
 	const { user } = useAuth();
 	const messageRef = useRef();
+	const fileInputRef = useRef();
 	//const scrollRef = useRef();
 	const [arrivalMessage, setArrivalMessage] = useState(null);
 	const [onlineUsers, setOnlineUsers] = useState([]);
+
+	// Already-uploaded URLs waiting to go out on the next send - see routes/messageUploads.js.
+	// Upload happens on file selection, not on send, so the compose box can show real thumbnails
+	// (and a real per-file failure) before the person commits to sending anything.
+	const [pendingImageUrls, setPendingImageUrls] = useState([]);
+	const [uploadingImages, setUploadingImages] = useState(false);
+	const [uploadError, setUploadError] = useState(null);
+
+	// Tracked separately from messageRef's own uncontrolled value purely to enable/disable the
+	// Send button below - the text field itself stays uncontrolled (messageRef is still what
+	// handleSaveMessage actually reads on send). Without this, the only way to send an
+	// image-only message was pressing Enter in an empty text field, which nothing on screen
+	// suggested would do anything - see handleSaveMessage's own comment on why that shipped a
+	// real bug (attached images that silently never sent).
+	const [hasText, setHasText] = useState(false);
+
+	const handleAttachClick = () => {
+		fileInputRef.current?.click();
+	};
+
+	const handleFilesSelected = async (e) => {
+		const files = Array.from(e.target.files || []);
+		// Reset immediately so choosing the SAME file again later still fires onChange - a raw
+		// file input only fires when its value actually changes.
+		e.target.value = "";
+		if (files.length === 0) {
+			return;
+		}
+		if (pendingImageUrls.length + files.length > MAX_IMAGES_PER_MESSAGE) {
+			setUploadError(`You can attach at most ${MAX_IMAGES_PER_MESSAGE} images per message.`);
+			return;
+		}
+		setUploadError(null);
+		setUploadingImages(true);
+		try {
+			const formData = new FormData();
+			files.forEach((file) => formData.append("files", file));
+			// Not through Apollo/GraphQL - same reasoning as Form file_upload fields and booking
+			// intake photos (see FormFieldsRenderer.jsx): binary payloads go through a plain REST
+			// route, never as a GraphQL variable. The Authorization header is built by hand here
+			// because this is the one upload route that needs one (routes/messageUploads.js is
+			// authenticated, unlike /form-uploads and /booking-uploads) - Apollo's own authLink
+			// (see index.jsx) has no reach over a raw fetch like this one.
+			//
+			// CacheService.getItem("token") returns the whole stored user object
+			// ({id, email, accessToken, ...}), not the raw JWT - the same shape index.jsx's own
+			// authLink reads `.accessToken` off, and the same shape IBSquarePaymentForm.jsx's own
+			// hand-built Authorization header reads `user.accessToken` off. Interpolating the bare
+			// object here (as this line used to) stringifies it to the literal text
+			// "[object Object]", which the server's jwt.verify rejects - every attachment upload
+			// failed with "Invalid/expired token" for exactly this reason.
+			const token = CacheService.getItem("token");
+			const response = await fetch(apiUrl("message-uploads"), {
+				method: "POST",
+				headers: { Authorization: `Bearer ${token?.accessToken}` },
+				body: formData,
+			});
+			const result = await response.json();
+			if (!response.ok) {
+				setUploadError(result?.error || "Upload failed.");
+				return;
+			}
+			setPendingImageUrls((prev) => [...prev, ...(result.urls || [])]);
+		} catch (err) {
+			setUploadError("Upload failed. Check your connection and try again.");
+		} finally {
+			setUploadingImages(false);
+		}
+	};
+
+	const handleRemovePendingImage = (url) => {
+		setPendingImageUrls((prev) => prev.filter((u) => u !== url));
+	};
 
 	// A sentinel at the BOTTOM of the thread, scrolled to whenever the message list changes.
 	//
@@ -111,11 +197,19 @@ const IBChatBox = ({ widget, conversation, setActiveMessages, messages, isInputD
 
 	const handleSaveMessage = (e) => {
 		e.preventDefault();
+		const messageText = messageRef.current.value;
+		// Mirrors the server's own rule (utils/validation.js's createMessageInputSchema .refine) -
+		// nothing to send if both are empty. Checked here too so a stray Enter on an empty,
+		// image-less box doesn't round-trip to the server just to be told no.
+		if (!messageText.trim() && pendingImageUrls.length === 0) {
+			return;
+		}
 			const newMessage = {
 			id: new ObjectID(),
 			conversationId: conversation.id,
 			senderId: user.id,
-			message: messageRef.current.value,
+			message: messageText,
+			imageUrls: pendingImageUrls,
 			createdAt: UtilsService.formatDateToISO(Date.now()),
 			updatedAt: UtilsService.formatDateToISO(Date.now()),
 		};
@@ -126,13 +220,14 @@ const IBChatBox = ({ widget, conversation, setActiveMessages, messages, isInputD
 			conversationId: newMessage.conversationId,
 			senderId: newMessage.senderId,
 			message: newMessage.message,
+			imageUrls: newMessage.imageUrls,
 			// No timestamps. The server stamps them - a client-supplied one decides thread order
 			// and unread state, neither of which may be caller-controlled. The local `newMessage`
 			// above still carries them for the optimistic render only.
 		},
 		}).then(({ data: { createMessage: msg } }) => {
 			console.log(msg);
-			
+
 			savedMessage = {
 				__typename: "Message",
 				id: msg.id,
@@ -144,6 +239,7 @@ const IBChatBox = ({ widget, conversation, setActiveMessages, messages, isInputD
 					avatar: user.avatar
 				},
 				message: msg.message,
+				imageUrls: msg.imageUrls,
 				// The SERVER's timestamp, not the local one built above. This was omitted
 				// entirely, which happened to look right - moment(undefined) means "now", and a
 				// message you just sent really is from now - so the bug only showed up as the
@@ -162,7 +258,7 @@ const IBChatBox = ({ widget, conversation, setActiveMessages, messages, isInputD
 			const recipients = conversation.members.filter(
 				(member) => member !== user.id
 			);
-	
+
 			const messageData = {
 				recipients,
 				savedMessage
@@ -173,11 +269,20 @@ const IBChatBox = ({ widget, conversation, setActiveMessages, messages, isInputD
 		});
 
 
-		
+
 
 		if (messageRef.current) {
 		messageRef.current.value = "";
 		}
+		// The DOM value is cleared above, but nothing re-fires onChange for an imperative clear -
+		// without this the Send button would stay enabled (or the helper text stay styled as "has
+		// text") after a message that just went out.
+		setHasText(false);
+		// Cleared on send, not before - the images just sent shouldn't linger as if still pending,
+		// and clearing regardless of the mutation's outcome matches the text field's own behavior
+		// above (no rollback-on-failure exists for that either today).
+		setPendingImageUrls([]);
+		setUploadError(null);
 
 	}
 
@@ -263,19 +368,85 @@ const IBChatBox = ({ widget, conversation, setActiveMessages, messages, isInputD
 						<div ref={bottomRef} />
 					</div>
 					<div className="ibChatBoxBottom">
-						<IBMultilineInput
-							id="addMessage"
-							variant="outlined"
-							inputRef={messageRef}
-							disabled={isInputDisabled}
-							className="chatMessageInput"
-							helperText="Type message and press enter"
-							onKeyDown={(e) => {
-								if (e.key === "Enter") {
-									handleSaveMessage(e, e.target.value);
-								}
-							}}
-						/>
+						{uploadError && <div className="ibChatBoxUploadError">{uploadError}</div>}
+						<div className="ibChatBoxInputRow">
+							<input
+								ref={fileInputRef}
+								type="file"
+								accept={ACCEPTED_IMAGE_TYPES}
+								multiple
+								hidden
+								onChange={handleFilesSelected}
+							/>
+							<IconButton
+								size="small"
+								className="ibChatBoxAttachButton"
+								onClick={handleAttachClick}
+								disabled={isInputDisabled || uploadingImages || pendingImageUrls.length >= MAX_IMAGES_PER_MESSAGE}
+								aria-label="Attach image"
+							>
+								{uploadingImages ? <CircularProgress size={18} /> : <ImageIcon fontSize="small" />}
+							</IconButton>
+							{/* Thumbnails now render INSIDE this bordered wrapper, directly above the
+							    text field, rather than in their own separate strip elsewhere on the
+							    page - a queued image with no visible connection to "the thing you're
+							    about to send" read as already-sent-and-lost when it wasn't sent at
+							    all. ibChatBox.css strips the TextField's own outlined border inside
+							    this wrapper so the two visually merge into one box. */}
+							<div className="ibChatBoxComposeArea">
+								{pendingImageUrls.length > 0 && (
+									<div className="ibChatBoxPendingImages">
+										{pendingImageUrls.map((url) => (
+											<div key={url} className="ibChatBoxPendingImage">
+												<img src={url} alt="Attachment preview" />
+												<IconButton
+													size="small"
+													className="ibChatBoxRemovePendingImage"
+													onClick={() => handleRemovePendingImage(url)}
+													aria-label="Remove image"
+												>
+													<CloseIcon fontSize="inherit" />
+												</IconButton>
+											</div>
+										))}
+									</div>
+								)}
+								<IBMultilineInput
+									id="addMessage"
+									variant="outlined"
+									inputRef={messageRef}
+									disabled={isInputDisabled}
+									className="chatMessageInput"
+									helperText={
+										pendingImageUrls.length > 0
+											? "Press Enter or tap Send to send the image above"
+											: "Type a message or attach an image, then press Enter or tap Send"
+									}
+									onChange={(e) => setHasText(!!e.target.value?.trim())}
+									onKeyDown={(e) => {
+										if (e.key === "Enter") {
+											handleSaveMessage(e, e.target.value);
+										}
+									}}
+								/>
+							</div>
+							{/* The only way to actually send used to be this exact Enter keydown above -
+							    fine for a typed reply, but there was no discoverable way to send an
+							    image-only message at all: nothing on screen said "press enter to send
+							    the picture you just attached." An uploaded-but-never-sent image looked
+							    like it had gone out (a thumbnail appeared) and then quietly vanished on
+							    refresh, because nothing had actually been sent. A visible Send button
+							    is the fix; Enter still works for anyone already used to it. */}
+							<IconButton
+								size="small"
+								className="ibChatBoxSendButton"
+								onClick={handleSaveMessage}
+								disabled={isInputDisabled || uploadingImages || (!hasText && pendingImageUrls.length === 0)}
+								aria-label="Send message"
+							>
+								<SendIcon fontSize="small" />
+							</IconButton>
+						</div>
 					</div>
 				</div>
 			</div>
