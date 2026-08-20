@@ -309,6 +309,38 @@ async function assertCanAccessClient(user, client) {
 }
 
 /**
+ * "May this caller triage this client's shared-message images?" - narrower than canAccessClient
+ * above on purpose. That function also lets the client read their own record (it answers "can I
+ * see this client"), and lets any shop member - including front-desk staff - in by virtue of
+ * sharing a shop. This surface exists to let someone file a client-shared image onto a project's
+ * References/Design/Body Images list, which is an artist-and-shop-admin action: never the client
+ * themselves (this chooses what lands in their own project), and not staff, who don't manage
+ * project content anywhere else in this app either.
+ */
+async function canManageClientSharedImages(user, client) {
+  if (!client) {
+    return false;
+  }
+  // An independent artist reached through a shared project - the same path canAccessClient's own
+  // artist branch takes, since there's no shop to check shopIds against.
+  if (user.role === Constants.ROLES.ARTIST) {
+    return Boolean(await Project.exists({ artistId: user.id, clientId: client._id }));
+  }
+  if (user.role > Constants.ROLES.SHOP_ADMIN) {
+    return false;
+  }
+  const myShopIds = await getShopIdsForUser(user.id);
+  const clientShopIds = (client.shopIds || []).map(String);
+  return myShopIds.some((id) => clientShopIds.includes(String(id)));
+}
+
+async function assertCanManageClientSharedImages(user, client) {
+  if (!(await canManageClientSharedImages(user, client))) {
+    throw new AuthenticationError('Action not allowed');
+  }
+}
+
+/**
  * The Mongo filter matching every Client this caller may LIST - the exact scoping getClients
  * (resolvers/clients.js) applies, extracted so a second caller (the search resolver) reuses it
  * rather than re-deriving it. Re-deriving authorization logic a second time is exactly the failure
@@ -378,6 +410,8 @@ module.exports = {
   linkClientToUsersShops,
   canAccessClient,
   assertCanAccessClient,
+  canManageClientSharedImages,
+  assertCanManageClientSharedImages,
   clientScopeFilter,
   projectScopeFilter,
   canManageArtist,
