@@ -7,6 +7,7 @@ const {
   sendNewMessageNotificationToArtist,
 } = require('./email');
 const { readRowFor, markConversationNotified } = require('./conversation-reads');
+const { getActiveShopIdForArtist } = require('./artist-shop');
 
 /**
  * Tells the other side of a conversation that a message arrived.
@@ -159,6 +160,17 @@ async function notifyNewMessage({
         continue;
       }
 
+      // Feature 2 (manageable system-generated text) - whose template wording applies. Guest
+      // direction: the SENDER is the artist speaking to their client, so their (or their shop's)
+      // override applies. Artist direction: the RECIPIENT is the artist being notified, so
+      // theirs applies instead - same "whoever is the artist in this exchange" resolution
+      // sendAutoResponseForIncomingMessage already uses for MESSAGE_RECEIVED. Best-effort and
+      // harmless either way: an id that isn't actually a connected artist just resolves to no
+      // shop and no override, falling through to the built-in default.
+      const templateArtistUserId = guestToken ? senderId : recipientId;
+      // eslint-disable-next-line no-await-in-loop
+      const templateShopId = await getActiveShopIdForArtist(templateArtistUserId);
+
       const via = guestToken ? 'guest-link' : 'app-link';
       const delivery = guestToken
         ? await sendToGuest({
@@ -167,6 +179,8 @@ async function notifyNewMessage({
             artistName: senderName,
             guestToken,
             messagePreview: messageText,
+            artistUserId: templateArtistUserId,
+            shopId: templateShopId,
           })
         : await sendToArtist({
             to: recipient.email,
@@ -174,6 +188,8 @@ async function notifyNewMessage({
             clientName: senderName,
             conversationId: String(conversationId),
             messagePreview: messageText,
+            artistUserId: templateArtistUserId,
+            shopId: templateShopId,
           });
 
       // sendEmail() returns null rather than throwing when the provider rejects the message or

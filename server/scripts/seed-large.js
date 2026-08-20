@@ -142,6 +142,37 @@ function daysAgo(n) {
   return d;
 }
 
+// A row's createdAt/updatedAt is "when this record was written," which can never be later than
+// right now - even for a project/appointment whose own appointmentDate is genuinely in the future
+// (that's the whole point of CONFIG.weeksOfFuture: a real booking gets made TODAY for a session
+// next week, not made next week). daysAgo(n) with a negative n produces a future date, and several
+// call sites below derive their createdAt/updatedAt offset from consultDaysAgo/dayCursor, which
+// are themselves allowed to go negative for the deliberately-future projects - so without this,
+// the DB ROW ends up dated later than "now", a state nothing in the real app can ever produce
+// (createMessage/createBookingRequest/etc. all stamp these server-side at the moment of the call -
+// see mutations/messages.js). Wrap every createdAt/updatedAt VALUE below in this (not just the day
+// offset fed into daysAgo() - see the note on why); leave appointmentDate/consultDate/sessionDate
+// themselves unwrapped, since those are exactly the fields that are SUPPOSED to be able to land in
+// the future.
+//
+// Clamps the RESULTING TIMESTAMP, not the day-count offset that produced it. A first version of
+// this clamped the integer (daysAgo(Math.max(0, n))) - that stops a message from landing weeks in
+// the future, but daysAgo() also rolls a random hour between 10am-5pm onto whatever day it lands
+// on, so daysAgo(0) ("today") can still come out a few hours LATER than the actual moment someone
+// is testing at. That is the exact same bug at a smaller scale: a message dated 3pm today is just
+// as unreadable-forever at 11am today as one dated next month is right now, for the identical
+// reason - lastReadAt cannot catch up to a timestamp that has not happened yet. Clamping the
+// output Date instead of the input day-count closes that gap regardless of the hour jitter.
+//
+// Found via a real, reproducible report: a seeded conversation message tied to a future project
+// got a createdAt after "now", and its unread badge could never clear - not from clicking it, not
+// from reloading - because markConversationRead stamps lastReadAt to the real current time, which
+// can never catch up to a message timestamped in the future, whether that's by weeks or by hours.
+function notFuture(date) {
+  const now = new Date();
+  return date > now ? now : date;
+}
+
 const FIRST_NAMES = [
   'Priya', 'Marcus', 'Elena', 'Dwayne', 'Rosa', 'Tomas', 'Aisha', 'Nils', 'Camille', 'Jonah',
   'Yuki', 'Ade', 'Freya', 'Ravi', 'Lena', 'Osman', 'Marta', 'Kofi', 'Ingrid', 'Diego',
@@ -591,8 +622,8 @@ async function main() {
       // omitting them fails validation, which is the sort of thing a seed only finds by running.
       const conversation = await new Conversation({
         members: [String(a.user._id), String(c.user._id)].sort(),
-        createdAt: daysAgo(consultDaysAgo + 7),
-        updatedAt: daysAgo(consultDaysAgo + 7),
+        createdAt: notFuture(daysAgo(consultDaysAgo + 7)),
+        updatedAt: notFuture(daysAgo(consultDaysAgo + 7)),
       }).save();
       const bookingRequest = await new BookingRequest({
         artistId: a.user._id,
@@ -605,8 +636,8 @@ async function main() {
         phone: c.client.phone,
         description: 'Seeded booking request.',
         status: 'session_booked',
-        createdAt: daysAgo(consultDaysAgo + 7),
-        updatedAt: daysAgo(consultDaysAgo + 7),
+        createdAt: notFuture(daysAgo(consultDaysAgo + 7)),
+        updatedAt: notFuture(daysAgo(consultDaysAgo + 7)),
       }).save();
 
       const project = await new Project({
@@ -620,8 +651,8 @@ async function main() {
         status: 'in_progress',
         tags: chance(0.4) ? [pick(['cover-up', 'walk-in', 'referral', 'touch-up'])] : [],
         bookingRequestId: bookingRequest._id,
-        createdAt: daysAgo(consultDaysAgo + 7),
-        updatedAt: daysAgo(consultDaysAgo + 7),
+        createdAt: notFuture(daysAgo(consultDaysAgo + 7)),
+        updatedAt: notFuture(daysAgo(consultDaysAgo + 7)),
       }).save();
       projectsMade += 1;
 
@@ -660,8 +691,8 @@ async function main() {
         taxCents: depositBreakdown.taxCents,
         feeCents: depositBreakdown.feeOffsetCents,
         totalCents: depositBreakdown.amountDueCents,
-        createdAt: daysAgo(consultDaysAgo + 1),
-        updatedAt: daysAgo(consultDaysAgo + 1),
+        createdAt: notFuture(daysAgo(consultDaysAgo + 1)),
+        updatedAt: notFuture(daysAgo(consultDaysAgo + 1)),
       });
       await applyShopCut(consult);
       await consult.save();
@@ -724,8 +755,8 @@ async function main() {
             status === 'completed' ? `seed-payment-${a.key}-${p}-${s}` : undefined,
           accumulatedSeconds: status === 'completed' ? hours * 3600 : 0,
           timerStatus: 'stopped',
-          createdAt: daysAgo(dayCursor + 3),
-          updatedAt: daysAgo(dayCursor + 3),
+          createdAt: notFuture(daysAgo(dayCursor + 3)),
+          updatedAt: notFuture(daysAgo(dayCursor + 3)),
         });
         await applyShopCut(appointment);
 
@@ -737,14 +768,14 @@ async function main() {
             appointment.shopCutStatus = 'paid';
             appointment.shopCutPaymentMethod = 'manual';
             appointment.shopCutMarkedPaidBy = a.user._id;
-            appointment.shopCutMarkedPaidAt = daysAgo(dayCursor - 2);
+            appointment.shopCutMarkedPaidAt = notFuture(daysAgo(dayCursor - 2));
             appointment.shopCutConfirmedBy = owner.user._id;
-            appointment.shopCutConfirmedAt = daysAgo(dayCursor - 1);
+            appointment.shopCutConfirmedAt = notFuture(daysAgo(dayCursor - 1));
           } else if (roll < 0.6) {
             appointment.shopCutStatus = 'pending_confirmation';
             appointment.shopCutPaymentMethod = 'manual';
             appointment.shopCutMarkedPaidBy = a.user._id;
-            appointment.shopCutMarkedPaidAt = daysAgo(dayCursor - 2);
+            appointment.shopCutMarkedPaidAt = notFuture(daysAgo(dayCursor - 2));
           } else if (roll < 0.72) {
             appointment.shopCutStatus = 'invoice_sent';
             appointment.shopCutPaymentMethod = 'square_invoice';
@@ -800,8 +831,8 @@ async function main() {
           message: fromClient
             ? pick(['Can we shift by an hour?', 'Loved the last session!', 'Sending refs now.'])
             : pick(['Sounds good.', 'Booked you in.', 'Bring snacks, it is a long one.']),
-          createdAt: daysAgo(consultDaysAgo - m),
-          updatedAt: daysAgo(consultDaysAgo - m),
+          createdAt: notFuture(daysAgo(consultDaysAgo - m)),
+          updatedAt: notFuture(daysAgo(consultDaysAgo - m)),
         }).save();
       }
 

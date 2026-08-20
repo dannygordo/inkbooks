@@ -16,14 +16,40 @@
     margin-left: 20px;
 }
 
-/* The currently open thread. Was unstyled entirely - the chat menu gave no indication of which
-   conversation you were reading. */
+/* The currently open thread. Was unstyled entirely, then a flat 6% black tint - too close to
+   .ibConversation:hover's own var(--ib-surface-subtle) to read as a distinct, permanent "this one
+   is open" state rather than a hover you happened to be sitting on. A left accent bar reads as
+   selection at a glance even on a greyscale screen, the way the unread weight above does; the tint
+   itself now uses the app's primary-tinted surface token so it stays visible (and on-brand) in
+   both themes rather than a hardcoded black that only worked in light mode.
+   border-left eats 3px of the row's own 10px left padding so the content doesn't jump sideways
+   when a row becomes active. */
 .ibConversationActive {
-	background-color: rgba(0, 0, 0, 0.06);
+	background-color: var(--ib-primary-bg);
+	border-left: 3px solid var(--ib-primary);
+	padding-left: 7px;
+}
+/* Without this, hovering the active row would show the plain hover tint instead, making the
+   selected thread momentarily look like any other row under the cursor. */
+.ibConversationActive:hover {
+	background-color: var(--ib-primary-bg);
 }
 
 /* A thread with unread messages. Weight rather than colour alone, so the distinction survives a
    greyscale screen and doesn't rely on the badge being noticed. */
 .ibConversationUnread .ibConversationName {
 	font-weight: 700;
+}
+
+/* The row's overflow menu button ("Mark as unread") - hidden until the row is hovered or the menu
+   is actually open, so the chat list doesn't carry a permanent row of dots down the right edge.
+   Pushed to the far right via margin-left: auto on the row's flex layout. */
+.ibConversationMenuButton {
+	margin-left: auto;
+	opacity: 0;
+	transition: opacity 0.1s ease;
+}
+.ibConversation:hover .ibConversationMenuButton,
+.ibConversationMenuButton[aria-expanded="true"] {
+	opacity: 1;
 }

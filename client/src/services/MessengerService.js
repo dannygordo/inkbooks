@@ -11,6 +11,7 @@ const MessengerService = (() => {
 					conversationId
 					senderId
 					message
+					imageUrls
 					createdAt
 					updatedAt
 					user {
@@ -59,6 +60,7 @@ const MessengerService = (() => {
 						avatar
 					}
 					message
+					imageUrls
 					createdAt
 					updatedAt
 				}
@@ -132,6 +134,7 @@ const MessengerService = (() => {
 				conversationId
 				senderId
 				message
+				imageUrls
 				createdAt
 				updatedAt
 				user {
@@ -156,16 +159,23 @@ const MessengerService = (() => {
 	};
 
 	const _CREATE_MESSAGE_MUTATION = gql`
-		mutation CreateMessage($conversationId: ID!, $senderId: ID!, $message: String!) {
+		mutation CreateMessage(
+			$conversationId: ID!
+			$senderId: ID!
+			$message: String
+			$imageUrls: [String!]
+		) {
 			createMessage(
 				conversationId: $conversationId
 				senderId: $senderId
 				message: $message
+				imageUrls: $imageUrls
 			) {
 				id
 				conversationId
 				senderId
 				message
+				imageUrls
 				createdAt
 				updatedAt
 			}
@@ -208,10 +218,22 @@ const MessengerService = (() => {
 		}
 	`;
 
+	// The reverse of the above - see conversation-reads.js's markConversationUnreadForUser. Same
+	// shape deliberately: this is the same field, just clearing it instead of setting it.
+	const _MARK_CONVERSATION_UNREAD = gql`
+		mutation MarkConversationUnread($conversationId: ID!) {
+			markConversationUnread(conversationId: $conversationId) {
+				id
+				unreadCount
+			}
+		}
+	`;
+
 	return {
 		GET_UNREAD_MESSAGE_COUNT: _GET_UNREAD_MESSAGE_COUNT,
 		useUnreadMessageCount: _useUnreadMessageCount,
 		MARK_CONVERSATION_READ: _MARK_CONVERSATION_READ,
+		MARK_CONVERSATION_UNREAD: _MARK_CONVERSATION_UNREAD,
 		fetchProjectConversation: _fetchProjectConversation,
 		fetchProjectConversationQuery: FETCH_PROJECT_CONVERSATION_QUERY,
 		fetchShopConversations: _fetchShopConversations,

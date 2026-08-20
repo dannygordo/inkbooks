@@ -46,6 +46,18 @@ const Messenger = () => {
 		refetchQueries: ["GetUnreadMessageCount", "GetConversationsByMemberId"],
 	});
 
+	// Same refetch shape as markConversationRead - it's the same field, just cleared instead of
+	// set, so the same two queries need to hear about it.
+	const [markConversationUnread] = useMutation(MessengerService.MARK_CONVERSATION_UNREAD, {
+		refetchQueries: ["GetUnreadMessageCount", "GetConversationsByMemberId"],
+	});
+	const handleMarkUnread = (conversation) => {
+		markConversationUnread({ variables: { conversationId: conversation.id } }).catch(() => {
+			// Same reasoning as the read-mutation's own swallowed catch above: a failed toggle is a
+			// wrong badge, not lost data.
+		});
+	};
+
 	const conversations = useMemo(
 		() => (data ? data.getConversationsByMemberId : []),
 		[data],
@@ -144,6 +156,24 @@ const Messenger = () => {
 		// Keeps the URL honest, so a reload or a back button returns to the same thread - and so
 		// the deep-link effect above doesn't fight the click by re-selecting the emailed one.
 		setSearchParams({ conversation: conversation.id }, { replace: true });
+
+		// The mark-read effect above only re-fires when activeConversationId (or activeUnread)
+		// actually CHANGES - React skips an effect whose dependencies compare equal to last time,
+		// and setActiveConversationId(conversation.id) is exactly that when the clicked row is
+		// already the active one. That's invisible for every OTHER conversation, but the
+		// auto-select effect above always picks conversations[0] (the most recently active
+		// thread) on page load - so clicking THAT row is always a same-value no-op, and its
+		// unread count never clears from a click. This was "the first client in the list is
+		// never marked read" - Marta, in this case, being whoever's most recently active.
+		// Calling the mutation directly here closes that gap. Safe to double up with the effect
+		// on an actual selection change: markConversationRead is idempotent by design (see its
+		// own header comment in utils/conversation-reads.js).
+		if ((conversation.unreadCount || 0) > 0) {
+			markConversationRead({ variables: { conversationId: conversation.id } }).catch(() => {
+				// Same reasoning as the effect's own swallowed catch above: a wrong badge, not
+				// lost data.
+			});
+		}
 	};
 
 	if (loading && !data) {
@@ -190,6 +220,7 @@ const Messenger = () => {
 								conversation={conversation}
 								activeConversation={handleConversationClick}
 								isActive={conversation.id === activeConversationId}
+								onMarkUnread={handleMarkUnread}
 							/>
 						))}
 					</div>

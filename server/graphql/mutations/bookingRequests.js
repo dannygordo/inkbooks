@@ -14,6 +14,7 @@ const { findOrCreateGuestClient } = require('../../utils/guest-client');
 const { resolveGuestToken } = require('../../utils/guest-auth');
 const { checkRateLimit, getClientIp } = require('../../utils/rate-limit');
 const { tryCheckAuth } = require('../../utils/check-auth');
+const { findOrCreateConversationForMembers } = require('../../utils/conversations');
 const { assertCanManageArtist, linkClientToUsersShops } = require('../../utils/shop-membership');
 const { getActiveShopIdForArtist } = require('../../utils/artist-shop');
 const {
@@ -132,11 +133,21 @@ module.exports = {
     const artistIsActor = String(actorUserId) === String(artist._id);
 
     const now = new Date();
-    const conversation = await new Conversation({
-      members: [artist.id, clientUser.id],
-      createdAt: now,
-      updatedAt: now,
-    }).save();
+    // Was an unconditional `new Conversation(...).save()` - a SECOND booking request from a
+    // client who already has a thread with this artist (a real client re-inquiring later, or
+    // simply testing the form twice) created a genuine duplicate conversation between the exact
+    // same two people, rather than reusing the existing one. findOrCreateConversationForMembers
+    // (utils/conversations.js) is the shared dedup this codebase already has for exactly this -
+    // its own header comment specifically calls out booking-request conversations as the
+    // canonical thread other paths (Project.conversation) expect to reuse, which only holds if
+    // booking requests themselves never create a second one. A duplicate here is not cosmetic:
+    // getConversationsByMemberId (resolvers/conversations.js) lists BOTH as separate rows with
+    // the same displayed name, and whichever one is stale (no longer receiving real messages,
+    // because ongoing conversation happens through the OTHER, reused thread) can sit at the top
+    // of the Messenger list with an unread count that a click on "that person's name" can never
+    // actually clear, since the row the user is looking at and the row real traffic flows through
+    // are two different documents. Found via investigating exactly that report.
+    const conversation = await findOrCreateConversationForMembers([artist.id, clientUser.id]);
 
     // guestToken is a required field on BookingRequest - must be generated before the first
     // save, not assigned afterward, or the save itself would fail validation.
@@ -166,11 +177,18 @@ module.exports = {
     // Best-effort notifications, sent after the record is safely persisted - a delivery
     // failure here shouldn't fail the whole request, and sendEmail() itself already warns and
     // no-ops rather than throwing (see utils/email.js).
+    //
+    // Feature 2 (manageable system-generated text): both emails are owned by THIS artist - the
+    // one whose wording preference applies is whoever the request is FOR, regardless of who sent
+    // either notification.
+    const notificationShopId = await getActiveShopIdForArtist(artist.id);
     await sendBookingRequestReceivedEmail({
       to: clientUser.email,
       firstName: clientUser.firstName,
       artistName: artist.firstName,
       guestToken,
+      artistUserId: artist.id,
+      shopId: notificationShopId,
     });
     // Not when the artist made it themselves. An artist scheduling a walk-in through the
     // appointment wizard hits this same mutation, and mailing them "you have a new booking
@@ -186,6 +204,8 @@ module.exports = {
         to: artist.email,
         artistFirstName: artist.firstName,
         clientName: `${clientUser.firstName} ${clientUser.lastName}`,
+        artistUserId: artist.id,
+        shopId: notificationShopId,
       });
     }
 
