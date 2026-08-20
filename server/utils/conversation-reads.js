@@ -129,6 +129,31 @@ async function markConversationRead(conversationId, userId, at = new Date()) {
   return Conversation.findById(conversationId);
 }
 
+/**
+ * Marks a conversation unread again for this user - the reverse of markConversationRead.
+ *
+ * No new storage, on purpose. Unread is entirely a function of lastReadAt vs. message.createdAt
+ * (see the header comment), so "make this look unread" is just clearing that one field. A missing
+ * read row already means "everything is unread" (see unreadFilter), so if this user has never
+ * opened the thread there is nothing to do - the $unset simply matches zero documents, which is
+ * the correct no-op rather than a case worth special-casing.
+ *
+ * lastNotifiedAt is left untouched. Marking a thread unread is a "remind me" UI action, not a
+ * request to be re-emailed immediately - shouldNotify()'s throttle should keep working off of
+ * when the recipient was actually last notified, not be reset as a side effect of this.
+ *
+ * This deliberately cannot mark a single MESSAGE unread while leaving earlier ones read - see
+ * models/Conversation.js's own header comment on why per-message readBy was rejected. "Unread"
+ * here means the whole conversation, the same granularity the rest of this file already works at.
+ */
+async function markConversationUnreadForUser(conversationId, userId) {
+  await Conversation.updateOne(
+    { _id: conversationId, 'reads.userId': userId },
+    { $unset: { 'reads.$.lastReadAt': '' } },
+  );
+  return Conversation.findById(conversationId);
+}
+
 /** Records that we've emailed this member about this conversation, for the throttle. */
 async function markConversationNotified(conversationId, userId, at = new Date()) {
   const updated = await Conversation.updateOne(
@@ -152,5 +177,6 @@ module.exports = {
   unreadCountForConversation,
   unreadSummaryForUser,
   markConversationRead,
+  markConversationUnreadForUser,
   markConversationNotified,
 };

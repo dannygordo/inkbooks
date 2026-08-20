@@ -4,7 +4,7 @@ const { Constants } = require('../../utils/constants');
 const { UserInputError, AuthenticationError, rethrow } = require('../../utils/errors');
 const { updateConversationInputSchema, createConversationInputSchema, validate } = require('../../utils/validation');
 const { canAccessConversation } = require('../../utils/shop-membership');
-const { markConversationRead } = require('../../utils/conversation-reads');
+const { markConversationRead, markConversationUnreadForUser } = require('../../utils/conversation-reads');
 
 module.exports = {
     // Not called anywhere in the client (grepped - real conversations are created directly via
@@ -78,5 +78,30 @@ module.exports = {
         throw new AuthenticationError('Action not allowed');
       }
       return markConversationRead(conversationId, user.id);
+    }),
+
+    /**
+     * Marks a conversation UNREAD again for the caller - the reverse of markConversationRead.
+     * "I want to come back to this" is a real, ordinary use of a messenger, and the read model
+     * (Conversation.reads[].lastReadAt - see conversation-reads.js) already supports it for free:
+     * unread is computed from that one field, so this just clears it.
+     *
+     * Same membership auth shape as markConversationRead - only the reader can un-read their own
+     * thread. Idempotent: calling this on an already-unread thread is a no-op.
+     */
+    markConversationUnread: withAuth(async (_, { conversationId }, context, info, user) => {
+      const conversation = await Conversation.findById(conversationId).select('members');
+      if (!conversation) {
+        throw new UserInputError('Errors', {
+          errors: { conversationId: 'Conversation not found.' },
+        });
+      }
+      const isMember = (conversation.members || []).some(
+        (memberId) => String(memberId) === String(user.id),
+      );
+      if (!isMember) {
+        throw new AuthenticationError('Action not allowed');
+      }
+      return markConversationUnreadForUser(conversationId, user.id);
     }),
   };
