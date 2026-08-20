@@ -7,6 +7,9 @@ const User = require('../models/User');
 const { formatCents } = require('./money');
 const { digestTimingFor } = require('./notification-preferences');
 const { sendEmail, buildGuestConversationLink } = require('./email');
+const { getActiveShopIdForArtist } = require('./artist-shop');
+const { resolveSystemMessageTemplate, DEFAULT_TEMPLATES } = require('./system-message-templates');
+const { renderTemplate } = require('./message-templates');
 
 /**
  * Telling a client what they have booked.
@@ -107,6 +110,14 @@ function intakeLines(bookingRequest) {
  * @param {number}   input.depositCents - 0 when none was taken
  * @param {object}   [input.bookingRequest]
  * @param {string}   [input.guestLink]
+ * @param {string}   [input.subjectOverride] - Feature 2: an owner's custom subject, already
+ *   rendered against {{clientFirstName}}/{{artistName}}. Null/omitted keeps the code-generated
+ *   subject below, which stays smart about singular/plural and consult/session wording in a way
+ *   a single static override can't be.
+ * @param {string}   [input.extraNote] - Feature 2: an owner's appendable note, already rendered.
+ *   The ONLY other part of this email that's owner-editable - see this file's own header comment
+ *   on why the schedule/deposit/intake body stays code-generated rather than becoming a second
+ *   free-text template a shop could accidentally delete real information from.
  */
 function buildClientBookingEmail({
   clientFirstName,
@@ -117,13 +128,17 @@ function buildClientBookingEmail({
   depositCents,
   bookingRequest,
   guestLink,
+  subjectOverride,
+  extraNote,
 }) {
   const isConsult = kind === 'consult';
-  const subject = isConsult
-    ? `Your consult with ${artistName} is booked`
-    : appointments.length === 1
-      ? `Your session with ${artistName} is booked`
-      : `Your ${appointments.length} sessions with ${artistName} are booked`;
+  const subject =
+    subjectOverride ||
+    (isConsult
+      ? `Your consult with ${artistName} is booked`
+      : appointments.length === 1
+        ? `Your session with ${artistName} is booked`
+        : `Your ${appointments.length} sessions with ${artistName} are booked`);
 
   const when = appointments.map((appointment) => ({
     when: formatWhen(appointment.appointmentDate, timezone),
@@ -164,6 +179,7 @@ function buildClientBookingEmail({
       ? [`<p>You can view this and message ${artistName} here:</p>`,
          `<p><a href="${guestLink}">${guestLink}</a></p>`]
       : []),
+    ...(extraNote ? [`<p>${extraNote}</p>`] : []),
     `<p>Times are shown in ${timezone}.</p>`,
   ].join('');
 
@@ -184,11 +200,33 @@ function buildClientBookingEmail({
       ? ['', 'Your original request', ...intake.map(([label, value]) => `  ${label}: ${value}`)]
       : []),
     ...(guestLink ? ['', `View this and message ${artistName}:`, guestLink] : []),
+    ...(extraNote ? ['', extraNote] : []),
     '',
     `Times are shown in ${timezone}.`,
   ].join('\n');
 
   return { subject, htmlBody: html, textBody: text };
+}
+
+/**
+ * Feature 2's narrower treatment for this one email - see buildClientBookingEmail's own doc
+ * comment on subjectOverride/extraNote. Resolved once here rather than inline at each of the two
+ * call sites below, so BOOKING_CONFIRMATION's precedence can't drift between the immediate-consult
+ * path and the debounced-session sweep.
+ */
+async function resolveBookingConfirmationExtras({ artistUserId, shopId, clientFirstName, artistName }) {
+  const custom = await resolveSystemMessageTemplate({
+    artistUserId,
+    shopId,
+    key: 'BOOKING_CONFIRMATION',
+  });
+  const vars = { clientFirstName, artistName };
+  const subjectTemplate = (custom && custom.emailSubjectTemplate) || DEFAULT_TEMPLATES.BOOKING_CONFIRMATION.emailSubject;
+  const noteTemplate = (custom && custom.extraNoteTemplate) || DEFAULT_TEMPLATES.BOOKING_CONFIRMATION.extraNote;
+  return {
+    subjectOverride: subjectTemplate ? renderTemplate(subjectTemplate, vars) : null,
+    extraNote: noteTemplate ? renderTemplate(noteTemplate, vars) : '',
+  };
 }
 
 /** Everything the builder needs, gathered from ids. Shared by both timings. */
@@ -231,9 +269,17 @@ async function sendConsultBookedEmail(
       return { ok: false, reason: 'no-email' };
     }
     const { timezone } = digestTimingFor(artistUser);
+    const displayName = artistDisplayName(artistUser);
+    const shopId = await getActiveShopIdForArtist(artistUserId);
+    const { subjectOverride, extraNote } = await resolveBookingConfirmationExtras({
+      artistUserId,
+      shopId,
+      clientFirstName: clientUser.firstName,
+      artistName: displayName,
+    });
     const email = buildClientBookingEmail({
       clientFirstName: clientUser.firstName,
-      artistName: artistDisplayName(artistUser),
+      artistName: displayName,
       timezone,
       kind: 'consult',
       appointments: [appointment],
@@ -242,6 +288,8 @@ async function sendConsultBookedEmail(
       guestLink: bookingRequest?.guestToken
         ? buildGuestConversationLink(bookingRequest.guestToken)
         : null,
+      subjectOverride,
+      extraNote,
     });
     const result = await send({ to: clientUser.email, ...email });
     // sendEmail() signals failure by returning null rather than throwing - the convention
@@ -372,9 +420,19 @@ async function sendDueClientScheduleEmails({ now = new Date(), limit = 100, send
       );
 
       const { timezone } = digestTimingFor(artistUser);
+      const displayName = artistDisplayName(artistUser);
+      // eslint-disable-next-line no-await-in-loop
+      const shopId = await getActiveShopIdForArtist(row.artistUserId);
+      // eslint-disable-next-line no-await-in-loop
+      const { subjectOverride, extraNote } = await resolveBookingConfirmationExtras({
+        artistUserId: row.artistUserId,
+        shopId,
+        clientFirstName: clientUser.firstName,
+        artistName: displayName,
+      });
       const email = buildClientBookingEmail({
         clientFirstName: clientUser.firstName,
-        artistName: artistDisplayName(artistUser),
+        artistName: displayName,
         timezone,
         kind: 'session',
         appointments,
@@ -383,6 +441,8 @@ async function sendDueClientScheduleEmails({ now = new Date(), limit = 100, send
         guestLink: bookingRequest?.guestToken
           ? buildGuestConversationLink(bookingRequest.guestToken)
           : null,
+        subjectOverride,
+        extraNote,
       });
 
       const result = await send({ to: clientUser.email, ...email });
@@ -412,6 +472,7 @@ module.exports = {
   formatDuration,
   formatWhen,
   intakeLines,
+  resolveBookingConfirmationExtras,
   queueProjectScheduleEmail,
   sendConsultBookedEmail,
   sendDueClientScheduleEmails,

@@ -1,5 +1,6 @@
 const { Resend } = require('resend');
 const { Constants } = require('./constants');
+const { resolveSystemMessageTemplate, renderSystemMessage } = require('./system-message-templates');
 
 // Resend's free tier (3,000 emails/month) chosen to start at $0 while volume is low - swap
 // providers later just by rewriting this file, the higher-level send*() functions below don't
@@ -133,19 +134,35 @@ function snippetForSubject(text, max = SUBJECT_SNIPPET_MAX) {
   return `${lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut}…`;
 }
 
-async function sendBookingRequestReceivedEmail({ to, firstName, artistName, guestToken }) {
+// artistUserId/shopId are optional (a caller with neither still sends - the built-in default is
+// always a valid answer, same as an AutoResponse owner with no enabled row for a trigger). Pass
+// whichever ownership context is actually available at the call site - see
+// utils/system-message-templates.js's resolveSystemMessageTemplate for the precedence between the
+// two when both are given.
+async function sendBookingRequestReceivedEmail({
+  to,
+  firstName,
+  artistName,
+  guestToken,
+  artistUserId,
+  shopId,
+}) {
   const link = buildGuestConversationLink(guestToken);
+  const custom = await resolveSystemMessageTemplate({
+    artistUserId,
+    shopId,
+    key: 'BOOKING_REQUEST_RECEIVED',
+  });
+  const { subject, body } = renderSystemMessage('BOOKING_REQUEST_RECEIVED', custom, {
+    firstName,
+    artistName,
+    link,
+  });
   return sendEmail({
     to,
-    subject: `Your request to ${artistName} has been sent`,
-    htmlBody:
-      `<p>Hi ${firstName},</p>` +
-      `<p>Your booking request has been sent to ${artistName}. You can view your request and ` +
-      `reply here at any time - no account needed:</p>` +
-      `<p><a href="${link}">${link}</a></p>`,
-    textBody:
-      `Hi ${firstName},\n\nYour booking request has been sent to ${artistName}. View your ` +
-      `request and reply here at any time - no account needed:\n${link}`,
+    subject,
+    htmlBody: body.replace(/\n/g, '<br/>'),
+    textBody: body,
   });
 }
 
@@ -155,34 +172,51 @@ async function sendNewMessageNotificationToGuest({
   artistName,
   guestToken,
   messagePreview,
+  artistUserId,
+  shopId,
 }) {
   const link = buildGuestConversationLink(guestToken);
+  const custom = await resolveSystemMessageTemplate({
+    artistUserId,
+    shopId,
+    key: 'NEW_MESSAGE_TO_GUEST',
+  });
+  const { subject: subjectFallback, body } = renderSystemMessage('NEW_MESSAGE_TO_GUEST', custom, {
+    firstName,
+    artistName,
+    link,
+  });
   return sendEmail({
     to,
-    // Falls back to the old fixed wording when there's no usable text - an image-only or
-    // whitespace message shouldn't produce a subject ending in a bare colon.
-    subject: subjectForNewMessage(
-      artistName,
-      messagePreview,
-      `${artistName} replied to your request`,
-    ),
-    htmlBody:
-      `<p>Hi ${firstName},</p><p>${artistName} sent you a new message. View it and reply here:</p>` +
-      `<p><a href="${link}">${link}</a></p>`,
-    textBody: `Hi ${firstName},\n\n${artistName} sent you a new message. View it and reply here:\n${link}`,
+    // Falls back to the (possibly customized) fixed wording when there's no usable text - an
+    // image-only or whitespace message shouldn't produce a subject ending in a bare colon.
+    subject: subjectForNewMessage(artistName, messagePreview, subjectFallback),
+    htmlBody: body.replace(/\n/g, '<br/>'),
+    textBody: body,
   });
 }
 
-async function sendNewBookingRequestNotificationToArtist({ to, artistFirstName, clientName }) {
+async function sendNewBookingRequestNotificationToArtist({
+  to,
+  artistFirstName,
+  clientName,
+  artistUserId,
+  shopId,
+}) {
+  const custom = await resolveSystemMessageTemplate({
+    artistUserId,
+    shopId,
+    key: 'NEW_BOOKING_REQUEST_TO_ARTIST',
+  });
+  const { subject, body } = renderSystemMessage('NEW_BOOKING_REQUEST_TO_ARTIST', custom, {
+    artistFirstName,
+    clientName,
+  });
   return sendEmail({
     to,
-    subject: `New booking request from ${clientName}`,
-    htmlBody:
-      `<p>Hi ${artistFirstName},</p><p>You have a new booking request from ${clientName}. ` +
-      `Log in to InkBooks to view it and respond.</p>`,
-    textBody:
-      `Hi ${artistFirstName},\n\nYou have a new booking request from ${clientName}. Log in to ` +
-      `InkBooks to view it and respond.`,
+    subject,
+    htmlBody: body.replace(/\n/g, '<br/>'),
+    textBody: body,
   });
 }
 
@@ -195,18 +229,27 @@ async function sendNewMessageNotificationToArtist({
   clientName,
   conversationId,
   messagePreview,
+  artistUserId,
+  shopId,
 }) {
   const link = conversationId
     ? `${Constants.URLS.INKBOOKS_WEBAPP}/messenger?conversation=${conversationId}`
     : `${Constants.URLS.INKBOOKS_WEBAPP}/messenger`;
+  const custom = await resolveSystemMessageTemplate({
+    artistUserId,
+    shopId,
+    key: 'NEW_MESSAGE_TO_ARTIST',
+  });
+  const { subject: subjectFallback, body } = renderSystemMessage('NEW_MESSAGE_TO_ARTIST', custom, {
+    artistFirstName,
+    clientName,
+    link,
+  });
   return sendEmail({
     to,
-    subject: subjectForNewMessage(clientName, messagePreview, `New message from ${clientName}`),
-    htmlBody:
-      `<p>Hi ${artistFirstName},</p><p>${clientName} sent you a new message. Read it and reply here:</p>` +
-      `<p><a href="${link}">${link}</a></p>`,
-    textBody:
-      `Hi ${artistFirstName},\n\n${clientName} sent you a new message. Read it and reply here:\n${link}`,
+    subject: subjectForNewMessage(clientName, messagePreview, subjectFallback),
+    htmlBody: body.replace(/\n/g, '<br/>'),
+    textBody: body,
   });
 }
 
@@ -215,22 +258,30 @@ async function sendNewMessageNotificationToArtist({
 // comment on the same gap). This is the notification half of the manual mark-paid/confirm
 // dual-control flow (see mutations/shopCutPayments.js) - the shop still has to log in and call
 // confirmShopCutPaid themselves; this email is just the ping that something needs their action.
-async function sendShopCutMarkedPaidNotificationToShop({ to, shopName, artistName, amountCents }) {
+//
+// SHOP-OWNED ONLY - no artistUserId here, unlike the four functions above. This lands in the
+// shop's own inbox about an artist's action; there's no artist "voice" to speak this notification
+// in, only the shop's own preference for how it reads.
+async function sendShopCutMarkedPaidNotificationToShop({ to, shopName, artistName, amountCents, shopId }) {
   // Takes cents now, not dollars - every stored money value in this codebase is integer cents
   // (see utils/money.js). The old signature took `amount` in dollars and .toFixed(2)'d it, which
   // would have formatted a cents value as e.g. "$8950.00".
   const formattedAmount =
     typeof amountCents === 'number' ? `$${(amountCents / 100).toFixed(2)}` : 'their shop cut';
+  const custom = await resolveSystemMessageTemplate({
+    shopId,
+    key: 'SHOP_CUT_MARKED_PAID',
+  });
+  const { subject, body } = renderSystemMessage('SHOP_CUT_MARKED_PAID', custom, {
+    shopName,
+    artistName,
+    formattedAmount,
+  });
   return sendEmail({
     to,
-    subject: `${artistName} marked a shop cut as paid`,
-    htmlBody:
-      `<p>Hi ${shopName},</p>` +
-      `<p>${artistName} marked ${formattedAmount} as paid outside the app (e.g. cash). Log in to ` +
-      `InkBooks to review and confirm you received it before it's marked complete.</p>`,
-    textBody:
-      `Hi ${shopName},\n\n${artistName} marked ${formattedAmount} as paid outside the app (e.g. ` +
-      `cash). Log in to InkBooks to review and confirm you received it before it's marked complete.`,
+    subject,
+    htmlBody: body.replace(/\n/g, '<br/>'),
+    textBody: body,
   });
 }
 
@@ -292,12 +343,23 @@ async function sendPasswordResetEmail({ to, firstName, rawToken }) {
   });
 }
 
-async function sendShopCutConfirmedNotificationToArtist({ to, artistFirstName, shopName }) {
+// ARTIST-OWNED ONLY, mirroring sendShopCutMarkedPaidNotificationToShop's shop-owned-only shape in
+// the other direction - this lands in the artist's own inbox about their own payment, so their
+// own preference (not the shop's) is what applies.
+async function sendShopCutConfirmedNotificationToArtist({ to, artistFirstName, shopName, artistUserId }) {
+  const custom = await resolveSystemMessageTemplate({
+    artistUserId,
+    key: 'SHOP_CUT_CONFIRMED',
+  });
+  const { subject, body } = renderSystemMessage('SHOP_CUT_CONFIRMED', custom, {
+    artistFirstName,
+    shopName,
+  });
   return sendEmail({
     to,
-    subject: `${shopName} confirmed your payment`,
-    htmlBody: `<p>Hi ${artistFirstName},</p><p>${shopName} confirmed they received your shop-cut payment. This is now marked paid.</p>`,
-    textBody: `Hi ${artistFirstName},\n\n${shopName} confirmed they received your shop-cut payment. This is now marked paid.`,
+    subject,
+    htmlBody: body.replace(/\n/g, '<br/>'),
+    textBody: body,
   });
 }
 
