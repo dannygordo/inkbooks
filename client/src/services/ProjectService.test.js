@@ -1,0 +1,950 @@
+// ProjectService.js tests. Same convention as ClientService.test.js: every export here is either
+// a hook-factory wrapping useQuery/useMutation around a gql document, or a raw gql document meant
+// to be handed to a calling component's own useQuery/useMutation - so each export is exercised
+// through a tiny throwaway harness rendered under MockedProvider. Real exported documents
+// (FETCH_PROJECT_QUERY, fetchProjectGQL, CREATE_PROJECT_MUTATION) are used directly; documents
+// that only live inside a factory function's own closure (FETCH_PROJECTS_QUERY,
+// _FETCH_PROJECTS_BY_ARTIST_QUERY, UPDATE_PROJECT_MUTATION, UPDATE_PROJECT_NOTES_MUTATION,
+// UPDATE_PROJECT_TAGS_MUTATION) are reconstructed field-for-field below, purely so MockedProvider
+// has something to match against - MockedProvider matches a request by the document's printed
+// text plus variables, not by reference identity, so each reconstruction still fails loudly if
+// the real query in ProjectService.js ever drifts from what's copied here.
+//
+// Written with React.createElement rather than JSX: see vite.config.js's own header comment -
+// this codebase's .js files (as opposed to .jsx) cannot contain literal JSX at all under this
+// project's Vite/oxc pipeline, and this file stays a .js to match its sibling ProjectService.js.
+import React from "react";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { MockedProvider } from "@apollo/client/testing";
+import { gql, useQuery, useMutation } from "@apollo/client";
+import { print } from "graphql";
+import ProjectService from "./ProjectService";
+
+// ---- reconstructed (non-exported) documents ----------------------------------------------------
+
+const FETCH_PROJECTS_QUERY_FOR_TESTS = gql`
+	query GetProjects($page: PageInput) {
+		getProjects(page: $page) {
+			items {
+				id
+				title
+				description
+				placement
+				size
+				palette
+				artistId
+				artist {
+					firstName
+					lastName
+					email
+					avatar
+					id
+				}
+				clientId
+				client {
+					firstName
+					lastName
+					email
+					avatar
+					id
+				}
+				referenceImages {
+					url
+					avatar
+					title
+					uploadedByDisplayName
+					tags
+					updatedAt
+					createdAt
+				}
+				bodyImages {
+					url
+					avatar
+					title
+					uploadedByDisplayName
+					tags
+					updatedAt
+					createdAt
+				}
+				designImages {
+					url
+					avatar
+					uploadedByDisplayName
+					tags
+					updatedAt
+					createdAt
+				}
+				materialsUsed
+				notes {
+					author
+					note
+					createdAt
+					updatedAt
+				}
+				tags
+				status
+				depositCollectedCents
+				depositAvailableCents
+			}
+			pageInfo {
+				totalCount
+				hasMore
+				limit
+				offset
+			}
+		}
+	}
+`;
+
+const FETCH_PROJECTS_BY_ARTIST_QUERY_FOR_TESTS = gql`
+	query GetProjectsByArtist($artistId: ID!) {
+		getProjectsByArtist(artistId: $artistId) {
+			id
+			title
+			description
+			client {
+				user {
+					id
+					firstName
+					lastName
+					avatar
+				}
+			}
+			artist {
+				user {
+					id
+					firstName
+					lastName
+					avatar
+				}
+			}
+		}
+	}
+`;
+
+const UPDATE_PROJECT_MUTATION_FOR_TESTS = gql`
+	mutation ($project: ProjectInput) {
+		updateProject(project: $project) {
+			id
+			title
+			description
+			placement
+			size
+			palette
+			artistId
+			clientId
+			referenceImages {
+				id
+				url
+				avatar
+				title
+				uploadedByDisplayName
+				userId
+				userInfo {
+					firstName
+					lastName
+					avatar
+					id
+				}
+				tags
+				updatedAt
+				createdAt
+			}
+			bodyImages {
+				id
+				url
+				avatar
+				title
+				uploadedByDisplayName
+				userId
+				userInfo {
+					firstName
+					lastName
+					avatar
+					id
+				}
+				tags
+				updatedAt
+				createdAt
+			}
+			designImages {
+				id
+				url
+				avatar
+				uploadedByDisplayName
+				userId
+				userInfo {
+					firstName
+					lastName
+					avatar
+					id
+				}
+				tags
+				updatedAt
+				createdAt
+			}
+			materialsUsed
+			notes {
+				id
+				author
+				note
+				createdAt
+				updatedAt
+			}
+			tags
+			status
+			depositCollectedCents
+			depositAvailableCents
+		}
+	}
+`;
+
+const UPDATE_PROJECT_NOTES_MUTATION_FOR_TESTS = gql`
+	mutation ($projectId: ID!, $notes: [IBNoteInput]) {
+		updateProjectNotes(projectId: $projectId, notes: $notes) {
+			notes {
+				author
+				note
+				createdAt
+				updatedAt
+			}
+		}
+	}
+`;
+
+const UPDATE_PROJECT_TAGS_MUTATION_FOR_TESTS = gql`
+	mutation ($projectId: ID!, $tags: [String]) {
+		updateProjectTags(projectId: $projectId, tags: $tags) {
+			tags
+		}
+	}
+`;
+
+// ---- generic harnesses -----------------------------------------------------------------------
+
+// Renders whatever a query-returning hook function produces. `hookFn` is called with no args and
+// must itself close over any variables it needs.
+function QueryHarness({ hookFn }) {
+	const { loading, error, data } = hookFn();
+	if (loading) {
+		return React.createElement("div", null, "loading");
+	}
+	if (error) {
+		// Deliberately generic: these tests only need to know THAT a request errored (e.g. no mock
+		// matched, proving a network call was actually attempted), not the message text.
+		return React.createElement("div", { "data-testid": "error" }, "ERROR");
+	}
+	return React.createElement("div", { "data-testid": "result" }, JSON.stringify(data ?? null));
+}
+
+// Renders a button that fires a mutation with fixed variables, and the onCompleted payload once
+// it lands.
+function MutationHarness({ document, variables }) {
+	const [result, setResult] = React.useState(null);
+	const [mutate] = useMutation(document, { onCompleted: setResult });
+	return React.createElement(
+		"div",
+		null,
+		React.createElement("button", { onClick: () => mutate({ variables }) }, "go"),
+		result && React.createElement("div", { "data-testid": "result" }, JSON.stringify(result)),
+	);
+}
+
+async function clickGo(user) {
+	await user.click(screen.getByRole("button", { name: "go" }));
+}
+
+// ---- fetchProject -------------------------------------------------------------------------------
+
+describe("ProjectService.fetchProject", () => {
+	function project(overrides = {}) {
+		return {
+			__typename: "Project",
+			id: "project-1",
+			title: "Half sleeve - koi",
+			description: "Full color koi half sleeve",
+			placement: "Right arm",
+			size: "Large",
+			palette: "Color",
+			artistId: "artist-1",
+			artist: {
+				__typename: "Artist",
+				firstName: "Gendry",
+				lastName: "Baratheon",
+				email: "gendry@example.com",
+				id: "artist-1",
+				hourlyRate: 150,
+				flatRate: null,
+				billingType: "hourly",
+				user: { __typename: "User", id: "user-artist-1" },
+				shop: {
+					__typename: "Shop",
+					id: "shop-1",
+					name: "Winterfell Ink",
+					hourlyRate: 150,
+					flatRate: null,
+					billingType: "hourly",
+				},
+			},
+			clientId: "client-1",
+			client: {
+				__typename: "Client",
+				firstName: "Arya",
+				lastName: "Stark",
+				email: "arya@example.com",
+				id: "client-1",
+			},
+			conversation: {
+				__typename: "Conversation",
+				id: "conv-1",
+				members: ["user-artist-1", "client-1"],
+				membersInfo: [
+					{ __typename: "User", id: "user-artist-1", firstName: "Gendry", lastName: "Baratheon", avatar: null },
+				],
+				messages: [
+					{
+						__typename: "Message",
+						id: "msg-1",
+						conversationId: "conv-1",
+						senderId: "user-artist-1",
+						user: { __typename: "User", firstName: "Gendry", lastName: "Baratheon", avatar: null },
+						message: "See you Tuesday",
+						createdAt: "2026-01-01T00:00:00.000Z",
+						updatedAt: "2026-01-01T00:00:00.000Z",
+					},
+				],
+				createdAt: "2026-01-01T00:00:00.000Z",
+				updatedAt: "2026-01-01T00:00:00.000Z",
+			},
+			referenceImages: [],
+			bodyImages: [],
+			designImages: [],
+			materialsUsed: null,
+			notes: [],
+			tags: [],
+			status: "in_progress",
+			depositCollectedCents: 0,
+			depositAvailableCents: 0,
+			deposits: [],
+			consultAppointment: null,
+			...overrides,
+		};
+	}
+
+	it("resolves with the project and hands its conversation messages to onCompleted's callback", async () => {
+		function Harness() {
+			const [messages, setMessages] = React.useState(null);
+			const { loading, error, data } = ProjectService.fetchProject("project-1", setMessages);
+			if (loading) return React.createElement("div", null, "loading");
+			if (error) return React.createElement("div", { "data-testid": "error" }, "ERROR");
+			return React.createElement(
+				"div",
+				null,
+				data && React.createElement("div", { "data-testid": "result" }, JSON.stringify(data)),
+				messages && React.createElement("div", { "data-testid": "messages" }, JSON.stringify(messages)),
+			);
+		}
+
+		render(
+			React.createElement(
+				MockedProvider,
+				{
+					mocks: [
+						{
+							request: {
+								query: ProjectService.FETCH_PROJECT_QUERY,
+								variables: { projectId: "project-1" },
+							},
+							result: { data: { getProject: project() } },
+						},
+					],
+				},
+				React.createElement(Harness),
+			),
+		);
+
+		expect(await screen.findByTestId("result")).toHaveTextContent("Half sleeve - koi");
+		expect(await screen.findByTestId("messages")).toHaveTextContent("See you Tuesday");
+	});
+
+	// _fetchProject has no `skip` guard at all - unlike SharedImageService's getSharedImagesForClient,
+	// it fires unconditionally even with a falsy projectId. Registering zero mocks and observing the
+	// query still error out (rather than sitting quietly with loading:false the way a skipped query
+	// would) is the proof that a real request was attempted.
+	it("still fires the query even when projectId is falsy", async () => {
+		const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+		function Harness() {
+			return React.createElement(QueryHarness, {
+				hookFn: () => ProjectService.fetchProject("", () => {}),
+			});
+		}
+		render(React.createElement(MockedProvider, { mocks: [] }, React.createElement(Harness)));
+
+		expect(await screen.findByTestId("error")).toBeInTheDocument();
+		spy.mockRestore();
+	});
+});
+
+// ---- ProjectService.FETCH_PROJECT_QUERY (raw document) -------------------------------------------
+
+describe("ProjectService.FETCH_PROJECT_QUERY (raw document)", () => {
+	it("works standalone via useQuery, the exact document _fetchProject runs internally", async () => {
+		function Harness() {
+			return React.createElement(QueryHarness, {
+				hookFn: () =>
+					useQuery(ProjectService.FETCH_PROJECT_QUERY, { variables: { projectId: "project-1" } }),
+			});
+		}
+		render(
+			React.createElement(
+				MockedProvider,
+				{
+					mocks: [
+						{
+							request: {
+								query: ProjectService.FETCH_PROJECT_QUERY,
+								variables: { projectId: "project-1" },
+							},
+							result: {
+								data: {
+									getProject: {
+										__typename: "Project",
+										id: "project-1",
+										title: "Half sleeve - koi",
+										description: null,
+										placement: null,
+										size: null,
+										palette: null,
+										artistId: "artist-1",
+										artist: {
+											__typename: "Artist",
+											firstName: "Gendry",
+											lastName: "Baratheon",
+											email: "gendry@example.com",
+											id: "artist-1",
+											hourlyRate: null,
+											flatRate: null,
+											billingType: null,
+											user: { __typename: "User", id: "user-artist-1" },
+											shop: null,
+										},
+										clientId: "client-1",
+										client: {
+											__typename: "Client",
+											firstName: "Arya",
+											lastName: "Stark",
+											email: "arya@example.com",
+											id: "client-1",
+										},
+										conversation: {
+											__typename: "Conversation",
+											id: "conv-1",
+											members: [],
+											membersInfo: [],
+											messages: [],
+											createdAt: "2026-01-01T00:00:00.000Z",
+											updatedAt: "2026-01-01T00:00:00.000Z",
+										},
+										referenceImages: [],
+										bodyImages: [],
+										designImages: [],
+										materialsUsed: null,
+										notes: [],
+										tags: [],
+										status: "in_progress",
+										depositCollectedCents: 0,
+										depositAvailableCents: 0,
+										deposits: [],
+										consultAppointment: null,
+									},
+								},
+							},
+						},
+					],
+				},
+				React.createElement(Harness),
+			),
+		);
+
+		expect(await screen.findByTestId("result")).toHaveTextContent("Half sleeve - koi");
+	});
+
+	// Distinguishes FETCH_PROJECT_QUERY (used by fetchProject, the project-detail page) from
+	// fetchProjectGQL below (a leaner variant) - the two must not silently converge.
+	it("selects the conversation and consultAppointment fields that fetchProjectGQL deliberately omits", () => {
+		const printed = print(ProjectService.FETCH_PROJECT_QUERY);
+		expect(printed).toContain("conversation");
+		expect(printed).toContain("consultAppointment");
+	});
+});
+
+// ---- fetchProjects ------------------------------------------------------------------------------
+
+describe("ProjectService.fetchProjects", () => {
+	it("resolves with a page of projects", async () => {
+		function Harness() {
+			return React.createElement(QueryHarness, { hookFn: () => ProjectService.fetchProjects() });
+		}
+		render(
+			React.createElement(
+				MockedProvider,
+				{
+					mocks: [
+						{
+							request: {
+								query: FETCH_PROJECTS_QUERY_FOR_TESTS,
+								// fetchProjects(page) has no default value - calling it with no argument
+								// sends page: undefined, not page: {}.
+								variables: { page: undefined },
+							},
+							result: {
+								data: {
+									getProjects: {
+										__typename: "ProjectPage",
+										items: [
+											{
+												__typename: "Project",
+												id: "project-1",
+												title: "Half sleeve - koi",
+												description: "Full color koi half sleeve",
+												placement: "Right arm",
+												size: "Large",
+												palette: "Color",
+												artistId: "artist-1",
+												artist: {
+													__typename: "Artist",
+													firstName: "Gendry",
+													lastName: "Baratheon",
+													email: "gendry@example.com",
+													avatar: null,
+													id: "artist-1",
+												},
+												clientId: "client-1",
+												client: {
+													__typename: "Client",
+													firstName: "Arya",
+													lastName: "Stark",
+													email: "arya@example.com",
+													avatar: null,
+													id: "client-1",
+												},
+												referenceImages: [],
+												bodyImages: [],
+												designImages: [],
+												materialsUsed: null,
+												notes: [],
+												tags: [],
+												status: "in_progress",
+												depositCollectedCents: 0,
+												depositAvailableCents: 0,
+											},
+										],
+										pageInfo: { __typename: "PageInfo", totalCount: 1, hasMore: false, limit: 25, offset: 0 },
+									},
+								},
+							},
+						},
+					],
+				},
+				React.createElement(Harness),
+			),
+		);
+
+		expect(await screen.findByTestId("result")).toHaveTextContent("Half sleeve - koi");
+	});
+
+	it("passes an explicit page through as a variable", async () => {
+		const page = { limit: 5, offset: 10 };
+		function Harness() {
+			return React.createElement(QueryHarness, {
+				hookFn: () => ProjectService.fetchProjects(page),
+			});
+		}
+		render(
+			React.createElement(
+				MockedProvider,
+				{
+					mocks: [
+						{
+							request: { query: FETCH_PROJECTS_QUERY_FOR_TESTS, variables: { page } },
+							result: {
+								data: {
+									getProjects: {
+										__typename: "ProjectPage",
+										items: [],
+										pageInfo: { __typename: "PageInfo", totalCount: 0, hasMore: false, limit: 5, offset: 10 },
+									},
+								},
+							},
+						},
+					],
+				},
+				React.createElement(Harness),
+			),
+		);
+
+		// Reaching a resolved (non-error) result at all IS the assertion that the variables the mock
+		// demanded ({limit:5, offset:10}) were what was sent - MockedProvider throws loudly on any
+		// mismatch.
+		expect(await screen.findByTestId("result")).toHaveTextContent('"items":[]');
+	});
+});
+
+// ---- fetchProjectsByArtist ------------------------------------------------------------------------
+
+describe("ProjectService.fetchProjectsByArtist", () => {
+	it("resolves with the artist's projects", async () => {
+		function Harness() {
+			return React.createElement(QueryHarness, {
+				hookFn: () => ProjectService.fetchProjectsByArtist("artist-1"),
+			});
+		}
+		render(
+			React.createElement(
+				MockedProvider,
+				{
+					mocks: [
+						{
+							request: {
+								query: FETCH_PROJECTS_BY_ARTIST_QUERY_FOR_TESTS,
+								variables: { artistId: "artist-1" },
+							},
+							result: {
+								data: {
+									getProjectsByArtist: [
+										{
+											__typename: "Project",
+											id: "project-1",
+											title: "Half sleeve - koi",
+											description: "Full color koi half sleeve",
+											client: {
+												__typename: "Client",
+												user: {
+													__typename: "User",
+													id: "user-client-1",
+													firstName: "Arya",
+													lastName: "Stark",
+													avatar: null,
+												},
+											},
+											artist: {
+												__typename: "Artist",
+												user: {
+													__typename: "User",
+													id: "user-artist-1",
+													firstName: "Gendry",
+													lastName: "Baratheon",
+													avatar: null,
+												},
+											},
+										},
+									],
+								},
+							},
+						},
+					],
+				},
+				React.createElement(Harness),
+			),
+		);
+
+		expect(await screen.findByTestId("result")).toHaveTextContent("Half sleeve - koi");
+	});
+
+	// No `skip` guard here either - fires unconditionally even with a falsy artistId.
+	it("still fires the query even when artistId is falsy", async () => {
+		const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+		function Harness() {
+			return React.createElement(QueryHarness, {
+				hookFn: () => ProjectService.fetchProjectsByArtist(""),
+			});
+		}
+		render(React.createElement(MockedProvider, { mocks: [] }, React.createElement(Harness)));
+
+		expect(await screen.findByTestId("error")).toBeInTheDocument();
+		spy.mockRestore();
+	});
+});
+
+// ---- updateProject (ignores its own argument, like ClientService.updateClient) --------------------
+
+describe("ProjectService.updateProject", () => {
+	// SURPRISE: despite taking a `project` parameter, _updateProject's body never reads it - it
+	// just builds and returns the UPDATE_PROJECT_MUTATION document unconditionally, exactly the way
+	// ClientService.updateClient works.
+	it("ignores its argument - the same document comes back regardless of what's passed", () => {
+		const docA = ProjectService.updateProject({ id: "a" });
+		const docB = ProjectService.updateProject(undefined);
+		expect(print(docA)).toEqual(print(docB));
+		expect(print(docA)).toEqual(print(UPDATE_PROJECT_MUTATION_FOR_TESTS));
+	});
+
+	it("is a usable mutation document when handed to useMutation directly, as real callers would", async () => {
+		const user = userEvent.setup();
+		const project = { id: "project-1", title: "Half sleeve - koi (updated)" };
+		const document = ProjectService.updateProject(project);
+
+		function Harness() {
+			return React.createElement(MutationHarness, { document, variables: { project } });
+		}
+		render(
+			React.createElement(
+				MockedProvider,
+				{
+					mocks: [
+						{
+							request: { query: UPDATE_PROJECT_MUTATION_FOR_TESTS, variables: { project } },
+							result: {
+								data: {
+									updateProject: {
+										__typename: "Project",
+										id: "project-1",
+										title: "Half sleeve - koi (updated)",
+										description: null,
+										placement: null,
+										size: null,
+										palette: null,
+										artistId: "artist-1",
+										clientId: "client-1",
+										referenceImages: [],
+										bodyImages: [],
+										designImages: [],
+										materialsUsed: null,
+										notes: [],
+										tags: [],
+										status: "in_progress",
+										depositCollectedCents: 0,
+										depositAvailableCents: 0,
+									},
+								},
+							},
+						},
+					],
+				},
+				React.createElement(Harness),
+			),
+		);
+
+		await clickGo(user);
+		expect(await screen.findByTestId("result")).toHaveTextContent("updated");
+	});
+});
+
+// ---- updateProjectNotes (takes no arguments) -------------------------------------------------------
+
+describe("ProjectService.updateProjectNotes", () => {
+	it("returns the UPDATE_PROJECT_NOTES_MUTATION document, ignoring any call args", () => {
+		const doc = ProjectService.updateProjectNotes();
+		expect(print(doc)).toEqual(print(UPDATE_PROJECT_NOTES_MUTATION_FOR_TESTS));
+	});
+
+	it("is a usable mutation document when handed to useMutation directly", async () => {
+		const user = userEvent.setup();
+		const notes = [{ author: "Gendry", note: "Healing well", createdAt: "2026-08-21T00:00:00.000Z", updatedAt: "2026-08-21T00:00:00.000Z" }];
+		const document = ProjectService.updateProjectNotes();
+
+		function Harness() {
+			return React.createElement(MutationHarness, {
+				document,
+				variables: { projectId: "project-1", notes },
+			});
+		}
+		render(
+			React.createElement(
+				MockedProvider,
+				{
+					mocks: [
+						{
+							request: {
+								query: UPDATE_PROJECT_NOTES_MUTATION_FOR_TESTS,
+								variables: { projectId: "project-1", notes },
+							},
+							result: {
+								data: {
+									updateProjectNotes: {
+										__typename: "Project",
+										notes: notes.map((n) => ({ __typename: "IBNote", ...n })),
+									},
+								},
+							},
+						},
+					],
+				},
+				React.createElement(Harness),
+			),
+		);
+
+		await clickGo(user);
+		expect(await screen.findByTestId("result")).toHaveTextContent("Healing well");
+	});
+});
+
+// ---- updateProjectTags (takes no arguments) -------------------------------------------------------
+
+describe("ProjectService.updateProjectTags", () => {
+	it("returns the UPDATE_PROJECT_TAGS_MUTATION document, ignoring any call args", () => {
+		const doc = ProjectService.updateProjectTags();
+		expect(print(doc)).toEqual(print(UPDATE_PROJECT_TAGS_MUTATION_FOR_TESTS));
+	});
+
+	it("is a usable mutation document when handed to useMutation directly", async () => {
+		const user = userEvent.setup();
+		const document = ProjectService.updateProjectTags();
+
+		function Harness() {
+			return React.createElement(MutationHarness, {
+				document,
+				variables: { projectId: "project-1", tags: ["koi", "color"] },
+			});
+		}
+		render(
+			React.createElement(
+				MockedProvider,
+				{
+					mocks: [
+						{
+							request: {
+								query: UPDATE_PROJECT_TAGS_MUTATION_FOR_TESTS,
+								variables: { projectId: "project-1", tags: ["koi", "color"] },
+							},
+							result: {
+								data: {
+									updateProjectTags: { __typename: "Project", tags: ["koi", "color"] },
+								},
+							},
+						},
+					],
+				},
+				React.createElement(Harness),
+			),
+		);
+
+		await clickGo(user);
+		expect(await screen.findByTestId("result")).toHaveTextContent("koi");
+	});
+});
+
+// ---- fetchProjectGQL (raw document, leaner variant of FETCH_PROJECT_QUERY) -------------------------
+
+describe("ProjectService.fetchProjectGQL (raw document)", () => {
+	it("works standalone via useQuery", async () => {
+		function Harness() {
+			return React.createElement(QueryHarness, {
+				hookFn: () =>
+					useQuery(ProjectService.fetchProjectGQL, { variables: { projectId: "project-1" } }),
+			});
+		}
+		render(
+			React.createElement(
+				MockedProvider,
+				{
+					mocks: [
+						{
+							request: { query: ProjectService.fetchProjectGQL, variables: { projectId: "project-1" } },
+							result: {
+								data: {
+									getProject: {
+										__typename: "Project",
+										id: "project-1",
+										title: "Half sleeve - koi",
+										description: null,
+										placement: null,
+										size: null,
+										palette: null,
+										artistId: "artist-1",
+										artist: {
+											__typename: "Artist",
+											firstName: "Gendry",
+											lastName: "Baratheon",
+											email: "gendry@example.com",
+											id: "artist-1",
+											shop: { __typename: "Shop", id: "shop-1", name: "Winterfell Ink" },
+										},
+										clientId: "client-1",
+										client: {
+											__typename: "Client",
+											firstName: "Arya",
+											lastName: "Stark",
+											email: "arya@example.com",
+											id: "client-1",
+										},
+										referenceImages: [],
+										bodyImages: [],
+										designImages: [],
+										materialsUsed: null,
+										notes: [],
+										tags: [],
+										status: "in_progress",
+										depositCollectedCents: 0,
+										depositAvailableCents: 0,
+										deposits: [],
+									},
+								},
+							},
+						},
+					],
+				},
+				React.createElement(Harness),
+			),
+		);
+
+		expect(await screen.findByTestId("result")).toHaveTextContent("Half sleeve - koi");
+	});
+
+	// The whole reason fetchProjectGQL exists alongside FETCH_PROJECT_QUERY: it must stay leaner,
+	// omitting the conversation graph and consultAppointment that FETCH_PROJECT_QUERY carries.
+	it("omits the conversation and consultAppointment fields that FETCH_PROJECT_QUERY selects", () => {
+		const printed = print(ProjectService.fetchProjectGQL);
+		expect(printed).not.toContain("conversation");
+		expect(printed).not.toContain("consultAppointment");
+		// But it still carries deposits, same as FETCH_PROJECT_QUERY.
+		expect(printed).toContain("deposits");
+	});
+});
+
+// ---- CREATE_PROJECT_MUTATION (raw document, flat args rather than a ProjectInput) -------------------
+
+describe("ProjectService.CREATE_PROJECT_MUTATION", () => {
+	it("creates a project from flat arguments and returns its id/title", async () => {
+		const user = userEvent.setup();
+		const variables = {
+			title: "New sleeve",
+			description: "Consult scheduled",
+			placement: "Left arm",
+			size: null,
+			artistId: "artist-1",
+			clientId: "client-1",
+			status: "consult",
+		};
+
+		function Harness() {
+			return React.createElement(MutationHarness, {
+				document: ProjectService.CREATE_PROJECT_MUTATION,
+				variables,
+			});
+		}
+		render(
+			React.createElement(
+				MockedProvider,
+				{
+					mocks: [
+						{
+							request: { query: ProjectService.CREATE_PROJECT_MUTATION, variables },
+							result: {
+								data: {
+									createProject: { __typename: "Project", id: "project-2", title: "New sleeve" },
+								},
+							},
+						},
+					],
+				},
+				React.createElement(Harness),
+			),
+		);
+
+		await clickGo(user);
+		expect(await screen.findByTestId("result")).toHaveTextContent("New sleeve");
+	});
+});
