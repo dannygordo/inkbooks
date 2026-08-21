@@ -226,6 +226,14 @@
     max-width: 62ch;
 }
 
+/* Same shape as .settingsPanelHelp, for the one case a panel's explanation is reporting an actual
+   validation problem rather than just describing the control - e.g. ResponseTimePanel's
+   artist-exceeds-shop-ceiling message. Themed via --ib-error rather than a fixed red so it still
+   passes contrast in dark mode. */
+.settingsPanelHelpError {
+    color: var(--ib-error);
+}
+
 .settingsAvatar {
     display: flex;
     justify-content: flex-start;

@@ -70,9 +70,10 @@ function ResponseTimeSection({ scope, title, description, ceilingHint }) {
 			location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
 		});
 
-	// Client-side only - the server is still the real guard (resolveResponseTimeThresholds clamps
-	// the EFFECTIVE value regardless of what's stored), but a save that's silently going to be
-	// overridden by the shop's ceiling deserves a clearer message than just letting it happen.
+	// The server now rejects a write above the ceiling outright (see
+	// resolvers/responseTimeSettings.js's updateResponseTimeSettings) rather than silently letting
+	// it save and be overridden at read time - this mirrors that same check client-side so the
+	// artist sees why before they hit Save, not after a round trip.
 	const exceedsCeiling =
 		ceiling &&
 		(hoursToMinutes(initialHours) > ceiling.initialThresholdMinutes ||
@@ -130,7 +131,12 @@ function ResponseTimeSection({ scope, title, description, ceilingHint }) {
 					type="number"
 					value={initialHours}
 					onChange={(e) => setInitialHours(e.target.value)}
-					inputProps={{ min: 0.1, step: 0.5 }}
+					inputProps={{
+						min: 0.1,
+						step: 0.5,
+						...(ceiling ? { max: minutesToHours(ceiling.initialThresholdMinutes) } : {}),
+					}}
+					error={exceedsCeiling}
 					fullWidth
 				/>
 				<TextField
@@ -138,14 +144,20 @@ function ResponseTimeSection({ scope, title, description, ceilingHint }) {
 					type="number"
 					value={repeatHours}
 					onChange={(e) => setRepeatHours(e.target.value)}
-					inputProps={{ min: 0.1, step: 0.5 }}
+					inputProps={{
+						min: 0.1,
+						step: 0.5,
+						...(ceiling ? { max: minutesToHours(ceiling.repeatIntervalMinutes) } : {}),
+					}}
+					error={exceedsCeiling}
 					fullWidth
 					helperText="Keeps repeating on this interval until you reply - see Settings' own help text above."
 				/>
 				{exceedsCeiling && (
-					<p className="settingsPanelHelp">
-						Your shop's ceiling is stricter than this - saving will still take effect, but the
-						shop's limit is what actually applies until it changes.
+					<p className="settingsPanelHelp settingsPanelHelpError">
+						Your shop caps this at {minutesToHours(ceiling.initialThresholdMinutes)} hour(s) before
+						the first nudge and {minutesToHours(ceiling.repeatIntervalMinutes)} hour(s) between
+						repeats - bring both at or under those to save.
 					</p>
 				)}
 			</Stack>
@@ -154,7 +166,7 @@ function ResponseTimeSection({ scope, title, description, ceilingHint }) {
 				<Button
 					variant="contained"
 					onClick={handleSave}
-					disabled={saving || !initialHours || !repeatHours}
+					disabled={saving || !initialHours || !repeatHours || exceedsCeiling}
 				>
 					{saving ? "Saving..." : "Save"}
 				</Button>
