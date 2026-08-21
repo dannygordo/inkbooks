@@ -4,9 +4,45 @@
 has not been verified. `DECISIONS.md` is *rules* — the settled calls and why. They change at
 different rates, which is why they are separate files.
 
-Last updated: 2026-08-20.
+Last updated: 2026-08-21.
 
 ---
+
+### 2026-08-21: Response-time ceiling was only enforced at read time - an artist could save a value above their shop's limit
+
+Reported after the first real smoke test of Feature 3 (unanswered-message nudges): logging in as an
+artist and raising the threshold above the shop's ceiling appeared to work - the save succeeded and
+the settings screen echoed the higher number back.
+
+**Root cause**: the "artist may tighten, never loosen past the shop's ceiling" rule
+(`models/ResponseTimeSettings.js`'s own header comment; `utils/response-time.js`'s `clamp()`) was
+only ever applied where the EFFECTIVE value gets computed - the nudge sweep and the inbox condition.
+`updateResponseTimeSettings` (`resolvers/responseTimeSettings.js`) had no equivalent check on the
+write path, so it persisted whatever the caller sent. The actual nudge timing was never wrong -
+`resolveResponseTimeThresholds` still clamped it correctly on every read - but the artist had no way
+to know that; what they saved and what silently applied were two different numbers.
+
+**Fix**: `updateResponseTimeSettings` now looks up the artist's shop ceiling (extracted into a
+`getShopCeilingForArtist` helper shared with the `resolveShopCeiling` field resolver - previously
+two separate copies of the same query) and rejects, with a `UserInputError` naming the limit, any
+`initialThresholdMinutes`/`repeatIntervalMinutes` above it. A silent server-side clamp was considered
+and rejected - rewriting what the artist typed to a different number they didn't choose is the same
+confusing outcome as no enforcement at all, just quieter about it.
+
+`ResponseTimePanel.jsx` mirrors the same check client-side: the number inputs get a `max` tied to
+the ceiling, `error` styling when exceeded, Save disabled, and the old "saving will still take
+effect" reassurance replaced with an explicit "your shop caps this at..." message using a new
+`.settingsPanelHelpError` class (`--ib-error` token, so it stays correct in dark mode) rather than
+the heavier page-level `.errors` box used for full-form failures.
+
+**Verified**: `node --check` on the resolver, `esbuild` syntax check on the panel, full pre-commit
+hook suite (schema rebuild, `check-graphql-documents.js`, client import/React-key/timezone checks) -
+all green. **Not yet re-verified live** - the user should confirm the same artist-account repro
+(raise above the shop's ceiling) now gets rejected with a visible error and the input clamps as
+expected, since this sandbox can't reach the real Mongo instance to exercise it end to end.
+
+**Files**: `server/graphql/resolvers/responseTimeSettings.js`,
+`client/src/components/settings/ResponseTimePanel.jsx`, `client/src/pages/settings/settings.css`.
 
 ### 2026-08-20: Image tag editor - dark-mode-invisible input text, and cramped overlay spacing
 
