@@ -154,6 +154,24 @@ const FormService = (() => {
 	`;
 	const _getMyFormLinks = (options = {}) => useQuery(_GET_MY_FORM_LINKS, options);
 
+	// SELF-SCOPED the other way - not an artist's own shop links, but a CLIENT's own fillable
+	// forms (see server/graphql/typeDefs.js's getMyFillableForms). Only the fields FormFillOut.jsx
+	// actually needs to render/fill one out - deliberately narrower than _FORM_FIELDS above, the
+	// same "don't hand a client fields meant for the management view" reasoning GET_PUBLIC_FORM
+	// follows for the guest path.
+	const _GET_MY_FILLABLE_FORMS = gql`
+		query GetMyFillableForms {
+			getMyFillableForms {
+				id
+				title
+				description
+			}
+		}
+	`;
+	const _getMyFillableForms = (options = {}) => {
+		return useQuery(_GET_MY_FILLABLE_FORMS, { fetchPolicy: "cache-and-network", ...options });
+	};
+
 	const CREATE_FORM = gql`
 		mutation CreateForm($input: CreateFormInput!) {
 			createForm(input: $input) {
@@ -334,6 +352,7 @@ const FormService = (() => {
 		GET_PUBLIC_FORM,
 		GET_PUBLIC_FORM_BY_SLUG,
 		getMyFormLinks: _getMyFormLinks,
+		getMyFillableForms: _getMyFillableForms,
 		CREATE_FORM,
 		UPDATE_FORM,
 		PUBLISH_FORM,

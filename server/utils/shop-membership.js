@@ -309,6 +309,36 @@ async function assertCanAccessClient(user, client) {
 }
 
 /**
+ * "Does this client actually belong to this Form's owner?" - the REVERSE direction of
+ * canAccessClient above (there: does the acting staff/artist reach this client; here: does this
+ * client reach this shop/artist), needed because Forms' self-service submission path
+ * (resolvers/forms.js's submitFormResponse) resolves a form by bare formId for an authenticated
+ * caller with no ownership check at all - a signed-in client could otherwise submit a response
+ * against ANY published form on the platform, shop-owned or artist-owned, regardless of ever
+ * having worked with that shop or artist. Not a data leak (the response holds only what the
+ * client themselves typed), but a real integrity gap: it would let a client's response land in a
+ * completely unrelated business's FormResponses list.
+ *
+ * Same two paths canAccessClient itself checks, just walked from the other end: a shop-owned form
+ * needs this shop in the client's own shopIds; an artist-owned form needs a shared Project, the
+ * only link an independent (or shop-affiliated-but-personally-owned) artist's clients are ever
+ * reached through.
+ */
+async function clientBelongsToFormOwner(client, { shopId, artistUserId }) {
+  if (!client) {
+    return false;
+  }
+  if (shopId) {
+    const clientShopIds = (client.shopIds || []).map(String);
+    return clientShopIds.includes(String(shopId));
+  }
+  if (artistUserId) {
+    return Boolean(await Project.exists({ artistId: artistUserId, clientId: client._id }));
+  }
+  return false;
+}
+
+/**
  * "May this caller triage this client's shared-message images?" - narrower than canAccessClient
  * above on purpose. That function also lets the client read their own record (it answers "can I
  * see this client"), and lets any shop member - including front-desk staff - in by virtue of
@@ -410,6 +440,7 @@ module.exports = {
   linkClientToUsersShops,
   canAccessClient,
   assertCanAccessClient,
+  clientBelongsToFormOwner,
   canManageClientSharedImages,
   assertCanManageClientSharedImages,
   clientScopeFilter,

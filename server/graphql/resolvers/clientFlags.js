@@ -1,10 +1,11 @@
 const { GraphQLError } = require('graphql');
 const Client = require('../../models/Client');
+const ClientFlag = require('../../models/ClientFlag');
 const ClientFlagType = require('../../models/ClientFlagType');
 const withAuth = require('../../utils/with-auth');
 const { UserInputError, AuthenticationError } = require('../../utils/errors');
 const { assertCanAccessClient, assertCanAccessShop, getShopIdsForUser } = require('../../utils/shop-membership');
-const { raiseClientFlag } = require('../../utils/client-flags');
+const { raiseClientFlag, resolveClientFlag } = require('../../utils/client-flags');
 const { recordEvent } = require('../../utils/event-log');
 
 // The acting user's own shop, for EventLog.shopId - same helper, same reasoning, as
@@ -82,6 +83,48 @@ module.exports = {
         }
         throw new UserInputError('Errors', { errors: { typeKey: err.message } });
       }
+    }),
+
+    // The other half of raiseClientFlag - see utils/client-flags.js's resolveClientFlag for why
+    // this exists as its own function rather than reusing resolveClientFlagsForAppointment (this
+    // is the only path that can clear a flag with no appointment behind it at all, which is the
+    // common case for a hand-raised one). Same authorization boundary as raiseClientFlag, for the
+    // same reason: taking a flag back is still an internal record about the client, so the person
+    // it's about must not be the one deciding it no longer applies.
+    resolveClientFlag: withAuth(async (_, { flagId }, context, info, user) => {
+      const flag = await ClientFlag.findById(flagId);
+      if (!flag) {
+        throw new UserInputError('Errors', { errors: { flagId: 'Flag not found.' } });
+      }
+      const client = await Client.findById(flag.clientId);
+      if (!client) {
+        throw new UserInputError('Errors', { errors: { flagId: 'Flag not found.' } });
+      }
+      if (String(user.id) === String(client.userId)) {
+        throw new AuthenticationError('Action not allowed');
+      }
+      await assertCanAccessClient(user, client);
+
+      if (flag.resolvedAt) {
+        // Already resolved - returned as-is rather than an error. Resolving something twice
+        // (a slow double-click, two staff acting on the same stale list) should be a no-op the
+        // caller can treat as success, not a failure to recover from.
+        return flag;
+      }
+
+      const resolved = await resolveClientFlag({ flagId: flag._id, resolvedByUserId: user.id });
+
+      await recordEvent({
+        entityType: 'ClientFlag',
+        entityId: flag._id,
+        action: 'update',
+        actorUserId: user.id,
+        shopId: (await actingShopId(user.id)) || flag.shopId || undefined,
+        summary: `Resolved ${client.firstName} ${client.lastName}'s ${flag.typeKey} flag`,
+        changes: [{ field: 'resolvedAt', from: null, to: resolved.resolvedAt }],
+      });
+
+      return resolved;
     }),
   },
 };

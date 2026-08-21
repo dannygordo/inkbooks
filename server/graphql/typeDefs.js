@@ -2227,6 +2227,12 @@ module.exports = gql`
     # lets a plain shop-connected artist (not shop_admin) see their own shop's published form
     # links in their own Settings without needing management authority over the shop's forms.
     getMyFormLinks: [FormLinkSummary!]!
+    # SELF-SCOPED the other way - not an artist looking at their own shop's links, but a CLIENT
+    # looking at what they themselves can fill out. Published forms only, from shops in the
+    # caller's own Client.shopIds and artists they share a Project with (see resolvers/forms.js's
+    # getMyFillableForms and utils/shop-membership.js's clientBelongsToFormOwner). Empty for a
+    # caller with no Client record of their own, never an error.
+    getMyFillableForms: [Form!]!
     getFormResponses(formId: ID!, page: PageInput): FormResponsePage!
     getFormResponse(formResponseId: ID!): FormResponse!
     getFormAnalytics(formId: ID!): FormAnalytics!
@@ -2545,6 +2551,10 @@ module.exports = gql`
     # appointment's own status changing, never from here. Refuses a systemGenerated typeKey itself
     # (raiseClientFlag does), same as it refuses an unknown one.
     raiseClientFlag(input: RaiseClientFlagInput!): ClientFlag!
+    # Resolves ONE flag by its own id - not restricted to manually-raised ones, see
+    # utils/client-flags.js's resolveClientFlag for why. A no-op (returns the flag unchanged) if it
+    # was already resolved, rather than an error.
+    resolveClientFlag(flagId: ID!): ClientFlag!
 
     ######### Deposits ############
     # Records a deposit taken on an appointment (normally a consult). Also sets that appointment's

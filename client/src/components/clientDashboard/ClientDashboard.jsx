@@ -78,13 +78,16 @@ const ClientDashboard = ({ clientId, isSelf = false }) => {
 	// artist view (see this file's own header comment on why Notes/Flags are also !isSelf-only):
 	// businessScopeFor(user) resolves to the LOGGED-IN staff/artist's own scope, which is correct
 	// here (they're the one who'd be sending a waiver), but would be nonsense on a client's own
-	// dashboard - a client has no shop/artist scope of their own to look up forms by. Self-service
-	// fill-out (a client filling out their own copy of a form) isn't wired up from here - see
-	// HANDOFF.md.
+	// dashboard - a client has no shop/artist scope of their own to look up forms by.
 	const scope = businessScopeFor(user);
 	const { data: formsData } = FormService.getForms(scope, "published", { limit: 25, offset: 0 }, {
 		skip: isSelf,
 	});
+	// The self-service counterpart - a client looking at what THEY can fill out, via the
+	// self-scoped getMyFillableForms rather than getForms(scope) above (which needs management
+	// authority a client will never have). See server/graphql/resolvers/forms.js's own comment on
+	// getMyFillableForms for the ownership resolution.
+	const { data: myFormsData } = FormService.getMyFillableForms({ skip: !isSelf });
 	const [newNote, setNewNote] = useState("");
 	const [showNoteForm, setShowNoteForm] = useState(false);
 	const [projectsOffset, setProjectsOffset] = useState(0);
@@ -108,6 +111,10 @@ const ClientDashboard = ({ clientId, isSelf = false }) => {
 	// the client's own view rather than fetched and hidden, since there's no picker to show them.
 	const { data: flagTypesData } = ClientService.getClientFlagTypes(undefined, { skip: isSelf });
 	const [raiseClientFlag, { loading: savingFlag }] = useMutation(ClientService.RAISE_CLIENT_FLAG);
+	const [resolveClientFlag] = useMutation(ClientService.RESOLVE_CLIENT_FLAG);
+	// Tracks which single row's Resolve button is in flight, not a component-wide boolean - flags
+	// resolve one at a time and a second row's button must stay clickable while the first is saving.
+	const [resolvingFlagId, setResolvingFlagId] = useState(null);
 
 	// `loading` alone would flash the spinner on every background refetch, because the query runs
 	// cache-and-network. Gating on "loading AND nothing cached yet" keeps the first load behaving
@@ -237,6 +244,39 @@ const ClientDashboard = ({ clientId, isSelf = false }) => {
 				timeout: ALERT_CONSTANTS.TIMEOUT,
 				location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
 			});
+		}
+	};
+
+	const handleResolveFlag = async (flagId) => {
+		setResolvingFlagId(flagId);
+		try {
+			await resolveClientFlag({
+				variables: { flagId },
+				// getClient's `flags` field only ever returns LIVE flags (see resolvers/index.js's own
+				// "Live flags only" comment) - once resolved, this row no longer belongs in that list,
+				// so it's evicted from the cache rather than patched in place. Same "update the one
+				// cached array this component reads" approach handleRaiseFlag uses above, mirrored for
+				// removal instead of prepend.
+				update: (cache) => {
+					cache.modify({
+						id: cache.identify({ __typename: "Client", id: clientId }),
+						fields: {
+							flags: (existing = [], { readField }) =>
+								existing.filter((ref) => readField("id", ref) !== flagId),
+						},
+					});
+				},
+			});
+		} catch (err) {
+			setAlert({
+				isAlert: true,
+				severity: ALERT_CONSTANTS.SEVERITY.ERROR,
+				message: err.graphQLErrors?.[0]?.message || err.message,
+				timeout: ALERT_CONSTANTS.TIMEOUT,
+				location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
+			});
+		} finally {
+			setResolvingFlagId(null);
 		}
 	};
 
@@ -423,6 +463,53 @@ const ClientDashboard = ({ clientId, isSelf = false }) => {
 				</IBCardWrapper>
 			)}
 
+			{/* The self-service counterpart to the staff/artist Forms section above - a client
+			    filling out their OWN copy from their own dashboard (clientId omitted from
+			    FormFillOut, the self-service branch submitFormResponse already supports - see
+			    getMyFillableForms's own comment for what decides which forms show up here). */}
+			{isSelf && (myFormsData?.getMyFillableForms || []).length > 0 && (
+				<IBCardWrapper>
+					<h2 className="clientDashboardSectionTitle">Forms</h2>
+					<p className="clientDashboardNotesHint">
+						Forms your artist or shop has asked you to fill out.
+					</p>
+					<ul className="clientDashboardList">
+						{myFormsData.getMyFillableForms.map((form) => (
+							<li key={form.id} className="clientDashboardListRow">
+								<span className="clientDashboardListPrimary">{form.title}</span>
+								<Button
+									size="small"
+									onClick={() =>
+										setModal({
+											isOpen: true,
+											title: form.title,
+											content: (
+												<FormFillOut
+													formId={form.id}
+													onSubmitted={() => {
+														setModal({ ...modal, isOpen: false });
+														setAlert({
+															isAlert: true,
+															severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
+															message: "Response submitted.",
+															timeout: ALERT_CONSTANTS.TIMEOUT,
+															location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
+														});
+													}}
+													onCancel={() => setModal({ ...modal, isOpen: false })}
+												/>
+											),
+										})
+									}
+								>
+									Fill Out
+								</Button>
+							</li>
+						))}
+					</ul>
+				</IBCardWrapper>
+			)}
+
 			{/* Shop-side only. See this file's header comment on why a client doesn't see notes
 			    written about them. */}
 			{!isSelf && (
@@ -556,10 +643,22 @@ const ClientDashboard = ({ clientId, isSelf = false }) => {
 						<ul className="clientDashboardList">
 							{flags.map((flag) => (
 								<li key={flag.id} className="clientDashboardNoteRow">
-									<p className="clientDashboardNoteBody">
-										{flag.type?.label || flag.typeKey}
-										{flag.systemGenerated ? " (automatic)" : ""}
-									</p>
+									<div className="clientDashboardFlagRowHeader">
+										<p className="clientDashboardNoteBody">
+											{flag.type?.label || flag.typeKey}
+											{flag.systemGenerated ? " (automatic)" : ""}
+										</p>
+										{/* Resolving isn't limited to manual flags - see
+										    utils/client-flags.js's resolveClientFlag for why an automatic
+										    one (e.g. a stale NO_SHOWED) can still be cleared by hand here. */}
+										<Button
+											size="small"
+											onClick={() => handleResolveFlag(flag.id)}
+											disabled={resolvingFlagId === flag.id}
+										>
+											{resolvingFlagId === flag.id ? "Resolving..." : "Resolve"}
+										</Button>
+									</div>
 									{flag.note && <p className="clientDashboardFlagNote">{flag.note}</p>}
 									<span className="clientDashboardListMeta">
 										{flag.createdBy

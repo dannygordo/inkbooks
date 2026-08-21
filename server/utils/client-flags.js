@@ -177,6 +177,42 @@ async function resolveClientFlagsForAppointment({ appointmentId, typeKey, resolv
 }
 
 /**
+ * Resolves ONE flag, by its own id — the counterpart `resolveClientFlagsForAppointment` doesn't
+ * cover.
+ *
+ * That function resolves by (appointmentId, typeKey), which is exactly what the automatic
+ * NO_SHOWED path needs and all it was built for: an appointment's status is the only fact driving
+ * it, so there's never a bare id to resolve by. A manually-raised flag (MOVED_APPOINTMENT, "always
+ * late", etc.) has no appointment behind it at all in the common case — id is the only handle a
+ * person picking one flag off a client's list actually has.
+ *
+ * Deliberately not restricted to manual flags. raiseClientFlag enforces a strict manual/automatic
+ * split going IN, because a flag's provenance (who or what asserted this) is part of what makes it
+ * trustworthy, and that must not be faked. Taking one back is a different, lower-stakes act — an
+ * admin who decides a stale NO_SHOWED no longer applies needs a way to say so even outside the one
+ * appointment-status-change path that happens to also resolve it, and there's no reason to special
+ * -case that flag type here just because it happens to usually clear itself another way.
+ *
+ * Returns null for an id that doesn't exist or was already resolved, rather than throwing — same
+ * "0 is a normal outcome" contract as resolveClientFlagsForAppointment, one level more specific.
+ */
+async function resolveClientFlag({ flagId, resolvedByUserId = null }) {
+  if (!flagId) {
+    return null;
+  }
+  const flag = await ClientFlag.findOneAndUpdate(
+    { _id: flagId, resolvedAt: null },
+    { $set: { resolvedAt: new Date(), resolvedByUserId } },
+    { new: true },
+  );
+  if (!flag) {
+    return null;
+  }
+  await recountClientFlags(flag.clientId);
+  return flag;
+}
+
+/**
  * Keeps the NO_SHOWED flag in step with an appointment's status.
  *
  * Called from the one place appointment status changes. Marking no-show raises the flag; moving off
@@ -232,6 +268,7 @@ module.exports = {
   findFlagType,
   raiseClientFlag,
   recountClientFlags,
+  resolveClientFlag,
   resolveClientFlagsForAppointment,
   syncNoShowFlag,
 };

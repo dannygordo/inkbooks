@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const Form = require('../../models/Form');
 const FormResponse = require('../../models/FormResponse');
 const Client = require('../../models/Client');
+const Project = require('../../models/Project');
 const withAuth = require('../../utils/with-auth');
 const { UserInputError, AuthenticationError, RateLimitError } = require('../../utils/errors');
 const { paginate } = require('../../utils/pagination');
@@ -9,6 +10,7 @@ const {
   resolveBusinessOwner,
   assertCanManageBusinessRecord,
   assertCanAccessClient,
+  clientBelongsToFormOwner,
   linkClientToUsersShops,
   getShopIdsForUser,
 } = require('../../utils/shop-membership');
@@ -183,12 +185,34 @@ function buildStoredAnswers(fields, answerInputs, submittedAt) {
 
 module.exports = {
   Query: {
+    // TWO AUDIENCES, same query. A manager of the form's own owner reads it to edit/preview it
+    // (the original, only reason this existed); a client reads their OWN account's copy to fill it
+    // out (FormFillOut.jsx's self-service mode). Neither check duplicates the other's rule - a
+    // manager doesn't need the form published, a client must never see a draft.
     getForm: withAuth(async (_, { formId }, context, info, user) => {
       const form = await Form.findById(formId);
       if (!form) {
         throw new UserInputError('Errors', { errors: { formId: 'Form not found' } });
       }
-      await assertCanManageBusinessRecord(user, { shopId: form.shopId, artistUserId: form.artistUserId });
+      let canManage = true;
+      try {
+        await assertCanManageBusinessRecord(user, { shopId: form.shopId, artistUserId: form.artistUserId });
+      } catch (err) {
+        canManage = false;
+      }
+      if (!canManage) {
+        if (form.status !== 'published') {
+          throw new AuthenticationError('Action not allowed');
+        }
+        const ownClient = await Client.findOne({ userId: user.id });
+        const belongs = await clientBelongsToFormOwner(ownClient, {
+          shopId: form.shopId,
+          artistUserId: form.artistUserId,
+        });
+        if (!belongs) {
+          throw new AuthenticationError('Action not allowed');
+        }
+      }
       return form;
     }),
 
@@ -200,6 +224,30 @@ module.exports = {
         filter.status = status;
       }
       return paginate(Form, filter, { sort: { createdAt: -1 }, page });
+    }),
+
+    // SELF-SCOPED, not the management getForms above - every authenticated caller with a Client
+    // record of their own may call this for themselves, the same "self, not management" shape
+    // getMyFormLinks already established for artists. This is the query ClientDashboard.jsx's
+    // "Forms" section uses on a client's OWN dashboard (isSelf) to list what they can fill out -
+    // getForms itself needs management authority a client will never have.
+    //
+    // Published only (a client has no business seeing a draft), scoped to exactly the shops
+    // they've worked with (Client.shopIds) and the artists they share a Project with - the same
+    // two ownership paths clientBelongsToFormOwner checks one form at a time, done here in bulk.
+    getMyFillableForms: withAuth(async (_, __, context, info, user) => {
+      const client = await Client.findOne({ userId: user.id });
+      if (!client) {
+        return [];
+      }
+      const artistIds = await Project.distinct('artistId', { clientId: client._id });
+      return Form.find({
+        status: 'published',
+        $or: [
+          { shopId: { $in: client.shopIds || [] } },
+          { artistUserId: { $in: artistIds } },
+        ],
+      }).sort({ title: 1 });
     }),
 
     // PUBLIC - see typeDefs.js's own comment on this query. Not withAuth; anyone with the link, or
@@ -756,6 +804,20 @@ module.exports = {
           throw new UserInputError('Errors', {
             errors: { formId: 'No client record found for this account.' },
           });
+        }
+        // A formId alone proves nothing about whose form this is - see this function's own
+        // comment on why formId-only resolution is trusted for an authenticated caller in the
+        // first place. Without this, any signed-in client could submit a response against ANY
+        // published form on the platform, attributed to themselves, at a shop or independent
+        // artist they have never worked with. clientBelongsToFormOwner is the same shopIds/
+        // shared-Project check canAccessClient makes, walked from the client's side instead of
+        // the staff/artist side.
+        const belongs = await clientBelongsToFormOwner(ownClient, {
+          shopId: form.shopId,
+          artistUserId: form.artistUserId,
+        });
+        if (!belongs) {
+          throw new AuthenticationError('Action not allowed');
         }
         clientDoc = ownClient;
         submittedByUserId = authenticatedCaller.id;

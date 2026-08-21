@@ -133,6 +133,19 @@
 /* Flags reuse .clientDashboardNoteRow/.clientDashboardNoteBody for the list itself (see
    models/ClientFlag.js - a flag and a note are the same shape of thing: a candid internal record
    with an author and a date) - only the form needs its own rule, for the type <select>. */
+/* The Resolve button sits beside the flag's label rather than below it - .clientDashboardNoteBody
+   itself stays untouched (notes have no equivalent action) so this wraps it instead of changing it. */
+.clientDashboardFlagRowHeader {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+}
+
+.clientDashboardFlagRowHeader .clientDashboardNoteBody {
+	margin: 0;
+}
+
 .clientDashboardFlagForm {
 	display: flex;
 	flex-direction: column;

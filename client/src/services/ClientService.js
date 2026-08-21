@@ -270,6 +270,19 @@ const ClientService = (() => {
 		}
 	`;
 
+	// The other half of raiseClientFlag - see typeDefs.js's resolveClientFlag and
+	// utils/client-flags.js. Returns just enough to let ClientDashboard.jsx update the one row it
+	// already has in the list (no refetch), the same "patch what changed" pattern raiseClientFlag
+	// itself follows above.
+	const _RESOLVE_CLIENT_FLAG = gql`
+		mutation ResolveClientFlag($flagId: ID!) {
+			resolveClientFlag(flagId: $flagId) {
+				id
+				resolvedAt
+			}
+		}
+	`;
+
 	const _ARCHIVE_CLIENT_MUTATION = gql`
 		mutation ArchiveClient($clientId: ID!) {
 			archiveClient(clientId: $clientId) { id status }
@@ -292,6 +305,7 @@ const ClientService = (() => {
 		ARCHIVE_CLIENT_MUTATION: _ARCHIVE_CLIENT_MUTATION,
 		UNARCHIVE_CLIENT_MUTATION: _UNARCHIVE_CLIENT_MUTATION,
 		getClientFlagTypes: _getClientFlagTypes,
+		RESOLVE_CLIENT_FLAG: _RESOLVE_CLIENT_FLAG,
 		RAISE_CLIENT_FLAG: _RAISE_CLIENT_FLAG,
 	};
 })();
