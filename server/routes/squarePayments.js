@@ -15,6 +15,7 @@ const { formatCents } = require('../utils/money');
 const { Constants } = require('../utils/constants');
 const { recordEvent } = require('../utils/event-log');
 const { sendAutoResponsesForTrigger } = require('../utils/auto-responses');
+const { reportError } = require('../utils/error-reporting');
 
 const router = express.Router();
 
@@ -287,7 +288,7 @@ router.post('/square/process-payment', express.json(), async (req, res) => {
       breakdown,
     });
   } catch (err) {
-    console.error('[square-payment] Failed to process payment:', err.message);
+    reportError(err, { context: '[square-payment] Failed to process payment' });
     return res.status(err.status || 500).json({ error: err.message });
   }
 });

@@ -3,6 +3,7 @@ const { UserInputError, rethrow } = require('../../utils/errors');
 const { issuePasswordToken, consumePasswordToken } = require('../../utils/password-tokens');
 const { sendPasswordResetEmail } = require('../../utils/email');
 const { checkRateLimit, getClientIp } = require('../../utils/rate-limit');
+const { reportError } = require('../../utils/error-reporting');
 
 /**
  * The logged-out half of password management. Both mutations here are deliberately public - the
@@ -59,7 +60,7 @@ module.exports = {
       // Swallowed on purpose. A failure here (email provider down, database hiccup) must not
       // change what the caller sees, or the error itself becomes the oracle this whole design
       // avoids. Logged so it's visible to whoever runs the server.
-      console.error('[passwords] requestPasswordReset failed:', err.message);
+      reportError(err, { context: '[passwords] requestPasswordReset failed' });
     }
     return true;
   },

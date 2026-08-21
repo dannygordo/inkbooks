@@ -12,6 +12,7 @@ const {
 const { findOrCreateConversationForMembers } = require('../../utils/conversations');
 const { bookingInboxConversationIds } = require('../../utils/conversation-routing');
 const { toObjectIds } = require('../../utils/object-id');
+const logger = require('../../utils/logger');
 
 module.exports = {
   Query: {
@@ -72,7 +73,10 @@ module.exports = {
         }).sort({ updatedAt: -1 });
         return conversation;
       } catch (err) {
-        console.log(err);
+        // Not reportError here - this rethrows into Apollo's formatError hook (index.js), which
+        // is already the one place unexpected GraphQL errors get sent to Sentry. Reporting here
+        // too would double-fire the same error.
+        logger.error({ err }, '[conversations] getConversationsByMemberId failed');
         rethrow(err);
       }
     }),
@@ -100,7 +104,9 @@ module.exports = {
           }).sort({ updatedAt: 1 });
           return conversation;
         } catch (err) {
-          console.log(err);
+          // Same reasoning as getConversationsByMemberId above - rethrow() feeds Apollo's
+          // formatError hook, which already reports unexpected errors to Sentry.
+          logger.error({ err }, '[conversations] getConversationsByShopId failed');
           rethrow(err);
         }
       }),

@@ -1,4 +1,5 @@
 const ScheduledRun = require('../models/ScheduledRun');
+const { reportError } = require('./error-reporting');
 
 /**
  * A small scheduler: an interval in this process, plus a database lock so a second process can't
@@ -84,7 +85,14 @@ async function runOnce(job, everyMs, fn, now = Date.now()) {
  *
  * Returns a stop function. Tests use it; so does anything that needs a clean shutdown.
  */
-function startScheduler(jobs, { tickMs = 5 * 60 * 1000, onError = console.error } = {}) {
+// A scheduled job throwing is exactly the "broken for weeks, nobody noticed" failure mode this
+// codebase has been bitten by before (see utils/notifications.js/utils/message-notifications.js's
+// own header comments) - the default reports it for real, not just to a log nobody's tailing.
+// Still injectable (a test can pass its own recorder) - this is only what a real run uses.
+function startScheduler(
+  jobs,
+  { tickMs = 5 * 60 * 1000, onError = (name, err) => reportError(err, { job: name }) } = {},
+) {
   let stopped = false;
 
   const tick = async () => {
@@ -95,7 +103,7 @@ function startScheduler(jobs, { tickMs = 5 * 60 * 1000, onError = console.error 
       } catch (err) {
         // One job failing must not stop the others - they are independent sweeps, and a broken
         // digest should not take down the condition sweep that would have reported it.
-        onError(`[scheduler] ${name} failed:`, err.message);
+        onError(name, err);
       }
     }
   };

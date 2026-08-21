@@ -1,4 +1,5 @@
 const { Resend } = require('resend');
+const logger = require('./logger');
 const { Constants } = require('./constants');
 const { resolveSystemMessageTemplate, renderSystemMessage } = require('./system-message-templates');
 
@@ -19,7 +20,7 @@ function ensureInitialized() {
   const apiKey = process.env.RESEND_API_KEY;
   const fromAddress = process.env.EMAIL_FROM_ADDRESS;
   if (!apiKey || !fromAddress) {
-    console.warn(
+    logger.warn(
       '[email] RESEND_API_KEY / EMAIL_FROM_ADDRESS not set - transactional emails (booking ' +
         'request confirmations, new-message notifications) are disabled until this is configured.'
     );
@@ -31,7 +32,7 @@ function ensureInitialized() {
 
 async function sendEmail({ to, subject, htmlBody, textBody }) {
   if (!ensureInitialized()) {
-    console.warn(`[email] Skipped sending "${subject}" to ${to} - email is not configured.`);
+    logger.warn(`[email] Skipped sending "${subject}" to ${to} - email is not configured.`);
     return null;
   }
   try {
@@ -51,11 +52,9 @@ async function sendEmail({ to, subject, htmlBody, textBody }) {
       // tell whether the two are about the same message. Resend also puts the useful part in
       // `name`/`statusCode` rather than always in `message` (an unverified sending domain reports
       // as `validation_error`), so all three are printed.
-      console.warn(
-        `[email] REJECTED by provider - "${subject}" to ${to}:`,
-        error.name || '',
-        error.statusCode || '',
-        error.message || error,
+      logger.warn(
+        { to, subject, errorName: error.name, statusCode: error.statusCode, error: error.message || error },
+        '[email] REJECTED by provider',
       );
       return null;
     }
@@ -67,12 +66,12 @@ async function sendEmail({ to, subject, htmlBody, textBody }) {
     // printing it turns "no email arrived" from an argument into a lookup. The recipient is printed
     // beside it because "sent to the wrong address" and "sent and not delivered" look identical
     // from in here, and they have completely different fixes.
-    console.log(
+    logger.info(
       `[email] accepted "${subject}" to ${to} id=${data && data.id ? data.id : '(none returned)'}`,
     );
     return data;
   } catch (err) {
-    console.warn(`[email] FAILED to send "${subject}" to ${to}:`, err.message);
+    logger.warn({ err, to, subject }, '[email] FAILED to send');
     return null;
   }
 }

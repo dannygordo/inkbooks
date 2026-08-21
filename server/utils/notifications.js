@@ -1,6 +1,7 @@
 const Notification = require('../models/Notification');
 const User = require('../models/User');
 const { emailModeFor, IMMEDIATE, DIGEST, OFF } = require('./notification-preferences');
+const { reportError } = require('./error-reporting');
 
 /**
  * Creating notifications, in one place.
@@ -189,8 +190,9 @@ async function markDone(userId, notificationIds, at = new Date()) {
  *
  * The failure is REPORTED rather than swallowed, though. The last time this codebase had a
  * notification path that failed into a bare console.warn, it was broken for weeks and only found
- * by accident - so the outcome comes back as a value the caller can act on, and the message says
- * plainly that a notification was lost rather than being one line in a log nobody reads.
+ * by accident - so this goes through reportError (structured log + Sentry, see
+ * utils/error-reporting.js) rather than a log line nobody's tailing, and the outcome also comes
+ * back as a value the caller can act on.
  *
  * Use this at emit sites. Use notify() directly where the notification IS the point.
  */
@@ -199,10 +201,9 @@ async function notifySafely(event) {
     const created = await notify(event);
     return { ok: true, created: created.length };
   } catch (err) {
-    console.warn(
-      `[notifications] LOST a ${event && event.type} notification: ${err.message}. ` +
-        'The action itself succeeded; only the notification failed.',
-    );
+    reportError(err, {
+      context: `[notifications] LOST a ${event && event.type} notification - the action itself succeeded, only the notification failed`,
+    });
     return { ok: false, error: err.message };
   }
 }

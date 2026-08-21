@@ -2,6 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const { checkRateLimit, getClientIp } = require('../utils/rate-limit');
 const { uploadGuestReferenceImage } = require('../utils/firebase-admin');
+const { reportError } = require('../utils/error-reporting');
 
 const MAX_FILES = 5;
 const MAX_FILE_SIZE_BYTES = 8 * 1024 * 1024; // 8MB per file
@@ -92,7 +93,7 @@ router.post(
         }
         res.json({ urls });
       } catch (uploadErr) {
-        console.error('[booking-uploads] Failed to upload to Firebase Storage:', uploadErr.message);
+        reportError(uploadErr, { context: '[booking-uploads] Failed to upload to Firebase Storage' });
         res.status(500).json({ error: 'Upload failed.' });
       }
     });

@@ -1,6 +1,7 @@
 const Client = require('../models/Client');
 const Artist = require('../models/Artist');
 const SharedImage = require('../models/SharedImage');
+const logger = require('./logger');
 
 /**
  * Best-effort recording of a client-artist conversation's shared images, for the client-dashboard
@@ -51,7 +52,7 @@ async function recordSharedImagesForMessage({ conversation, message }) {
     // still inserts every non-duplicate document even though the call itself rejects, so there is
     // nothing to recover here either way. Logged rather than silent so a genuinely new failure
     // mode doesn't hide forever.
-    console.warn(`[shared-images] recordSharedImagesForMessage: ${err.message}`);
+    logger.warn(`[shared-images] recordSharedImagesForMessage: ${err.message}`);
   }
 }
 

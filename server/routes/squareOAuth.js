@@ -6,6 +6,8 @@ const tokenCrypto = require('../utils/token-crypto');
 const square = require('../utils/square');
 const { getOrCreateAccountForOwner } = require('../utils/square-account');
 const { Constants } = require('../utils/constants');
+const logger = require('../utils/logger');
+const { reportError } = require('../utils/error-reporting');
 
 const router = express.Router();
 
@@ -77,7 +79,7 @@ router.get('/square/oauth/callback', async (req, res) => {
   try {
     owner = verifyState(state);
   } catch (err) {
-    console.warn('[square-oauth] Rejected callback with invalid/expired state:', err.message);
+    logger.warn({ err }, '[square-oauth] Rejected callback with invalid/expired state');
     return res.status(400).send('This connection link has expired or is invalid. Please try connecting again from InkBooks.');
   }
 
@@ -118,7 +120,7 @@ router.get('/square/oauth/callback', async (req, res) => {
 
     return res.redirect(settingsRedirectUrl(owner.ownerType, owner.ownerId, 'connected'));
   } catch (err) {
-    console.error('[square-oauth] Failed to complete Square connection:', err.message);
+    reportError(err, { context: '[square-oauth] Failed to complete Square connection' });
     return res.redirect(settingsRedirectUrl(owner.ownerType, owner.ownerId, 'error'));
   }
 });

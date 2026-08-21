@@ -1,6 +1,8 @@
 const express = require('express');
 const Appointment = require('../models/Appointment');
 const square = require('../utils/square');
+const logger = require('../utils/logger');
+const { reportError } = require('../utils/error-reporting');
 
 const router = express.Router();
 
@@ -25,11 +27,11 @@ router.post(
     try {
       isValid = square.verifyWebhookSignature({ notificationUrl, rawBody, signatureHeader });
     } catch (err) {
-      console.error('[square-webhook] Signature verification error:', err.message);
+      reportError(err, { context: '[square-webhook] Signature verification error' });
       return res.status(500).send();
     }
     if (!isValid) {
-      console.warn('[square-webhook] Rejected event with invalid signature.');
+      logger.warn('[square-webhook] Rejected event with invalid signature.');
       return res.status(403).send();
     }
 
@@ -64,7 +66,7 @@ router.post(
       } catch (err) {
         // Don't 500 here - Square will retry on non-2xx, and a transient DB error shouldn't
         // spiral into repeated retries indefinitely. Logged for manual follow-up instead.
-        console.error('[square-webhook] Failed to process invoice.payment_made:', err.message);
+        reportError(err, { context: '[square-webhook] Failed to process invoice.payment_made' });
       }
     }
 

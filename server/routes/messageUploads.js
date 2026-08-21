@@ -3,6 +3,7 @@ const multer = require('multer');
 const checkAuth = require('../utils/check-auth');
 const { checkRateLimit, getClientIp } = require('../utils/rate-limit');
 const { uploadMessageAttachment } = require('../utils/firebase-admin');
+const { reportError } = require('../utils/error-reporting');
 
 // Mirrors routes/formUploads.js almost exactly - same Storage mechanism (uploadMessageAttachment,
 // a thin folder-scoped wrapper around the same uploadPublicFile that backs
@@ -109,7 +110,7 @@ router.post(
         }
         res.json({ urls });
       } catch (uploadErr) {
-        console.error('[message-uploads] Failed to upload to Firebase Storage:', uploadErr.message);
+        reportError(uploadErr, { context: '[message-uploads] Failed to upload to Firebase Storage' });
         res.status(500).json({ error: 'Upload failed.' });
       }
     });

@@ -1,5 +1,6 @@
 const AutoResponse = require('../models/AutoResponse');
 const AutoResponseLog = require('../models/AutoResponseLog');
+const logger = require('./logger');
 const Appointment = require('../models/Appointment');
 const Artist = require('../models/Artist');
 const User = require('../models/User');
@@ -233,7 +234,7 @@ async function sendAutoResponsesForTrigger(
 
     return { sent, skipped, failed };
   } catch (err) {
-    console.warn(`[auto-responses] sendAutoResponsesForTrigger failed: ${err.message}`);
+    logger.warn(`[auto-responses] sendAutoResponsesForTrigger failed: ${err.message}`);
     return { sent: 0, skipped: 0, failed: 0, error: err.message };
   }
 }
@@ -442,7 +443,7 @@ async function sendAutoResponseForIncomingMessage(
 
     return { sent, skipped, failed };
   } catch (err) {
-    console.warn(`[auto-responses] sendAutoResponseForIncomingMessage failed: ${err.message}`);
+    logger.warn(`[auto-responses] sendAutoResponseForIncomingMessage failed: ${err.message}`);
     return { sent: 0, skipped: 0, failed: 0, error: err.message };
   }
 }

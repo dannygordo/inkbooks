@@ -1,4 +1,5 @@
 const Appointment = require('../models/Appointment');
+const logger = require('./logger');
 const BookingRequest = require('../models/BookingRequest');
 const Client = require('../models/Client');
 const ClientScheduleEmail = require('../models/ClientScheduleEmail');
@@ -297,7 +298,7 @@ async function sendConsultBookedEmail(
     // is how "sent" came to be reported for mail that never left.
     return result ? { ok: true } : { ok: false, reason: 'provider-rejected' };
   } catch (err) {
-    console.warn(`[client-emails] consult confirmation failed: ${err.message}`);
+    logger.warn(`[client-emails] consult confirmation failed: ${err.message}`);
     return { ok: false, reason: 'failed', error: err.message };
   }
 }

@@ -2,6 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const { checkRateLimit, getClientIp } = require('../utils/rate-limit');
 const { uploadFormSubmissionFile } = require('../utils/firebase-admin');
+const { reportError } = require('../utils/error-reporting');
 
 // Mirrors routes/bookingUploads.js almost exactly - same Storage mechanism
 // (uploadFormSubmissionFile, a thin folder-scoped wrapper around the same uploadPublicFile that
@@ -95,7 +96,7 @@ router.post(
         }
         res.json({ urls });
       } catch (uploadErr) {
-        console.error('[form-uploads] Failed to upload to Firebase Storage:', uploadErr.message);
+        reportError(uploadErr, { context: '[form-uploads] Failed to upload to Firebase Storage' });
         res.status(500).json({ error: 'Upload failed.' });
       }
     });

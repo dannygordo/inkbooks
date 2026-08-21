@@ -1,4 +1,5 @@
 const Conversation = require('../models/Conversation');
+const logger = require('./logger');
 const User = require('../models/User');
 const Client = require('../models/Client');
 const BookingRequest = require('../models/BookingRequest');
@@ -237,7 +238,7 @@ async function notifyNewMessage({
  */
 function logNotifyOutcomes(scope, conversationId, results) {
   if (!results || results.length === 0) {
-    console.warn(`[${scope}] conversation ${conversationId}: notified nobody (no other members)`);
+    logger.warn(`[${scope}] conversation ${conversationId}: notified nobody (no other members)`);
     return;
   }
   // `via` is in here because its absence cost a debugging round trip. "sent" alone cannot
@@ -254,7 +255,7 @@ function logNotifyOutcomes(scope, conversationId, results) {
     .join(', ');
   const notified = results.some((r) => r.outcome === 'sent');
   // warn rather than log when nobody was reached, so it survives a log level that hides chatter.
-  const write = notified ? console.log : console.warn;
+  const write = notified ? logger.info.bind(logger) : logger.warn.bind(logger);
   write(`[${scope}] conversation ${conversationId}: ${summary}`);
 }
 

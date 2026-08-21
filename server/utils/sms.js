@@ -10,6 +10,7 @@
 //
 // Degrades gracefully exactly like utils/email.js's Resend client: everything else keeps working,
 // this just warns and no-ops until the three env vars below are set.
+const logger = require('./logger');
 
 let client = null;
 let checkedConfig = false;
@@ -30,7 +31,7 @@ function ensureInitialized() {
   fromAddress = messagingServiceSid || fromNumber;
 
   if (!accountSid || !authToken || !fromAddress) {
-    console.warn(
+    logger.warn(
       '[sms] TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN / (TWILIO_MESSAGING_SERVICE_SID or ' +
         'TWILIO_FROM_NUMBER) not set - appointment reminder texts are disabled until this is ' +
         'configured.',
@@ -53,11 +54,11 @@ function ensureInitialized() {
  */
 async function sendSms({ to, body }) {
   if (!ensureInitialized()) {
-    console.warn(`[sms] Skipped sending to ${to} - SMS is not configured.`);
+    logger.warn(`[sms] Skipped sending to ${to} - SMS is not configured.`);
     return null;
   }
   if (!to) {
-    console.warn('[sms] Skipped sending - no destination number.');
+    logger.warn('[sms] Skipped sending - no destination number.');
     return null;
   }
   try {
@@ -71,10 +72,10 @@ async function sendSms({ to, body }) {
     // Logged on success too, same reasoning as email.js's own accepted-send log: once Twilio has
     // accepted a message this side of the line knows nothing further, and the sid is the join key
     // into Twilio's own console/logs for "did this actually land."
-    console.log(`[sms] accepted to ${to} sid=${message.sid} status=${message.status}`);
+    logger.info(`[sms] accepted to ${to} sid=${message.sid} status=${message.status}`);
     return message;
   } catch (err) {
-    console.warn(`[sms] FAILED to send to ${to}:`, err.message);
+    logger.warn({ err, to }, '[sms] FAILED to send');
     return null;
   }
 }

@@ -1,4 +1,5 @@
 const Client = require('../models/Client');
+const { reportError } = require('./error-reporting');
 const { toObjectId } = require('./object-id');
 const ClientFlag = require('../models/ClientFlag');
 const ClientFlagType = require('../models/ClientFlagType');
@@ -222,7 +223,7 @@ async function syncNoShowFlag({ appointment, previousStatus, actingUserId }) {
     });
     return { ok: true, changed: resolved > 0, resolved };
   } catch (err) {
-    console.warn(`[client-flags] LOST a NO_SHOWED flag change: ${err.message}`);
+    reportError(err, { context: '[client-flags] LOST a NO_SHOWED flag change' });
     return { ok: false, error: err.message };
   }
 }

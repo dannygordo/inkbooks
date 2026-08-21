@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const logger = require('./logger');
 const { getMemberUserIdsForShop } = require('./shop-membership');
 
 // Mirrors client/src/constants/app.js's APP_SETTINGS_CONSTANTS.TAG_COLORS palette - the server
@@ -96,10 +97,7 @@ async function ensureTagColor(user) {
       // Swallowed deliberately: a read path (a field resolver) must not fail an otherwise valid
       // query because an opportunistic backfill write lost a race with a concurrent one. The
       // caller still gets a usable color back, and the next read simply tries again.
-      console.error(
-        `[tag-color] Could not persist backfilled tagColor for user ${userId}:`,
-        err.message,
-      );
+      logger.error({ userId, err }, '[tag-color] Could not persist backfilled tagColor');
     }
     return color;
   }
@@ -112,10 +110,7 @@ async function ensureTagColor(user) {
     try {
       await persisted.save();
     } catch (err) {
-      console.error(
-        `[tag-color] Could not persist backfilled tagColor for user ${userId}:`,
-        err.message,
-      );
+      logger.error({ userId, err }, '[tag-color] Could not persist backfilled tagColor');
     }
   }
   return persisted && !isUnsetTagColor(persisted.tagColor) ? persisted.tagColor : color;

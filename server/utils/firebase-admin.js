@@ -4,6 +4,7 @@
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
 const { getStorage, getDownloadURL } = require('firebase-admin/storage');
+const logger = require('./logger');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -33,7 +34,7 @@ function ensureInitialized() {
   }
   const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
   if (!serviceAccountPath) {
-    console.warn(
+    logger.warn(
       '[firebase-admin] FIREBASE_SERVICE_ACCOUNT_PATH is not set - Firebase custom token ' +
         'minting is disabled. Login/register will still work, but per-user Firebase Storage ' +
         'access (uploading/deleting images) will not until this is configured.'
@@ -42,7 +43,7 @@ function ensureInitialized() {
   }
   const resolvedPath = path.resolve(serviceAccountPath);
   if (!fs.existsSync(resolvedPath)) {
-    console.warn(
+    logger.warn(
       `[firebase-admin] FIREBASE_SERVICE_ACCOUNT_PATH is set to "${serviceAccountPath}" but no ` +
         'file exists there. Firebase custom token minting is disabled.'
     );
@@ -61,7 +62,7 @@ function ensureInitialized() {
     if (process.env.FIREBASE_STORAGE_BUCKET) {
       bucketInstance = getStorage(app).bucket();
     } else {
-      console.warn(
+      logger.warn(
         '[firebase-admin] FIREBASE_STORAGE_BUCKET is not set - guest reference-image uploads ' +
           'are disabled until this is configured (Firebase custom token minting is unaffected).'
       );
@@ -69,7 +70,7 @@ function ensureInitialized() {
     initialized = true;
     return true;
   } catch (err) {
-    console.warn('[firebase-admin] Failed to initialize Firebase Admin SDK:', err.message);
+    logger.warn({ err }, '[firebase-admin] Failed to initialize Firebase Admin SDK');
     return false;
   }
 }
@@ -88,7 +89,7 @@ async function mintFirebaseToken(userId, claims = {}) {
   try {
     return await authInstance.createCustomToken(String(userId), claims);
   } catch (err) {
-    console.warn('[firebase-admin] Failed to mint custom token:', err.message);
+    logger.warn({ err, userId }, '[firebase-admin] Failed to mint custom token');
     return null;
   }
 }

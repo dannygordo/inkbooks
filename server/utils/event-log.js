@@ -1,5 +1,7 @@
 const EventLog = require('../models/EventLog');
 const User = require('../models/User');
+const logger = require('./logger');
+const { reportError } = require('./error-reporting');
 
 /**
  * Recording events, in one place - the same shape as utils/notifications.js's notify()/
@@ -64,7 +66,7 @@ async function recordEvent({ entityType, entityId, action, actorUserId, shopId, 
     // Loud in dev/logs rather than silently attributing an event to nobody - same reasoning as
     // notify()'s own actorId guard, just not re-thrown, since this function's whole contract is
     // "never fail the caller's real action."
-    console.warn(`[event-log] recordEvent(${entityType}.${action}) called with no actorUserId - skipped.`);
+    logger.warn(`[event-log] recordEvent(${entityType}.${action}) called with no actorUserId - skipped.`);
     return { ok: false, error: 'missing actorUserId' };
   }
   try {
@@ -82,10 +84,9 @@ async function recordEvent({ entityType, entityId, action, actorUserId, shopId, 
     });
     return { ok: true };
   } catch (err) {
-    console.warn(
-      `[event-log] LOST a ${action} event for ${entityType} ${entityId}: ${err.message}. ` +
-        'The action itself succeeded; only the audit record failed.',
-    );
+    reportError(err, {
+      context: `[event-log] LOST a ${action} event for ${entityType} ${entityId} - the action itself succeeded, only the audit record failed`,
+    });
     return { ok: false, error: err.message };
   }
 }

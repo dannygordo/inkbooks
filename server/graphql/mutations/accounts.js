@@ -18,6 +18,7 @@ const { assertSlugAvailable } = require('../../utils/booking-slug');
 const { pickDefaultTagColor } = require('../../utils/tag-color');
 const { findOrCreateGuestClient } = require('../../utils/guest-client');
 const Shop = require('../../models/Shop');
+const { reportError } = require('../../utils/error-reporting');
 
 /**
  * Account creation for the three wizards.
@@ -99,7 +100,7 @@ async function createUserWithInvite({ firstName, lastName, email, role, userType
       expiresAt,
     });
   } catch (err) {
-    console.error('[accounts] Invite email failed:', err.message);
+    reportError(err, { context: '[accounts] Invite email failed' });
   }
 
   return { user, inviteLink: buildSetPasswordLink(rawToken) };

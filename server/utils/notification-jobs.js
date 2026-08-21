@@ -1,4 +1,5 @@
 const Notification = require('../models/Notification');
+const { reportError } = require('./error-reporting');
 const User = require('../models/User');
 const Artist = require('../models/Artist');
 const { sendEmail } = require('./email');
@@ -321,7 +322,11 @@ async function sendBoothRentNudges({ now = new Date() } = {}) {
  * grace promises; running it hourly would make the real delay up to an hour and turn a considered
  * pause into an apparent outage.
  */
-function notificationJobs({ onReport = console.warn } = {}) {
+// A stuck-notification health check finding real backlog IS an incident worth Sentry's attention,
+// not just a log line - "the send sweep is not completing" is exactly the kind of thing that
+// deserves an alert, not silence until someone happens to grep for it. onReport stays injectable
+// (tests override it with a plain recorder) - this is only the default a real run actually uses.
+function notificationJobs({ onReport = (msg) => reportError(new Error(msg)) } = {}) {
   return [
     {
       name: 'notification-emails',

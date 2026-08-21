@@ -9,10 +9,15 @@ if (process.env.NODE_ENV !== 'PRODUCTION') {
 } else {
   dotenv.config({ path: '.env.production' });
 }
-console.log('NODE_ENV:', process.env.NODE_ENV);
 
 const http = require('http');
 const express = require('express');
+const logger = require('./utils/logger');
+// Imported for its side effect (Sentry.init(), if SENTRY_DSN is set) as early as possible - right
+// after env vars load, before anything else gets a chance to throw. See that file's own header
+// comment: this no-ops completely with no DSN configured, so it's safe on day one.
+const { reportError } = require('./utils/error-reporting');
+logger.info({ nodeEnv: process.env.NODE_ENV }, 'Starting server');
 const { createLoaders } = require('./utils/loaders');
 const { startScheduler } = require('./utils/scheduler');
 const { notificationJobs } = require('./utils/notification-jobs');
@@ -75,7 +80,7 @@ function checkSquareApplicationIds() {
   const token = process.env.SQUARE_SANDBOX_ACCESS_TOKEN;
 
   if (token && !sandboxAppId && !oauthAppId) {
-    console.warn(
+    logger.warn(
       '[square] SQUARE_SANDBOX_ACCESS_TOKEN is set but neither SQUARE_SANDBOX_APPLICATION_ID nor ' +
         'SQUARE_APPLICATION_ID is - the card form has no application id to tokenize against and ' +
         'GET /square/config will return a 500.',
@@ -83,7 +88,7 @@ function checkSquareApplicationIds() {
     return;
   }
   if (sandboxAppId && oauthAppId && sandboxAppId !== oauthAppId) {
-    console.warn(
+    logger.warn(
       '\n[square] WARNING: two different Square applications are configured.\n' +
         `  SQUARE_SANDBOX_APPLICATION_ID  ${sandboxAppId}\n` +
         `  SQUARE_APPLICATION_ID          ${oauthAppId}\n` +
@@ -138,7 +143,7 @@ const io = new Server(httpServer, {
 });
 
 io.on('connection', (socket) => {
-  console.log('user connected on socket: ' + socket.id);
+  logger.info({ socketId: socket.id }, 'user connected on socket');
 
   const id = socket.handshake.query.id;
   socket.join(id);
@@ -156,12 +161,20 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    console.log('a user disconnected');
+    logger.info('a user disconnected');
   });
 });
 // ---------- End Socket.io setup ----------
 
 const typeDefs = [ibTypeDefs, DateTypeDefs];
+
+// The four codes utils/errors.js's AuthenticationError/UserInputError/ForbiddenError/
+// RateLimitError carry - see utils/error-reporting.js's own header comment for the reasoning: any
+// error wearing one of these is an EXPECTED outcome of normal use (wrong password, bad form
+// input), not an incident, and reporting every one of those to Sentry would bury the signal that
+// actually matters. Anything else reaching formatError - a Mongoose cast error, a null-pointer
+// bug, an unhandled third-party API failure - is genuinely unexpected and worth reporting.
+const EXPECTED_ERROR_CODES = new Set(['UNAUTHENTICATED', 'BAD_USER_INPUT', 'FORBIDDEN', 'RATE_LIMITED']);
 
 const server = new ApolloServer({
   typeDefs,
@@ -169,6 +182,18 @@ const server = new ApolloServer({
   // Lets the HTTP server shut down cleanly (finishes in-flight requests, then closes) instead
   // of being killed out from under active connections.
   plugins: [ApolloServerPluginDrainHttpServer({ httpServer })],
+  // The single place every unexpected resolver failure across the entire GraphQL surface passes
+  // through, win or lose - one hook here covers every resolver, instead of every resolver needing
+  // its own try/catch calling reportError by hand (and inevitably missing some, the same way
+  // every Query resolver once missed checkAuth before utils/with-auth.js existed - see
+  // PRODUCTION_ROADMAP.md Phase 1/2 on that exact failure mode).
+  formatError: (formattedError, error) => {
+    const code = formattedError.extensions && formattedError.extensions.code;
+    if (!EXPECTED_ERROR_CODES.has(code)) {
+      reportError(error, { graphqlPath: formattedError.path, code });
+    }
+    return formattedError;
+  },
 });
 
 async function start() {
@@ -209,7 +234,7 @@ async function start() {
   // options more strictly, so a genuinely dead legacy option is worth dropping now rather
   // than carrying it forward on faith.
   await mongoose.connect(mongoUri);
-  console.log('MongoDB Connected!');
+  logger.info('MongoDB Connected!');
 
   // Started only after Mongo is connected. The very first thing every job does is claim a lock
   // row, so a scheduler running before the database is up would throw on its first tick.
@@ -227,7 +252,7 @@ async function start() {
   // startScheduler call - one interval, one set of ticks, jobs from both files claimed by the
   // same lock (models/ScheduledRun.js). See utils/business-jobs.js for what this one does.
   startScheduler([...notificationJobs(), ...businessJobs()], { tickMs: 60 * 1000 });
-  console.log('Scheduler started');
+  logger.info('Scheduler started');
 
   // The flag types the app ships with. Idempotent and $setOnInsert-only, so re-running never
   // overwrites a label somebody has since edited - and doing it on boot rather than in a migration
@@ -237,10 +262,10 @@ async function start() {
 
   const PORT = process.env.PORT || 5500;
   await new Promise((resolve) => httpServer.listen(PORT, resolve));
-  console.log(`Server running at http://localhost:${PORT}/`);
+  logger.info({ port: PORT }, `Server running at http://localhost:${PORT}/`);
 }
 
 start().catch((err) => {
-  console.error('Failed to start server:', err);
+  reportError(err, { context: 'server startup' });
   process.exit(1);
 });
