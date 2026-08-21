@@ -1,7 +1,7 @@
 
 # InkBooks — Production Readiness Roadmap
 
-Prepared July 31, 2026. Scope: pre-launch app, no live customer data yet, "fix and harden in place" (not a rewrite), hosting stack not yet chosen.
+Prepared July 31, 2026. Scope: pre-launch app, no live customer data yet, "fix and harden in place" (not a rewrite), hosting stack not yet chosen. Updated August 21, 2026 against three weeks of shipped work documented in `HANDOFF.md` - see the new section near the end of Phase 7 and the refreshed "Suggested sequencing."
 
 This roadmap assumes one thing above all: nothing here needs to happen gracefully around live users, because there aren't any yet. That's the single biggest asset you have right now — use it. Every fix below can be a breaking change if it needs to be.
 
@@ -372,9 +372,9 @@ Verified: encryption round-trip + tamper rejection + missing-key rejection (`uti
 - `shopCutAmount` is a whole-dollar `Int` (matching `total`/`tip`/`shopMinimum`/`hourlyRate`'s existing convention in this schema, none of which are `Float`) - caught during verification, since the first pass used `parseFloat` client-side, which would have thrown a GraphQL Int-coercion error the first time someone typed a non-whole-dollar amount.
 - Verified via `@babel/parser` (JSX-aware syntax parse) on every new/changed client file, not a full `react-scripts build` - a full CRA production build was attempted but repeatedly exceeded this sandbox's command time budget before completing; worth an actual `npm run build` locally before deploying this.
 
-### Booking request & guest correspondence — finalized design (new feature, not yet built)
+### Booking request & guest correspondence — finalized design (built and shipped)
 
-How a prospective client connects to an artist is the critical path to actually getting a tattoo, and today that path doesn't exist in the product at all - a client has no way to reach an artist without already being a `Client` record something else created. This is the design for that, worked out in a dedicated conversation.
+How a prospective client connects to an artist is the critical path to actually getting a tattoo. This is the design that closed that gap, worked out in a dedicated conversation and since built end to end (see below) - a client can now reach an artist with no account and no app, via the tokenized-link flow this section describes.
 
 **The problem with the obvious approach.** The instinct is to let a client correspond by real email - fill out a form, then just reply to emails from there, seamlessly, no app needed. That's the wrong mechanism even though the "no account needed" goal is right. True inbound email requires a transactional email provider with inbound-parse support specifically, a webhook that verifies the sender isn't spoofed, thread-correlation logic, and handling for whatever malformed content real-world email clients produce - a lot of new infrastructure and ongoing cost for a worse outcome, since freeform email text has to be reverse-engineered into structured data (placement, size, budget, images) after the fact.
 
@@ -683,9 +683,11 @@ couldn't be confirmed by executing the suite here. **User should run `npm test` 
 confirm all new tests actually pass, not just parse.**
 
 - **CI:** ✅ Done — `.github/workflows/ci.yml` runs on every push/PR to `main`: a `server` job (`npm ci` + `npm test`, no other setup needed since `test/globalSetup.js` provisions its own in-memory MongoDB and dummy `SECRET_KEY`) and a `client` job (`npm ci` + `npm test` + `npm run build`, confirming the app still actually compiles, not just that tests pass). No lint step yet — there's no ESLint config anywhere in the repo to run; worth adding a real lint setup (and wiring it into this same workflow) as a follow-up, not bundled into this pass.
-- **Error monitoring:** Sentry (or similar) on both client and server — right now errors just go to `console.log`, including some that log full user objects, which you'll want to stop doing before this touches real client PII.
-- **Logging:** replace the `console.log(user)` / `console.log(appointment)` debug statements scattered through the mutations with structured logging (`pino`), and make sure nothing sensitive (passwords, tokens) ever hits a log line.
-- **Backups:** enable automated MongoDB Atlas snapshots before real client data exists in that cluster, not after.
+- **Error monitoring, structured logging, and backups — done, pending two manual, non-engineering steps.** ✅ Done as of August 21, 2026 — replaced the `console.log(user)` / `console.log(appointment)` debug statements scattered through the mutations with `server/utils/logger.js`, a pino structured logger (JSON output in production, `pino-pretty` in dev) that redacts tokens/passwords/secrets wherever they appear in a log object's shape — `req.headers.authorization`, any `*.password`, any `*.accessToken`, and similar paths — so logging a whole `user`/`appointment` record can no longer leak a credential the way the old debug statements risked. `server/utils/error-reporting.js`'s `reportError(err, context)` is the one place a genuinely unexpected failure gets escalated: it always logs via pino, and additionally calls `Sentry.captureException` when `SENTRY_DSN` is set — a no-op with no DSN configured, so this is safe to ship before a Sentry project exists. `server/index.js`'s Apollo Server `formatError` hook now routes any GraphQL error that isn't carrying one of the expected codes (`UNAUTHENTICATED`/`BAD_USER_INPUT`/`FORBIDDEN`/`RATE_LIMITED`) to Sentry via `reportError` — one central place instead of every resolver needing to remember to call it. Client-side, `client/src/index.jsx` wraps the render tree in a `Sentry.ErrorBoundary` with a plain `CrashFallback`, plus a new Apollo `onError` link (`errorReportingLink`) that reports unexpected GraphQL/network errors — both gated on `VITE_SENTRY_DSN`, the same no-DSN-means-off contract as the server side. Every scattered `console.log`/`warn`/`error` across server runtime code (`utils/notifications.js`, `event-log.js`, `client-flags.js`, `scheduler.js`, `sms.js`, `tag-color.js`, `firebase-admin.js`, `auto-responses.js`, `message-notifications.js`, `shared-images.js`, `client-booking-emails.js`, `email.js`, the `routes/*Uploads.js` and `routes/square*.js` files, `graphql/mutations/accounts.js` and `passwords.js`, `graphql/resolvers/conversations.js`) is now either plain structured pino logging (an expected/degraded condition) or a `reportError` call for a genuinely unexpected one — including the notification path this doc elsewhere describes as having failed silently for weeks before anyone noticed. `server/scripts/*` were deliberately left untouched — those are CLI tools meant to print to stdout for a human operator, not application runtime logging.
+
+  Dependencies (`pino`, `pino-pretty`, `@sentry/node` on the server; `@sentry/react` on the client) are added to both `package.json` files but not yet installed — same standing limitation as every other dependency bump in this doc: run `npm install` in both `server/` and `client/` by hand. `SENTRY_DSN`/`LOG_LEVEL` (server) and `VITE_SENTRY_DSN` (client) placeholders need to be added by hand to the four `.env` files — left blank on purpose, which means Sentry stays fully off (pino logging works fine with no DSN at all) until a real project exists.
+
+  **What's actually still open, and all of it is manual, not engineering:** (1) creating a real Sentry account/project and obtaining a DSN; (2) MongoDB Atlas automated backups — Cluster → Backup in the Atlas dashboard, a toggle with no API or code path, cannot be scripted from this repo; (3) `npm install` in both `server/` and `client/`; (4) confirming the whole thing actually works end-to-end once wired up — this sandbox has no live Sentry project and no reachable Mongo to exercise either against, so "the formatError hook reports to Sentry" is a code-reading claim until someone triggers a real unexpected error against a real DSN and watches it land.
 - **Legal:** a privacy policy and terms of service before collecting client PII and reference images for real — this is a legal/compliance conversation, not an engineering one, and it's worth having before Phase 1's data-model decisions get locked in.
 
 ### Hosting recommendation (since none is chosen yet)
@@ -1481,14 +1483,20 @@ match everywhere else and to stop the two same-named rules from disagreeing with
 this app has no CSS Modules/scoping - every component's CSS file declares plain global class names
 (`.shopItem`, `.artistActions`, etc.), and multiple unrelated files (an edit form's own CSS file
 *and* that entity's list/detail page CSS file) independently redeclare the same class names,
-sometimes with different values, as this pass's own `.artistActions` finding shows. That's the
-actual root cause of "look and feel isn't consistent" - not that nobody tried, but that styling
-correctness currently depends on avoiding accidental collisions across files that don't know about
-each other. A real fix is a CSS Modules (or styled-components/Tailwind) migration - a much larger,
-separate effort than one pass, and not started here. Also out of scope for this pass, deliberately:
-`Profile.jsx`/`Settings.jsx` (newer pages, already both use `IBInput` consistently - not part of
-the reported gap) and any deeper visual redesign beyond matching what `EditArtist.jsx` already
-does.
+sometimes with different values, as this pass's own `.artistActions` finding shows. **A CSS
+Modules (or styled-components/Tailwind) migration was considered and explicitly declined, per
+direct instruction ("we do not need a css rewrite") - not deferred, not backlog, a closed
+decision.** The global-class-collision risk described above is real and worth remembering when
+adding new CSS - grep for a class name before reusing it, prefer scoping a new file's rules under
+a component-specific top-level class - but the fix going forward is that discipline, not a
+migration. This is consistent with, not a compromise against, the CSS-custom-properties approach
+already carrying the app's entire light/dark theme system (`theme/tokens.css` - see HANDOFF.md's
+Done section): that system works today, across every screen, in both themes, on top of plain
+global classes - which is itself the evidence that the current architecture is adequate for what
+this app needs, not merely tolerated pending a rewrite. Also out of scope for this pass,
+deliberately: `Profile.jsx`/`Settings.jsx` (newer pages, already both use `IBInput` consistently -
+not part of the reported gap) and any deeper visual redesign beyond matching what `EditArtist.jsx`
+already does.
 
 Verified via `@babel/parser` JSX parsing on both changed files, and confirming (via `Grep`) no
 lingering bare `ref={...}` was left unconverted to `inputRef={...}` in either file - a raw `ref`
@@ -1500,8 +1508,9 @@ Artist/Edit Client, and confirm Save still submits the same values as before.
 
 This closes out Phase 7's originally-scoped four pieces (rates/settings, booking-request pipeline,
 appointment wizard, in-project sessions, shop-cut payout dashboard, and now this first UI pass).
-The CSS-architecture root cause above is a real, separate follow-up worth its own pass, not
-something to fold into "later" without writing it down.
+The CSS-architecture root cause above is real and worth remembering - the fix is naming discipline
+on new CSS files, not a migration. See the note above marking a CSS Modules/Tailwind rewrite as
+explicitly declined, not queued.
 
 ### Phase 7 follow-up fixes from first real usage (August 3, 2026) - done
 
@@ -1952,11 +1961,219 @@ same class of restriction as `mongodb-memory-server`'s block on the server side)
 None of this round's changes could be visually confirmed in a real browser either - the header-
 spacing fix and the Settings page layout in particular are worth a real click-through.
 
+### Three weeks of shipped feature work (August 4-21, 2026) - done, mostly unverified against a real database in this sandbox
+
+Everything below shipped after this document's last substantive update (Phase 7 follow-up fix #7,
+August 3) and is described in full, dated detail in `HANDOFF.md`, which is the source of truth for
+all of it. This section is a pointer into that detail, not a replacement for it - treat
+`HANDOFF.md`'s "Done", "Test status", "Next", and "Known gaps, not bugs" sections as the live
+record and this roadmap as the snapshot.
+
+**Five features shipped together from one message (August 19).** In build order (smallest/most
+self-contained first, the one touching real money last): mark-a-conversation-unread
+(`markConversationUnreadForUser`, no schema change - `Conversation.reads[].lastReadAt` already
+treats a missing row as fully unread); message image attachments (`Message.imageUrls`, a new
+`routes/messageUploads.js` mirroring the existing form-upload pipeline, a gallery rendered above
+the message bubble); unanswered-message response-time nudges (`ResponseTimeSettings` +
+`utils/response-time.js`, an 8-hour default then a repeating interval, artist-configurable down to
+but never past a shop-set ceiling - the first min-clamp owner-precedence shape in the codebase,
+everything else here is "one owner wins outright"); manageable system-generated email/SMS text
+(`SystemMessageTemplate`, 7 keys, extending the existing `AutoResponse` artist-wins-else-shop-wins-
+else-built-in-default precedence to the emails that used to be hardcoded strings - account-invite
+and password-reset deliberately excluded as identity/security mail nobody should be able to
+reword); and booth rent as an alternative to a percentage shop cut (`ShopCutRate.compensationModel`,
+an append-only `BoothRentPlan`/generated `BoothRentCharge` per artist per due month, a
+`due -> marked_paid -> confirmed` lifecycle mirroring the existing shop-cut-invoice dual-control
+pattern).
+
+**A forms/consent-form builder, entirely separate from Booking Requests (August 14, extended
+August 17).** `Form`/`FormResponse` models, V1 field types (short answer, paragraph, single
+choice, multi choice, date, file upload, and a TYPED signature - full legal name plus a server
+timestamp, deliberately not a drawn signature pad, which is a separately deferred future effort),
+owned by a shop admin or an independent artist on the same `shopId`/`artistUserId` XOR shape
+Expense/Income already use. `FormResponse.fieldsSnapshot` duplicates the form's fields at
+submission time rather than referencing the live `Form`, so editing a question's wording later can
+never retroactively change what an already-signed waiver is interpreted as having asked. Extended
+August 17 with default Booking Request/Consent forms seeded per shop, slug-based public links, and
+a Settings > Forms management panel.
+
+**A personal calendar (August 15-16).** `Appointment.isPersonal`, mutually exclusive with
+`shopId`/`projectId` by construction and immutable after creation - `createAppointment` forces
+`userId` to the caller and rejects a personal appointment carrying a shop or project id;
+`updateAppointment` refuses to flip the flag either direction. Enforced belt-and-suspenders at the
+query layer (`getAppointmentsByShop` excludes it outright, `getAppointmentsByArtist` forces the
+exclusion whenever the caller isn't the artist being asked about, `getAppointment` denies before
+any shop-membership check runs at all) so a shop admin can never see another user's private
+calendar entries under any query shape.
+
+**Expense/income tracking, recurring expenses, and three new dashboard financial figures.** Five
+new collections (`ExpenseType`, `IncomeType`, `Expense`, `Income`, `RecurringExpense`) on the same
+shop-XOR-artist ownership shape as everything else money-adjacent in this codebase.
+`RecurringExpense` is a template; an hourly job (`generateDueRecurringExpenses`) catches up every
+missed occurrence in one run rather than jumping to "now", idempotent via a partial unique index
+rather than in-memory locking. Three new `Analytics` fields (`expensesCents`, `otherIncomeCents`,
+`netCents`) land on the dashboard as new `StatCard`s, shop-wide for admins and personal for every
+artist including a shop-connected one - originally shipped as one "Expenses & Income" area, split
+into two separate Settings categories/nav entries the same day on request.
+
+**A complete light/dark theme system.** `theme/tokens.css` - CSS custom properties keyed off one
+`[data-theme]` attribute, read by both plain CSS and MUI's own `cssVariables` theme, so the two
+styling systems this client actually uses move together. Per-user and DB-backed
+(`User.themePreference`), not local storage. Getting every existing file onto the tokens took
+several passes - the keyword `white`, raw `rgb()` literals, a component's own local CSS-variable
+indirection, and color living in a JS object (`styled()`, inline `sx`) instead of a stylesheet all
+kept surfacing as separate gaps a hex-literal sweep alone couldn't see; the calendar and the login
+page were the two most recent finds of this kind. See the CSS Modules note above - this theme
+system is the concrete evidence that the current plain-CSS architecture, done carefully, is
+adequate; that decision is unrelated to and unaffected by this work.
+
+**Pagination reached the lists that were still unpaged.** The dashboard's own Upcoming/Completed
+appointment lists (`ArtistPerformancePanel`) were hard-capped at 5 rows with no way to see a 6th
+even though the underlying query already returned `pageInfo`. A client's own
+`Client.projects`/`Client.appointments` are now real server-paged connections; `Client.stats` was
+added as a separate full-history aggregate specifically so paginating those lists didn't quietly
+make the dashboard's own stat cards (Total spent, Total tipped, Average tip) reflect only whatever
+page happened to be on screen. The client's Notes list is the one remaining list on that page still
+paged client-side, since notes are embedded sub-documents `paginate()` can't query directly.
+
+**An activity/event log, global search, and SMS reminders.** `EventLog`/`recordEvent`, wired into
+every money-moving mutation, with a viewer panel in Settings. Global search as an AppBar dropdown,
+then a full results page once the dropdown's five-per-type cap stopped being enough for a shop with
+real history - text indexes on Client/Project/Message, later widened to also cover project-image
+and shared-image tags (August 20). SMS session reminders via Twilio (`utils/reminders.js`/`sms.js`,
+an hourly scheduler job, a per-client opt-out panel).
+
+**Settings reorganized from one flat page into categorized panels** (`settingsCategories.jsx`),
+giving Appearance/Reminders/Activity Log/Forms/Expenses/Income each their own place instead of
+getting bolted onto the end of an already-long page.
+
+**Four bugs worth recording for their root causes, out of many fixed along the way:**
+
+- **`AppointmentWizard.jsx` could leak a typed value from one field into another.** Every step of
+  the multi-step form returned its own JSX with no `key`, so React reconciled by tree shape rather
+  than by which step this was - two unrelated steps can share an identical shape at the top (the
+  client-email step's first field and the session/new-project step's Project Title field are both
+  the first plain `IBInput` under a `DialogContent`). React reused the same uncontrolled `<input>`
+  DOM node across the step change instead of mounting a fresh one, and since `defaultValue` only
+  applies on initial mount, whatever an artist had typed as a client's email was still sitting in
+  that DOM node when they started typing a project title next - silently prefixing it
+  (`new.client@example.comBack piece`). Fixed with `key={step}` forcing a real remount on every
+  step change. Caught by a test written during a coverage push, not by manual testing.
+- **A response-time ceiling was enforced only at read time, not at write time.** The "artist may
+  tighten, never loosen past the shop's ceiling" rule was applied everywhere the effective value
+  gets computed (the nudge sweep, the inbox condition) but `updateResponseTimeSettings` had no
+  equivalent check on the write path, so an artist who typed a number above the shop's ceiling had
+  it saved verbatim - the nudge timing itself was never actually wrong, but what the artist saved
+  and what silently applied were two different numbers, with nothing telling them so. Fixed by
+  having the mutation look up and enforce the same ceiling the read path already used, rejecting
+  the write outright with a `UserInputError` naming the limit, rather than silently clamping it to
+  a different number the artist didn't choose.
+- **A stuck "permanently unread" conversation badge traced to `createBookingRequest` creating a
+  brand-new `Conversation` on every call**, instead of reusing an existing thread the way every
+  other conversation-opening path in the codebase already does via
+  `findOrCreateConversationForMembers`. A client submitting a second booking request to an artist
+  they'd already messaged got a second, disconnected `Conversation` for the same two people - real
+  traffic kept flowing through one of them, the other sat at whatever unread state it was last left
+  in, and since the UI renders only the other member's name (never a conversation id), the two
+  duplicates were visually indistinguishable. Fixed going forward; a new one-time script
+  (`scripts/merge-duplicate-conversations.js`) merges existing duplicates by member set, reassigning
+  every `Message`/`BookingRequest`/`SharedImage` pointer to the oldest copy and keeping whichever
+  read-state timestamp is later - written but not yet run against the real database.
+- **`redeemGiftCard` silently under-recorded a shop's cut on shop-issued redemptions.** It only
+  called `applyShopCut` inside the artist-issued branch, so a shop-issued gift card redemption
+  updated the card's balance and wrote its own liability figure but never computed the session's
+  ordinary `shopCutCents` at all - a real money-accounting gap invisible until a real `npm test` run
+  against a live database exercised both branches. Fixed by always calling `applyShopCut`
+  regardless of which branch handled the redemption.
+
+**Verification status, stated plainly.** The five-feature batch, the forms builder's second pass,
+the personal-calendar test-coverage push, and everything from August 20-21 (messenger fixes,
+image-message upload, shared-images list, global search over image tags, the response-time
+write-time fix) are verified in this sandbox only as far as `node --check`/`esbuild` syntax checks,
+a live schema rebuild, and `scripts/check-graphql-documents.js` matching every GraphQL document
+against the schema - none of it has run against a real MongoDB from here, because this sandbox has
+no route to `fastdl.mongodb.org` (server integration tests) or enough time budget to finish a
+client `npm test` run (roughly five minutes, longer than any single command here is allowed to
+run). The last full, real, on-a-real-machine green run either suite actually got was reported
+August 19 (server: 781 tests across 52 files; client suite run in full previously, individual
+touched files spot-checked since). Every real `npm test` run so far has found at least one genuine,
+previously-shipped bug that a syntax check alone missed - the gift-card cut bug and the response-
+time write-enforcement gap above included - which is the concrete argument for running the suites
+for real before trusting anything in this section, not a formality.
+
+**Files**: too many to list individually here - see each dated entry in `HANDOFF.md`
+(2026-08-14 through 2026-08-21) for the exact file list behind each feature and fix above.
+
 ---
 
-## Suggested sequencing
+## Suggested sequencing (updated August 21, 2026)
 
-Phase 0 today. Phase 1 this week — it's the part where real damage is currently possible. Phase 2 the following 1-2 weeks, since it's what keeps Phase 1 fixed. Phase 3 (modernization, including the monorepo/TypeScript scaffolding that Phase 5 needs) can run in parallel with Phase 2 once the auth wrapper pattern is settled. Phase 4 (real payments) whenever you're ready to actually take deposits. Phase 5 (mobile) starts once Phase 0-2 are done and the monorepo shape from Phase 3 exists — don't build a mobile UI against an API that's still wide open. Phase 6 items — tests, CI, monitoring — should be stood up incrementally starting in Phase 1, not bolted on at the end; retrofitting tests onto already-migrated code (or two clients instead of one) is much more expensive than writing them alongside the fixes.
+The CSS Modules/Tailwind migration discussed earlier in this doc is explicitly off the table -
+see the note above. It is not on this list at any priority, not because it was forgotten.
+
+1. **Run both test suites for real, on a real machine, right now.** `cd server && npm test`,
+   `cd client && npm test`. The last confirmed full green run of either suite was August 19
+   (server: 781/781 across 52 files). Everything shipped since then - the five-feature batch's own
+   tests (never run against it), the forms slug-link work, the personal-calendar `isPersonal`
+   additions, and all of August 20-21's fixes (messenger, image uploads, shared images,
+   search-over-tags, the response-time write-time fix) - is verified in the sandbox that built it
+   only as far as `node --check`/`esbuild`/schema rebuild/`check-graphql-documents.js`. Every real
+   run so far has found at least one genuine, previously-shipped bug a syntax check missed (the
+   `redeemGiftCard` shop-cut gap, two `AutoResponse` schema-hook crashes, the `AppointmentWizard`
+   step-leak). Treat this as the single highest-priority item, ahead of any new feature work.
+2. **The two remaining manual steps on monitoring/logging/backups**, now that the engineering side
+   is done (see the rewritten section above). Create a real Sentry project and set `SENTRY_DSN`/
+   `VITE_SENTRY_DSN`, and turn on MongoDB Atlas automated backups (Cluster → Backup - a dashboard
+   toggle, not something any script here can do). Both are minutes of work with no code risk, and
+   both are pure exposure until done - errors currently reported nowhere and a cluster with no
+   snapshot until they're finished.
+3. **Run the outstanding one-time data script against the real database**:
+   `node scripts/merge-duplicate-conversations.js --dry-run` then for real (fixes the
+   duplicate-Conversation-from-booking-requests unread-badge bug for any account it already
+   affected - Marta's account is the confirmed case). Non-destructive and idempotent by design;
+   has never been run against a real database from the sandbox that wrote it.
+4. **Close the `S2` authorization gap**: an independent artist still cannot archive their own
+   client, because the `withAuth(fn, ROLES.SHOP_ADMIN)` call sites don't yet honour
+   `canManageArtist`'s "own their own account" exception the way other gates already do. A shared
+   helper, not a per-call-site patch. Worth doing before the next item, not after, since it's the
+   same class of gap Phase 1/2 of this roadmap already spent real effort closing everywhere else.
+5. **Set a real tax rate for every existing shop and independent artist in Settings** before any
+   charge path goes live - every row is currently 0, not from a migration bug but because there was
+   never a way to set one until recently.
+6. **Pick the deferred Square-payment verification back up when ready**: run
+   `scripts/migrate-square-accounts.js`, connect a real Square sandbox seller, and take one real
+   payment + deposit end to end, confirming the figures in Square's own dashboard match what
+   InkBooks recorded. Nothing in the charge arithmetic has ever touched a real Square API beyond
+   the OAuth handshake itself (verified 2026-08-11). Any Square account connected before
+   2026-08-11 needs to disconnect and reconnect first to pick up the `PAYMENTS_WRITE` scope.
+7. **Once #6 is verified**: run the shop-admin migration
+   (`scripts/migrate-shop-admins-to-artists.js --dry-run` first - a `STAFF`-typed shop admin has no
+   Settings page today), drop the seven now-unread legacy `square*` fields on `Shop`, and wire the
+   `PAYMENT_RECEIVED` Auto-Response trigger to the real charge success path in
+   `routes/squarePayments.js` (the template and toggle already exist in Settings; nothing calls it
+   yet, deliberately, until #6 is trustworthy).
+8. **Wire `ClientFlagType.ensureSeeded()` into application boot** (`index.js` or another real
+   startup path), not just the dev seed scripts. On current evidence, `ClientFlagType` has zero rows
+   in production or any non-locally-seeded environment right now, which means the Client Flags
+   feature has nothing to flag with anywhere but a hand-seeded dev database.
+9. **Add a `resolveClientFlag(id)` mutation.** A manually-raised flag (e.g. `MOVED_APPOINTMENT`) has
+   no way to be marked resolved today - only the automatic `NO_SHOWED` path can resolve anything,
+   by `appointmentId`+`typeKey`, which doesn't fit a flag raised by hand.
+10. **Continue the test-coverage initiative** the personal-calendar push started: the remaining
+    `ibCalendar`/`appointments` client components (`AppointmentSlotPicker`, `DaySchedule`,
+    `DurationPicker`, `CalendarHeader`, `Month`, `ViewEventDialog`), the ~46 still-unaudited
+    `server/utils/*.js` files, and - highest priority within this item - the entire Forms feature,
+    which has zero client tests and zero server tests for its August 17 slug/default-forms half
+    specifically (the August 14 base at least has `node --check`/schema coverage; the slug-link
+    authorization logic - `updateBookingRequestFields`'s exact-key-set enforcement,
+    `getMyFormLinks`'s self-scoping - has never run against a database at all).
+11. **Smaller, lower-urgency items already on record, worth sweeping in one pass**: give
+    `computeChargeBreakdown` clamped (not raw) credit figures in its echoed result once the deposit
+    UI is built; build a lookup so a client can self-service fill out their own copy of a form
+    (`submitFormResponse`'s self-service path already works, there's just no page pointing at it);
+    revisit the reference-image-upload 400 if it recurs with an actual payload to diagnose against.
+
+Phase 0 today, if any of it is still outstanding. Phase 1 this week — it's the part where real damage is currently possible. Phase 2 the following 1-2 weeks, since it's what keeps Phase 1 fixed. Phase 3 (modernization, including the monorepo/TypeScript scaffolding that Phase 5 needs) can run in parallel with Phase 2 once the auth wrapper pattern is settled. Phase 4 (real payments) whenever you're ready to actually take deposits — see item 6 above for exactly where that stands. Phase 5 (mobile) starts once Phase 0-2 are done and the monorepo shape from Phase 3 exists — don't build a mobile UI against an API that's still wide open. Phase 6 items — tests, CI, monitoring — should be stood up incrementally starting in Phase 1, not bolted on at the end; retrofitting tests onto already-migrated code (or two clients instead of one) is much more expensive than writing them alongside the fixes.
 
 ---
 
