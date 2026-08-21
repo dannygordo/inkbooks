@@ -1834,10 +1834,18 @@ regression.
   be noticed from a receipt. Worth setting for every real shop before the charge path goes live.
 - **Nothing writes a `ShopCutRate` row automatically.** Until an admin records one, every lookup
   falls through to the connection or shop value exactly as before. Behaviour is unchanged.
-- **`S2` is unevenly implemented.** An independent artist is their own admin, but only the
-  `canManageArtist` gates honour that. The `withAuth(fn, ROLES.SHOP_ADMIN)` call sites refuse them
-  outright — an independent artist currently cannot archive their own client. Fix is a shared helper,
-  not an edit per call site.
+- ~~`S2` is unevenly implemented~~ — **stale, already fixed; this bullet should have been removed
+  when it was.** Confirmed 2026-08-21 by reading every affected file directly:
+  `hasAdminAuthority`/`assertAdminAuthority` (`utils/shop-membership.js`) is exactly the shared
+  helper this bullet asked for, and it's already wired into `archiveClient`/`unarchiveClient`/
+  `redactClient`/`updateClient` (`mutations/clients.js`), `archiveArtist`/`unarchiveArtist`
+  (`mutations/artists.js`, with its own "NO ROLE FLOOR, deliberately - DECISIONS.md S2" comment),
+  and `updateSquarePricingSettings` (`mutations/squarePricing.js`). Matches the "Done" section's
+  own "S2 is implemented" entry above - this gap and that done-item were just never reconciled.
+  The bare `SHOP_ADMIN` floors that remain elsewhere (`updateShop`, `disconnectShopSquare`,
+  `confirmShopCutPaid`, `confirmBoothRentPaid`, `createStaffAccount`, and similar) are correctly
+  left alone - each is a genuinely shop-only action with no independent-artist equivalent to grant,
+  exactly as `hasAdminAuthority`'s own header comment enumerates.
 - **The reference-image upload 400** is parked until it recurs and a payload exists. `express.json()`
   was on Express's 100kb default and is now 2mb; that is **not** confirmed as the cause.
 - **Artists who already disconnected and reconnected** have no interval history. There was nothing to

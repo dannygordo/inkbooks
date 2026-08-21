@@ -2068,17 +2068,29 @@ getting bolted onto the end of an already-long page.
   having the mutation look up and enforce the same ceiling the read path already used, rejecting
   the write outright with a `UserInputError` naming the limit, rather than silently clamping it to
   a different number the artist didn't choose.
-- **A stuck "permanently unread" conversation badge traced to `createBookingRequest` creating a
-  brand-new `Conversation` on every call**, instead of reusing an existing thread the way every
-  other conversation-opening path in the codebase already does via
-  `findOrCreateConversationForMembers`. A client submitting a second booking request to an artist
-  they'd already messaged got a second, disconnected `Conversation` for the same two people - real
-  traffic kept flowing through one of them, the other sat at whatever unread state it was last left
-  in, and since the UI renders only the other member's name (never a conversation id), the two
-  duplicates were visually indistinguishable. Fixed going forward; a new one-time script
-  (`scripts/merge-duplicate-conversations.js`) merges existing duplicates by member set, reassigning
-  every `Message`/`BookingRequest`/`SharedImage` pointer to the oldest copy and keeping whichever
-  read-state timestamp is later - written but not yet run against the real database.
+- **A "stuck at N unread forever" conversation badge, root-caused twice - the first theory was
+  wrong, and it's worth recording why.** First theory: `createBookingRequest` creating a
+  brand-new `Conversation` on every call instead of reusing an existing thread via
+  `findOrCreateConversationForMembers`, leaving two disconnected `Conversation` documents for the
+  same two people. A one-time cleanup script (`scripts/merge-duplicate-conversations.js`) was
+  written and run with `--dry-run` against the affected dev database - and found **zero** duplicate
+  member-sets, disproving the theory outright rather than confirming it. The actual cause, found
+  by a read-only diagnostic (`scripts/debug-conversation-unread.js`) that dumped the raw data and
+  ran the real `unreadCountForConversation` directly: several seeded rows in
+  `scripts/seed-large.js` (`Conversation`/`Message`/`BookingRequest`/`Project`/`Appointment`
+  timestamps) inherited a negative day-offset from a project deliberately seeded up to three weeks
+  in the *future* (`CONFIG.weeksOfFuture`, for testing upcoming bookings), producing `createdAt`
+  values dated after the actual current moment - something the real app can never do, since every
+  real mutation stamps these fields server-side at the moment of the call. A message dated in the
+  future can never register as "read," because `lastReadAt` can't exceed a date that hasn't
+  happened yet. Fixed in `seed-large.js` with a `notFound`-style clamp on the resulting `Date`
+  (not just the day-count fed into it - a first pass that clamped only the day integer still let
+  an hour-of-day jitter push a same-day row past "now"). **This never affected real production
+  data** - `merge-duplicate-conversations.js`'s own dry-run confirmed no real duplicates exist, and
+  the underlying cause was specific to how the dev/demo seed script computes dates for future-dated
+  demo bookings, not anything a real user's actions could produce. The `findOrCreateConversationForMembers`
+  reuse pattern the first theory was built on remains good practice and is unchanged; there was just
+  nothing broken for it to have caused here.
 - **`redeemGiftCard` silently under-recorded a shop's cut on shop-issued redemptions.** It only
   called `applyShopCut` inside the artist-issued branch, so a shop-issued gift card redemption
   updated the card's balance and wrote its own liability figure but never computed the session's
@@ -2127,16 +2139,20 @@ see the note above. It is not on this list at any priority, not because it was f
    toggle, not something any script here can do). Both are minutes of work with no code risk, and
    both are pure exposure until done - errors currently reported nowhere and a cluster with no
    snapshot until they're finished.
-3. **Run the outstanding one-time data script against the real database**:
-   `node scripts/merge-duplicate-conversations.js --dry-run` then for real (fixes the
-   duplicate-Conversation-from-booking-requests unread-badge bug for any account it already
-   affected - Marta's account is the confirmed case). Non-destructive and idempotent by design;
-   has never been run against a real database from the sandbox that wrote it.
-4. **Close the `S2` authorization gap**: an independent artist still cannot archive their own
-   client, because the `withAuth(fn, ROLES.SHOP_ADMIN)` call sites don't yet honour
-   `canManageArtist`'s "own their own account" exception the way other gates already do. A shared
-   helper, not a per-call-site patch. Worth doing before the next item, not after, since it's the
-   same class of gap Phase 1/2 of this roadmap already spent real effort closing everywhere else.
+3. ~~Run `merge-duplicate-conversations.js` against the real database~~ — **not needed.** Confirmed
+   August 21: the real database has no duplicate conversations, and its own `--dry-run` already
+   found zero duplicate member-sets against the affected dev database too - see the corrected bug
+   account above. The stuck-unread symptom was a `seed-large.js` future-dated-timestamp bug,
+   local-only, already fixed there.
+4. ~~Close the `S2` authorization gap~~ — **already done, verified 2026-08-21.**
+   `hasAdminAuthority`/`assertAdminAuthority` (`utils/shop-membership.js`) is already wired into
+   `archiveClient`/`unarchiveClient`/`redactClient`/`updateClient`, `archiveArtist`/
+   `unarchiveArtist`, and `updateSquarePricingSettings` - an independent artist can archive their
+   own client and themselves, and set their own tax rate, today. `HANDOFF.md`'s "Known gaps"
+   section had a stale bullet claiming otherwise; corrected there too. The bare `SHOP_ADMIN` floors
+   that remain (`updateShop`, `disconnectShopSquare`, `confirmShopCutPaid`,
+   `confirmBoothRentPaid`, `createStaffAccount`) are intentional - each is a genuinely shop-only
+   action with no independent-artist equivalent.
 5. **Set a real tax rate for every existing shop and independent artist in Settings** before any
    charge path goes live - every row is currently 0, not from a migration bug but because there was
    never a way to set one until recently.
