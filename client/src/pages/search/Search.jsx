@@ -41,16 +41,36 @@ const IMAGE_COLUMNS = [
 
 const Search = () => {
 	const [searchParams, setSearchParams] = useSearchParams();
-	const initialQuery = searchParams.get("q") || "";
+	const urlQuery = searchParams.get("q") || "";
 
-	const [inputValue, setInputValue] = useState(initialQuery);
+	const [inputValue, setInputValue] = useState(urlQuery);
 	const [runSearch, { data, loading, called }] = SearchService.useSearch();
 
 	const debounceRef = useRef(null);
-	// Skips the debounce exactly once - the query arriving in the URL (Enter, or "See all
-	// results", from the app bar) should search immediately, not wait out a 300ms delay meant for
-	// someone actively typing INTO this page's own box a moment later.
+	// Skips the debounce - the query arriving in the URL (Enter, or "See all results", from the app
+	// bar) should search immediately, not wait out a 300ms delay meant for someone actively typing
+	// INTO this page's own box a moment later. Re-armed below whenever the URL brings a NEW query,
+	// not just on the first mount.
 	const isFirstRun = useRef(true);
+
+	// `?q=` is the input of record, so it has to keep driving the box AFTER mount too. Searching
+	// again from the app bar while already standing on /search is a navigation to the same route,
+	// which re-renders this component instead of remounting it - so seeding state from the URL only
+	// in useState's initializer left the old term in the box and the old results on screen under a
+	// new ?q=. Comparing against the trimmed input is what keeps this from fighting the debounce's
+	// own setSearchParams below: when the URL changed because WE wrote it, it already matches what
+	// is typed and this is a no-op.
+	useEffect(() => {
+		setInputValue((current) => {
+			if (current.trim() === urlQuery.trim()) {
+				return current;
+			}
+			// A query that arrived from outside is the same case as a fresh landing: run it now
+			// rather than making someone wait out a debounce they didn't type into.
+			isFirstRun.current = true;
+			return urlQuery;
+		});
+	}, [urlQuery]);
 
 	useEffect(() => {
 		const trimmed = inputValue.trim();
