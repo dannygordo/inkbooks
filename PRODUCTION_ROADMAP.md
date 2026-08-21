@@ -2175,14 +2175,21 @@ see the note above. It is not on this list at any priority, not because it was f
 9. **Add a `resolveClientFlag(id)` mutation.** A manually-raised flag (e.g. `MOVED_APPOINTMENT`) has
    no way to be marked resolved today - only the automatic `NO_SHOWED` path can resolve anything,
    by `appointmentId`+`typeKey`, which doesn't fit a flag raised by hand.
-10. **Continue the test-coverage initiative** the personal-calendar push started: the remaining
-    `ibCalendar`/`appointments` client components (`AppointmentSlotPicker`, `DaySchedule`,
-    `DurationPicker`, `CalendarHeader`, `Month`, `ViewEventDialog`), the ~46 still-unaudited
-    `server/utils/*.js` files, and - highest priority within this item - the entire Forms feature,
-    which has zero client tests and zero server tests for its August 17 slug/default-forms half
-    specifically (the August 14 base at least has `node --check`/schema coverage; the slug-link
-    authorization logic - `updateBookingRequestFields`'s exact-key-set enforcement,
-    `getMyFormLinks`'s self-scoping - has never run against a database at all).
+10. ~~Continue the test-coverage initiative the personal-calendar push started: the remaining
+    `ibCalendar`/`appointments` client components..., and - highest priority within this item - the
+    entire Forms feature, which has zero client tests and zero server tests for its August 17
+    slug/default-forms half~~ — **the two highest-priority pieces of this are done, verified
+    2026-08-21.** All 6 remaining `ibCalendar`/`appointments` components have test files
+    (`AppointmentSlotPicker`, `DaySchedule`, `DurationPicker`, `CalendarHeader`, `Month`,
+    `ViewEventDialog`), and the Forms feature now has both halves covered: client
+    (`FormBuilder.test.jsx`, `FormFillOut.test.jsx`, `PublicFormBySlugFillOut.test.jsx`,
+    `BookingRequestFieldsEditor.test.jsx`, `FormsPanel.test.jsx`) and server
+    (`forms.test.js`, `formSlugLinks.test.js` covering the exact-key-set enforcement and
+    self-scoping logic that had never run against a database before). What's still genuinely open:
+    the ~46 `server/utils/*.js` files not yet audited against the 15 that have unit tests, and a much
+    larger client remainder (~27 services, ~10 utils, ~16 settings panels, ~29 pages, ~50+ other
+    components) that Danny explicitly chose to leave as backlog rather than push through in one
+    session (2026-08-21) - see `HANDOFF.md`'s matching "Known gaps" entry for the full breakdown.
 11. **Smaller, lower-urgency items already on record, worth sweeping in one pass**: give
     `computeChargeBreakdown` clamped (not raw) credit figures in its echoed result once the deposit
     UI is built; build a lookup so a client can self-service fill out their own copy of a form

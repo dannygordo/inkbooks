@@ -8,6 +8,40 @@ Last updated: 2026-08-21.
 
 ---
 
+### 2026-08-21: Client Sentry env files, two stale-doc corrections, and 17 new test files (server Forms/attention gaps + client calendar/Forms components)
+
+Six-item request in one message. Three were quick fixes/answers, already covered by earlier entries
+this same day (the duplicate-conversation and S2 corrections — see this file's own "Known gaps"
+section, both struck through with a 2026-08-21 note) or delivered directly in chat (client
+`client/.env.development`/`.env.production` with `VITE_SENTRY_DSN=` placeholders — `.env.*` writes
+are hard-blocked by this session's remote-file tooling regardless of the path, so the content was
+handed over as text for Danny to paste in himself; where to create a Sentry project). Real tax
+rates were NOT set — that needs the actual rate value(s) and scope (shop vs. independent artists)
+from Danny, which weren't supplied; `updateSquarePricingSettings` itself already has no gap.
+
+**Test coverage** — closed the two highest-priority zero-coverage areas flagged in this file's own
+"Known gaps" section: server-side `forms.test.js`, `formSlugLinks.test.js`,
+`systemMessageTemplates.test.js`, `attention.test.js` (6 of 10 exported conditions - see gaps
+section), `markConversationUnread.test.js`, `messageImageAttachments.test.js`; client-side the 6
+remaining `ibCalendar`/`appointments` components (`CalendarHeader`, `Month`, `ViewEventDialog`,
+`AppointmentSlotPicker`, `DurationPicker`, `DaySchedule`) and the 5 Forms components/pages
+(`FormBuilder`, `FormFillOut`, `PublicFormBySlugFillOut`, `BookingRequestFieldsEditor`,
+`FormsPanel`). All 17 files verified (`node --check`/`esbuild` syntax checks, plus a full
+`check-graphql-documents.js` run — 364 documents, clean) and committed (`5ddf3f7`, `c7ab0dc`).
+
+Given that the ~140-file remainder on the client (services, utils, settings panels, pages, and other
+components — see the "Known gaps" test-coverage entry for the exact breakdown) is a genuinely large
+effort, Danny was asked how to scope it and chose to **stop here for now** rather than continue
+exhaustively in this session. Server-side coverage is broad (69 test files); the client's
+highest-risk paths (money, forms, calendar, auth) are covered; the rest is a real backlog, not a
+silently-dropped requirement.
+
+**Not yet run against a live database** — same caveat as every other server test file added this
+project: this sandbox has no network to `fastdl.mongodb.org`, so `node --check`/schema validation is
+as far as verification went. A real `npm test` pass on both `client/` and `server/` is still owed.
+
+---
+
 ### 2026-08-21: Response-time ceiling was only enforced at read time - an artist could save a value above their shop's limit
 
 Reported after the first real smoke test of Feature 3 (unanswered-message nudges): logging in as an
@@ -1876,12 +1910,17 @@ regression.
 - **The 2026-08-16 `isPersonal` additions to `appointments.test.js`, and all 4 new
   `server/test/unit/*.test.js` files (`money`, `object-id`, `errors`, `pagination`), have never
   actually run either** — see Test status above for why this now includes even the pure, DB-free
-  unit tests, not just integration files. Test coverage remains a stated, explicit, multi-session V1
-  goal (client is close to caught up for the personal-calendar feature; server utils/resolvers/
-  mutations are largely still unaudited for gaps) — continue from the client's
-  `ibCalendar`/`appointments` components not yet covered (`AppointmentSlotPicker`, `DaySchedule`,
-  `DurationPicker`, `CalendarHeader`, `Month`, `ViewEventDialog`) and from auditing the remaining
-  ~46 `server/utils/*.js` files against the 14 that now have unit tests.
+  unit tests, not just integration files. ~~continue from the client's `ibCalendar`/`appointments`
+  components not yet covered (`AppointmentSlotPicker`, `DaySchedule`, `DurationPicker`,
+  `CalendarHeader`, `Month`, `ViewEventDialog`)~~ — **done 2026-08-21, all 6 now have test files**
+  (`AppointmentSlotPicker.test.jsx`, `DaySchedule.test.jsx`, `DurationPicker.test.jsx`,
+  `CalendarHeader.test.jsx`, `Month.test.jsx`, `ViewEventDialog.test.jsx`). Test coverage remains a
+  stated, explicit, multi-session V1 goal — server-side is now broad (69 test files across
+  integration+unit), and the client's highest-risk gaps (calendar, Forms, booth rent, response-time
+  settings) are closed, but a genuinely large remainder is still untested on the client: ~27
+  services, ~10 utils, ~16 settings panels, ~29 pages, and ~50+ other components. Danny explicitly
+  chose to stop there for now (2026-08-21) rather than chase full exhaustive coverage in one push —
+  treat the remainder as a real backlog, not a silently-dropped requirement.
 - ~~A shop-connected plain artist's personal expense/income ledger has no UI~~ — **resolved
   2026-08-18, see the note near the top of this file.** Was deliberate scope, changed on request.
 - **`ExpenseType`/`IncomeType` have no delete, only deactivate** — matching `ClientFlagType`'s own
@@ -1914,24 +1953,26 @@ regression.
   calls `createForm` with the source form's own fields (keys stripped, so the copy gets fresh stable
   keys of its own), there is no server `duplicateForm` mutation. Functionally complete, just worth
   knowing where the logic actually lives if it ever needs to move server-side.
-- **The Forms client code has no automated tests yet** (no `FormBuilder.test.jsx`,
+- ~~**The Forms client code has no automated tests yet** (no `FormBuilder.test.jsx`,
   `FormFillOut.test.jsx`, `PublicFormBySlugFillOut.test.jsx`, `BookingRequestFieldsEditor.test.jsx`,
-  `FormsPanel.test.jsx`, etc.), and the full client `vitest` suite could not be run end-to-end in the
-  sandbox that built any of it (times out before finishing — see Test status above). Verified instead
-  via a production `vite build`/`esbuild` bundle, `check-graphql-documents.js` (320 documents, clean),
-  and the complete pre-commit hook where applicable. Continuing the testing initiative (see the
-  `isPersonal`/unit-test gaps above) into this feature — both the 2026-08-14 Forms base and the
-  2026-08-17 default-forms/slug-link/Settings work on top of it — is real, queued work with zero
-  coverage today, not just thin coverage.
-- **The 2026-08-17 default-forms/slug-link feature has no server test coverage either** — unlike
-  `adjustments.test.js`/`clientFlags.test.js`/`expenses.test.js` (written but unrun, see above), no
-  test file was even written for `utils/form-slug.js`, `utils/shop-slug.js`, `utils/
-  public-form-lookup.js`, `utils/seed-default-forms.js`, `updateBookingRequestFields`'s exact-key-set
-  enforcement, `getMyFormLinks`'s self-scoping, or the new `getPublicArtistProfile.archived`/
-  `getPublicFormBySlug` state logic. `node --check`, a full schema rebuild, and
-  `check-graphql-documents.js` all pass, but none of the actual behavior — including the authorization
-  logic — has run against a database even once. Highest-priority gap to close before trusting this
-  feature with a real shop's forms.
+  `FormsPanel.test.jsx`, etc.)~~ — **done 2026-08-21, all 5 now exist** (drag-and-drop reordering in
+  `FormBuilder`/`BookingRequestFieldsEditor` is tested at the `arrayMove`-algorithm level rather than
+  via simulated pointer gestures, since jsdom has no layout engine for dnd-kit's collision detection
+  to run against). The full client `vitest` suite still could not be run end-to-end in this sandbox
+  (times out before finishing — see Test status above); verified instead via `esbuild` syntax checks
+  on every new file, a production `vite build` bundle, `check-graphql-documents.js`, and the complete
+  pre-commit hook.
+- ~~**The 2026-08-17 default-forms/slug-link feature has no server test coverage either**~~ — **done
+  2026-08-21**: `forms.test.js` and `formSlugLinks.test.js` now cover `createForm`/`updateForm`/
+  `publishForm`/`archiveForm`/`setFormGuestAccess`/`submitFormResponse`/`getForm`,
+  `getPublicFormBySlug`, `getPublicArtistProfile`, `getMyFormLinks`, `getForms`, and
+  `updateBookingRequestFields`'s exact-key-set enforcement, plus `systemMessageTemplates.test.js`,
+  `attention.test.js` (6 of 10 exported conditions — `unappliedDeposits`/`completedWithoutPayment`/
+  `unredeemedInvites`/`squareHealth` still need staged model fixtures, tracked separately),
+  `markConversationUnread.test.js`, and `messageImageAttachments.test.js`. All validated against a
+  real `mongodb-memory-server`-shaped schema via `check-graphql-documents.js` (362 documents, clean)
+  — still not run against an actual live database in this sandbox (no network to
+  `fastdl.mongodb.org`), same caveat as every other server test file here.
 
 ## How this repo carries context
 
