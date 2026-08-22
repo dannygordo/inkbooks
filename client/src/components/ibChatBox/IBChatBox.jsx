@@ -1,5 +1,5 @@
 import { useApolloClient, useMutation } from "@apollo/client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { IconButton, CircularProgress } from "@mui/material";
 import ImageIcon from "@mui/icons-material/Image";
 import SendIcon from "@mui/icons-material/Send";

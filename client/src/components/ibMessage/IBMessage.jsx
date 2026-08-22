@@ -1,3 +1,4 @@
+import React from 'react';
 import IBAvatar from '../inputs/IBAvatar';
 import { prettyMessageTime, fullMessageTime } from '../../utils/messageTime';
 import './ibMessage.css';

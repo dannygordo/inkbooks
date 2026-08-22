@@ -9,7 +9,7 @@ import IBImagesList from "../../components/ibImagesList/IBImagesList";
 import { useMutation } from "@apollo/client";
 import IBCardWrapper from "../../components/card/ibCard/IBCardWrapper";
 import IBInput from "../../components/inputs/IBInput";
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import IBMultilineInput from "../../components/inputs/IBMultilineInput";
 import { useAuth } from "../../context/auth";
 import moment from "moment";

@@ -1,5 +1,5 @@
 import { useParams } from "react-router-dom";
-import { useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import { useMutation } from "@apollo/client";
 import "./staffProfile.css";
 import StaffService  from "../../services/StaffService";
