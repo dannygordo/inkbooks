@@ -13,6 +13,7 @@ const SHOP_CUT_RATE_FIELDS = `
 	artistId
 	shopId
 	percent
+	compensationModel
 	effectiveFrom
 	setByUserId
 	note
@@ -32,6 +33,7 @@ export const SET_SHOP_CUT_RATE = gql`
 		$artistId: ID!
 		$shopId: ID!
 		$percent: Int!
+		$compensationModel: String
 		$effectiveFrom: DateTime
 		$note: String
 	) {
@@ -39,6 +41,7 @@ export const SET_SHOP_CUT_RATE = gql`
 			artistId: $artistId
 			shopId: $shopId
 			percent: $percent
+			compensationModel: $compensationModel
 			effectiveFrom: $effectiveFrom
 			note: $note
 		) {

@@ -53,7 +53,11 @@ describe("ResetPassword (logged out)", () => {
 	it("renders the email form with the submit button disabled until an email is entered", () => {
 		renderResetPassword();
 
-		expect(screen.getByLabelText("Email address")).toBeInTheDocument();
+		// Regex, not the exact string "Email address" - this field is required, and MUI's own
+		// InputLabel renders a required field's asterisk as part of the SAME label element (see
+		// IBPasswordField.test.jsx's matching comment, the first place this bit), so the label's
+		// real accessible text is "Email address *", not "Email address".
+		expect(screen.getByLabelText(/email address/i)).toBeInTheDocument();
 		expect(screen.getByRole("button", { name: "Send reset link" })).toBeDisabled();
 		expect(screen.getByRole("link", { name: "Back to login" })).toHaveAttribute(
 			"href",
@@ -65,7 +69,7 @@ describe("ResetPassword (logged out)", () => {
 		const user = userEvent.setup();
 		renderResetPassword();
 
-		await user.type(screen.getByLabelText("Email address"), "arya@example.com");
+		await user.type(screen.getByLabelText(/email address/i), "arya@example.com");
 
 		expect(screen.getByRole("button", { name: "Send reset link" })).not.toBeDisabled();
 	});
@@ -74,7 +78,7 @@ describe("ResetPassword (logged out)", () => {
 		const user = userEvent.setup();
 		renderResetPassword({ mocks: [resetMock("arya@example.com")] });
 
-		await user.type(screen.getByLabelText("Email address"), "arya@example.com");
+		await user.type(screen.getByLabelText(/email address/i), "arya@example.com");
 		await user.click(screen.getByRole("button", { name: "Send reset link" }));
 
 		// Reaching this text (rather than an Apollo "no matching mock" error) IS the assertion that
@@ -97,7 +101,7 @@ describe("ResetPassword (logged out)", () => {
 			mocks: [resetMock("arya@example.com", { delay: 60 * 1000 })],
 		});
 
-		await user.type(screen.getByLabelText("Email address"), "arya@example.com");
+		await user.type(screen.getByLabelText(/email address/i), "arya@example.com");
 		await user.click(screen.getByRole("button", { name: "Send reset link" }));
 
 		expect(await screen.findByRole("button", { name: "Sending..." })).toBeDisabled();
@@ -112,7 +116,7 @@ describe("ResetPassword (logged out)", () => {
 			mocks: [resetMock("nobody@example.com", { error: new Error("boom") })],
 		});
 
-		await user.type(screen.getByLabelText("Email address"), "nobody@example.com");
+		await user.type(screen.getByLabelText(/email address/i), "nobody@example.com");
 		await user.click(screen.getByRole("button", { name: "Send reset link" }));
 
 		expect(await screen.findByText("Check your email")).toBeInTheDocument();

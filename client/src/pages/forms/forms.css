@@ -221,6 +221,10 @@
 	flex-direction: column;
 	gap: 6px;
 }
+.formFieldQuestionRow {
+	display: inline-flex;
+	align-items: baseline;
+}
 .formFieldQuestion {
 	font-weight: 600;
 	font-size: 14px;

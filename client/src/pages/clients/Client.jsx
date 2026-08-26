@@ -58,18 +58,25 @@ const Client = (props) => {
 	// Hiding the panel for a legitimate independent artist would be a worse regression than
 	// occasionally letting someone who isn't allowed try and get told no: an unauthorized save
 	// fails loudly below (see handleContactFieldBlur's catch) rather than silently.
+	// `||`, not `??`: once a field's input has mounted, a null/undefined underlying value
+	// still leaves ref.current.value as a real empty string (the DOM has no way to represent
+	// an unset text input), so `?? data.field` never actually falls through post-mount and a
+	// field that was genuinely null got silently written back as "" on every unrelated blur.
+	// `||` falls back to the original value both before mount (ref undefined) and for an
+	// untouched-but-null field after mount (ref.current.value === ""), and still prefers
+	// anything actually typed.
 	const buildContactPayload = () => ({
 		id: data.getClient.id,
-		firstName: firstNameRef.current?.value ?? data.getClient.firstName,
-		lastName: lastNameRef.current?.value ?? data.getClient.lastName,
-		email: emailRef.current?.value ?? data.getClient.email,
-		phone: phoneRef.current?.value ?? data.getClient.phone,
-		address: addressRef.current?.value ?? data.getClient.address,
-		city: cityRef.current?.value ?? data.getClient.city,
-		state: stateRef.current?.value ?? data.getClient.state,
-		zip: zipRef.current?.value ?? data.getClient.zip,
-		instagram: instagramRef.current?.value ?? data.getClient.instagram,
-		facebook: facebookRef.current?.value ?? data.getClient.facebook,
+		firstName: firstNameRef.current?.value || data.getClient.firstName,
+		lastName: lastNameRef.current?.value || data.getClient.lastName,
+		email: emailRef.current?.value || data.getClient.email,
+		phone: phoneRef.current?.value || data.getClient.phone,
+		address: addressRef.current?.value || data.getClient.address,
+		city: cityRef.current?.value || data.getClient.city,
+		state: stateRef.current?.value || data.getClient.state,
+		zip: zipRef.current?.value || data.getClient.zip,
+		instagram: instagramRef.current?.value || data.getClient.instagram,
+		facebook: facebookRef.current?.value || data.getClient.facebook,
 	});
 
 	const handleContactFieldBlur = async () => {
@@ -99,8 +106,17 @@ const Client = (props) => {
 	if (loading) {
 		return <IBPageLoader />;
 	}
+	// Lazy baseline init (allowed during render for a ref - see React's own docs on this
+	// exact pattern): lastSavedContactRef starts null, and buildIdentityPayload/buildContactPayload/
+	// etc. fall back to data's own values for every ref that hasn't attached to a real input
+	// yet, which is exactly every ref on the render where data first arrives. Without this,
+	// the first blur ever - even one that changed nothing - always looks 'dirty' against a
+	// null baseline and fires a save no one asked for.
+	if (data && data.getClient && lastSavedContactRef.current === null) {
+		lastSavedContactRef.current = JSON.stringify(buildContactPayload());
+	}
 
-	if (data) {
+	if (data && data.getClient) {
 		return (
 			<div className="client">
 				<div className="clientHeader">

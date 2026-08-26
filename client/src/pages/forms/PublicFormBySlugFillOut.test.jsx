@@ -89,9 +89,14 @@ describe("PublicFormBySlugFillOut", () => {
 		expect(screen.getByText("Any allergies?")).toBeInTheDocument();
 		// The guest identity fields the page collects itself, on top of whatever FormFieldsRenderer
 		// renders for the form's own fields.
-		expect(screen.getByLabelText("First name")).toBeInTheDocument();
-		expect(screen.getByLabelText("Last name")).toBeInTheDocument();
-		expect(screen.getByLabelText("Email")).toBeInTheDocument();
+		//
+		// See PublicFormFillOut.test.jsx's matching comment on why this is `/^email/i` with an
+		// `input[type='email']` selector rather than an exact/end-anchored match - required-field
+		// asterisk plus a same-named radio option risk on that page's sibling test file, kept
+		// consistent here even though this file's own fixtures don't currently hit either case.
+		expect(screen.getByLabelText(/^first name/i)).toBeInTheDocument();
+		expect(screen.getByLabelText(/^last name/i)).toBeInTheDocument();
+		expect(screen.getByLabelText(/^email/i, { selector: "input[type='email']" })).toBeInTheDocument();
 	});
 
 	// A bad slug is a real, expected case on a public URL (typo'd link, unpublished form, an
@@ -105,7 +110,7 @@ describe("PublicFormBySlugFillOut", () => {
 			await screen.findByText("This link doesn't work. Double-check it and try again.")
 		).toBeInTheDocument();
 		// No guest fields and no form title should render at all in this state.
-		expect(screen.queryByLabelText("First name")).not.toBeInTheDocument();
+		expect(screen.queryByLabelText(/^first name/i)).not.toBeInTheDocument();
 		expect(screen.queryByText("Tattoo Consent Form")).not.toBeInTheDocument();
 	});
 
@@ -182,9 +187,9 @@ describe("PublicFormBySlugFillOut", () => {
 
 		await screen.findByText("Tattoo Consent Form");
 
-		await user.type(screen.getByLabelText("First name"), "Arya");
-		await user.type(screen.getByLabelText("Last name"), "Stark");
-		await user.type(screen.getByLabelText("Email"), "arya@example.com");
+		await user.type(screen.getByLabelText(/^first name/i), "Arya");
+		await user.type(screen.getByLabelText(/^last name/i), "Stark");
+		await user.type(screen.getByLabelText(/^email/i, { selector: "input[type='email']" }), "arya@example.com");
 		// Phone left blank on purpose - the component sends `phone || null` for an empty string.
 		await user.type(screen.getByLabelText("Any allergies?"), "None");
 

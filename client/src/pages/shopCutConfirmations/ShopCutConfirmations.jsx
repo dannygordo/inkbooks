@@ -52,7 +52,15 @@ const ShopCutConfirmations = () => {
 	}
 
 	if (loading) {
-		return <IBPageLoader />;
+		// The title renders regardless of loading state - see the matching test comment - so a
+		// shop admin lands on a page that already says what they're looking at rather than a bare
+		// spinner with no context.
+		return (
+			<div className="shopCutConfirmations">
+				<h1 className="shopCutConfirmationsTitle">Pending Shop Cut Confirmations</h1>
+				<IBPageLoader />
+			</div>
+		);
 	}
 
 	const items = (data && data.getPendingShopCutConfirmations) || [];

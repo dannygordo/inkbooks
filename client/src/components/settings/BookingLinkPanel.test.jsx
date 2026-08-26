@@ -137,7 +137,7 @@ describe("no artist to look up", () => {
 	it("renders the card without ever querying getArtist", async () => {
 		renderPanel({ user: NON_ARTIST_USER, mocks: [] });
 
-		expect(await screen.findByText("Booking link")).toBeInTheDocument();
+		expect(await screen.findByText("Booking link", { selector: "h1" })).toBeInTheDocument();
 		expect(screen.getByLabelText(/Booking link/)).toHaveValue("");
 	});
 });
@@ -149,7 +149,7 @@ describe("before a link has ever been set", () => {
 			mocks: [artistMock("artist-1", { bookingSlug: "" })],
 		});
 
-		await screen.findByText("Booking link");
+		await screen.findByText("Booking link", { selector: "h1" });
 		expect(screen.getByLabelText(/Booking link/)).toHaveValue("");
 		expect(screen.queryByRole("button", { name: "Copy link" })).not.toBeInTheDocument();
 	});
@@ -253,8 +253,15 @@ describe("saving the booking slug", () => {
 			result: {
 				data: { updateMyBookingSlug: { __typename: "Artist", id: "artist-1", bookingSlug: "new-handle" } },
 			},
-			// A brief real delay, just enough to observe the in-flight label before it resolves.
-			delay: 20,
+			// Long enough that this test's assertion runs well before it resolves - the codebase's
+			// own established convention for an in-flight assertion that never awaits the
+			// after-state (see e.g. ShopCutRatePanel.test.jsx's/ProjectSessionsList.test.jsx's own
+			// "Saving..."/"Saving..." in-flight tests). The previous `delay: 20` raced the real
+			// clock against user.click's own async overhead and MockedProvider's microtask
+			// scheduling - occasionally the mutation had already resolved (and "Save link" was
+			// back) by the time `findByRole("Saving...")` got its first poll, failing
+			// intermittently rather than deterministically.
+			delay: 60 * 1000,
 		};
 		renderPanel({
 			user: ARTIST_USER,
@@ -303,17 +310,24 @@ describe("saving the booking slug", () => {
 describe("copying the booking link", () => {
 	let writeText;
 
-	beforeEach(() => {
+	// Installs the clipboard mock - pulled out of a shared beforeEach (and called from each test
+	// below, always AFTER userEvent.setup()) because of a real ordering trap: userEvent.setup()
+	// itself unconditionally overwrites navigator.clipboard with its OWN internal stub (see
+	// node_modules/@testing-library/user-event/dist/esm/utils/dataTransfer/Clipboard.js -
+	// setupMain() calls attachClipboardStubToView(view) on every setup() call, no way to opt out).
+	// A beforeEach that defines navigator.clipboard BEFORE the test body's userEvent.setup() runs
+	// gets silently clobbered the moment setup() executes - writeText then never gets called at
+	// all (calls stay at the clipboard stub's own no-op-ish internal implementation, which still
+	// resolves successfully), which is exactly the "0 calls, but the click still succeeded" failure
+	// this test used to produce. FormsPanel.test.jsx's own copy test avoids this by calling
+	// userEvent.setup() first and only defining navigator.clipboard afterward - same fix here.
+	function mockClipboard() {
 		writeText = vi.fn().mockResolvedValue(undefined);
-		// jsdom has no clipboard implementation at all; the component guards with
-		// `navigator.clipboard?.writeText(...)`, so without this the click would silently no-op
-		// and "Copied" would never appear - not a component bug, just an unimplemented jsdom API.
-		// Same setup as FormsPanel.test.jsx's own copy test.
 		Object.defineProperty(navigator, "clipboard", {
 			value: { writeText },
 			configurable: true,
 		});
-	});
+	}
 
 	afterEach(() => {
 		delete navigator.clipboard;
@@ -321,22 +335,29 @@ describe("copying the booking link", () => {
 
 	it("copies the current slug's full booking URL and shows Copied", async () => {
 		const user = userEvent.setup();
+		mockClipboard();
 		renderPanel({ user: ARTIST_USER, mocks: [artistMock("artist-1")] });
 
-		await screen.findByLabelText(/Booking link/);
-		await user.click(screen.getByRole("button", { name: "Copy link" }));
+		// The "Copy link" button is gated on currentSlug from the artist query (see
+		// BookingLinkPanel.jsx's `{currentSlug && (...)}`), unlike the field's own label, which is
+		// present from the very first render regardless of loading state - waiting on the button
+		// itself, not just the label, is what actually guarantees the query has resolved before we
+		// click it (see FormsPanel.test.jsx's analogous copy test for the same reasoning).
+		const copyButton = await screen.findByRole("button", { name: "Copy link" });
+		await user.click(copyButton);
 
 		expect(writeText).toHaveBeenCalledWith(bookingUrl("renee-tattoo"));
 		expect(await screen.findByRole("button", { name: "Copied" })).toBeInTheDocument();
 	});
 
 	it("reverts the label back to Copy link if the clipboard write fails", async () => {
-		writeText.mockRejectedValue(new Error("denied"));
 		const user = userEvent.setup();
+		mockClipboard();
+		writeText.mockRejectedValue(new Error("denied"));
 		renderPanel({ user: ARTIST_USER, mocks: [artistMock("artist-1")] });
 
-		await screen.findByLabelText(/Booking link/);
-		await user.click(screen.getByRole("button", { name: "Copy link" }));
+		const copyButton = await screen.findByRole("button", { name: "Copy link" });
+		await user.click(copyButton);
 
 		await waitFor(() => expect(screen.getByRole("button", { name: "Copy link" })).toBeInTheDocument());
 		expect(screen.queryByRole("button", { name: "Copied" })).not.toBeInTheDocument();
@@ -346,6 +367,7 @@ describe("copying the booking link", () => {
 	// hands out a link that already works, not a draft.
 	it("still copies the saved slug even with an unsaved edit in the field", async () => {
 		const user = userEvent.setup();
+		mockClipboard();
 		renderPanel({
 			user: ARTIST_USER,
 			mocks: [artistMock("artist-1"), slugAvailableMock("draft-handle")],
@@ -354,7 +376,7 @@ describe("copying the booking link", () => {
 		const field = await screen.findByLabelText(/Booking link/);
 		await user.clear(field);
 		await user.type(field, "draft-handle");
-		await user.click(screen.getByRole("button", { name: "Copy link" }));
+		await user.click(await screen.findByRole("button", { name: "Copy link" }));
 
 		expect(writeText).toHaveBeenCalledWith(bookingUrl("renee-tattoo"));
 	});

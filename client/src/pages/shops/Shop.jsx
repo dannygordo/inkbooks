@@ -68,18 +68,25 @@ const Shop = (props) => {
 	 * page now only ever echoes the value back unchanged, the same way it already treats
 	 * shopMinimum/hourlyRate/logo/billingType/status.
 	 */
+	// `||`, not `??`: once a field's input has mounted, a null/undefined underlying value
+	// still leaves ref.current.value as a real empty string (the DOM has no way to represent
+	// an unset text input), so `?? data.field` never actually falls through post-mount and a
+	// field that was genuinely null got silently written back as "" on every unrelated blur.
+	// `||` falls back to the original value both before mount (ref undefined) and for an
+	// untouched-but-null field after mount (ref.current.value === ""), and still prefers
+	// anything actually typed.
 	const buildShopPayload = () => ({
 		id: params.shopId,
-		name: nameRef.current?.value ?? data.getShop.name,
-		email: emailRef.current?.value ?? data.getShop.email,
-		phone: phoneRef.current?.value ?? data.getShop.phone,
-		address: addressRef.current?.value ?? data.getShop.address,
-		city: cityRef.current?.value ?? data.getShop.city,
-		state: stateRef.current?.value ?? data.getShop.state,
-		zip: zipRef.current?.value ?? data.getShop.zip,
-		instagram: instagramRef.current?.value ?? data.getShop.instagram,
-		facebook: facebookRef.current?.value ?? data.getShop.facebook,
-		website: websiteRef.current?.value ?? data.getShop.website,
+		name: nameRef.current?.value || data.getShop.name,
+		email: emailRef.current?.value || data.getShop.email,
+		phone: phoneRef.current?.value || data.getShop.phone,
+		address: addressRef.current?.value || data.getShop.address,
+		city: cityRef.current?.value || data.getShop.city,
+		state: stateRef.current?.value || data.getShop.state,
+		zip: zipRef.current?.value || data.getShop.zip,
+		instagram: instagramRef.current?.value || data.getShop.instagram,
+		facebook: facebookRef.current?.value || data.getShop.facebook,
+		website: websiteRef.current?.value || data.getShop.website,
 		shopMinimum: data.getShop.shopMinimum,
 		hourlyRate: data.getShop.hourlyRate,
 		logo: data.getShop.logo,
@@ -146,8 +153,17 @@ const Shop = (props) => {
 	if (loading) {
 		return <IBPageLoader />;
 	}
+	// Lazy baseline init (allowed during render for a ref - this exact pattern is called
+	// out in React's own docs): lastSavedShopRef starts null, and the build*Payload fallbacks
+	// read from data itself for every ref that hasn't attached to a real input yet, which
+	// is every ref on the render where data first arrives. Without this, the first blur
+	// ever - even one that changed nothing - looks 'dirty' against a null baseline and
+	// fires a save no one asked for.
+	if (data && data.getShop && lastSavedShopRef.current === null) {
+		lastSavedShopRef.current = JSON.stringify(buildShopPayload());
+	}
 
-	if (data) {
+	if (data && data.getShop) {
 		return (
 			<div className="shop">
 				{redirectMessage && (

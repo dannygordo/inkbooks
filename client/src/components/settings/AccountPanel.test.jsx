@@ -283,7 +283,12 @@ describe("Calendar color - shop-scoped availability", () => {
 		});
 
 		await screen.findByText("Calendar color");
-		await user.click(screen.getByRole("button", { name: GOLDFINGER.label }));
+		// findByRole rather than getByRole: the "Calendar color" heading renders unconditionally on
+		// the very first paint, but the swatch buttons themselves only appear once the shop's taken-
+		// colors query resolves and the tagColors effect runs (see AccountPanel.jsx's own comment on
+		// why that effect is gated on `!loading` - it used to run prematurely on the first render
+		// too, which is what let a synchronous getByRole here find the swatches by coincidence).
+		await user.click(await screen.findByRole("button", { name: GOLDFINGER.label }));
 
 		await waitFor(() =>
 			expect(updateCurrentUser).toHaveBeenCalledWith(

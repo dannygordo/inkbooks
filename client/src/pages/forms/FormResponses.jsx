@@ -31,7 +31,13 @@ const formatAnswer = (field, answer) => {
 		case "multi_choice":
 			return (answer.selectedOptions || []).join(", ") || "—";
 		case "date":
-			return answer.dateValue ? moment(answer.dateValue).format("MMM D, YYYY") : "—";
+			// moment.utc, not moment - dateValue is a pure calendar date (a native <input type="date">
+			// value, sent to the server as UTC midnight - see FormFieldsRenderer.jsx's own date field),
+			// with no time-of-day meaning at all. Parsing it in the viewer's LOCAL timezone instead
+			// rolls it back a day for anyone west of UTC (a birthdate of 1995-03-02T00:00:00.000Z
+			// displays as Mar 1 for a US timezone). signedAt just below is left on local time on
+			// purpose - that ONE is a real timestamp of when signing happened, not a calendar date.
+			return answer.dateValue ? moment.utc(answer.dateValue).format("MMM D, YYYY") : "—"; // utc-ok: pure calendar date, see comment above
 		case "file_upload":
 			return (answer.fileUrls || []).length > 0 ? (
 				<>

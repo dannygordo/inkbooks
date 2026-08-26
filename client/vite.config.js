@@ -30,5 +30,15 @@ export default defineConfig({
 		environment: "jsdom",
 		globals: true,
 		setupFiles: ["./src/test/setup.js"],
+		// Trims the size of a failing assertion's printed diff (toEqual/toHaveBeenCalledWith/etc.) -
+		// without this, a mismatch against an object with several fields, or a mock called several
+		// times (see Messenger.test.jsx's IBChatBox assertion, whose failure alone printed six full
+		// call diffs), produces hundreds of lines per failure. A run with many failures then scrolls
+		// its way out of a terminal's/shell's buffer before the EARLIEST failures are even visible -
+		// see src/test/setup.js's DEBUG_PRINT_LIMIT for the matching fix on the DOM-dump side of the
+		// same problem (a failed getBy/findBy query pretty-prints the whole current DOM by default).
+		diff: {
+			truncateThreshold: 40,
+		},
 	},
 });

@@ -30,6 +30,11 @@ const {
 	markConversationRead,
 	markConversationNotified,
 } = require('../../utils/conversation-reads');
+// logNotifyOutcomes logs through this pino singleton, not console.* (see utils/logger.js) - a
+// console.warn spy never sees it. vi.mock() is still off the table for the reason above this
+// import block explains, but spying directly on the already-required singleton's method works
+// fine over CommonJS require(), since every caller shares the same cached instance.
+const logger = require('../../utils/logger');
 
 const asUser = (user) => ({ contextValue: contextWithToken(signTestToken(user)) });
 
@@ -427,8 +432,9 @@ describe('the resolver actually calls it', () => {
 		const { artist, guest, conversation } = await guestThread();
 		const server = createTestServer();
 		// warn, not log: logNotifyOutcomes uses warn when nobody was successfully notified, which
-		// is the case here precisely because mail isn't configured.
-		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		// is the case here precisely because mail isn't configured. Spying on the logger itself,
+		// not console.warn - logNotifyOutcomes calls the pino logger, which never touches console.
+		const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
 
 		try {
 			const res = await server.executeOperation(
@@ -468,7 +474,7 @@ describe('the resolver actually calls it', () => {
 		// fifteen minutes of deliberate silence on top of a message that never arrived.
 		const { artist, guest, conversation } = await guestThread();
 		const server = createTestServer();
-		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
 
 		try {
 			await server.executeOperation(

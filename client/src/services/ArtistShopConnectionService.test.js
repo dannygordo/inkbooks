@@ -16,7 +16,7 @@ import { describe, it, expect } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MockedProvider } from "@apollo/client/testing";
-import { useMutation } from "@apollo/client";
+import { gql, useMutation } from "@apollo/client";
 import ArtistShopConnectionService from "./ArtistShopConnectionService";
 
 // ---- generic harnesses -----------------------------------------------------------------------
@@ -63,6 +63,24 @@ function connection(overrides = {}) {
 
 // ---- fetchArtistShopConnections / FETCH_ARTIST_SHOP_CONNECTIONS ---------------------------------
 
+// ArtistShopConnectionService keeps this query document private inside the hook function -
+// only fetchArtistShopConnections itself is exported, no query-document constant - so this is
+// reconstructed verbatim from the service's own internal query (see RatesPanel.test.jsx's
+// identical reconstruction, done for the same reason). The old version of this test referenced
+// a nonexistent export on the service module directly, which passed undefined as MockLink's
+// `query` - checkDocument rejects that outright rather than simply failing to find a match.
+const FETCH_ARTIST_SHOP_CONNECTIONS = gql`
+	query GetArtistShopConnections($artistId: ID!) {
+		getArtistShopConnections(artistId: $artistId) {
+			id
+			artistId
+			shopId
+			status
+			rateSource
+		}
+	}
+`;
+
 describe("ArtistShopConnectionService.fetchArtistShopConnections", () => {
 	it("resolves with the artist's shop connections", async () => {
 		function Harness() {
@@ -77,7 +95,7 @@ describe("ArtistShopConnectionService.fetchArtistShopConnections", () => {
 					mocks: [
 						{
 							request: {
-								query: ArtistShopConnectionService.FETCH_ARTIST_SHOP_CONNECTIONS,
+								query: FETCH_ARTIST_SHOP_CONNECTIONS,
 								variables: { artistId: "artist-1" },
 							},
 							result: { data: { getArtistShopConnections: [connection()] } },
@@ -106,7 +124,7 @@ describe("ArtistShopConnectionService.fetchArtistShopConnections", () => {
 					mocks: [
 						{
 							request: {
-								query: ArtistShopConnectionService.FETCH_ARTIST_SHOP_CONNECTIONS,
+								query: FETCH_ARTIST_SHOP_CONNECTIONS,
 								variables: { artistId: "artist-2" },
 							},
 							result: { data: { getArtistShopConnections: [] } },

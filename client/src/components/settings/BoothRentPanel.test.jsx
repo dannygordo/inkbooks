@@ -252,7 +252,7 @@ describe("charge history", () => {
 		});
 
 		await screen.findByText("Your booth rent");
-		expect(screen.getByText("$400.00")).toBeInTheDocument();
+		expect(screen.getByText("$400.00", { selector: ".shopCutRatePercent" })).toBeInTheDocument();
 		expect(screen.getByText(/July 2026/)).toBeInTheDocument();
 		expect(screen.getByText(/due Jul 1/)).toBeInTheDocument();
 		expect(screen.getByText("Due")).toBeInTheDocument();
@@ -404,5 +404,15 @@ describe("marking a charge paid manually", () => {
 		const buttons = screen.getAllByRole("button", { name: /Mark paid|Marking…/ });
 		expect(buttons.find((b) => b.textContent === "Marking…")).toBeDisabled();
 		expect(buttons.find((b) => b.textContent === "Mark paid")).not.toBeDisabled();
+
+		// Let markPaidMock's 20ms delay actually elapse before the test (and its cleanup/unmount)
+		// ends. Left unawaited, that real setTimeout fires after the test file's jsdom environment
+		// is torn down, and handleMarkPaid's own .finally(() => setMarkingId(null)) - running
+		// against an already-unmounted component in an already-gone `window` - crashes with a
+		// "ReferenceError: window is not defined" that vitest reports as an unhandled rejection
+		// against a DIFFERENT, later test file, since by then this one has already finished.
+		await waitFor(() =>
+			expect(screen.queryByRole("button", { name: "Marking…" })).not.toBeInTheDocument(),
+		);
 	});
 });

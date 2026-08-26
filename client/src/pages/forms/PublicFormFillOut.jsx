@@ -108,16 +108,27 @@ const PublicFormFillOut = () => {
 					lastName,
 					email,
 					phone: phone || null,
-					answers: Object.values(answers).map(
-						({ fieldKey, textValue, selectedOptions, dateValue, fileUrls, signedName }) => ({
-							fieldKey,
-							textValue: textValue || null,
-							selectedOptions: selectedOptions || [],
-							dateValue: dateValue || null,
-							fileUrls: fileUrls || [],
-							signedName: signedName || null,
-						})
-					),
+					// One entry per rendered field, not Object.values(answers) - `answers` only ever
+					// gains a key once FormFieldsRenderer's onAnswerChange fires for it (see that
+					// component's own setAnswer), so a field the guest never touched at all - as
+					// opposed to one they touched and left blank - would simply be MISSING from
+					// the array rather than present with a null value. That's indistinguishable
+					// from the field not existing on this form, from assertAnswersMatchFields'
+					// point of view, and means server-side required-field rejection (the case
+					// this design leans on - see FormFieldsRenderer.jsx's header comment on the
+					// server being "the actual authority on what required means here") can never
+					// actually be reached for a field nobody interacted with.
+					answers: form.fields.map((field) => {
+						const answer = answers[field.key] || {};
+						return {
+							fieldKey: field.key,
+							textValue: answer.textValue || null,
+							selectedOptions: answer.selectedOptions || [],
+							dateValue: answer.dateValue || null,
+							fileUrls: answer.fileUrls || [],
+							signedName: answer.signedName || null,
+						};
+					}),
 				},
 			},
 		});

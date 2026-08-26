@@ -8,9 +8,11 @@ const IBPageLoader = () => {
   return (
     <div className="ibPageLoader">
         <div className="ibPageLoaderContainer">
-        <CircularProgress>
-            {APP_SETTINGS_CONSTANTS.LOADING_TEXT}
-        </CircularProgress>
+        {/* CircularProgress renders a self-contained SVG spinner and silently ignores any
+            children passed to it - LOADING_TEXT was never actually reaching the screen this
+            way. Rendered as a real sibling element instead so it's visible (and queryable). */}
+        <CircularProgress />
+        <span className="ibPageLoaderText">{APP_SETTINGS_CONSTANTS.LOADING_TEXT}</span>
         </div>
     </div>
   )

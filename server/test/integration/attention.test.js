@@ -438,11 +438,19 @@ describe('unansweredBookingRequests (pre-existing condition - regression guard)'
 	async function agedPendingPublicRequest(artistId, ageHours) {
 		const { user: client } = await createClientUser();
 		const request = await createBookingRequest(artistId, client._id);
-		await BookingRequest.findByIdAndUpdate(request._id, {
-			status: 'pending',
-			source: 'public_form',
-			createdAt: new Date(Date.now() - ageHours * 60 * 60 * 1000),
-		});
+		await BookingRequest.findByIdAndUpdate(
+			request._id,
+			{
+				status: 'pending',
+				source: 'public_form',
+				createdAt: new Date(Date.now() - ageHours * 60 * 60 * 1000),
+			},
+			// Mongoose marks a timestamps:true createdAt immutable by default - without this,
+			// findByIdAndUpdate silently drops createdAt from the update and the fixture never
+			// actually ages, which is exactly the kind of self-defeating test this regression
+			// guard exists to avoid.
+			{ overwriteImmutable: true },
+		);
 		return BookingRequest.findById(request._id);
 	}
 
@@ -479,10 +487,14 @@ describe('unansweredBookingRequests (pre-existing condition - regression guard)'
 		const request = await createBookingRequest(artist._id, client._id, {
 			source: 'public_form',
 		});
-		await BookingRequest.findByIdAndUpdate(request._id, {
-			status: 'declined',
-			createdAt: daysAgo(5),
-		});
+		await BookingRequest.findByIdAndUpdate(
+			request._id,
+			{
+				status: 'declined',
+				createdAt: daysAgo(5),
+			},
+			{ overwriteImmutable: true },
+		);
 
 		const result = await unansweredBookingRequests([String(artist._id)]);
 
@@ -496,7 +508,7 @@ describe('unansweredBookingRequests (pre-existing condition - regression guard)'
 		const { user: artist } = await createArtistUser();
 		const { user: client } = await createClientUser();
 		const request = await createBookingRequest(artist._id, client._id); // default source: artist_created
-		await BookingRequest.findByIdAndUpdate(request._id, { status: 'pending', createdAt: daysAgo(5) });
+		await BookingRequest.findByIdAndUpdate(request._id, { status: 'pending', createdAt: daysAgo(5) }, { overwriteImmutable: true });
 
 		const result = await unansweredBookingRequests([String(artist._id)]);
 
@@ -528,7 +540,7 @@ describe('attentionForUser: the merged inbox', () => {
 		// (3) An unanswered public booking request, well past the 48h cutoff.
 		const { user: guestClient } = await createClientUser();
 		const request = await createBookingRequest(artist._id, guestClient._id, { source: 'public_form' });
-		await BookingRequest.findByIdAndUpdate(request._id, { status: 'pending', createdAt: daysAgo(3) });
+		await BookingRequest.findByIdAndUpdate(request._id, { status: 'pending', createdAt: daysAgo(3) }, { overwriteImmutable: true });
 
 		const result = await attentionForUser(artist);
 

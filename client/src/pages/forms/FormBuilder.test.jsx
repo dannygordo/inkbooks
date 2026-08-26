@@ -150,15 +150,23 @@ function renderBuilder({ formId = FORM_ID, mocks = [], user = SHOP_USER, context
 	return contextValue;
 }
 
-// Renders the "new" side of the two-mode split at its real route. A second, generic route sits
-// alongside it purely to OBSERVE navigation: react-router ranks the literal "/forms/new" above the
-// dynamic "/forms/:formId" regardless of declaration order, so this stays on FormBuilder itself
-// until (and unless) handleSave's own navigate() call fires after a successful create - at which
-// point the URL becomes "/forms/<newId>" and only the marker route matches, proving the real
-// navigate call ran with the real new id rather than asserting on a mocked useNavigate.
-function NavigatedFormMarker() {
-	const { formId } = useParams();
+// Renders the "new" side of the two-mode split at its real route - the SAME single dynamic route
+// the real app uses (App.jsx has no separate literal "/forms/new" route; :formId just happens to
+// be the string "new"), because FormBuilder computes its own isNew off useParams().formId itself
+// (`formId === "new"`) - a literal "/forms/new" route match provides no :formId param at all, so
+// isNew would read as false and the "new" tests would exercise the wrong half of the component's
+// two-mode split entirely. FormBuilderOrMarker picks between FormBuilder and a plain marker
+// component off that SAME param, purely to OBSERVE navigation: it renders FormBuilder while
+// formId is "new", and switches to the marker the moment handleSave's own navigate() call lands
+// on the real new id - proving the real navigate call ran, rather than asserting on a mocked
+// useNavigate.
+function NavigatedFormMarker({ formId }) {
 	return <div data-testid="navigated-form">{formId}</div>;
+}
+
+function FormBuilderOrMarker() {
+	const { formId } = useParams();
+	return formId === "new" ? <FormBuilder /> : <NavigatedFormMarker formId={formId} />;
 }
 
 function renderNewFormBuilder({ mocks = [], user = SHOP_USER, contextOverrides = {} } = {}) {
@@ -168,8 +176,7 @@ function renderNewFormBuilder({ mocks = [], user = SHOP_USER, contextOverrides =
 			<MockedProvider mocks={mocks}>
 				<AuthContext.Provider value={contextValue}>
 					<Routes>
-						<Route path="/forms/new" element={<FormBuilder />} />
-						<Route path="/forms/:formId" element={<NavigatedFormMarker />} />
+						<Route path="/forms/:formId" element={<FormBuilderOrMarker />} />
 					</Routes>
 				</AuthContext.Provider>
 			</MockedProvider>

@@ -181,9 +181,18 @@ describe("populated", () => {
 		const dashboard = await screen.findByTestId("client-dashboard-stub");
 		expect(dashboard).toHaveTextContent("dashboard for client-1");
 		expect(dashboard).toHaveTextContent("isSelf=false");
+		// React invokes function components as Component(props, secondArg); for a plain function
+		// component secondArg is a literal `undefined`, not an omitted argument (confirmed against
+		// react-dom's own source - see Messenger.test.jsx's matching note, which hit the same thing
+		// against IBChatBox). expect.anything() explicitly refuses to match null/undefined, so pairing
+		// it with that second positional slot always fails. Dropping the second argument doesn't fix it
+		// either: vitest's toHaveBeenCalledWith does NOT ignore a trailing undefined call argument the
+		// way toEqual ignores undefined object properties, so a one-argument matcher against the real
+		// (props, undefined) call still reports a length mismatch. Assert the second argument for what
+		// it actually is instead: a literal undefined.
 		expect(ClientDashboard).toHaveBeenCalledWith(
 			expect.objectContaining({ clientId: "client-1", isSelf: false }),
-			expect.anything(),
+			undefined,
 		);
 	});
 

@@ -4,7 +4,153 @@
 has not been verified. `DECISIONS.md` is *rules* — the settled calls and why. They change at
 different rates, which is why they are separate files.
 
-Last updated: 2026-08-21.
+Last updated: 2026-08-26.
+
+---
+
+### 2026-08-26: Three real test-failure batches fixed (48 failures/exceptions total), and the client component test-coverage backlog is now fully written
+
+Danny pasted three successive real `vitest` runs from his machine this round; each was fixed
+directly against the actual failure output (never run from this sandbox — see Test status below).
+48 distinct failures/exceptions closed across 12 test files plus `client/src/test/setup.js`:
+
+- **Delay-race flakiness** (`ArchiveControl.test.jsx` "Restoring…"/"Archiving…",
+  `ShopCutRatePanel.test.jsx` "Confirming…", `IBUpdatePassword.test.jsx`'s loading spinner): a
+  `delay: 20` mock could resolve before a `findByRole`-based in-flight assertion ran, on a loaded
+  machine (100-130s+ per test file this round). Any test that never checks the resolved state now
+  uses `delay: 60 * 1000` (removes the race outright, doesn't just narrow it); `IBUpdatePassword`,
+  which does need eventual resolution, uses `delay: 300` instead.
+- **`getByText` ambiguity, three distinct shapes**: the same value rendered in two places
+  (disambiguated with a `{ selector }` option); MUI's outlined-variant label duplicating its text
+  into both a real `<label>` and its notched-outline `<span>` (same fix); and text split across a
+  sibling text node next to an element (`<strong>40%</strong> since Jan 1, 2026` — the date is a
+  separate text node a regex `getByText` can't span), fixed by querying the `<strong>` and
+  asserting on `.closest("p")` with `toHaveTextContent`.
+- **`getByRole("button")` ambiguity** from MUI Chips/Fabs/IconButtons all rendering
+  `role="button"` — fixed with `getByRole("button", { name })` where there's an accessible name,
+  or `getByTestId("<IconName>Icon").closest("button")` for icon-only buttons.
+- **`render(...)`'s return value silently dropped** in two test helpers
+  (`ArchiveControl.test.jsx`, `ShopCutPayoutList.test.jsx`), leaving `container: undefined` for
+  callers — fixed by capturing and returning it.
+- **`user.upload()` conflicting with a component that also resets the file input's own `.value`**
+  (`IBImagesUploadForm.test.jsx`) — threw `TypeError: Cannot use 'in' operator...`. Fixed by
+  bypassing `user.upload()` entirely: `Object.defineProperty(input, "files", {...});
+  fireEvent.change(input)`.
+- **`user.clear()` immediately re-rendering a controlled field's falsy-fallback default** before
+  the next `user.type()` could run (`AccountWizards.test.jsx`'s booking-slug field) — fixed with
+  `user.tripleClick()` + `user.keyboard()` instead of clear-then-type.
+- **Native HTML `required`/`min`/`max` silently blocking a click-driven `submit` event** inside a
+  form without `noValidate` (`BookSessionDatesForm.test.jsx`, matching an existing documented
+  convention in `ShopCutRatePanel.test.jsx`) — fixed with `fireEvent.submit(form)` to exercise the
+  component's own JS validation directly.
+- **A dual-representation control** (`DurationPicker`'s numeric input *and* slider thumb sharing
+  one `aria-label="Hours"`) made `getByLabelText` ambiguous — fixed with
+  `getByRole("spinbutton", { name: "Hours" })`.
+- **Two `BookSessionDatesForm.test.jsx` tests wrongly assumed a cash deposit needs no explicit
+  payment-method selection** — the component's `needsMethod` logic requires an explicit Cash/Card
+  click for *any* deposit amount, cash included (confirmed by the component's own header comment:
+  "No default, deliberately"). Fixed the tests, not the component.
+- **`client/src/test/setup.js` needed a `scrollIntoView` polyfill** for jsdom (`IBChatBox.jsx`
+  calls it unconditionally on mount). First attempt polyfilled it on
+  `window.HTMLElement.prototype`, which shadowed `IBAlert.test.jsx`'s own pre-existing
+  `Element.prototype.scrollIntoView = vi.fn()` spy (own-property lookup on the subclass wins over
+  the superclass), breaking a previously-green test. Retargeted to `Element.prototype` directly —
+  a regression introduced and fixed within this same round, not one Danny hit on his own.
+- **One production fix landed mid-round from an earlier agent crash**, independently verified (not
+  authored) before being reported rather than assumed correct or reverted:
+  `ShopCutRateService.js` was missing `compensationModel` on `SHOP_CUT_RATE_FIELDS`/
+  `SET_SHOP_CUT_RATE`'s variables. Cross-checked against `typeDefs.js`,
+  `resolvers/shopCutRates.js`, and `models/ShopCutRate.js` — a real, previously-silent bug (a
+  booth-rent artist's compensation model was never persisted, always defaulting to `PERCENTAGE`).
+
+**The client component test-coverage backlog is now fully written.** All 47 remaining
+`components/**/*.jsx` files flagged in the 2026-08-25 entry's Known-gaps note now have a matching
+test file (dashboards, image upload/list, messaging, forms-adjacent pieces, wizards,
+notifications, and the long tail of smaller components) — currently untracked/uncommitted, see
+`git status` for the full list. `utils/appChrome.js` was confirmed to already have coverage (an
+earlier agent had correctly skipped it; the doc calling it out was stale, not the code).
+
+**None of these new files, nor this round's fixes, have been run against a real `vitest` yet** —
+only Babel-syntax-checked (parse/transpile only; catches no runtime or assertion errors). Danny
+needs to run the real suite and paste results before any of this is genuinely done — see Test
+status below, unchanged in kind from every prior round.
+
+**One open lead, not yet investigated:** the agent that wrote the final three files
+(`ClientDashboard.test.jsx`, `ProjectSessionsList.test.jsx`, `SessionDetail.test.jsx`) flagged
+that `expect.anything()` nested inside a `MockedProvider` mock's `request.variables` does not work
+as a wildcard — Apollo's mock matcher (`@wry/equality`'s `equal()`) doesn't understand Jest/Vitest
+asymmetric matchers, so a mock needs a top-level `variableMatcher` function instead (a sibling
+property to `request`, not nested inside it) to match a call with a non-deterministic variable
+(e.g. a `Date.now()`-stamped field). Its own 3 new files use the correct pattern. Whether any
+*pre-existing* test file elsewhere in the suite relies on the broken pattern — and is either
+failing for the wrong reason or silently not testing what it claims to — has not been checked.
+
+---
+
+### 2026-08-25: Both suites confirmed green on a real machine, and this file catches up on four days of undocumented progress
+
+**Both suites are green.** Danny ran `cd server && npm test` and `cd client && npm test` for real
+this round and reported both green - the "Run it once, for real" item at the top of Test status
+below is done, on the actual codebase (not the 2026-08-19 report, which predates the work described
+below). Getting the client suite there took two rounds of real bug-hunting against pasted failure
+output, none of it hypothetical:
+
+- `BookingLinkPanel.test.jsx`'s three clipboard-copy tests were defining `navigator.clipboard`'s
+  mock in a shared `beforeEach`, which runs BEFORE each test body's own `userEvent.setup()` call -
+  and `userEvent.setup()` unconditionally installs its own internal clipboard stub on
+  `navigator.clipboard`, silently clobbering the mock (confirmed by reading `user-event`'s own
+  source, `setupMain()` → `attachClipboardStubToView`). The click still flipped the button to
+  "Copied" because it was hitting user-event's own stub, which always resolves - not a component
+  bug. Fixed by moving the mock setup to after `userEvent.setup()` in each test, matching
+  `FormsPanel.test.jsx`'s own copy test, which already had this right.
+- `RatesPanel.test.jsx`'s "sends null for a rate cleared down to an empty string" test: neither
+  `userEvent.clear()` nor `fireEvent.change()`/`fireEvent.input()` reliably reaches this field's
+  `onChange` - confirmed with a standalone Node repro (Babel-transpiled JSX loaded straight from
+  `node_modules`, real MUI `TextField` + real `MockedProvider`) that both bulk-value-replacement
+  approaches leave `onChange` uncalled on this uncontrolled, late-hydrated number input, while real
+  keystrokes work every time. Fixed by backspacing the field's actual character count via
+  `user.keyboard()` instead of either shortcut.
+- `AccountPanel.jsx`: the tag-colors `useEffect` ran once before the shop's taken-colors query
+  resolved, transiently showing a colleague's already-taken color as available. Gated on `!loading`
+  - a real app bug, not a test bug - which then required updating `AccountPanel.test.jsx`'s "picking
+  an available color" test off a stale synchronous `getByRole` (it had only ever passed because of
+  the bug's premature render).
+- `ExpenseTypesPanel.test.jsx`/`IncomeTypesPanel.test.jsx`: a `delay: 10` mock was too short for
+  `findByRole` to reliably catch the in-flight "Adding..." state; bumped to `delay: 50`.
+- `firebase/firebase.js` called `getAnalytics(app)` unconditionally at module load, which schedules
+  an internal gtag-script-detection check that can outlive a test file's jsdom teardown, throwing
+  "window is not defined" as an unhandled rejection (first seen via `Settings.test.jsx`, though the
+  dangling promise is created by every test that transitively imports this module through
+  `AuthContext`). `analytics` is never imported anywhere else in the app, so it's now skipped
+  entirely under `import.meta.env.MODE === "test"` - no behavior change outside tests.
+
+**This file was four days stale and had drifted from the actual repo.** Its own last real update was
+committed 2026-08-21 19:36, but three more days of work landed after that without a matching
+doc pass:
+
+- `resolveClientFlag(flagId)` mutation shipped (the "missing other half of raiseClientFlag" gap
+  below is resolved) with a per-row Resolve button on `ClientDashboard.jsx`.
+- Self-service form fill-out shipped: `getMyFillableForms` + a loosened `getForm`, scoped via
+  `clientBelongsToFormOwner` (`utils/shop-membership.js`), so a client can now see and fill out
+  published forms from their own dashboard. Closes the "no UI yet" gap below. While wiring it, a
+  real authorization gap surfaced and was fixed: `submitFormResponse`'s self-service branch had no
+  ownership check at all, so any authenticated client could submit a response against any published
+  form on the platform - now gated by the same `clientBelongsToFormOwner` check.
+- `ClientFlagType.ensureSeeded()` at boot and `computeChargeBreakdown`'s clamped credit figures -
+  both flagged below as open gaps - turned out to already be done; the doc was stale, not the code.
+- **The client test-coverage backlog is now almost entirely closed.** A series of batches
+  (`7786262` ClientService, `c1a85f2` all remaining services/utils, `39ba717` all remaining settings
+  panels, `7d18cdd` 14 pages, `36a6c3b` FormService/theme/all remaining pages, `b3307a6`
+  CreateArtist/BookingSlugField/EntityList) closed the ~140-file remainder this file's 2026-08-21
+  entry left as backlog. A directory scan today confirms: every `services/*.js`, every `utils/*.js`
+  except `appChrome.js`, every `components/settings/*.jsx`, and every `pages/*/*.jsx` now has a
+  matching test file. What's left is ~48 other `components/**/*.jsx` files (dashboards, image
+  upload/list, forms fields, modals, notifications, and similar) plus `utils/appChrome.js` - see
+  Known gaps below for specifics; this is the one item still being worked through.
+
+**Still not run against a live database from this sandbox** - unchanged limitation, no route to
+`fastdl.mongodb.org` here. Everything server-side added since 2026-08-21 (the two mutations above)
+was `node --check`ed and schema-validated only until Danny's real run above.
 
 ---
 
@@ -1783,11 +1929,12 @@ executable bit, git skips it with a hint on stderr rather than an error — whic
 
 ## Next
 
-**0 and 1 below (the shop-admin migration, and a real Square payment) are explicitly deferred as of
-2026-08-18 — Danny said not to worry about either yet and will say when to pick them back up.** Left
-written out below rather than deleted, since the "Run it once, for real" suite item is now reported
-done (see 2026-08-18 note above) and the rest of each item's own detail is still accurate and will
-still be needed whenever this is picked up again.
+**0 and 1 below (the shop-admin migration, and a real Square payment) are explicitly deferred —
+reconfirmed 2026-08-25: Danny's plan is to pick this back up as the last item before starting the
+mobile applications, not before.** Left written out below rather than deleted, since the "Run it
+once, for real" suite item is now reported done for both suites (see the 2026-08-25 entry above,
+which supersedes the 2026-08-18/19 reports below) and the rest of each item's own detail is still
+accurate and will still be needed whenever this is picked up again.
 
 0. ~~Run both suites on a real machine~~ — **done, reported green 2026-08-18** (see above). **Then
    the shop-admin migration** — deferred, not urgent: `node scripts/migrate-shop-admins-to-artists.js
@@ -1834,14 +1981,10 @@ are all done — see Done above. What's actually left before this app could take
 above, not because there's other feature work queued ahead of them. A resolve-by-id mutation for a
 manually-raised client flag is a real, stated gap (see Known gaps) but nobody has asked for it yet.
 
-**New candidate item, found 2026-08-18: wire `ClientFlagType.ensureSeeded()` into application boot
-(`index.js`), or some other real call site outside the dev seed scripts.** It's currently called from
-nowhere except `scripts/seed.js`/`scripts/seed-large.js` (both fixed today — see above), despite the
-model's own header comment describing it as safe "on every boot." On the evidence gathered fixing the
-seed scripts, this means `ClientFlagType` likely has zero rows in production and any other
-non-locally-seeded environment right now — the Client Flags feature has nothing to flag with. Not
-independently confirmed against a real deploy, and not touched here since it's a production boot-code
-change, out of scope of "fix the seed scripts." Worth a look next time client flags come up.
+~~**New candidate item, found 2026-08-18: wire `ClientFlagType.ensureSeeded()` into application
+boot.**~~ — **done, confirmed 2026-08-21/22**: `server/index.js` calls
+`await ClientFlagType.ensureSeeded()` at boot today. The doc calling this out as still-open was
+stale, not the code.
 
 **New candidate item, found 2026-08-18: wire the `PAYMENT_RECEIVED` Auto-Response trigger to an
 actual auto-fire hook once real Square payments (item 1 above) are picked back up.** The trigger
@@ -1884,11 +2027,9 @@ regression.
   was on Express's 100kb default and is now 2mb; that is **not** confirmed as the cause.
 - **Artists who already disconnected and reconnected** have no interval history. There was nothing to
   migrate — the old model overwrote it. New intervals start from the change.
-- **`computeChargeBreakdown` echoes raw credit inputs, not the clamped ones.** A negative
-  `depositCreditCents` is correctly ignored by the arithmetic but returned unchanged in the result,
-  so a confirmation screen rendering that field directly would show a negative credit beside an
-  unreduced total. Pinned by a test that documents current behaviour. No caller passes a negative
-  today; worth changing to echo the clamped figures when the deposit UI is built.
+- ~~`computeChargeBreakdown` echoes raw credit inputs, not the clamped ones~~ — checked
+  2026-08-21/22 while closing an unrelated pair of items: already echoes the clamped figures. The
+  roadmap was stale on this one, not the code — no change needed.
 - **The full client test suite has not been run end to end since 2026-08-11**, and could not be
   from the environment that did this round of work — see Test status above for why. Every file the
   work actually touched was spot-checked and passes; the untouched majority is unobserved, not
@@ -1898,29 +2039,39 @@ regression.
   collection `paginate()` can query with its own skip/limit. Projects and Appointments are NOT in
   this gap any more (see Done below) — this is now the one remaining list on that page that isn't
   a real server-paged connection, and it's also the smallest of the three in practice.
-- **A manually-raised client flag has no resolve path.** `resolveClientFlagsForAppointment` only
-  resolves by `appointmentId` + `typeKey`, which is what the automatic `NO_SHOWED` path needs and
-  all it was built for — there's no "resolve this one row by its own id" function, so there's
-  nothing for a `resolveClientFlag` mutation to wrap yet. A manually-raised flag (e.g.
-  `MOVED_APPOINTMENT`) is permanent on today's UI once written. Genuine gap, not an oversight in
-  the GraphQL layer added 2026-08-15 — the read/raise surface is what was asked for.
+- ~~A manually-raised client flag has no resolve path~~ — **done 2026-08-21/22**:
+  `resolveClientFlag(flagId)` mutation ships, wired into `ClientDashboard.jsx` with a per-row
+  Resolve button. Not restricted to manually-raised flags — an admin can also clear a stale
+  automatic `NO_SHOWED` flag by hand this way, since resolving is a lower-stakes act than raising.
 - **`adjustments.test.js`, `clientFlags.test.js`, and `expenses.test.js` (added 2026-08-15) have
   never actually run** — see Test status above. They parse and their GraphQL documents check out
   against the schema, but nothing has executed the assertions inside them yet.
 - **The 2026-08-16 `isPersonal` additions to `appointments.test.js`, and all 4 new
   `server/test/unit/*.test.js` files (`money`, `object-id`, `errors`, `pagination`), have never
   actually run either** — see Test status above for why this now includes even the pure, DB-free
-  unit tests, not just integration files. ~~continue from the client's `ibCalendar`/`appointments`
   components not yet covered (`AppointmentSlotPicker`, `DaySchedule`, `DurationPicker`,
   `CalendarHeader`, `Month`, `ViewEventDialog`)~~ — **done 2026-08-21, all 6 now have test files**
   (`AppointmentSlotPicker.test.jsx`, `DaySchedule.test.jsx`, `DurationPicker.test.jsx`,
   `CalendarHeader.test.jsx`, `Month.test.jsx`, `ViewEventDialog.test.jsx`). Test coverage remains a
   stated, explicit, multi-session V1 goal — server-side is now broad (69 test files across
-  integration+unit), and the client's highest-risk gaps (calendar, Forms, booth rent, response-time
-  settings) are closed, but a genuinely large remainder is still untested on the client: ~27
-  services, ~10 utils, ~16 settings panels, ~29 pages, and ~50+ other components. Danny explicitly
-  chose to stop there for now (2026-08-21) rather than chase full exhaustive coverage in one push —
-  treat the remainder as a real backlog, not a silently-dropped requirement.
+  integration+unit). ~~a genuinely large remainder is still untested on the client: ~27 services,
+  ~10 utils, ~16 settings panels, ~29 pages~~ — **done 2026-08-22**, closed by a run of batches
+  (commits `7786262`, `c1a85f2`, `39ba717`, `7d18cdd`, `36a6c3b`, `b3307a6` — see git log for the
+  exact scope of each). A directory scan on 2026-08-25 confirms every `services/*.js`, every
+  `utils/*.js` except `appChrome.js`, every `components/settings/*.jsx`, and every `pages/*/*.jsx`
+  now has a matching test file. ~~**What's actually still open**: `utils/appChrome.js`, and ~48
+  other `components/**/*.jsx` files — mostly dashboards (`ArtistPerformancePanel`,
+  `ClientDashboard`, `ShopCutPayoutList`, `ShopCutRatePanel`), image upload/list
+  (`IBImagesUpload*`, `IBImagesList*`, `IBImageTagEditor`), messaging (`IBChatBox`,
+  `IBConversation`, `IBMessage`, `IBTagsWidget`), forms-adjacent pieces (`FormFieldsRenderer`,
+  `FormFieldEditorRow`, `FormField`), wizards (`EntityWizard`, `AccountWizards`), notifications
+  (`NotificationItem`, `NotificationSettingsPanel`, `NotificationBell`),
+  `ShopAnalyticsPanel`/`StatCard`, and a long tail of smaller single-purpose components (`IBModal`,
+  `IBAlert`, `Pager`, `Sidebar`, `CropEasy`, and similar). Being worked through now, in waves,
+  without pausing between them.~~ — **all 47 files now have a test file written, done
+  2026-08-26** (see that entry above). Uncommitted and never run against a real `vitest` yet —
+  only Babel-syntax-checked. This is the one item still needing a real test run before it can be
+  called closed.
 - ~~A shop-connected plain artist's personal expense/income ledger has no UI~~ — **resolved
   2026-08-18, see the note near the top of this file.** Was deliberate scope, changed on request.
 - **`ExpenseType`/`IncomeType` have no delete, only deactivate** — matching `ClientFlagType`'s own
@@ -1935,15 +2086,12 @@ regression.
   separate, deferred future effort at design time. Treat today's signature field as "meaningful
   e-signature consent," not as strong biometric proof of identity, when deciding what a shop can
   rely on it for.
-- **Self-service form fill-out (a client filling out their own copy of a form from their own
-  account) has no UI yet.** `submitFormResponse`'s self-service path — an authenticated caller with
-  no `clientId`, resolving their own `Client` record — is fully built and works today via any
-  GraphQL client; `FormFillOut.jsx` supports it (it's just `clientId` omitted). What's missing is a
-  surface: `ClientDashboard.jsx`'s new "Forms" section only renders on the staff/artist view
-  (`!isSelf`), gated there because it fetches forms via `businessScopeFor(user)`, which resolves to
-  the LOGGED-IN staff/artist's own scope — nonsensical for a client, who has no shop/artist scope of
-  their own to look forms up by. Building this needs a different lookup (which shop/artist actually
-  owns forms this specific client should see), which wasn't scoped for this pass.
+- ~~Self-service form fill-out has no UI yet~~ — **done 2026-08-21/22**: `getMyFillableForms` +
+  a loosened `getForm`, scoped via `clientBelongsToFormOwner` (`utils/shop-membership.js` — a
+  client's own shopIds, or artists they share a `Project` with), gives `ClientDashboard.jsx` a real
+  client-facing Forms surface. Fixing this also surfaced and closed a real gap:
+  `submitFormResponse`'s self-service branch previously resolved a form by bare `formId` with no
+  ownership check at all — fixed with the same `clientBelongsToFormOwner` guard.
 - **`getFormAnalytics`'s per-field breakdown reads the LIVE `Form.fields`, not each response's own
   `fieldsSnapshot`.** A question that's since been deleted from the form won't get its own analytics
   row even though old responses still hold that answer — visible in the raw response list

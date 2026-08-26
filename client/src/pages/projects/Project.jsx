@@ -243,13 +243,20 @@ const Project = (props) => {
 	 * re-sent each time - so a stale value in one field could overwrite a fresh one saved from
 	 * another.
 	 */
+	// `||`, not `??`: once a field's input has mounted, a null/undefined underlying value
+	// still leaves ref.current.value as a real empty string (the DOM has no way to represent
+	// an unset text input), so `?? data.field` never actually falls through post-mount and a
+	// field that was genuinely null got silently written back as "" on every unrelated blur.
+	// `||` falls back to the original value both before mount (ref undefined) and for an
+	// untouched-but-null field after mount (ref.current.value === ""), and still prefers
+	// anything actually typed.
 	const buildDetailsPayload = () => ({
 		id: data.getProject.id,
-		title: titleRef.current?.value ?? data.getProject.title,
-		description: descriptionRef.current?.value ?? data.getProject.description,
-		placement: placementRef.current?.value ?? data.getProject.placement,
-		size: sizeRef.current?.value ?? data.getProject.size,
-		palette: selectPaletteRef.current?.value ?? data.getProject.palette,
+		title: titleRef.current?.value || data.getProject.title,
+		description: descriptionRef.current?.value || data.getProject.description,
+		placement: placementRef.current?.value || data.getProject.placement,
+		size: sizeRef.current?.value || data.getProject.size,
+		palette: selectPaletteRef.current?.value || data.getProject.palette,
 		clientId: data.getProject.clientId,
 		artistId: data.getProject.artistId,
 		status: data.getProject.status,
@@ -457,8 +464,17 @@ const Project = (props) => {
 	if (loading) {
 		return <IBPageLoader />;
 	}
+	// Lazy baseline init (allowed during render for a ref - this exact pattern is called
+	// out in React's own docs): lastSavedDetailsRef starts null, and the build*Payload fallbacks
+	// read from data itself for every ref that hasn't attached to a real input yet, which
+	// is every ref on the render where data first arrives. Without this, the first blur
+	// ever - even one that changed nothing - looks 'dirty' against a null baseline and
+	// fires a save no one asked for.
+	if (data && data.getProject && lastSavedDetailsRef.current === null) {
+		lastSavedDetailsRef.current = JSON.stringify(buildDetailsPayload());
+	}
 
-	if (data) {
+	if (data && data.getProject) {
 		return (
 			<div className="project">
 				<div className="projectTitleContainer">

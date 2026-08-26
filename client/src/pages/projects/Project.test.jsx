@@ -833,9 +833,16 @@ describe("Details autosave", () => {
 	it("does not resend an unchanged payload on a second blur", async () => {
 		const user = userEvent.setup();
 		const base = project();
+		// The baseline this dirty-check compares against is seeded from the fetched project the
+		// moment it loads (see Project.jsx's own lazy-init comment) - a blur that changes nothing
+		// is already a no-op on the very FIRST blur, not just the second. So this test has to
+		// actually change the field to get a send at all; it was previously written expecting an
+		// untouched first blur to fire (autosaving the same value right back), which is exactly the
+		// no-op-send bug that baseline exists to prevent - see StaffProfile.test.jsx's matching
+		// "does not fire a mutation on blur when nothing changed" test for the other half of this.
 		const payload = {
 			id: "project-1",
-			title: base.title,
+			title: "Half sleeve - koi, revised",
 			description: base.description,
 			placement: base.placement,
 			size: base.size,
@@ -849,15 +856,20 @@ describe("Details autosave", () => {
 			mocks: [
 				projectMock("project-1", base),
 				sessionsMock("project-1"),
-				// Only ONE update mock - MockedProvider consumes it on the first blur. If the second,
-				// identical blur tried to save again, there would be no matching mock left and the
-				// save would surface as an error instead of staying "saved".
-				updateProjectMock(payload, updateProjectResult(base)),
+				// Only ONE update mock - MockedProvider consumes it on the first (actually changed)
+				// blur. If the second, identical blur tried to save again, there would be no
+				// matching mock left and the save would surface as an error instead of staying
+				// "saved".
+				updateProjectMock(
+					payload,
+					updateProjectResult(base, { title: "Half sleeve - koi, revised" }),
+				),
 			],
 		});
 
 		const titleField = await screen.findByLabelText("Title");
-		titleField.focus();
+		await user.clear(titleField);
+		await user.type(titleField, "Half sleeve - koi, revised");
 		await user.tab();
 		await waitFor(() => expect(screen.getByText("All changes saved")).toBeInTheDocument());
 

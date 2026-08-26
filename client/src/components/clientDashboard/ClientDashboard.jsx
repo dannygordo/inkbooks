@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useMutation } from "@apollo/client";
+import { useMutation, makeReference } from "@apollo/client";
 import moment from "moment";
 import { Button } from "@mui/material";
 import { Add } from "@mui/icons-material";
@@ -220,11 +220,22 @@ const ClientDashboard = ({ clientId, isSelf = false }) => {
 					if (!newFlag) {
 						return;
 					}
-					// toReference(..., true) both writes newFlag into the normalized store as its own
-					// ClientFlag:<id> entity (it already has __typename + id from the mutation
-					// response) and hands back the Reference this field wants, rather than embedding
-					// the raw object where a reference belongs.
-					const newFlagRef = cache.toReference(newFlag, true);
+					// `cache.toReference` was removed from ApolloCache's public API somewhere
+					// short of the 3.14.1 this project is now on (it's still documented in older
+					// versions' docs, which is where this originally came from) - calling it threw
+					// "cache.toReference is not a function" on every raise, which the mutation's
+					// own promise then rejected with, so the form never closed and every flag
+					// silently failed to save. The mutation response is already normalized into
+					// the store automatically by the time `update` runs (it has __typename + id,
+					// same as before) - cache.identify + makeReference is the same two-step this
+					// codebase's own handleResolveFlag below does implicitly via readField, just
+					// spelled out to build the Reference this field wants instead of embedding the
+					// raw object where a reference belongs.
+					const newFlagId = cache.identify(newFlag);
+					if (!newFlagId) {
+						return;
+					}
+					const newFlagRef = makeReference(newFlagId);
 					cache.modify({
 						id: cache.identify({ __typename: "Client", id: clientId }),
 						fields: {

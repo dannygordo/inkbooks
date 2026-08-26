@@ -2118,21 +2118,21 @@ for real before trusting anything in this section, not a formality.
 
 ---
 
-## Suggested sequencing (updated August 21, 2026)
+## Suggested sequencing (updated August 25, 2026)
 
 The CSS Modules/Tailwind migration discussed earlier in this doc is explicitly off the table -
 see the note above. It is not on this list at any priority, not because it was forgotten.
 
-1. **Run both test suites for real, on a real machine, right now.** `cd server && npm test`,
-   `cd client && npm test`. The last confirmed full green run of either suite was August 19
-   (server: 781/781 across 52 files). Everything shipped since then - the five-feature batch's own
-   tests (never run against it), the forms slug-link work, the personal-calendar `isPersonal`
-   additions, and all of August 20-21's fixes (messenger, image uploads, shared images,
-   search-over-tags, the response-time write-time fix) - is verified in the sandbox that built it
-   only as far as `node --check`/`esbuild`/schema rebuild/`check-graphql-documents.js`. Every real
-   run so far has found at least one genuine, previously-shipped bug a syntax check missed (the
-   `redeemGiftCard` shop-cut gap, two `AutoResponse` schema-hook crashes, the `AppointmentWizard`
-   step-leak). Treat this as the single highest-priority item, ahead of any new feature work.
+1. ~~Run both test suites for real, on a real machine, right now~~ — **done, both green, August
+   25.** Getting the client suite there found (and fixed) five more real issues this same pass: a
+   `userEvent.setup()`/clipboard-mock ordering bug in `BookingLinkPanel.test.jsx`, an uncontrolled-
+   number-input `onChange` gap in `RatesPanel.test.jsx` neither `clear()` nor `fireEvent.change()`
+   could reach, a real `AccountPanel.jsx` premature-render bug (a colleague's taken color briefly
+   showing as available), a too-short mock delay in two Settings panels' tests, and an eagerly-
+   initialized `firebase/firebase.js` analytics call that could outlive a test file's jsdom
+   teardown. See `HANDOFF.md`'s 2026-08-25 entry for the full account. Every real run of either
+   suite so far has found at least one genuine bug a syntax check alone missed - that streak is
+   unbroken.
 2. **The two remaining manual steps on monitoring/logging/backups**, now that the engineering side
    is done (see the rewritten section above). Create a real Sentry project and set `SENTRY_DSN`/
    `VITE_SENTRY_DSN`, and turn on MongoDB Atlas automated backups (Cluster → Backup - a dashboard
@@ -2168,35 +2168,37 @@ see the note above. It is not on this list at any priority, not because it was f
    `PAYMENT_RECEIVED` Auto-Response trigger to the real charge success path in
    `routes/squarePayments.js` (the template and toggle already exist in Settings; nothing calls it
    yet, deliberately, until #6 is trustworthy).
-8. **Wire `ClientFlagType.ensureSeeded()` into application boot** (`index.js` or another real
-   startup path), not just the dev seed scripts. On current evidence, `ClientFlagType` has zero rows
-   in production or any non-locally-seeded environment right now, which means the Client Flags
-   feature has nothing to flag with anywhere but a hand-seeded dev database.
-9. **Add a `resolveClientFlag(id)` mutation.** A manually-raised flag (e.g. `MOVED_APPOINTMENT`) has
-   no way to be marked resolved today - only the automatic `NO_SHOWED` path can resolve anything,
-   by `appointmentId`+`typeKey`, which doesn't fit a flag raised by hand.
-10. ~~Continue the test-coverage initiative the personal-calendar push started: the remaining
-    `ibCalendar`/`appointments` client components..., and - highest priority within this item - the
-    entire Forms feature, which has zero client tests and zero server tests for its August 17
-    slug/default-forms half~~ — **the two highest-priority pieces of this are done, verified
-    2026-08-21.** All 6 remaining `ibCalendar`/`appointments` components have test files
-    (`AppointmentSlotPicker`, `DaySchedule`, `DurationPicker`, `CalendarHeader`, `Month`,
-    `ViewEventDialog`), and the Forms feature now has both halves covered: client
-    (`FormBuilder.test.jsx`, `FormFillOut.test.jsx`, `PublicFormBySlugFillOut.test.jsx`,
-    `BookingRequestFieldsEditor.test.jsx`, `FormsPanel.test.jsx`) and server
-    (`forms.test.js`, `formSlugLinks.test.js` covering the exact-key-set enforcement and
-    self-scoping logic that had never run against a database before). What's still genuinely open:
-    the ~46 `server/utils/*.js` files not yet audited against the 15 that have unit tests, and a much
-    larger client remainder (~27 services, ~10 utils, ~16 settings panels, ~29 pages, ~50+ other
-    components) that Danny explicitly chose to leave as backlog rather than push through in one
-    session (2026-08-21) - see `HANDOFF.md`'s matching "Known gaps" entry for the full breakdown.
-11. **Smaller, lower-urgency items already on record, worth sweeping in one pass**: give
-    `computeChargeBreakdown` clamped (not raw) credit figures in its echoed result once the deposit
-    UI is built; build a lookup so a client can self-service fill out their own copy of a form
-    (`submitFormResponse`'s self-service path already works, there's just no page pointing at it);
-    revisit the reference-image-upload 400 if it recurs with an actual payload to diagnose against.
+8. ~~Wire `ClientFlagType.ensureSeeded()` into application boot~~ — **already done**, confirmed
+   2026-08-21/22 by reading `server/index.js` directly (`await ClientFlagType.ensureSeeded()` at
+   boot). This item was stale, not the underlying code.
+9. ~~Add a `resolveClientFlag(id)` mutation~~ — **done 2026-08-21/22**, wired into
+   `ClientDashboard.jsx` with a per-row Resolve button.
+10. ~~Continue the test-coverage initiative~~ — **almost entirely done.** All 6
+    `ibCalendar`/`appointments` components and the full Forms feature (client + server) were closed
+    2026-08-21. The much larger remainder flagged then (~27 services, ~10 utils, ~16 settings
+    panels, ~29 pages, ~50+ other components) was closed in a run of batches 2026-08-22 (commits
+    `7786262`, `c1a85f2`, `39ba717`, `7d18cdd`, `36a6c3b`, `b3307a6`). A directory scan 2026-08-25
+    confirms every service, every util except `appChrome.js`, every settings panel, and every page
+    now has a test file. **Still genuinely open**: `utils/appChrome.js` and ~48 other
+    `components/**/*.jsx` files (dashboards, image upload/list, messaging, forms-adjacent pieces,
+    wizards, notifications, and a long tail of smaller components - see `HANDOFF.md`'s matching
+    "Known gaps" entry for the itemized list), plus the ~46 `server/utils/*.js` files never audited
+    against the 15 that have unit tests. Being worked through now.
+11. ~~Smaller, lower-urgency items already on record~~ — **two of three done, one not a real task.**
+    `computeChargeBreakdown` already echoes clamped credit figures (checked 2026-08-21/22, the
+    roadmap was stale, not the code). The client self-service form-fill lookup shipped 2026-08-21/22
+    (`getMyFillableForms`, scoped via `clientBelongsToFormOwner`) - fixing it also closed a real
+    ownership gap in `submitFormResponse`'s self-service branch. The reference-image-upload 400
+    remains parked exactly as before: nothing to do until it recurs with a payload to diagnose
+    against.
 
 Phase 0 today, if any of it is still outstanding. Phase 1 this week — it's the part where real damage is currently possible. Phase 2 the following 1-2 weeks, since it's what keeps Phase 1 fixed. Phase 3 (modernization, including the monorepo/TypeScript scaffolding that Phase 5 needs) can run in parallel with Phase 2 once the auth wrapper pattern is settled. Phase 4 (real payments) whenever you're ready to actually take deposits — see item 6 above for exactly where that stands. Phase 5 (mobile) starts once Phase 0-2 are done and the monorepo shape from Phase 3 exists — don't build a mobile UI against an API that's still wide open. Phase 6 items — tests, CI, monitoring — should be stood up incrementally starting in Phase 1, not bolted on at the end; retrofitting tests onto already-migrated code (or two clients instead of one) is much more expensive than writing them alongside the fixes.
+
+**Danny's own stated sequencing, reconfirmed 2026-08-25**: items 2 (Sentry/Atlas backups) and 5
+(real tax rates) are the only other pre-launch items with no code left to write - both need his own
+accounts/business data, not more engineering. Item 6 (real Square payment verification) is
+deliberately the very last item before mobile app work starts, not before - do not raise it again
+until that stage is reached.
 
 ---
 

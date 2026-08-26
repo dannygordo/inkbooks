@@ -80,10 +80,19 @@ const FormFieldsRenderer = ({ fields, answers, onAnswerChange, errors = {}, disa
 				const error = errors[field.key];
 				return (
 					<div className="formFieldBlock" key={field.key}>
-						<label className="formFieldQuestion" htmlFor={`formField-${field.key}`}>
-							{field.label}
-							{field.required && <span className="formFieldRequiredMark">*</span>}
-						</label>
+						{/* The required mark is a SIBLING of the label, not a child of it. A getByLabelText
+						    lookup (testing-library) reads a label's full descendant text content, asterisk
+						    included, with no separator - so nesting it inside <label> silently turned every
+						    required question's accessible name into "Full name*" instead of "Full name",
+						    breaking an exact match with no visible sign anything was wrong. Sitting beside the
+						    label instead of inside it keeps the same visual placement without corrupting what
+						    the label is actually named. */}
+						<span className="formFieldQuestionRow">
+							<label className="formFieldQuestion" htmlFor={`formField-${field.key}`}>
+								{field.label}
+							</label>
+							{field.required && <span className="formFieldRequiredMark"> *</span>}
+						</span>
 						{field.helpText && <p className="formFieldHelp">{field.helpText}</p>}
 
 						{field.type === "short_text" && (
@@ -194,7 +203,16 @@ const FormFieldsRenderer = ({ fields, answers, onAnswerChange, errors = {}, disa
 								value={answer.signedName || ""}
 								onChange={(e) => setAnswer(field.key, { signedName: e.target.value })}
 								disabled={disabled}
-								required={field.required}
+								// Deliberately NOT passing `required` through here, unlike short_text/date
+								// above. Those two never give IBInput a `label` prop, so MUI never renders
+								// its own InputLabel and `required` stays a silent HTML attribute. This one
+								// DOES pass a label ("Type your full legal name to sign") - MUI would render
+								// its own asterisk on THAT label too, a confusing second required-mark for
+								// the same field (the question label above already shows one), and the exact
+								// same getByLabelText corruption this file's other comment describes, just
+								// inside a component this file doesn't own. Client-side required enforcement
+								// isn't the point anyway - see this file's own header comment: the server is
+								// the sole authority on what's required.
 							/>
 						)}
 

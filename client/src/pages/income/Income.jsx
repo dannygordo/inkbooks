@@ -102,7 +102,10 @@ const Income = () => {
 			incomeTypeId: item.incomeTypeId,
 			amountDollars: String(centsToDollars(item.amountCents)),
 			description: item.description || "",
-			date: moment(item.date).format("YYYY-MM-DD"),
+			// A pure calendar date (an <input type="date"> value stored as UTC midnight), not a
+			// timestamped instant - see FormResponses.jsx's formatAnswer for the canonical
+			// explanation of this exact pattern.
+			date: moment.utc(item.date).format("YYYY-MM-DD"), // utc-ok: income date is a pure calendar date, see comment above
 		});
 	};
 
@@ -301,7 +304,7 @@ const Income = () => {
 													</span>
 												)}
 												<span className="businessLedgerMeta">
-													{moment(item.date).format("MMM D, YYYY")}
+													{moment.utc(item.date).format("MMM D, YYYY")}{/* utc-ok: pure calendar date, see startEdit above */}
 													{item.createdBy
 														? ` · logged by ${item.createdBy.firstName} ${item.createdBy.lastName}`
 														: ""}

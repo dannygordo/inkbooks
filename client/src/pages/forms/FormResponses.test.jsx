@@ -311,7 +311,9 @@ describe("analytics summary", () => {
 
 		expect(await screen.findByText("4")).toBeInTheDocument();
 		expect(screen.getByText("Any allergies?")).toBeInTheDocument();
-		expect(screen.getByText("4 of 4 answered")).toBeInTheDocument();
+		// Both fields legitimately show the same "4 of 4 answered" text (both have
+		// answeredCount: 4 against totalResponses: 4 above) - getAllByText, not getByText.
+		expect(screen.getAllByText("4 of 4 answered")).toHaveLength(2);
 		expect(screen.getByText("Preferred contact")).toBeInTheDocument();
 		expect(screen.getByText("Email")).toBeInTheDocument();
 		expect(screen.getByText("3")).toBeInTheDocument();

@@ -349,7 +349,10 @@ describe("adding a category", () => {
 		const input = { shopId: "shop-1", name: "Piercing", description: "" };
 		const createMock = {
 			request: { query: IncomeService.CREATE_INCOME_TYPE, variables: { input } },
-			delay: 10,
+			// 10ms was too tight for findByRole's own polling overhead to reliably observe
+			// "Adding..." before the mock already resolved - see ExpenseTypesPanel.test.jsx's
+			// identical fix.
+			delay: 50,
 			result: { data: { createIncomeType: incomeType({ id: "income-type-2", name: "Piercing" }) } },
 		};
 		renderPanel({

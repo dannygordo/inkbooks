@@ -1,3 +1,4 @@
+import React from "react";
 import './ibErrorsList.css';
 
 const IBErrorsList = ({errors}) => {

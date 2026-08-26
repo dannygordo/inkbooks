@@ -393,9 +393,14 @@ const ArtistBookingRequests = () => {
       <div className="bookingRequestsList">
         <h3 className="bookingRequestsListTitle">Booking Requests</h3>
         {/* Changing this changes the QUERY, not a client-side filter - closed requests are never
-            fetched until they're asked for. */}
+            fetched until they're asked for. aria-label because there's no visible label text
+            here - without one this <select> has no accessible name at all, which used to be
+            harmless for a bare getByRole("combobox") lookup in tests but broke once Pager's own
+            "Show" page-size <select> (below) started being the SECOND unlabeled-by-role
+            combobox on screen whenever there's at least one request to page through. */}
         <select
           className="bookingRequestsFilter"
+          aria-label="Status"
           value={statusFilter}
           onChange={(e) => {
             setStatusFilter(e.target.value);

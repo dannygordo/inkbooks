@@ -49,19 +49,26 @@ const StaffProfile = (props) => {
 	// at all rather than just editable - previously this page showed a name and nothing else.
 	const canEditIdentity = user.role <= ROLES.SHOP_ADMIN;
 
+	// `||`, not `??`: once a field's input has mounted, a null/undefined underlying value
+	// still leaves ref.current.value as a real empty string (the DOM has no way to represent
+	// an unset text input), so `?? data.field` never actually falls through post-mount and a
+	// field that was genuinely null got silently written back as "" on every unrelated blur.
+	// `||` falls back to the original value both before mount (ref undefined) and for an
+	// untouched-but-null field after mount (ref.current.value === ""), and still prefers
+	// anything actually typed.
 	const buildIdentityPayload = () => ({
 		id: data.getOneStaff.id,
-		firstName: firstNameRef.current?.value ?? data.getOneStaff.firstName,
-		lastName: lastNameRef.current?.value ?? data.getOneStaff.lastName,
-		email: emailRef.current?.value ?? data.getOneStaff.email,
-		phone: phoneRef.current?.value ?? data.getOneStaff.phone,
-		title: titleRef.current?.value ?? data.getOneStaff.title,
-		address: addressRef.current?.value ?? data.getOneStaff.address,
-		city: cityRef.current?.value ?? data.getOneStaff.city,
-		state: stateRef.current?.value ?? data.getOneStaff.state,
-		zip: zipRef.current?.value ?? data.getOneStaff.zip,
-		instagram: instagramRef.current?.value ?? data.getOneStaff.instagram,
-		facebook: facebookRef.current?.value ?? data.getOneStaff.facebook,
+		firstName: firstNameRef.current?.value || data.getOneStaff.firstName,
+		lastName: lastNameRef.current?.value || data.getOneStaff.lastName,
+		email: emailRef.current?.value || data.getOneStaff.email,
+		phone: phoneRef.current?.value || data.getOneStaff.phone,
+		title: titleRef.current?.value || data.getOneStaff.title,
+		address: addressRef.current?.value || data.getOneStaff.address,
+		city: cityRef.current?.value || data.getOneStaff.city,
+		state: stateRef.current?.value || data.getOneStaff.state,
+		zip: zipRef.current?.value || data.getOneStaff.zip,
+		instagram: instagramRef.current?.value || data.getOneStaff.instagram,
+		facebook: facebookRef.current?.value || data.getOneStaff.facebook,
 		// StaffInput requires these three as non-null - echoed back unchanged since nothing here
 		// edits them (status has its own door, ArchiveControl; shopId/userId aren't user-editable).
 		shopId: data.getOneStaff.shopId,
@@ -96,8 +103,17 @@ const StaffProfile = (props) => {
 	if (loading) {
 		return <IBPageLoader />;
 	}
+	// Lazy baseline init (allowed during render for a ref - see React's own docs on this
+	// exact pattern): lastSavedIdentityRef starts null, and buildIdentityPayload/buildContactPayload/
+	// etc. fall back to data's own values for every ref that hasn't attached to a real input
+	// yet, which is exactly every ref on the render where data first arrives. Without this,
+	// the first blur ever - even one that changed nothing - always looks 'dirty' against a
+	// null baseline and fires a save no one asked for.
+	if (data && data.getOneStaff && lastSavedIdentityRef.current === null) {
+		lastSavedIdentityRef.current = JSON.stringify(buildIdentityPayload());
+	}
 
-	if (data) {
+	if (data && data.getOneStaff) {
 		return (
 			<div className="staffProfile">
 				<div className="staffProfileHeader">

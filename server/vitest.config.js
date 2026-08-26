@@ -19,5 +19,12 @@ module.exports = defineConfig({
 		// still-running assertions. Simpler and safer to run files one at a time; this test suite
 		// isn't large enough yet for that to matter for speed.
 		fileParallelism: false,
+		// Same fix as client/vite.config.js's matching test.diff option - without it, a mismatch
+		// against a full Mongoose document (or an array of them) can print a diff hundreds of lines
+		// long, and a run with several failures scrolls the earliest ones out of a terminal's buffer
+		// before the run even finishes.
+		diff: {
+			truncateThreshold: 40,
+		},
 	},
 });

@@ -14,7 +14,7 @@
 // it).
 import React from "react";
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MockedProvider } from "@apollo/client/testing";
 import { GraphQLError } from "graphql";
@@ -116,12 +116,12 @@ function submitMock({ variables, data, errors }) {
 function renderFillOut({ mocks = [], ...props } = {}) {
 	const onSubmitted = props.onSubmitted || vi.fn();
 	const onCancel = props.onCancel;
-	render(
+	const { container } = render(
 		<MockedProvider mocks={mocks}>
 			<FormFillOut formId={FORM_ID} {...props} onSubmitted={onSubmitted} onCancel={onCancel} />
 		</MockedProvider>
 	);
-	return { onSubmitted };
+	return { onSubmitted, container };
 }
 
 describe("FormFillOut", () => {
@@ -222,6 +222,14 @@ describe("FormFillOut", () => {
 						fileUrls: [],
 						signedName: null,
 					},
+					{
+						fieldKey: "preference",
+						textValue: null,
+						selectedOptions: [],
+						dateValue: null,
+						fileUrls: [],
+						signedName: null,
+					},
 				],
 			},
 		};
@@ -273,13 +281,19 @@ describe("FormFillOut", () => {
 				],
 			}),
 		];
-		renderFillOut({ mocks });
+		const { container } = renderFillOut({ mocks });
 
 		await screen.findByLabelText("Full name");
 		// Submitting with the required field left blank - FormFieldsRenderer applies no client-side
 		// required check of its own (server is the sole authority, per its header comment), so the
-		// submit goes through and comes back with the mocked server-side rejection.
-		await user.click(screen.getByRole("button", { name: /submit/i }));
+		// submit goes through and comes back with the mocked server-side rejection. A real click on
+		// the submit button won't reach handleSubmit at all here, though: FormFieldsRenderer passes
+		// `required={field.required}` straight through to the native <input> (see its own comment),
+		// and jsdom actually implements HTML5 constraint validation - it blocks the "submit" event
+		// outright when a required input is empty, before React's onSubmit ever runs (same gate as
+		// BookingRequest.test.jsx's "shows field-level errors" test). fireEvent.submit dispatches
+        // the event directly, bypassing that gate the same way.
+		fireEvent.submit(container.querySelector("form"));
 
 		expect(await screen.findByText("This field is required.")).toBeInTheDocument();
 	});

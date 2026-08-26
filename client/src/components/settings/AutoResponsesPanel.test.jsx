@@ -227,7 +227,7 @@ describe("a single section's states", () => {
 		});
 
 		await screen.findByText("Session complete thank-you");
-		expect(screen.getByRole("checkbox")).toBeDisabled();
+		expect(screen.getByRole("switch")).toBeDisabled();
 		expect(screen.getByText("Manual only")).toBeInTheDocument();
 	});
 });
@@ -245,12 +245,12 @@ describe("toggling a response's auto-fire switch", () => {
 		});
 
 		await screen.findByText("Session complete thank-you");
-		const toggle = screen.getByRole("checkbox");
+		const toggle = screen.getByRole("switch");
 		expect(toggle).toBeChecked();
 
 		await user.click(toggle);
 
-		await waitFor(() => expect(screen.getByRole("checkbox")).not.toBeChecked());
+		await waitFor(() => expect(screen.getByRole("switch")).not.toBeChecked());
 	});
 
 	it("alerts an error and leaves the row alone when the toggle fails", async () => {
@@ -268,7 +268,7 @@ describe("toggling a response's auto-fire switch", () => {
 		});
 
 		await screen.findByText("Session complete thank-you");
-		await user.click(screen.getByRole("checkbox"));
+		await user.click(screen.getByRole("switch"));
 
 		await waitFor(() =>
 			expect(setAlert).toHaveBeenCalledWith(
@@ -276,7 +276,7 @@ describe("toggling a response's auto-fire switch", () => {
 			),
 		);
 		// No refetch runs on failure, so the row's own switch stays exactly as it was.
-		expect(screen.getByRole("checkbox")).toBeChecked();
+		expect(screen.getByRole("switch")).toBeChecked();
 	});
 });
 
@@ -344,7 +344,7 @@ describe("creating a new Auto-Response", () => {
 		await user.click(screen.getByRole("option", { name: "Manual only" }));
 
 		expect(
-			screen.queryByRole("checkbox", { name: "Send automatically" }),
+			screen.queryByRole("switch", { name: "Send automatically" }),
 		).not.toBeInTheDocument();
 		expect(
 			screen.getByText(/Manual-only responses never fire on their own/),
@@ -403,7 +403,10 @@ describe("creating a new Auto-Response", () => {
 				expect.objectContaining({ severity: "success", message: "Auto-Response created." }),
 			),
 		);
-		expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+		// MUI's Dialog keeps its content mounted through its own exit transition rather than removing
+		// it the instant `open` goes false - see the matching note in
+		// SystemMessageTemplatesPanel.test.jsx, which hit the same race.
+		await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
 	});
 
 	it("includes shopId in the input for a shop-scoped create", async () => {
@@ -494,7 +497,7 @@ describe("editing an existing Auto-Response", () => {
 
 		await screen.findByText("Session complete thank-you");
 		await user.click(screen.getByRole("button", { name: "Edit" }));
-		await user.click(within(screen.getByRole("dialog")).getByRole("checkbox", { name: "Send automatically" }));
+		await user.click(within(screen.getByRole("dialog")).getByRole("switch", { name: "Send automatically" }));
 		await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Save" }));
 
 		await waitFor(() =>
@@ -555,6 +558,7 @@ describe("editing an existing Auto-Response", () => {
 		await user.click(screen.getByRole("button", { name: "Edit" }));
 		await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel" }));
 
-		expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+		// Same MUI Dialog exit-transition race as the create/save case above.
+		await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
 	});
 });

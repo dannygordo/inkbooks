@@ -17,7 +17,7 @@
 // Explicit React import - see the matching note in pages/login/Login.test.jsx.
 import React from "react";
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MockedProvider } from "@apollo/client/testing";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
@@ -325,6 +325,14 @@ describe("submitting", () => {
 
   it("shows field-level errors from the server without leaving the success state", async () => {
     const user = userEvent.setup();
+    // jsdom actually enforces native constraint validation on submit (HTMLFormElement's own
+    // reportValidity() gate, unless the <form> has novalidate) - a real browser would refuse to
+    // even fire the submit event for a required type="email" input holding "not-an-email", the
+    // same as jsdom does here. That's exactly why this test exists (SERVER-side email validation,
+    // as a defense the client's own HTML5 validation doesn't cover for e.g. a non-browser caller),
+    // so it has to dispatch the submit event directly - fireEvent.submit bypasses the browser's
+    // click-to-submit algorithm (and therefore its validation gate) that user.click's button click
+    // would otherwise go through.
     const failingMock = {
       request: {
         query: BookingRequestService.CREATE_BOOKING_REQUEST_MUTATION,
@@ -349,14 +357,14 @@ describe("submitting", () => {
         ],
       },
     };
-    renderPage({ mocks: [artistProfileMock(), formFieldsMock(), failingMock] });
+    const { container } = renderPage({ mocks: [artistProfileMock(), formFieldsMock(), failingMock] });
 
     await screen.findByText("Book with Maya Chen");
     await user.type(screen.getByPlaceholderText("First Name"), "Arya");
     await user.type(screen.getByPlaceholderText("Last Name"), "Stark");
     await user.type(screen.getByPlaceholderText("Email"), "not-an-email");
     await user.type(screen.getByPlaceholderText("Describe what you have in mind"), "Direwolf.");
-    await user.click(screen.getByRole("button", { name: "Send Request" }));
+    fireEvent.submit(container.querySelector("form"));
 
     expect(
       await screen.findByText("That doesn't look like a valid email address."),

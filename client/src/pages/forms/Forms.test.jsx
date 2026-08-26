@@ -8,6 +8,7 @@
 //
 // Explicit React import - see the matching note in pages/login/Login.test.jsx.
 import React from "react";
+import moment from "moment";
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -134,10 +135,14 @@ describe("a populated list", () => {
 			"href",
 			"/forms/form-1",
 		);
-		expect(screen.getByText("Draft")).toBeInTheDocument();
+		// "Draft" also names one of the always-present status filter tabs above the list (see
+		// Forms.jsx's formsFilterBar) - scoped to the row's own status Chip to avoid matching that.
+		expect(screen.getByText("Draft", { selector: ".MuiChip-label" })).toBeInTheDocument();
 		expect(screen.getByText(/1 field/)).toBeInTheDocument();
 		expect(screen.getByText(/created/)).toBeInTheDocument();
-		expect(screen.getByText(/Aug 1, 2026/)).toBeInTheDocument();
+		expect(
+			screen.getByText(moment("2026-08-01T00:00:00.000Z").format("MMM D, YYYY"), { exact: false }),
+		).toBeInTheDocument();
 	});
 
 	it("shows a Default chip for a system form and Public link on when guest submissions are allowed", async () => {
@@ -236,7 +241,9 @@ describe("row actions for the booking_request system form", () => {
 		});
 
 		await screen.findByText("Booking Request");
-		expect(screen.getByRole("button", { name: "Edit intake fields" })).toHaveAttribute(
+		// A RouterLink-backed control with an href, not a button - see Forms.jsx's own "Edit intake
+		// fields" action - so its accessible role is "link", the same as "Responses" below.
+		expect(screen.getByRole("link", { name: "Edit intake fields" })).toHaveAttribute(
 			"href",
 			"/forms/form-br/booking-fields",
 		);
@@ -265,7 +272,11 @@ describe("publishing and archiving", () => {
 
 		await user.click(await screen.findByRole("button", { name: "Publish" }));
 
-		expect(await screen.findByText("Published")).toBeInTheDocument();
+		// "Published" also names one of the always-present status filter tabs above the list (see
+		// Forms.jsx's formsFilterBar) - scoped to the row's own status Chip to avoid matching that.
+		expect(
+			await screen.findByText("Published", { selector: ".MuiChip-label" }),
+		).toBeInTheDocument();
 	});
 
 	it("archives a published form and refetches the list", async () => {
@@ -284,7 +295,10 @@ describe("publishing and archiving", () => {
 
 		await user.click(await screen.findByRole("button", { name: "Archive" }));
 
-		expect(await screen.findByText("Archived")).toBeInTheDocument();
+		// Same filter-tab-vs-status-Chip ambiguity as the publish test above.
+		expect(
+			await screen.findByText("Archived", { selector: ".MuiChip-label" }),
+		).toBeInTheDocument();
 	});
 
 	it("alerts the server's error message when publishing fails", async () => {

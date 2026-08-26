@@ -353,7 +353,7 @@ describe("adding a category", () => {
 		const input = { shopId: "shop-1", name: "Supplies", description: "" };
 		const createMock = {
 			request: { query: ExpenseService.CREATE_EXPENSE_TYPE, variables: { input } },
-			delay: 10,
+			delay: 50,
 			result: { data: { createExpenseType: expenseType({ id: "expense-type-2", name: "Supplies" }) } },
 		};
 		renderPanel({

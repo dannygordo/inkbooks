@@ -94,7 +94,7 @@ describe("header", () => {
 		renderList({ columns: [], items: [item({ values: undefined })] });
 		expect(screen.getByText("Arya Stark")).toBeInTheDocument();
 		const header = document.querySelector(".entityListHeader");
-		expect(header.style.gridTemplateColumns).toBe("40px minmax(0, 1fr) ");
+		expect(header.style.gridTemplateColumns).toBe("40px minmax(0, 1fr)");
 	});
 });
 
@@ -110,7 +110,7 @@ describe("row rendering", () => {
 	it("renders the primary and secondary text", () => {
 		renderList({ columns: COLUMNS, items: [item()] });
 		expect(screen.getByText("Arya Stark")).toBeInTheDocument();
-		expect(screen.getByText("arya@example.com")).toBeInTheDocument();
+		expect(screen.getByText("arya@example.com", { selector: ".entityRowSecondary" })).toBeInTheDocument();
 	});
 
 	it("omits the secondary line entirely when secondary is not supplied", () => {

@@ -88,7 +88,16 @@ const GuestConversation = () => {
 
   const [sendGuestMessage, { loading: sending }] = useMutation(SEND_GUEST_MESSAGE, {
     onCompleted() {
-      messageInput.current.value = "";
+      // `onCompleted` fires whenever the mutation resolves, whether or not this component is
+      // still mounted to receive it - a guest who sends a message and then navigates away (or,
+      // in a test, a component unmounted before a delayed mock resolves) unmounts the input this
+      // ref pointed at, so `.current` is null by the time this runs. Writing straight to
+      // `.current.value` in that case threw "Cannot set properties of null" from inside an
+      // Apollo-internal promise chain - unhandled, since nothing here was in a position to catch
+      // it. setSendError/refetch don't touch the DOM, so they're safe to still run either way.
+      if (messageInput.current) {
+        messageInput.current.value = "";
+      }
       setSendError(null);
       refetch();
     },

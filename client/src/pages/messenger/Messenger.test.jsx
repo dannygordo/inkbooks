@@ -209,9 +209,19 @@ describe("populated", () => {
 		// No ?conversation= deep link and nothing selected yet, so conversations[0] (convo-1) wins.
 		expect(await screen.findByTestId("chatbox-conversation-id")).toHaveTextContent("convo-1");
 		expect(await screen.findByText("Hey there")).toBeInTheDocument();
+		// React invokes function components as Component(props, secondArg), and for a plain function
+		// component (no legacy contextTypes) secondArg is a literal `undefined` - not an omitted
+		// argument, an actual one (confirmed against react-dom's own source: updateFunctionComponent
+		// passes `void 0` into renderWithHooks, which calls Component(props, secondArg) with both
+		// arguments present). expect.anything() explicitly refuses to match null/undefined, so pairing
+		// it with that second positional slot always fails. Dropping the second argument entirely
+		// doesn't fix it either - unlike toEqual on plain objects, vitest's toHaveBeenCalledWith does
+		// NOT ignore a trailing undefined call argument, so a one-argument matcher against a real
+		// (props, undefined) call still reports a length mismatch. The second argument has to be
+		// asserted for what it actually is: a literal undefined.
 		expect(IBChatBox).toHaveBeenCalledWith(
 			expect.objectContaining({ conversation: expect.objectContaining({ id: "convo-1" }) }),
-			expect.anything(),
+			undefined,
 		);
 	});
 

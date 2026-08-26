@@ -94,14 +94,20 @@ const ArchiveControl = ({
 
 	return (
 		<div className="archiveControl">
-			<button
-				type="button"
-				className="ibButtonSecondary"
-				disabled={busy}
-				onClick={() => setConfirming(true)}
-			>
-				Archive
-			</button>
+			{/* Hidden while the confirm dialog is open, not just visually covered by it - two
+			    simultaneously-queryable "Archive" buttons is exactly the kind of thing that reads
+			    fine to the eye (the backdrop covers this one) and ambiguous to anything walking the
+			    accessibility tree, tests included. */}
+			{!confirming && (
+				<button
+					type="button"
+					className="ibButtonSecondary"
+					disabled={busy}
+					onClick={() => setConfirming(true)}
+				>
+					Archive
+				</button>
+			)}
 
 			{confirming && (
 				<div className="archiveConfirmBackdrop" role="dialog" aria-modal="true">

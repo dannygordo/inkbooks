@@ -1,3 +1,4 @@
+import React from "react";
 import { Close } from "@mui/icons-material";
 import { Alert, Box, Collapse, IconButton, Slide } from "@mui/material";
 import { useEffect, useRef } from "react";

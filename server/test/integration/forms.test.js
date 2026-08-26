@@ -22,6 +22,7 @@ const {
 	createShopAdminUser,
 	createStaffUser,
 	createClientUser,
+	createProject,
 } = require('../helpers/factories');
 const Form = require('../../models/Form');
 const FormResponse = require('../../models/FormResponse');
@@ -627,6 +628,12 @@ describe('submitFormResponse: the self-service path (authenticated, no clientId)
 		const { user: artist } = await createArtistUser();
 		const form = await makeForm({ artistUserId: artist.id }, artist.id);
 		const { user: clientUser, client } = await createClientUser();
+		// clientBelongsToFormOwner (server/utils/shop-membership.js) requires a real relationship
+		// to the form's owner for the artist-owned branch - a shared Project, the same link
+		// canAccessClient's own artist branch walks. createClientUser deliberately makes a client
+		// with no shop/artist ties at all, so self-service submission has nothing to resolve
+		// against unless one is created here.
+		await createProject(artist.id, client._id);
 
 		const res = await submitAsUser(
 			{
@@ -734,7 +741,11 @@ describe('deleteForm: refuses once any FormResponse references the form', () => 
 	it('refuses to delete a form that already has one response on file', async () => {
 		const { user: artist } = await createArtistUser();
 		const form = await makeForm({ artistUserId: artist.id }, artist.id);
-		const { user: clientUser } = await createClientUser();
+		const { user: clientUser, client } = await createClientUser();
+		// Same ownership requirement as the self-service test above - a shared Project is what
+		// makes this a legitimate self-service submission rather than the exact cross-business gap
+		// clientBelongsToFormOwner was added to close.
+		await createProject(artist.id, client._id);
 		const submitRes = await submitAsUser(
 			{ input: { formId: form.id, answers: [{ fieldKey: form.fields[0].key, textValue: 'On file' }] } },
 			clientUser,

@@ -159,10 +159,10 @@ describe("DaySchedule", () => {
 		expect(items_).toHaveLength(2);
 		expect(items_[0]).toHaveTextContent("Half sleeve - koi");
 		expect(items_[0]).toHaveTextContent("Session");
-		expect(items_[0]).toHaveTextContent("2:00 PM");
+		expect(items_[0]).toHaveTextContent(moment("2026-08-10T14:00:00.000Z").format("h:mm A"));
 		expect(items_[1]).toHaveTextContent("Consult - Arya Stark");
 		expect(items_[1]).toHaveTextContent("Consult");
-		expect(items_[1]).toHaveTextContent("6:00 PM");
+		expect(items_[1]).toHaveTextContent(moment("2026-08-10T18:00:00.000Z").format("h:mm A"));
 	});
 
 	// A project-linked session has no `title` of its own - it falls back to `project.title`, and an

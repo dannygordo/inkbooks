@@ -319,9 +319,15 @@ describe("editing a template", () => {
 				expect.objectContaining({ isAlert: true, severity: "success", message: "Template updated." }),
 			),
 		);
-		expect(
-			screen.queryByRole("heading", { name: "New message notification (to client)" }),
-		).not.toBeInTheDocument();
+		// MUI's Dialog keeps its content mounted through its own exit transition (Fade, ~200ms real
+		// time by default) rather than removing it the instant `open` goes false, so an unwaited
+		// synchronous check here races that transition and finds the heading still present. waitFor
+		// polls until the transition actually finishes closing it.
+		await waitFor(() =>
+			expect(
+				screen.queryByRole("heading", { name: "New message notification (to client)" }),
+			).not.toBeInTheDocument(),
+		);
 	});
 
 	// The narrower BOOKING_CONFIRMATION case: only extraNoteTemplate is ever editable for this
@@ -405,9 +411,15 @@ describe("editing a template", () => {
 		await screen.findByLabelText("Email subject");
 		await user.click(screen.getByRole("button", { name: "Cancel" }));
 
-		expect(
-			screen.queryByRole("heading", { name: "New message notification (to client)" }),
-		).not.toBeInTheDocument();
+		// MUI's Dialog keeps its content mounted through its own exit transition (Fade, ~200ms real
+		// time by default) rather than removing it the instant `open` goes false, so an unwaited
+		// synchronous check here races that transition and finds the heading still present. waitFor
+		// polls until the transition actually finishes closing it.
+		await waitFor(() =>
+			expect(
+				screen.queryByRole("heading", { name: "New message notification (to client)" }),
+			).not.toBeInTheDocument(),
+		);
 	});
 
 	it("alerts the server's error message when saving fails", async () => {

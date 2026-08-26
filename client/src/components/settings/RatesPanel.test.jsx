@@ -7,7 +7,7 @@
 // Explicit React import - see the matching note in pages/login/Login.test.jsx.
 import React from "react";
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MockedProvider } from "@apollo/client/testing";
 import { gql } from "@apollo/client";
@@ -211,8 +211,13 @@ describe("a shop-connected artist", () => {
 		});
 
 		const ownRadio = await screen.findByRole("radio", { name: "Use my own rate" });
-		expect(ownRadio).toBeChecked();
-		expect(screen.getByRole("radio", { name: "Use the shop's rate" })).not.toBeChecked();
+		const shopRadio = screen.getByRole("radio", { name: "Use the shop's rate" });
+		// The radio group renders as soon as shopId is available from `user` - well before the
+		// connections query resolves - so the elements exist immediately at "shop" selected. Wait
+		// for the hydration effect to actually flip the checked state, not just for the radios to
+		// exist.
+		await waitFor(() => expect(ownRadio).toBeChecked());
+		expect(shopRadio).not.toBeChecked();
 	});
 
 	// Only an ACTIVE connection matching this artist's own shopId should hydrate the radio - a
@@ -414,7 +419,22 @@ describe("saving rates", () => {
 		});
 
 		const hourlyField = await screen.findByLabelText("Hourly Rate ($)");
-		await user.clear(hourlyField);
+		await waitFor(() => expect(hourlyField).toHaveValue(150));
+		// Neither userEvent.clear() nor fireEvent.change() reliably empties this field. clear()
+		// fails because it's uncontrolled (IBInput passes defaultValue, not value) and its starting
+		// value only arrives once the artist query resolves, well after mount - user-event's own
+		// internal value tracking is seeded at that first, still-empty mount and never notices the
+		// DOM's own defaultValue-driven jump to 150, so clear() no-ops against its stale bookkeeping.
+		// fireEvent.change() bypasses that tracking by setting the DOM value directly and dispatching
+		// a synthetic event, which works for other fields in this codebase (see
+		// RecurringExpensesPanel.test.jsx's type="date" inputs) but was confirmed NOT to reach this
+		// particular MUI number TextField's onChange either. Real keystrokes (End, then one Backspace
+		// per existing character) go through user-event's normal typing path instead - the same path
+		// user.type() already relies on everywhere else in this suite - rather than either of the
+		// two bulk-value-replacement shortcuts above.
+		await user.click(hourlyField);
+		await user.keyboard("{End}" + "{Backspace}".repeat(hourlyField.value.length));
+		await waitFor(() => expect(hourlyField).toHaveValue(null));
 		await user.click(screen.getByRole("button", { name: "Save Rates" }));
 
 		await waitFor(() =>

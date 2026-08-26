@@ -52,7 +52,19 @@ const AccountPanel = () => {
 	// `if (availableTags)` version meant no swatches ever populated and the entire page sat on a
 	// spinner forever. An independent artist reported their calendar labels having no colour; the
 	// cause was that they could never reach this picker to change the default.
+	//
+	// The `if (loading) return` below matters just as much as that gate does. This effect runs
+	// after the VERY FIRST render too, while a real (non-skipped) query is still in flight -
+	// `availableTags` is still undefined at that point, `?? []` makes it look like NOBODY has
+	// taken any color yet, and every color - including one a shop-mate actually holds - briefly
+	// renders as available until the real response lands and this effect re-runs. Skipping the
+	// recompute entirely while genuinely loading avoids ever computing from that incomplete
+	// state; a SKIPPED query (the shop-less case above) has `loading: false` from the very start,
+	// so it still reaches the swatch list immediately, same as before.
 	useEffect(() => {
+		if (loading) {
+			return;
+		}
 		setTagColors(
 			UtilsService.showAvailableColorTags(
 				APP_SETTINGS_CONSTANTS.TAG_COLORS,

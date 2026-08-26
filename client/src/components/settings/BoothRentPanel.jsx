@@ -41,7 +41,14 @@ const BoothRentPanel = () => {
 	const [markBoothRentPaidManually] = BoothRentService.useMarkBoothRentPaidManually();
 
 	const plans = planData?.getBoothRentPlans || [];
-	const currentPlan = plans.find((plan) => moment(plan.effectiveFrom).isSameOrBefore(moment()));
+	const now = moment();
+	const currentPlan = plans
+		.filter((plan) => moment(plan.effectiveFrom).isSameOrBefore(now))
+		.reduce(
+			(latest, plan) =>
+				!latest || moment(plan.effectiveFrom).isAfter(moment(latest.effectiveFrom)) ? plan : latest,
+			null,
+		);
 	const charges = chargeData?.getBoothRentCharges?.items || [];
 
 	// Nothing to show - see the header comment above.

@@ -141,8 +141,16 @@ const RecurringExpensesPanel = () => {
 									<span className="businessTypeDescription">{item.description}</span>
 								)}
 								<span className="recurringExpenseMeta">
-									Next: {moment(item.nextRunDate).format("MMM D, YYYY")}
-									{item.endDate ? ` · Ends ${moment(item.endDate).format("MMM D, YYYY")}` : ""}
+									{/* moment.utc, not moment - nextRunDate/endDate are pure calendar dates (see
+									   startDate/endDate above, sent as local-midnight-converted-to-UTC via
+									   moment(dateStr, "YYYY-MM-DD").toISOString()), with no time-of-day meaning.
+									   nextRunDate in particular is computed server-side, not round-tripped through
+									   this same browser, so nothing guarantees the viewer is in the timezone that
+									   produced its UTC-midnight value - parsing it in local time instead rolls it
+									   back a day for anyone west of UTC (see FormResponses.jsx's formatAnswer for
+									   the same bug on a different pure-calendar-date field). */}
+									Next: {moment.utc(item.nextRunDate).format("MMM D, YYYY")}{/* utc-ok: nextRunDate is a pure calendar date, see comment above */}
+									{item.endDate ? ` · Ends ${moment.utc(item.endDate).format("MMM D, YYYY")}` : ""}{/* utc-ok: endDate is the same pure calendar date as nextRunDate above */}
 								</span>
 							</div>
 							<div className="recurringExpenseActions">

@@ -16,15 +16,30 @@
 // wizard and shown on the utc-formatting calendar reads back correctly, because the two errors
 // cancel exactly. It only became visible when a list rendered the same record honestly.
 //
-// WHY A BLANKET BAN
+// WHY (ALMOST) A BLANKET BAN
 //
-// There is no legitimate use of moment.utc in this client. The viewer is a person in a chair in a
-// tattoo shop; every date they see should be in their own zone, and every date they enter should
-// be interpreted in it. The server is the place that reasons about other timezones, and it does so
-// with Intl and an IANA zone name (see server/utils/digest.js), not with moment.utc.
+// Nearly every date in this client is an INSTANT, and for those there is no legitimate use of
+// moment.utc: the viewer is a person in a chair in a tattoo shop, every date they see should be in
+// their own zone, and every date they enter should be interpreted in it. The server is the place
+// that reasons about other timezones, and it does so with Intl and an IANA zone name (see
+// server/utils/digest.js), not with moment.utc.
 //
 // The nastiest property of this bug: it is INVISIBLE to anyone whose machine runs on UTC. A
 // developer in London sees nothing wrong, ever.
+//
+// THE ONE EXCEPTION: a genuinely date-only field with no time-of-day meaning at all (an expense's
+// date, a recurring schedule's next-run date, a form's `date`-type answer) - stored end to end as
+// UTC midnight, never round-tripped through a specific browser's local time, and often computed
+// server-side. moment(x) is WRONG for these: it rolls the calendar date back a day for anyone west
+// of UTC (see FormResponses.jsx's formatAnswer for the canonical example and its own comment).
+// moment.utc(x) is the only way to read "the date" back out the same way it went in, everywhere.
+//
+// This is still an instance-by-instance judgment call, not a free pass, so it is opt-in and
+// visible rather than silently allowed: mark the line with a trailing `// utc-ok: <why>` comment
+// explaining which field this is and why it has no time-of-day, the same way every other exception
+// in this codebase's checks is explained in prose rather than just suppressed. A reviewer (human or
+// this script's own count) can `grep -rn "utc-ok" client/src` to see every claimed exception at
+// once.
 //
 // Usage: node scripts/check-no-utc-display.mjs
 import { readFileSync, readdirSync, statSync } from "fs";
@@ -49,6 +64,13 @@ for (const file of walk(SRC)) {
 		// own justification, and flagging the explanation would be absurd.
 		const code = line.replace(/\/\/.*$/, "").replace(/^\s*\*.*$/, "");
 		if (/\bmoment\s*\.\s*utc\s*\(/.test(code)) {
+			// An explicit, visible, per-line opt-out for the one legitimate case (see this file's
+			// own header comment) - checked against the RAW line, not the comment-stripped `code`,
+			// since the marker IS a trailing comment. Requires a reason after the colon so this
+			// can't become a silent "utc-ok" copy-pasted with nothing behind it.
+			if (/utc-ok:\s*\S/.test(line)) {
+				return;
+			}
 			failures.push(`${file.replace(root + "/", "")}:${i + 1}: ${line.trim()}`);
 		}
 	});

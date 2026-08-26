@@ -156,7 +156,7 @@ describe("PublicFormFillOut", () => {
 		expect(
 			screen.getByText("This link is missing a form. Double-check the link and try again."),
 		).toBeInTheDocument();
-		expect(screen.queryByLabelText("First name")).not.toBeInTheDocument();
+		expect(screen.queryByLabelText(/^first name/i)).not.toBeInTheDocument();
 	});
 
 	it("shows a loading state, then renders the resolved form's title, description, and fields", async () => {
@@ -170,9 +170,17 @@ describe("PublicFormFillOut", () => {
 		expect(screen.getByText("Any allergies?")).toBeInTheDocument();
 		// The guest identity fields the page collects itself, on top of whatever FormFieldsRenderer
 		// renders for the form's own fields - never gated behind auth, this is the guest path.
-		expect(screen.getByLabelText("First name")).toBeInTheDocument();
-		expect(screen.getByLabelText("Last name")).toBeInTheDocument();
-		expect(screen.getByLabelText("Email")).toBeInTheDocument();
+		//
+		// `/^email/i`, not `/^email$/i`: this field is required, and MUI's own InputLabel folds a
+		// required field's asterisk into the SAME label element (see IBPasswordField.test.jsx's
+		// matching comment) - the real accessible text is "Email *", which an end-anchored regex
+		// would reject. The `input[type='email']` selector is what actually disambiguates it,
+		// though - a plain "email" match alone is also the visible text of the "Preferred contact
+		// method" radio's "Email" option elsewhere on this same page (see multiFieldForm() below),
+		// and would otherwise throw "Found multiple elements".
+		expect(screen.getByLabelText(/^first name/i)).toBeInTheDocument();
+		expect(screen.getByLabelText(/^last name/i)).toBeInTheDocument();
+		expect(screen.getByLabelText(/^email/i, { selector: "input[type='email']" })).toBeInTheDocument();
 		expect(screen.getByLabelText("Phone (optional)")).toBeInTheDocument();
 	});
 
@@ -194,7 +202,7 @@ describe("PublicFormFillOut", () => {
 				"This link doesn't work - it may have expired or is no longer accepting responses.",
 			),
 		).toBeInTheDocument();
-		expect(screen.queryByLabelText("First name")).not.toBeInTheDocument();
+		expect(screen.queryByLabelText(/^first name/i)).not.toBeInTheDocument();
 		expect(screen.queryByText("Tattoo Consent Form")).not.toBeInTheDocument();
 	});
 
@@ -275,9 +283,9 @@ describe("PublicFormFillOut", () => {
 
 		await screen.findByText("Tattoo Consent Form");
 
-		await user.type(screen.getByLabelText("First name"), "Arya");
-		await user.type(screen.getByLabelText("Last name"), "Stark");
-		await user.type(screen.getByLabelText("Email"), "arya@example.com");
+		await user.type(screen.getByLabelText(/^first name/i), "Arya");
+		await user.type(screen.getByLabelText(/^last name/i), "Stark");
+		await user.type(screen.getByLabelText(/^email/i, { selector: "input[type='email']" }), "arya@example.com");
 		// Phone left blank on purpose - the component sends `phone || null` for an empty string.
 		await user.type(screen.getByLabelText("Any allergies?"), "None");
 		await user.click(screen.getByRole("radio", { name: "Email" }));
@@ -328,9 +336,9 @@ describe("PublicFormFillOut", () => {
 		renderPage({ mocks: [getPublicFormMock({ form }), submitMock] });
 
 		await screen.findByText("Tattoo Consent Form");
-		await user.type(screen.getByLabelText("First name"), "Arya");
-		await user.type(screen.getByLabelText("Last name"), "Stark");
-		await user.type(screen.getByLabelText("Email"), "arya@example.com");
+		await user.type(screen.getByLabelText(/^first name/i), "Arya");
+		await user.type(screen.getByLabelText(/^last name/i), "Stark");
+		await user.type(screen.getByLabelText(/^email/i, { selector: "input[type='email']" }), "arya@example.com");
 		await user.type(screen.getByLabelText("Any allergies?"), "None");
 		const submitButton = screen.getByRole("button", { name: /submit/i });
 		await user.click(submitButton);
@@ -387,9 +395,9 @@ describe("PublicFormFillOut", () => {
 		renderPage({ mocks: [getPublicFormMock({ form }), failingMock] });
 
 		await screen.findByText("Tattoo Consent Form");
-		await user.type(screen.getByLabelText("First name"), "Arya");
-		await user.type(screen.getByLabelText("Last name"), "Stark");
-		await user.type(screen.getByLabelText("Email"), "arya@example.com");
+		await user.type(screen.getByLabelText(/^first name/i), "Arya");
+		await user.type(screen.getByLabelText(/^last name/i), "Stark");
+		await user.type(screen.getByLabelText(/^email/i, { selector: "input[type='email']" }), "arya@example.com");
 		await user.click(screen.getByRole("button", { name: /submit/i }));
 
 		expect(await screen.findByText("This question is required.")).toBeInTheDocument();
@@ -431,9 +439,9 @@ describe("PublicFormFillOut", () => {
 		renderPage({ mocks: [getPublicFormMock({ form }), failingMock] });
 
 		await screen.findByText("Tattoo Consent Form");
-		await user.type(screen.getByLabelText("First name"), "Arya");
-		await user.type(screen.getByLabelText("Last name"), "Stark");
-		await user.type(screen.getByLabelText("Email"), "arya@example.com");
+		await user.type(screen.getByLabelText(/^first name/i), "Arya");
+		await user.type(screen.getByLabelText(/^last name/i), "Stark");
+		await user.type(screen.getByLabelText(/^email/i, { selector: "input[type='email']" }), "arya@example.com");
 		await user.type(screen.getByLabelText("Any allergies?"), "None");
 		await user.click(screen.getByRole("button", { name: /submit/i }));
 
@@ -473,9 +481,9 @@ describe("PublicFormFillOut", () => {
 		renderPage({ mocks: [getPublicFormMock({ form }), submitMock] });
 
 		await screen.findByText("Tattoo Consent Form");
-		await user.type(screen.getByLabelText("First name"), "Arya");
-		await user.type(screen.getByLabelText("Last name"), "Stark");
-		await user.type(screen.getByLabelText("Email"), "arya@example.com");
+		await user.type(screen.getByLabelText(/^first name/i), "Arya");
+		await user.type(screen.getByLabelText(/^last name/i), "Stark");
+		await user.type(screen.getByLabelText(/^email/i, { selector: "input[type='email']" }), "arya@example.com");
 		await user.type(screen.getByLabelText("Phone (optional)"), "555-0100");
 		await user.type(screen.getByLabelText("Any allergies?"), "None");
 		await user.click(screen.getByRole("button", { name: /submit/i }));

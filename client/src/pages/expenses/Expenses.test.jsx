@@ -178,7 +178,7 @@ describe("a populated list", () => {
 		expect(await screen.findByText("$45.00")).toBeInTheDocument();
 		expect(screen.getByText("Supplies")).toBeInTheDocument();
 		expect(screen.getByText("Ink restock")).toBeInTheDocument();
-		expect(screen.getByText(/Aug 1, 2026/)).toBeInTheDocument();
+		expect(screen.getByText(/Aug 1, 2026/, { selector: ".businessLedgerMeta" })).toBeInTheDocument();
 		expect(screen.getByText(/logged by Gendry Baratheon/)).toBeInTheDocument();
 		expect(screen.getByText("Total shown: $45.00")).toBeInTheDocument();
 	});
@@ -440,9 +440,14 @@ describe("logging a new expense", () => {
 
 		await screen.findByText("No expenses logged in this range.");
 
-		// The add form's own category select - the only combobox on screen until a row enters edit
-		// mode. See IBSelect.test.jsx for this open/pick-option pattern.
-		await user.click(screen.getByRole("combobox"));
+		// The add form's own category select. It used to be the only combobox on screen until a row
+		// entered edit mode, but EntityListPager's "Show" size selector (components/entityList/
+		// EntityListPager.jsx) now renders unconditionally whenever a page-size handler is passed,
+		// even with zero items on the page - so there are two comboboxes present from the very
+		// first render, not one. Disambiguated by name, the same way the pagination test further up
+		// this file already does for the "Show" selector. See IBSelect.test.jsx for the underlying
+		// open/pick-option pattern.
+		await user.click(screen.getByRole("combobox", { name: "Category" }));
 		await user.click(screen.getByRole("option", { name: "Supplies" }));
 		await user.type(screen.getByLabelText("Amount $"), "45");
 		const dateField = screen.getByLabelText("Date");
@@ -490,13 +495,13 @@ describe("logging a new expense", () => {
 				expensesMock({
 					scope: ARTIST_SCOPE,
 					range,
-					items: [expense({ shopId: null, artistUserId: "artist-1", expenseTypeId: "expense-type-2", description: "", date: isoDate })],
+					items: [expense({ shopId: null, artistUserId: "artist-1", expenseTypeId: "expense-type-2", amountCents: 2000, description: "", date: isoDate })],
 				}),
 			],
 		});
 
 		await screen.findByText("No expenses logged in this range.");
-		await user.click(screen.getByRole("combobox"));
+		await user.click(screen.getByRole("combobox", { name: "Category" }));
 		await user.click(screen.getByRole("option", { name: "Supplies" }));
 		await user.type(screen.getByLabelText("Amount $"), "20");
 		const dateField = screen.getByLabelText("Date");
@@ -514,7 +519,7 @@ describe("logging a new expense", () => {
 		const input = { shopId: "shop-1", expenseTypeId: "expense-type-1", amountCents: 4500, description: "", date: isoDate };
 		const recordMock = {
 			request: { query: ExpenseService.RECORD_EXPENSE, variables: { input } },
-			delay: 10,
+			delay: 50,
 			result: { data: { recordExpense: expense({ date: isoDate }) } },
 		};
 		renderPage({
@@ -527,7 +532,7 @@ describe("logging a new expense", () => {
 		});
 
 		await screen.findByText("No expenses logged in this range.");
-		await user.click(screen.getByRole("combobox"));
+		await user.click(screen.getByRole("combobox", { name: "Category" }));
 		await user.click(screen.getByRole("option", { name: "Supplies" }));
 		await user.type(screen.getByLabelText("Amount $"), "45");
 		const dateField = screen.getByLabelText("Date");
@@ -557,7 +562,7 @@ describe("logging a new expense", () => {
 		});
 
 		await screen.findByText("No expenses logged in this range.");
-		await user.click(screen.getByRole("combobox"));
+		await user.click(screen.getByRole("combobox", { name: "Category" }));
 		await user.click(screen.getByRole("option", { name: "Supplies" }));
 		await user.type(screen.getByLabelText("Amount $"), "45");
 		const dateField = screen.getByLabelText("Date");
@@ -581,11 +586,14 @@ describe("editing an expense", () => {
 		const user = userEvent.setup();
 		const range = getDefaultRange();
 		const original = expense();
-		// The round trip startEdit/saveEdit puts every date through: item.date -> moment().format
-		// ("YYYY-MM-DD") to seed the field, then moment(..., "YYYY-MM-DD").toISOString() to send it
-		// back. Deriving the expected value the same way (rather than assuming a timezone) is what
-		// makes this assertion timezone-independent.
-		const roundTrippedDate = moment(moment(original.date).format("YYYY-MM-DD"), "YYYY-MM-DD").toISOString();
+		// The round trip startEdit/saveEdit puts every date through: item.date -> moment.utc().format
+		// ("YYYY-MM-DD") to seed the field (item.date is a pure calendar date with no time-of-day
+		// meaning - see Expenses.jsx/Income.jsx's own comment on that field - so startEdit parses it
+		// with .utc() to avoid rolling it back a day for anyone west of UTC), then
+		// moment(..., "YYYY-MM-DD").toISOString() to send the edited LOCAL calendar date back as a
+		// new UTC timestamp, same as a brand-new entry's date. Deriving the expected value the same
+		// way (rather than assuming a timezone) is what makes this assertion timezone-independent.
+		const roundTrippedDate = moment(moment.utc(original.date).format("YYYY-MM-DD"), "YYYY-MM-DD").toISOString(); // utc-ok: mirrors the production round trip explained above
 		const updateMock = {
 			request: {
 				query: ExpenseService.UPDATE_EXPENSE,
@@ -649,7 +657,7 @@ describe("editing an expense", () => {
 		const user = userEvent.setup();
 		const range = getDefaultRange();
 		const original = expense();
-		const roundTrippedDate = moment(moment(original.date).format("YYYY-MM-DD"), "YYYY-MM-DD").toISOString();
+		const roundTrippedDate = moment(moment.utc(original.date).format("YYYY-MM-DD"), "YYYY-MM-DD").toISOString(); // utc-ok: mirrors the production round trip explained above
 		const failingMock = {
 			request: {
 				query: ExpenseService.UPDATE_EXPENSE,

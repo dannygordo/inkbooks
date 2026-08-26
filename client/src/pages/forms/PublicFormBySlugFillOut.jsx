@@ -110,16 +110,20 @@ const PublicFormBySlugFillOut = () => {
 					lastName,
 					email,
 					phone: phone || null,
-					answers: Object.values(answers).map(
-						({ fieldKey, textValue, selectedOptions, dateValue, fileUrls, signedName }) => ({
-							fieldKey,
-							textValue: textValue || null,
-							selectedOptions: selectedOptions || [],
-							dateValue: dateValue || null,
-							fileUrls: fileUrls || [],
-							signedName: signedName || null,
-						})
-					),
+					// One entry per rendered field, not Object.values(answers) - see the fuller
+					// explanation in PublicFormFillOut.jsx's own handleSubmit, which hit the exact
+					// same "untouched required field silently drops out of the submitted array" bug.
+					answers: form.fields.map((field) => {
+						const answer = answers[field.key] || {};
+						return {
+							fieldKey: field.key,
+							textValue: answer.textValue || null,
+							selectedOptions: answer.selectedOptions || [],
+							dateValue: answer.dateValue || null,
+							fileUrls: answer.fileUrls || [],
+							signedName: answer.signedName || null,
+						};
+					}),
 				},
 			},
 		});

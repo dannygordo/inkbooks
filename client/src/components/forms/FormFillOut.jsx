@@ -74,16 +74,21 @@ const FormFillOut = ({ formId, clientId, onSubmitted, onCancel }) => {
 				input: {
 					formId: form.id,
 					clientId: clientId || null,
-					answers: Object.values(answers).map(
-						({ fieldKey, textValue, selectedOptions, dateValue, fileUrls, signedName }) => ({
-							fieldKey,
-							textValue: textValue || null,
-							selectedOptions: selectedOptions || [],
-							dateValue: dateValue || null,
-							fileUrls: fileUrls || [],
-							signedName: signedName || null,
-						})
-					),
+					// One entry per rendered field, not Object.values(answers) - see the matching note
+					// and full explanation in pages/forms/PublicFormFillOut.jsx's own handleSubmit,
+					// which hit the exact same "untouched required field silently drops out of the
+					// submitted array" bug.
+					answers: form.fields.map((field) => {
+						const answer = answers[field.key] || {};
+						return {
+							fieldKey: field.key,
+							textValue: answer.textValue || null,
+							selectedOptions: answer.selectedOptions || [],
+							dateValue: answer.dateValue || null,
+							fileUrls: answer.fileUrls || [],
+							signedName: answer.signedName || null,
+						};
+					}),
 				},
 			},
 		});

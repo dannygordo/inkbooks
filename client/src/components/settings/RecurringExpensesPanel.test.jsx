@@ -8,6 +8,7 @@
 //
 // Explicit React import - see the matching note in pages/login/Login.test.jsx.
 import React from "react";
+import moment from "moment";
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -402,7 +403,7 @@ describe("adding a recurring expense", () => {
 						amountCents: 250000,
 						description: "New chair",
 						frequency: "monthly",
-						startDate: new Date("2026-06-01T00:00:00.000Z").toISOString(),
+						startDate: moment("2026-06-01", "YYYY-MM-DD").toISOString(),
 						endDate: null,
 					},
 				},
@@ -470,8 +471,8 @@ describe("adding a recurring expense", () => {
 						amountCents: 5000,
 						description: "",
 						frequency: "yearly",
-						startDate: new Date("2026-06-01T00:00:00.000Z").toISOString(),
-						endDate: new Date("2027-06-01T00:00:00.000Z").toISOString(),
+						startDate: moment("2026-06-01", "YYYY-MM-DD").toISOString(),
+						endDate: moment("2027-06-01", "YYYY-MM-DD").toISOString(),
 					},
 				},
 			},
@@ -531,7 +532,7 @@ describe("adding a recurring expense", () => {
 						amountCents: 1000,
 						description: "",
 						frequency: "monthly",
-						startDate: new Date("2026-06-01T00:00:00.000Z").toISOString(),
+						startDate: moment("2026-06-01", "YYYY-MM-DD").toISOString(),
 						endDate: null,
 					},
 				},
@@ -582,7 +583,7 @@ describe("adding a recurring expense", () => {
 						amountCents: 1000,
 						description: "",
 						frequency: "monthly",
-						startDate: new Date("2026-06-01T00:00:00.000Z").toISOString(),
+						startDate: moment("2026-06-01", "YYYY-MM-DD").toISOString(),
 						endDate: null,
 					},
 				},

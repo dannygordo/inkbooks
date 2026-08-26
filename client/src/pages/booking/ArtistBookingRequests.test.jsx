@@ -310,7 +310,11 @@ describe("empty states", () => {
     });
 
     await waitForLoaded();
-    await user.selectOptions(screen.getByRole("combobox"), "closed");
+    // The status filter <select> gained an aria-label ("Status") so it's disambiguated from
+    // Pager.jsx's own "Show" page-size <select>, which is also on screen once there are any
+    // pending requests to page through - see ArtistBookingRequests.jsx's own comment on the
+    // filter select.
+    await user.selectOptions(screen.getByRole("combobox", { name: "Status" }), "closed");
 
     expect(await screen.findByText("Nothing here.")).toBeInTheDocument();
     expect(screen.queryByText("Nothing waiting on you.")).not.toBeInTheDocument();
@@ -419,7 +423,7 @@ describe("switching the status filter", () => {
     });
 
     await waitForLoaded();
-    await user.selectOptions(screen.getByRole("combobox"), "booked");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Status" }), "booked");
 
     // Changing statusFilter changes the query's variables, which briefly puts the page back into
     // its loading state (the whole two-pane UI - including ".bookingRequestsList" - unmounts for

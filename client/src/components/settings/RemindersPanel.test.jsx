@@ -73,10 +73,11 @@ describe("once settings have loaded", () => {
 		});
 
 		expect(await screen.findByRole("heading", { name: "Reminders" })).toBeInTheDocument();
-		// MUI's Switch renders its underlying <input> with role="checkbox", not "switch" - matching
-		// this codebase's other MUI Switch tests (see AutoResponsesPanel.test.jsx).
-		expect(screen.getByRole("checkbox", { name: "Email reminders" })).toBeChecked();
-		expect(screen.getByRole("checkbox", { name: "Text reminders" })).not.toBeChecked();
+		// MUI's Switch renders its underlying <input> with role="switch" (confirmed against this
+		// test's own printed accessible-roles dump), not "checkbox" - matching this codebase's
+		// other MUI Switch tests (see AutoResponsesPanel.test.jsx).
+		expect(screen.getByRole("switch", { name: "Email reminders" })).toBeChecked();
+		expect(screen.getByRole("switch", { name: "Text reminders" })).not.toBeChecked();
 	});
 
 	it("explains the shared-number trade-off for text reminders", async () => {
@@ -153,7 +154,7 @@ describe("once settings have loaded", () => {
 		// The per-rule enable Switch has no FormControlLabel/text of its own (unlike the two channel
 		// switches above it), so it's picked out by its row rather than by accessible name.
 		const ruleSwitches = screen
-			.getAllByRole("checkbox")
+			.getAllByRole("switch")
 			.filter((el) => el.closest(".remindersRuleRow"));
 		expect(ruleSwitches).toHaveLength(2);
 		expect(ruleSwitches[0]).toBeChecked();
@@ -293,7 +294,7 @@ describe("saving", () => {
 			],
 		});
 
-		await user.click(await screen.findByRole("checkbox", { name: "Text reminders" }));
+		await user.click(await screen.findByRole("switch", { name: "Text reminders" }));
 
 		const valueField = screen.getByLabelText("How long before");
 		await user.clear(valueField);
@@ -389,7 +390,7 @@ describe("saving", () => {
 		await user.click(screen.getByRole("button", { name: "Save Reminder Settings" }));
 
 		expect(await screen.findByRole("button", { name: "Saving..." })).toBeDisabled();
-		expect(screen.getByRole("checkbox", { name: "Email reminders" })).toBeDisabled();
+		expect(screen.getByRole("switch", { name: "Email reminders" })).toBeDisabled();
 		expect(screen.getByLabelText("How long before")).toBeDisabled();
 	});
 

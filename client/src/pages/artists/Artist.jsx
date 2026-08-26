@@ -63,20 +63,27 @@ const Artist = (props) => {
 	const isSelf = data?.getArtist ? String(user.id) === String(data.getArtist.userId) : false;
 	const canEditIdentity = isSelf || user.role <= ROLES.SHOP_ADMIN;
 
+	// `||`, not `??`: once a field's input has mounted, a null/undefined underlying value
+	// still leaves ref.current.value as a real empty string (the DOM has no way to represent
+	// an unset text input), so `?? data.field` never actually falls through post-mount and a
+	// field that was genuinely null got silently written back as "" on every unrelated blur.
+	// `||` falls back to the original value both before mount (ref undefined) and for an
+	// untouched-but-null field after mount (ref.current.value === ""), and still prefers
+	// anything actually typed.
 	const buildIdentityPayload = () => ({
 		id: data.getArtist.id,
-		firstName: firstNameRef.current?.value ?? data.getArtist.firstName,
-		lastName: lastNameRef.current?.value ?? data.getArtist.lastName,
-		email: emailRef.current?.value ?? data.getArtist.email,
-		phone: phoneRef.current?.value ?? data.getArtist.phone,
-		title: titleRef.current?.value ?? data.getArtist.title,
-		address: addressRef.current?.value ?? data.getArtist.address,
-		city: cityRef.current?.value ?? data.getArtist.city,
-		state: stateRef.current?.value ?? data.getArtist.state,
-		zip: zipRef.current?.value ?? data.getArtist.zip,
-		startDate: startDateRef.current?.value ?? data.getArtist.startDate,
-		instagram: instagramRef.current?.value ?? data.getArtist.instagram,
-		facebook: facebookRef.current?.value ?? data.getArtist.facebook,
+		firstName: firstNameRef.current?.value || data.getArtist.firstName,
+		lastName: lastNameRef.current?.value || data.getArtist.lastName,
+		email: emailRef.current?.value || data.getArtist.email,
+		phone: phoneRef.current?.value || data.getArtist.phone,
+		title: titleRef.current?.value || data.getArtist.title,
+		address: addressRef.current?.value || data.getArtist.address,
+		city: cityRef.current?.value || data.getArtist.city,
+		state: stateRef.current?.value || data.getArtist.state,
+		zip: zipRef.current?.value || data.getArtist.zip,
+		startDate: startDateRef.current?.value || data.getArtist.startDate,
+		instagram: instagramRef.current?.value || data.getArtist.instagram,
+		facebook: facebookRef.current?.value || data.getArtist.facebook,
 		// shopId is deliberately NOT sent - see updateArtist's own comment in
 		// server/graphql/mutations/artists.js on why an ordinary profile save must not be how an
 		// artist's shop changes (that's connectArtistToShop, which asks first).
@@ -123,6 +130,15 @@ const Artist = (props) => {
 
 	if (loading) {
 		return <IBPageLoader />;
+	}
+	// Lazy baseline init (allowed during render for a ref - this exact pattern is called
+	// out in React's own docs): lastSavedIdentityRef starts null, and the build*Payload fallbacks
+	// read from data itself for every ref that hasn't attached to a real input yet, which
+	// is every ref on the render where data first arrives. Without this, the first blur
+	// ever - even one that changed nothing - looks 'dirty' against a null baseline and
+	// fires a save no one asked for.
+	if (data && data.getArtist && lastSavedIdentityRef.current === null) {
+		lastSavedIdentityRef.current = JSON.stringify(buildIdentityPayload());
 	}
 
 	if (data && data.getArtist) {
