@@ -84,15 +84,28 @@ module.exports = {
     // truncated any cut that wasn't a whole number of dollars.
     const targetAmountCents = appointment.shopCutCents;
 
-    const invoiceResult = await square.createAndPublishShopCutInvoice({
-      account,
-      artistEmail: artist.email,
-      artistFirstName: artist.firstName,
-      artistLastName: artist.lastName,
-      targetAmountCents,
-      description: `Shop cut for appointment on ${appointment.appointmentDate.toDateString()}`,
-      paymentMethod,
-    });
+    let invoiceResult;
+    try {
+      invoiceResult = await square.createAndPublishShopCutInvoice({
+        account,
+        artistEmail: artist.email,
+        artistFirstName: artist.firstName,
+        artistLastName: artist.lastName,
+        targetAmountCents,
+        description: `Shop cut for appointment on ${appointment.appointmentDate.toDateString()}`,
+        paymentMethod,
+      });
+    } catch (err) {
+      // SQUARE_PAYMENTS_DISABLED (utils/square.js) is a deliberate, expected state - the
+      // dev-environment kill switch - not an unexpected failure, so it gets the same
+      // UserInputError treatment as every other guard above instead of falling through to
+      // formatError's Sentry-reporting branch. Anything else (a real Square API error) propagates
+      // unchanged.
+      if (err.code === 'SQUARE_PAYMENTS_DISABLED') {
+        throw new UserInputError('Errors', { errors: { appointmentId: err.message } });
+      }
+      throw err;
+    }
 
     const previousShopCutStatus = appointment.shopCutStatus;
     appointment.shopCutSquareInvoiceId = invoiceResult.invoiceId;
@@ -197,15 +210,25 @@ module.exports = {
     // Summed in cents, so a batch of N cuts is exact rather than accumulating N roundings.
     const targetAmountCents = appointments.reduce((sum, a) => sum + (a.shopCutCents || 0), 0);
 
-    const invoiceResult = await square.createAndPublishShopCutInvoice({
-      account,
-      artistEmail: artist.email,
-      artistFirstName: artist.firstName,
-      artistLastName: artist.lastName,
-      targetAmountCents,
-      description: `Shop cut for ${appointments.length} session(s)`,
-      paymentMethod,
-    });
+    let invoiceResult;
+    try {
+      invoiceResult = await square.createAndPublishShopCutInvoice({
+        account,
+        artistEmail: artist.email,
+        artistFirstName: artist.firstName,
+        artistLastName: artist.lastName,
+        targetAmountCents,
+        description: `Shop cut for ${appointments.length} session(s)`,
+        paymentMethod,
+      });
+    } catch (err) {
+      // See the single-appointment createShopCutInvoice above for why this one condition gets
+      // special-cased.
+      if (err.code === 'SQUARE_PAYMENTS_DISABLED') {
+        throw new UserInputError('Errors', { errors: { appointmentIds: err.message } });
+      }
+      throw err;
+    }
 
     for (const appointment of appointments) {
       appointment.shopCutSquareInvoiceId = invoiceResult.invoiceId;

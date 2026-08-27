@@ -22,6 +22,30 @@ function getEnvironment() {
   return process.env.SQUARE_ENVIRONMENT === 'production' ? 'production' : 'sandbox';
 }
 
+// A single kill switch in front of the only two places this file ever moves or requests real
+// money: a direct card charge (createPaymentForAccount) and a shop-cut invoice
+// (createAndPublishShopCutInvoice). Everything else in here - OAuth, token refresh, webhook
+// verification - stays live either way, so Settings' Square panel keeps working for connect/
+// disconnect while this is off.
+//
+// Defaults to enabled (unset behaves exactly as before this existed) - set
+// SQUARE_PAYMENTS_ENABLED=false in Render/`.env.*` to turn real charges off without touching code
+// or redeploying anything else. The thrown error carries both `.status` (the REST route at
+// routes/squarePayments.js already forwards `err.status` unchanged) and `.code` (so the GraphQL
+// side, shopCutPayments.js, can catch this one condition specifically and re-throw it as a
+// UserInputError instead of letting it fall through to formatError as an unexpected failure).
+function assertPaymentsEnabled() {
+  if (process.env.SQUARE_PAYMENTS_ENABLED === 'false') {
+    const error = new Error(
+      'Real Square payments are turned off in this environment (SQUARE_PAYMENTS_ENABLED=false). ' +
+        'Set it to true (or unset it) to take a real charge or send a real invoice.',
+    );
+    error.status = 503;
+    error.code = 'SQUARE_PAYMENTS_DISABLED';
+    throw error;
+  }
+}
+
 function getBaseUrl() {
   return getEnvironment() === 'production'
     ? 'https://connect.squareup.com'
@@ -282,6 +306,7 @@ async function createAndPublishShopCutInvoice({
   description,
   paymentMethod = 'ach',
 }) {
+  assertPaymentsEnabled();
   if (!account || !account.locationId) {
     throw new Error('This Square connection is missing a location id - reconnect Square.');
   }
@@ -463,6 +488,7 @@ function isInsufficientScopeError(data) {
 }
 
 async function createPaymentForAccount({ account, sourceId, amountCents, idempotencyKey, note }) {
+  assertPaymentsEnabled();
   if (!account || !account.locationId) {
     throw new Error('This Square connection is missing a location id - reconnect Square.');
   }
