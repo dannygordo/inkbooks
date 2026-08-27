@@ -1,8 +1,18 @@
 name: CI
 
 # Runs the full test suite (and the client production build) on every push to main and every PR
-# targeting main. Two independent jobs, since server/ and apps/web/ are separate npm projects with
-# their own package.json/lockfile - a failure in one shouldn't block visibility into the other.
+# targeting main. server/ stays a fully independent npm project with its own package.json/lockfile
+# and its own job - a failure there shouldn't block visibility into the others.
+#
+# apps/web and packages/api are different: since the mobile-app monorepo step
+# (PRODUCTION_ROADMAP.md's Phase 5, step 2) gave root package.json a real "workspaces" field,
+# apps/web consumes packages/api as an actual npm dependency (a "file:../../packages/api"
+# reference, resolved and built from source, not published anywhere). Empirically, once a
+# package's ancestor declares "workspaces", `npm ci` run with cwd inside that package no longer
+# manages its own independent lockfile the way it used to - resolution defers to the repo root.
+# So both jobs that touch the workspace install from the root, with ONE lockfile
+# (package-lock.json) covering apps/web + packages/api together, and use `--workspace=<name>` to
+# target a single project's scripts rather than `cd`-ing into it.
 on:
   push:
     branches: [main]
@@ -35,12 +45,9 @@ jobs:
       # handful of tests that exercise those code paths set their own dummy values inline.
       - run: npm test
 
-  client:
-    name: Client tests + build
+  packages-api:
+    name: packages/api build, typecheck, codegen drift
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/web
     steps:
       - uses: actions/checkout@v4
 
@@ -48,13 +55,41 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: apps/web/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - run: npm ci
-      - run: npm test
+      - run: npm run typecheck --workspace=packages/api
+      - run: npm run build --workspace=packages/api
+
+      # Catches the case a .graphql operation file (or the server schema itself) changed without
+      # re-running codegen - src/generated/graphql.tsx is committed precisely so this diff is
+      # possible. Same spirit as DECISIONS.md's X2: a generated-client drift is exactly the kind of
+      # silent mismatch that's cheap to catch here and expensive to find out about from a broken
+      # mobile build later.
+      - run: npm run codegen --workspace=packages/api
+      - run: git diff --exit-code -- packages/api/src/generated
+
+  client:
+    name: Client tests + build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - run: npm ci
+      # apps/web's "@inkbooks/api": "file:../../packages/api" dependency resolves to this
+      # directory's source - it needs a real dist/ (built from packages/api's TypeScript, per its
+      # package.json's "main"/"types") before apps/web's own tests or build can import it.
+      - run: npm run build --workspace=packages/api
+      - run: npm test --workspace=apps/web
 
       # Not just "does it pass tests" - "does it actually still produce a deployable bundle."
       # Vite reads VITE_* env vars at build time; none of the current ones (Firebase config,
       # Square app id, GraphQL endpoint) change whether the build itself succeeds, so no secrets
       # are needed here just to confirm the app compiles.
-      - run: npm run build
+      - run: npm run build --workspace=apps/web
