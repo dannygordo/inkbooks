@@ -1,0 +1,73 @@
+# Mirrors ProjectService._fetchProjects's inline FETCH_PROJECTS_QUERY. Powers pages/projects/Projects.jsx's
+# paginated list.
+query GetProjects($page: PageInput) {
+	getProjects(page: $page) {
+		items {
+			id
+			title
+			description
+			placement
+			size
+			palette
+			artistId
+			artist {
+				firstName
+				lastName
+				email
+				avatar
+				id
+			}
+			clientId
+			client {
+				firstName
+				lastName
+				email
+				avatar
+				id
+			}
+			referenceImages {
+				url
+				avatar
+				title
+				uploadedByDisplayName
+				tags
+				updatedAt
+				createdAt
+			}
+			bodyImages {
+				url
+				avatar
+				title
+				uploadedByDisplayName
+				tags
+				updatedAt
+				createdAt
+			}
+			designImages {
+				url
+				avatar
+				uploadedByDisplayName
+				tags
+				updatedAt
+				createdAt
+			}
+			materialsUsed
+			notes {
+				author
+				note
+				createdAt
+				updatedAt
+			}
+			tags
+			status
+			depositCollectedCents
+			depositAvailableCents
+		}
+		pageInfo {
+			totalCount
+			hasMore
+			limit
+			offset
+		}
+	}
+}

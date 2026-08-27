@@ -1,0 +1,75 @@
+# Mirrors ProjectService._updateProject's UPDATE_PROJECT_MUTATION.
+mutation UpdateProject($project: ProjectInput) {
+	updateProject(project: $project) {
+		id
+		title
+		description
+		placement
+		size
+		palette
+		artistId
+		clientId
+		referenceImages {
+			id
+			url
+			avatar
+			title
+			uploadedByDisplayName
+			userId
+			userInfo {
+				firstName
+				lastName
+				avatar
+				id
+			}
+			tags
+			updatedAt
+			createdAt
+		}
+		bodyImages {
+			id
+			url
+			avatar
+			title
+			uploadedByDisplayName
+			userId
+			userInfo {
+				firstName
+				lastName
+				avatar
+				id
+			}
+			tags
+			updatedAt
+			createdAt
+		}
+		designImages {
+			id
+			url
+			avatar
+			uploadedByDisplayName
+			userId
+			userInfo {
+				firstName
+				lastName
+				avatar
+				id
+			}
+			tags
+			updatedAt
+			createdAt
+		}
+		materialsUsed
+		notes {
+			id
+			author
+			note
+			createdAt
+			updatedAt
+		}
+		tags
+		status
+		depositCollectedCents
+		depositAvailableCents
+	}
+}

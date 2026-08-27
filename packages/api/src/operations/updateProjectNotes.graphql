@@ -1,0 +1,11 @@
+# Mirrors ProjectService._updateProjectNotes. Used by Project.jsx and ClientDashboard.jsx.
+mutation UpdateProjectNotes($projectId: ID!, $notes: [IBNoteInput]) {
+	updateProjectNotes(projectId: $projectId, notes: $notes) {
+		notes {
+			author
+			note
+			createdAt
+			updatedAt
+		}
+	}
+}

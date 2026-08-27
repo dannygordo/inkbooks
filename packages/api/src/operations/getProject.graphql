@@ -1,0 +1,140 @@
+# Mirrors apps/web's former ProjectService._FETCH_PROJECT_QUERY field-for-field. Powers the
+# project detail page (pages/projects/Project.jsx): full artist/shop billing info, the live
+# conversation thread, and every image list.
+query GetProject($projectId: ID!) {
+	getProject(projectId: $projectId) {
+		id
+		title
+		description
+		placement
+		size
+		palette
+		artistId
+		artist {
+			firstName
+			lastName
+			email
+			id
+			hourlyRate
+			flatRate
+			billingType
+			user {
+				id
+			}
+			shop {
+				id
+				name
+				hourlyRate
+				flatRate
+				billingType
+			}
+		}
+		clientId
+		client {
+			firstName
+			lastName
+			email
+			id
+		}
+		conversation {
+			id
+			members
+			membersInfo {
+				id
+				firstName
+				lastName
+				avatar
+			}
+			messages {
+				id
+				conversationId
+				senderId
+				user {
+					firstName
+					lastName
+					avatar
+				}
+				message
+				createdAt
+				updatedAt
+			}
+			createdAt
+			updatedAt
+		}
+		referenceImages {
+			id
+			url
+			avatar
+			title
+			uploadedByDisplayName
+			userId
+			userInfo {
+				firstName
+				lastName
+				avatar
+				id
+			}
+			tags
+			updatedAt
+			createdAt
+		}
+		bodyImages {
+			id
+			url
+			avatar
+			title
+			uploadedByDisplayName
+			userId
+			userInfo {
+				firstName
+				lastName
+				avatar
+				id
+			}
+			tags
+			updatedAt
+			createdAt
+		}
+		designImages {
+			id
+			url
+			avatar
+			uploadedByDisplayName
+			userId
+			userInfo {
+				firstName
+				lastName
+				avatar
+				id
+			}
+			tags
+			updatedAt
+			createdAt
+		}
+		materialsUsed
+		notes {
+			id
+			author
+			note
+			createdAt
+			updatedAt
+		}
+		tags
+		status
+		depositCollectedCents
+		depositAvailableCents
+		deposits {
+			id
+			depositCents
+			depositPaymentMethod
+			depositCollectedAt
+		}
+		consultAppointment {
+			id
+			depositCents
+			depositStatus
+			depositPaymentMethod
+			depositCollectedAt
+		}
+	}
+}

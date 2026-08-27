@@ -1,0 +1,6 @@
+# Mirrors ProjectService._updateProjectTags.
+mutation UpdateProjectTags($projectId: ID!, $tags: [String]) {
+	updateProjectTags(projectId: $projectId, tags: $tags) {
+		tags
+	}
+}
