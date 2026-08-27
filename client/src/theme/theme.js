@@ -1,4 +1,5 @@
 import { createTheme } from "@mui/material/styles";
+import { light, dark } from "./tokens.mjs";
 
 // MUI's cssVariables mode, keyed to the SAME [data-theme] attribute tokens.css already reads -
 // see that file's header comment for why one attribute has to drive both systems. This makes
@@ -6,11 +7,9 @@ import { createTheme } from "@mui/material/styles";
 // instead of baking a fixed light palette into the JS bundle, which is the only way a runtime
 // light/dark toggle can reach MUI's own components without a full remount.
 //
-// Values mirror client/src/theme/tokens.css exactly. They are duplicated rather than read from
-// the CSS file at build time because MUI's palette needs real JS color objects (main/dark/
-// contrastText) to compute hover/focus states correctly - keep the two in sync by hand if either
-// changes, the way DECISIONS.md's own worked examples have to stay in sync with the code they
-// describe.
+// Values come from tokens.mjs, the same plain-value source tokens.css is generated from - no
+// more hand-keeping two copies of the same hex values in sync (this file used to hardcode its
+// own literals here; see git history if that duplication is ever useful to compare against).
 const theme = createTheme({
 	cssVariables: {
 		colorSchemeSelector: "data-theme",
@@ -19,57 +18,57 @@ const theme = createTheme({
 		light: {
 			palette: {
 				primary: {
-					main: "#9c5a30",
-					dark: "#7e4726",
-					light: "#c9986a",
-					contrastText: "#ffffff",
+					main: light.primary,
+					dark: light.primaryHover,
+					light: light.primaryLight,
+					contrastText: light.primaryContrast,
 				},
 				error: {
-					main: "#b3452e",
-					dark: "#7a2e1c",
+					main: light.error,
+					dark: light.errorDark,
 				},
 				success: {
-					main: "#4a7043",
+					main: light.success,
 				},
 				background: {
-					default: "#f5f1ec",
-					paper: "#ffffff",
+					default: light.surfacePage,
+					paper: light.surfaceCard,
 				},
 				text: {
-					primary: "#2a201a",
-					secondary: "#6b5c4e",
+					primary: light.textPrimary,
+					secondary: light.textSecondary,
 				},
-				divider: "#e0d5c8",
+				divider: light.border,
 			},
 		},
 		dark: {
 			palette: {
 				primary: {
 					// Lighter than the light-mode copper - a dark-copper fill on a dark background
-					// doesn't hold contrast against light text, the same reason tokens.css's
-					// --ib-primary brightens for dark mode. Pairs with a dark contrastText below
-					// instead of white, for the same reason.
-					main: "#d38a51",
-					dark: "#e29e68",
-					light: "#e0a874",
-					contrastText: "#241c17",
+					// doesn't hold contrast against light text, the same reason tokens.mjs's dark
+					// palette brightens `primary`. Pairs with a dark contrastText below instead of
+					// white, for the same reason.
+					main: dark.primary,
+					dark: dark.primaryHover,
+					light: dark.primaryLight,
+					contrastText: dark.primaryContrast,
 				},
 				error: {
-					main: "#e2795a",
-					dark: "#f2a58c",
+					main: dark.error,
+					dark: dark.errorDark,
 				},
 				success: {
-					main: "#7fa86f",
+					main: dark.success,
 				},
 				background: {
-					default: "#1a1512",
-					paper: "#241c17",
+					default: dark.surfacePage,
+					paper: dark.surfaceCard,
 				},
 				text: {
-					primary: "#f3ece4",
-					secondary: "#c4b3a1",
+					primary: dark.textPrimary,
+					secondary: dark.textSecondary,
 				},
-				divider: "#453a30",
+				divider: dark.border,
 			},
 		},
 	},

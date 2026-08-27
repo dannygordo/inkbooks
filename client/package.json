@@ -35,7 +35,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "tokens:generate": "node scripts/generate-theme-tokens-css.mjs"
   },
   "browserslist": {
     "production": [
