@@ -679,6 +679,25 @@ section completes it and fixes the build order into a walking-skeleton-first seq
 4. Auth token storage interface, shipped on web first (`expo-secure-store`'s eventual mobile
    implementation and web's `localStorage` implementation sit behind the same interface). Also
    closes the XSS/localStorage token-theft exposure flagged in the original security audit.
+   ✅ Done (2026-08-27) - `apps/web/src/services/TokenStorageService.js` replaces `CacheService.js`
+   with an async `setItemAsync`/`getItemAsync`/`deleteItemAsync` interface shaped exactly like
+   `expo-secure-store`'s real API (strings only, no JSON encoding done by the service itself) -
+   see DECISIONS.md's X5 for why that shape, and for the redundant-double-JSON-encoding bug it
+   fixes as a byproduct. Every real call site is migrated: `context/auth.jsx` (the initial-session
+   check, now async, gated behind a new `initializing` flag distinct from the existing `loading`
+   one), `index.jsx`'s Apollo `authLink` (Apollo Client's `setContext` accepts an async context
+   function, so this needed no link-chain restructuring), and `IBChatBox.jsx`'s upload handler
+   (already async). `utils/AuthRoute.jsx` and `utils/RoleRoute.jsx` both gained an
+   `if (initializing) return null;` gate - without it, an already-authenticated person loading the
+   app straight into a guarded route would flash-redirect to `/login` for one render before the
+   async session restore resolved; RoleRoute needed this independently since it's used standalone
+   in `App.jsx`, not nested inside AuthRoute. Verified: full `apps/web` suite (179 files / 2130
+   tests, up from 2119 - CacheService.test.js's 4 removed, 15 added across the new/touched
+   auth files) green, plus a production build, via the same disposable cloud sandbox mirror
+   technique noted on item 3 above. Web's implementation is still `localStorage`-backed - this
+   step gets every call site behind the shared interface first; actually closing the XSS/
+   localStorage exposure the original audit flagged is a follow-up one-file swap here, not done
+   yet.
 5. Expo app scaffolded inside the monorepo. Items 4-7 above (mobile CI/CD, Sentry RN, test
    harness, App Store payment check) stood up immediately here, before feature screens - not
    after the app is "mostly done."

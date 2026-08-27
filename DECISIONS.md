@@ -782,6 +782,57 @@ accurate the moment `workspaces` landed and would only have kept lying about wha
 actually does. Run `npm ci` (or `npm install`) once from the repo root; that's what both CI jobs
 and any future workspace member (packages/shared, apps/mobile) will do too.
 
+### X5. Auth token storage sits behind an async interface shaped like expo-secure-store, not localStorage's synchronous one
+
+`CacheService.js` (`localStorage.setItem`/`getItem`/`removeItem`, synchronous) is gone, replaced by
+`apps/web/src/services/TokenStorageService.js` (`setItemAsync`/`getItemAsync`/`deleteItemAsync`).
+Staged in `apps/web/src/services/` ahead of `packages/shared` existing, same precedent as X3's
+design tokens - moves verbatim once that package exists.
+
+The shape is dictated by the mobile side, not chosen freely: `expo-secure-store`'s real API
+(iOS Keychain / Android Keystore) is inherently async and stores strings only, no JSON encoding
+done for you. An interface that stayed synchronous, or that did its own `JSON.stringify`
+internally the way `CacheService` did, could not become the real mobile implementation without
+also changing its signature - every call site would need a second migration later. Written now,
+the mobile implementation is a three-line re-export with no adapter logic:
+
+```js
+import * as SecureStore from "expo-secure-store";
+export const TokenStorageService = {
+  setItemAsync: SecureStore.setItemAsync,
+  getItemAsync: SecureStore.getItemAsync,
+  deleteItemAsync: SecureStore.deleteItemAsync,
+};
+```
+
+This also fixes a real, if harmless, bug rather than just relocating it: `CacheService.setItem`/
+`getItem` did a *redundant double* `JSON.stringify`/`JSON.parse` - every real caller already
+pre-stringified before calling `setItem`, then `setItem` stringified again, and `getItem` only
+round-tripped correctly because it parsed twice too. `CacheService.test.js` explicitly documented
+and locked that contract in, calling a fix "out of scope for a test-writing pass." It's in scope
+here: this step already touches every call site to make it async, and the new service does zero
+JSON encoding of its own - callers stringify once before `setItemAsync`, parse once after
+`getItemAsync` - so the double-encoding isn't fixed so much as made impossible to reintroduce.
+
+**Consequence for `context/auth.jsx`:** the previously-synchronous initial-session check (read
+directly into the reducer's initial state at module load, before React ever rendered) has to move
+into an effect, since `getItemAsync` is genuinely async even on web. That produces one real render,
+on mount, before a previously-signed-in user's session comes back - `AuthProvider` now exposes a
+distinct `initializing` boolean (not the existing, unrelated `loading` flag) so consumers can tell
+"still checking" apart from "checked, nobody's signed in." `utils/AuthRoute.jsx` and
+`utils/RoleRoute.jsx` both gate on it (render nothing while `initializing`) - without that, an
+already-authenticated person hitting a route either guards on a hard refresh would be bounced to
+`/login` for one render, before their session had a chance to be restored. RoleRoute needed the
+same fix independently: it's used standalone in `App.jsx` (`/artists`, `/expenses`, `/income`,
+`/forms`), not nested inside AuthRoute, so it had the identical exposure one role check further
+along.
+
+Not yet done, and deliberately out of scope for this step: `TokenStorageService`'s web
+implementation is still `localStorage`-backed. This step gets every call site behind the shared
+interface first, so swapping the storage backend later (closing the XSS/localStorage token-theft
+exposure the original security audit flagged) is a one-file change here, not an app-wide
+search-and-replace.
+
 ---
 
 ## Process
