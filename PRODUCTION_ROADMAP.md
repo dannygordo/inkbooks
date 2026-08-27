@@ -628,9 +628,19 @@ section completes it and fixes the build order into a walking-skeleton-first seq
 
 1. Decide items 1-3 above. These are decisions and small extractions, not long phases - they block
    nothing else from starting once written down, but any monorepo/RN code written before they're
-   decided risks being built against the wrong assumption.
+   decided risks being built against the wrong assumption. ✅ Done (2026-08-27) - X1/X2/X3 in
+   `DECISIONS.md`.
 2. Turborepo scaffold, the existing web app moved in verbatim. CI must stay green throughout; zero
-   behavior change is the acceptance criterion for this step.
+   behavior change is the acceptance criterion for this step. ✅ Done (2026-08-28) - `client/` ->
+   `apps/web/` via `git mv` (history preserved), CI paths updated, PR #1 merged to `main`
+   (`0d6ba77`). Root `package.json` deliberately has no `"workspaces"` field yet - confirmed
+   empirically that turning it on changes what `npm ci` expects when invoked with cwd inside a
+   workspace member, which would break CI's existing per-project install step; deferred to step 3,
+   alongside the CI change that requires. `turbo.json` scaffolded but inert (turbo not installed,
+   nothing invokes it). One unrelated, pre-existing flaky test surfaced in CI on this PR
+   (`ResponseTimePanel.test.jsx` racing a `useEffect` that hydrates its fields one render after the
+   heading) and was fixed in the same PR - not a monorepo-move regression. Netlify's base/publish
+   directory settings updated to `apps/web`/`apps/web/dist` in the same window as the merge.
 3. `packages/api`: GraphQL Codegen wired to the real schema, ONE existing web service (e.g.
    `ProjectService`) migrated to the generated hooks. Proves the codegen pipeline against a
    platform with a full, fast, already-green test suite - the cheapest place to find plumbing bugs.
