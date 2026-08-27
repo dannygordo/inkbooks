@@ -1,163 +1,27 @@
-import { gql, useQuery } from "@apollo/client";
+// Step 2 of the mobile-app monorepo plan (PRODUCTION_ROADMAP.md's Phase 5): the six operations
+// this service exposes are no longer hand-written gql`` documents - they're generated from
+// packages/api/src/operations/*.graphql by GraphQL Code Generator, run against the real server
+// schema (server/graphql/typeDefs.js). Field selections, operation names, and comments explaining
+// *why* a given field is selected now live in those .graphql files, not here - this file is left
+// as a thin adapter that preserves ProjectService's existing public shape (every call site in
+// apps/web keeps working unchanged) while delegating the actual query/mutation definitions to
+// @inkbooks/api. See DECISIONS.md's X1/X2/X3 for why this package is TypeScript, why schema
+// changes are additive-only, and where design tokens live - none of that is repeated here.
+import {
+	useGetProjectQuery,
+	useGetProjectsQuery,
+	useGetProjectsByArtistQuery,
+	GetProjectDocument,
+	GetProjectGqlDocument,
+	UpdateProjectDocument,
+	UpdateProjectNotesDocument,
+	UpdateProjectTagsDocument,
+	CreateProjectDocument,
+} from "@inkbooks/api";
 
 const ProjectService = (() => {
-	const _FETCH_PROJECT_QUERY = gql`
-		query ($projectId: ID!) {
-			getProject(projectId: $projectId) {
-				id
-				title
-				description
-				placement
-				size
-				palette
-				artistId
-				artist {
-					firstName
-					lastName
-					email
-					id
-					hourlyRate
-					flatRate
-					billingType
-					user {
-						id
-					}
-					shop {
-						id
-						name
-						hourlyRate
-						flatRate
-						billingType
-					}
-				}
-				clientId
-				client {
-					firstName
-					lastName
-					email
-					id
-				}
-				conversation {
-					id
-					members
-					membersInfo {
-						id
-						firstName
-						lastName
-						avatar
-					}
-					messages {
-						id
-						conversationId
-						senderId
-						user {
-							firstName
-							lastName
-							avatar
-						}
-						message
-						createdAt
-						updatedAt
-					}
-					createdAt
-					updatedAt
-				}
-				referenceImages {
-					id
-					url
-					avatar
-					title
-					uploadedByDisplayName
-					userId
-					userInfo {
-						firstName
-						lastName
-						avatar
-						id
-					}
-					tags
-					updatedAt
-					createdAt
-				}
-				# bodyImages was a bare [String] of URLs - promoted to the same IBImage shape as
-				# referenceImages/designImages (see server/graphql/typeDefs.js's Project.bodyImages
-				# comment) so the Finished Tattoo section can show an uploader/timestamp and support
-				# per-image tags the same way the other two sections do.
-				bodyImages {
-					id
-					url
-					avatar
-					title
-					uploadedByDisplayName
-					userId
-					userInfo {
-						firstName
-						lastName
-						avatar
-						id
-					}
-					tags
-					updatedAt
-					createdAt
-				}
-				designImages {
-					id
-					url
-					avatar
-					uploadedByDisplayName
-					userId
-					userInfo {
-						firstName
-						lastName
-						avatar
-						id
-					}
-					tags
-					updatedAt
-					createdAt
-				}
-				materialsUsed
-				notes {
-					id
-					author
-					note
-					createdAt
-					updatedAt
-				}
-				tags
-				status
-				# depositAmount is the DEPRECATED whole-dollar field (see server/models/Project.js)
-				# and nothing has written it since money moved to integer cents - so it is always
-				# null, and a UI reading it always concludes no deposit was taken. Which is exactly
-				# what pages/projects/Project.jsx did: the real deposit sat on the consult
-				# appointment, the dashboard read it correctly from there, and the project page
-				# said "None taken" about the same money. The list query on this same service was
-				# moved to the two fields below and these two detail queries were missed.
-				depositCollectedCents
-				depositAvailableCents
-				# How each deposit was actually taken. Recorded so a shop can reconcile the cash
-				# drawer and the Square dashboard against the books; showing it here is what makes
-				# that possible without opening the database.
-				deposits {
-					id
-					depositCents
-					depositPaymentMethod
-					depositCollectedAt
-				}
-				# The appointmentId "Add Deposit" records against - see components/booking's deposit
-				# fields for the same shape used at consult time.
-				consultAppointment {
-					id
-					depositCents
-					depositStatus
-					depositPaymentMethod
-					depositCollectedAt
-				}
-			}
-		}
-	`;
 	const _fetchProject = (projectId, setActiveMessages) => {
-		return useQuery(_FETCH_PROJECT_QUERY, {
+		return useGetProjectQuery({
 			variables: {
 				projectId,
 			},
@@ -166,31 +30,7 @@ const ProjectService = (() => {
 			},
 		});
 	};
-	const _FETCH_PROJECTS_BY_ARTIST_QUERY = gql`
-		query GetProjectsByArtist($artistId: ID!) {
-			getProjectsByArtist(artistId: $artistId) {
-				id
-				title
-				description
-				client {
-					user {
-						id
-						firstName
-						lastName
-						avatar
-					}
-				}
-				artist {
-					user {
-						id
-						firstName
-						lastName
-						avatar
-					}
-				}
-			}
-			}
-	`;
+
 	// fetchPolicy: 'cache-and-network' - same reasoning as AppointmentService's
 	// getAppointmentsByArtist (see that file's own comment): this powers ArtistPerformancePanel's
 	// "Active Projects" count on the same dashboard, and converting a consult to a session creates
@@ -198,342 +38,43 @@ const ProjectService = (() => {
 	// Left at Apollo's default 'cache-first', a dashboard visit right after that conversion could
 	// just as easily show a stale count as getAppointmentsByArtist showed a stale appointment list.
 	const _fetchProjectsByArtist = (artistId) => {
-		return useQuery(_FETCH_PROJECTS_BY_ARTIST_QUERY, {
+		return useGetProjectsByArtistQuery({
 			variables: {
 				artistId,
 			},
 			fetchPolicy: "cache-and-network",
-			onCompleted: (data) => {
-				// setActiveMessages(data.getProject.conversation.messages);
-			},
 		});
-	}
-
-	const _fetchProjects = (page) => {
-		const FETCH_PROJECTS_QUERY = gql`
-			query GetProjects($page: PageInput) {
-				getProjects(page: $page) {
-					items {
-						id
-						title
-						description
-						placement
-						size
-						palette
-						artistId
-						artist {
-							firstName
-							lastName
-							email
-							avatar
-							id
-						}
-						clientId
-						client {
-							firstName
-							lastName
-							email
-							avatar
-							id
-						}
-						referenceImages {
-							url
-							avatar
-							title
-							uploadedByDisplayName
-							tags
-							updatedAt
-							createdAt
-						}
-						bodyImages {
-							url
-							avatar
-							title
-							uploadedByDisplayName
-							tags
-							updatedAt
-							createdAt
-						}
-						designImages {
-							url
-							avatar
-							uploadedByDisplayName
-							tags
-							updatedAt
-							createdAt
-						}
-						materialsUsed
-						notes {
-							author
-							note
-							createdAt
-							updatedAt
-						}
-						tags
-						status
-						# depositAmount is deprecated (whole dollars, unwritten) - the real figures are
-						# below, resolved from the appointment that collected the deposit.
-						depositCollectedCents
-						depositAvailableCents
-					}
-					pageInfo { totalCount hasMore limit offset }
-				}
-			}
-		`;
-		return useQuery(FETCH_PROJECTS_QUERY, { variables: { page } });
 	};
 
+	const _fetchProjects = (page) => {
+		return useGetProjectsQuery({ variables: { page } });
+	};
+
+	// Ignores its own `project` argument, same as ClientService.updateClient - callers hand the
+	// returned document straight to their own useMutation() and pass `project` as that mutation's
+	// variables instead. Kept exactly as-is; only the document's source changed.
 	const _updateProject = (project) => {
-		const UPDATE_PROJECT_MUTATION = gql`
-			mutation ($project: ProjectInput) {
-				updateProject(project: $project) {
-					id
-					title
-					description
-					placement
-					size
-					palette
-					artistId
-					clientId
-					referenceImages {
-						id
-						url
-						avatar
-						title
-						uploadedByDisplayName
-						userId
-						userInfo {
-							firstName
-							lastName
-							avatar
-							id
-						}
-						tags
-						updatedAt
-						createdAt
-					}
-					bodyImages {
-						id
-						url
-						avatar
-						title
-						uploadedByDisplayName
-						userId
-						userInfo {
-							firstName
-							lastName
-							avatar
-							id
-						}
-						tags
-						updatedAt
-						createdAt
-					}
-					designImages {
-						id
-						url
-						avatar
-						uploadedByDisplayName
-						userId
-						userInfo {
-							firstName
-							lastName
-							avatar
-							id
-						}
-						tags
-						updatedAt
-						createdAt
-					}
-					materialsUsed
-					notes {
-						id
-						author
-						note
-						createdAt
-						updatedAt
-					}
-					tags
-					status
-					# depositAmount is deprecated (whole dollars, unwritten) - the real figures are
-					# below, resolved from the appointment that collected the deposit.
-					depositCollectedCents
-					depositAvailableCents
-				}
-			}
-		`;
-		return UPDATE_PROJECT_MUTATION;
+		return UpdateProjectDocument;
 	};
 
 	const _updateProjectNotes = () => {
-		const UPDATE_PROJECT_NOTES_MUTATION = gql`
-			mutation ($projectId: ID!, $notes: [IBNoteInput]) {
-				updateProjectNotes(projectId: $projectId, notes: $notes) {
-					notes {
-						author
-						note
-						createdAt
-						updatedAt
-					}
-				}
-			}
-		`;
-		return UPDATE_PROJECT_NOTES_MUTATION;
+		return UpdateProjectNotesDocument;
 	};
-
-	// Flat arguments, not a wrapped ProjectInput - matches the server's createProject signature
-	// exactly (typeDefs.js), unlike updateProject above. No client-side createProject existed
-	// before this - the only way a Project ever got made was via the server's seed script - added
-	// for the appointment wizard's "Session" path (see ibCalendar/AppointmentWizard.jsx), which
-	// needs to be able to create a brand-new Project inline when there isn't an existing one to
-	// attach the session to yet.
-	const _CREATE_PROJECT_MUTATION = gql`
-		mutation (
-			$title: String!
-			$description: String!
-			$placement: String
-			$size: String
-			$artistId: ID!
-			$clientId: ID!
-			$status: String!
-		) {
-			createProject(
-				title: $title
-				description: $description
-				placement: $placement
-				size: $size
-				artistId: $artistId
-				clientId: $clientId
-				status: $status
-			) {
-				id
-				title
-			}
-		}
-	`;
 
 	const _updateProjectTags = () => {
-		const UPDATE_PROJECT_TAGS_MUTATION = gql`
-			mutation ($projectId: ID!, $tags: [String]) {
-				updateProjectTags(projectId: $projectId, tags: $tags) {
-					tags
-				}
-			}
-		`;
-		return UPDATE_PROJECT_TAGS_MUTATION;
+		return UpdateProjectTagsDocument;
 	};
-	const GQL_FETCH_PROJECT_QUERY = gql`
-		query ($projectId: ID!) {
-			getProject(projectId: $projectId) {
-				id
-				title
-				description
-				placement
-				size
-				palette
-				artistId
-				artist {
-					firstName
-					lastName
-					email
-					id
-					shop {
-						id
-						name
-					}
-				}
-				clientId
-				client {
-					firstName
-					lastName
-					email
-					id
-				}
-				referenceImages {
-					url
-					avatar
-					title
-					uploadedByDisplayName
-					userId
-					userInfo {
-						firstName
-						lastName
-						avatar
-					}
-					tags
-					updatedAt
-					createdAt
-				}
-				bodyImages {
-					url
-					avatar
-					title
-					uploadedByDisplayName
-					userId
-					userInfo {
-						firstName
-						lastName
-						avatar
-					}
-					tags
-					updatedAt
-					createdAt
-				}
-				designImages {
-					url
-					avatar
-					uploadedByDisplayName
-					userId
-					userInfo {
-						firstName
-						lastName
-						avatar
-					}
-					tags
-					updatedAt
-					createdAt
-				}
-				materialsUsed
-				notes {
-					author
-					note
-					createdAt
-					updatedAt
-				}
-				tags
-				status
-				# depositAmount is the DEPRECATED whole-dollar field (see server/models/Project.js)
-				# and nothing has written it since money moved to integer cents - so it is always
-				# null, and a UI reading it always concludes no deposit was taken. Which is exactly
-				# what pages/projects/Project.jsx did: the real deposit sat on the consult
-				# appointment, the dashboard read it correctly from there, and the project page
-				# said "None taken" about the same money. The list query on this same service was
-				# moved to the two fields below and these two detail queries were missed.
-				depositCollectedCents
-				depositAvailableCents
-				# How each deposit was actually taken. Recorded so a shop can reconcile the cash
-				# drawer and the Square dashboard against the books; showing it here is what makes
-				# that possible without opening the database.
-				deposits {
-					id
-					depositCents
-					depositPaymentMethod
-					depositCollectedAt
-				}
-			}
-		}
-	`;
 
 	return {
-		FETCH_PROJECT_QUERY: _FETCH_PROJECT_QUERY,
+		FETCH_PROJECT_QUERY: GetProjectDocument,
 		fetchProject: _fetchProject,
 		fetchProjects: _fetchProjects,
 		updateProject: _updateProject,
 		updateProjectNotes: _updateProjectNotes,
 		updateProjectTags: _updateProjectTags,
-		fetchProjectGQL: GQL_FETCH_PROJECT_QUERY,
+		fetchProjectGQL: GetProjectGqlDocument,
 		fetchProjectsByArtist: _fetchProjectsByArtist,
-		CREATE_PROJECT_MUTATION: _CREATE_PROJECT_MUTATION
+		CREATE_PROJECT_MUTATION: CreateProjectDocument,
 	};
 })();
 

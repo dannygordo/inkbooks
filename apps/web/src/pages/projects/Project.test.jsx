@@ -26,6 +26,7 @@ import userEvent from "@testing-library/user-event";
 import { MockedProvider } from "@apollo/client/testing";
 import { MemoryRouter, Routes, Route, useParams } from "react-router-dom";
 import { gql } from "@apollo/client";
+import { UpdateProjectDocument } from "@inkbooks/api";
 import Project from "./Project";
 import { AuthContext } from "../../context/auth";
 import ProjectService from "../../services/ProjectService";
@@ -155,84 +156,12 @@ const GET_APPOINTMENTS_BY_PROJECT_QUERY = gql`
 	}
 `;
 
-// Reconstructed from ProjectService.js's _updateProject - see that file's own comment on why
-// nothing here reads its `project` argument before returning this fixed document.
-const UPDATE_PROJECT_MUTATION = gql`
-	mutation ($project: ProjectInput) {
-		updateProject(project: $project) {
-			id
-			title
-			description
-			placement
-			size
-			palette
-			artistId
-			clientId
-			referenceImages {
-				id
-				url
-				avatar
-				title
-				uploadedByDisplayName
-				userId
-				userInfo {
-					firstName
-					lastName
-					avatar
-					id
-				}
-				tags
-				updatedAt
-				createdAt
-			}
-			bodyImages {
-				id
-				url
-				avatar
-				title
-				uploadedByDisplayName
-				userId
-				userInfo {
-					firstName
-					lastName
-					avatar
-					id
-				}
-				tags
-				updatedAt
-				createdAt
-			}
-			designImages {
-				id
-				url
-				avatar
-				uploadedByDisplayName
-				userId
-				userInfo {
-					firstName
-					lastName
-					avatar
-					id
-				}
-				tags
-				updatedAt
-				createdAt
-			}
-			materialsUsed
-			notes {
-				id
-				author
-				note
-				createdAt
-				updatedAt
-			}
-			tags
-			status
-			depositCollectedCents
-			depositAvailableCents
-		}
-	}
-`;
+// ProjectService.js's _updateProject returns this document unchanged (see that file's own
+// comment on why nothing there reads its `project` argument) - generated from
+// packages/api/src/operations/updateProject.graphql by GraphQL Code Generator, so importing it
+// directly here (rather than hand-copying the selection set, as this file used to) means this
+// mock can never silently drift from what ProjectService.updateProject() actually returns.
+const UPDATE_PROJECT_MUTATION = UpdateProjectDocument;
 
 // ---- fixtures ------------------------------------------------------------------------------------
 
