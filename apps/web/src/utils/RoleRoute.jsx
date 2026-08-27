@@ -26,11 +26,21 @@ import { ROUTE_CONSTANTS } from "../constants";
  *   params. Checked first; if it returns true the role requirement is skipped entirely.
  */
 function RoleRoute({ children, minRole, allowIf }) {
-	const { user } = useContext(AuthContext);
+	const { user, initializing } = useContext(AuthContext);
 	const location = useLocation();
 	// Read here rather than passed in from App.jsx: RoleRoute renders inside the matched <Route>,
 	// so it has access to that route's own params, which is what "is this your own page?" needs.
 	const params = useParams();
+
+	// Same reasoning as AuthRoute.jsx: the stored session is read asynchronously now, and
+	// RoleRoute is used standalone on routes like /artists and /expenses, not nested inside
+	// AuthRoute - so without this it has the exact same flash-redirect exposure AuthRoute did,
+	// just one role check further along. `user` reads null for one render even for an already
+	// signed-in, sufficiently-privileged user, purely because AuthProvider's storage read hasn't
+	// resolved yet.
+	if (initializing) {
+		return null;
+	}
 
 	if (!user) {
 		return <Navigate to="/login" state={{ from: location }} replace />;

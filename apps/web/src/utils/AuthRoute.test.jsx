@@ -20,9 +20,9 @@ function LoginProbe() {
 	return <div>Login Page (from: {from})</div>;
 }
 
-function renderAt(path, { user } = {}) {
+function renderAt(path, { user, initializing } = {}) {
 	return render(
-		<AuthContext.Provider value={{ user }}>
+		<AuthContext.Provider value={{ user, initializing }}>
 			<MemoryRouter initialEntries={[path]}>
 				<Routes>
 					<Route path="/login" element={<LoginProbe />} />
@@ -65,5 +65,35 @@ describe("AuthRoute", () => {
 		renderAt("/protected/42", {});
 
 		expect(screen.getByText(/login page/i)).toBeInTheDocument();
+	});
+});
+
+describe("AuthRoute while the stored session is still being checked", () => {
+	// AuthProvider's own session check (context/auth.jsx) is async now - `user` reads null for one
+	// render even for someone who IS signed in, simply because that check hasn't resolved yet. If
+	// AuthRoute redirected on that render, an already-authenticated person would get bounced to
+	// /login on every hard refresh, immediately before AuthProvider restored them. `initializing`
+	// is how AuthRoute tells "still checking" apart from "checked, and nobody's signed in" - it
+	// must render neither the protected content nor the redirect until that resolves.
+	it("renders neither the protected content nor the login redirect while initializing", () => {
+		renderAt("/protected/42", { user: null, initializing: true });
+
+		expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
+		expect(screen.queryByText(/login page/i)).not.toBeInTheDocument();
+	});
+
+	it("still waits even if a stale user value happens to be set", () => {
+		// Defensive: initializing is meant to be checked before user is trusted either way, not
+		// only when user is null.
+		renderAt("/protected/42", { user: { id: "user-1" }, initializing: true });
+
+		expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
+		expect(screen.queryByText(/login page/i)).not.toBeInTheDocument();
+	});
+
+	it("proceeds to the normal redirect/render logic once initializing is false", () => {
+		renderAt("/protected/42", { user: { id: "user-1" }, initializing: false });
+
+		expect(screen.getByText("Protected Content")).toBeInTheDocument();
 	});
 });

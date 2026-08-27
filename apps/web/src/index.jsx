@@ -12,7 +12,7 @@ import {
 import { setContext } from "@apollo/client/link/context";
 import { onError } from "@apollo/client/link/error";
 import { BrowserRouter } from "react-router-dom";
-import { CacheService } from "./services/CacheService";
+import { TokenStorageService } from "./services/TokenStorageService";
 import { io } from "socket.io-client";
 import { apiBaseUrl } from "./utils/apiUrl";
 import { AuthProvider } from "./context/auth";
@@ -64,9 +64,13 @@ const httpLink = createHttpLink({
 	// lookup behind is how the pattern comes back.
 	uri: apiBaseUrl(),
 });
-const authLink = setContext((_, { headers }) => {
-	// get the authentication token from local storage if it exists
-	const token = CacheService.getItem("token");
+const authLink = setContext(async (_, { headers }) => {
+	// get the authentication token from storage if it exists. Async now -
+	// TokenStorageService.getItemAsync (see that file) is shaped like expo-secure-store's real,
+	// inherently-async API. Apollo Client's setContext supports a Promise-returning context
+	// function, so this is a drop-in change - no restructuring of the link chain itself.
+	const raw = await TokenStorageService.getItemAsync("token");
+	const token = raw ? JSON.parse(raw) : null;
 	// return the headers to the context so httpLink can read them
 	return {
 		headers: {

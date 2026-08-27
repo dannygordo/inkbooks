@@ -7,7 +7,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import { useAuth } from "../../context/auth";
 import MessengerService from "../../services/MessengerService";
 import UtilsService from "../../services/UtilsService";
-import { CacheService } from "../../services/CacheService";
+import { TokenStorageService } from "../../services/TokenStorageService";
 import { apiUrl } from "../../utils/apiUrl";
 import IBMessage from "../ibMessage/IBMessage";
 import IBPageLoader from "../ibPageLoader/IBPageLoader";
@@ -76,14 +76,16 @@ const IBChatBox = ({ widget, conversation, setActiveMessages, messages, isInputD
 			// authenticated, unlike /form-uploads and /booking-uploads) - Apollo's own authLink
 			// (see index.jsx) has no reach over a raw fetch like this one.
 			//
-			// CacheService.getItem("token") returns the whole stored user object
-			// ({id, email, accessToken, ...}), not the raw JWT - the same shape index.jsx's own
-			// authLink reads `.accessToken` off, and the same shape IBSquarePaymentForm.jsx's own
-			// hand-built Authorization header reads `user.accessToken` off. Interpolating the bare
-			// object here (as this line used to) stringifies it to the literal text
-			// "[object Object]", which the server's jwt.verify rejects - every attachment upload
-			// failed with "Invalid/expired token" for exactly this reason.
-			const token = CacheService.getItem("token");
+			// TokenStorageService.getItemAsync("token") returns the raw stored string -
+			// JSON.parsing it gives the whole stored user object ({id, email, accessToken, ...}),
+			// not the raw JWT - the same shape index.jsx's own authLink reads `.accessToken` off,
+			// and the same shape IBSquarePaymentForm.jsx's own hand-built Authorization header
+			// reads `user.accessToken` off. Interpolating the bare object here (as this line used
+			// to, back when CacheService.getItem returned it directly) stringifies it to the
+			// literal text "[object Object]", which the server's jwt.verify rejects - every
+			// attachment upload failed with "Invalid/expired token" for exactly this reason.
+			const rawToken = await TokenStorageService.getItemAsync("token");
+			const token = rawToken ? JSON.parse(rawToken) : null;
 			const response = await fetch(apiUrl("message-uploads"), {
 				method: "POST",
 				headers: { Authorization: `Bearer ${token?.accessToken}` },

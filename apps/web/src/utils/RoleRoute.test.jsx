@@ -11,9 +11,9 @@ import { AuthContext } from "../context/auth";
 import { ROLES } from "../constants/auth";
 import { ROUTE_CONSTANTS } from "../constants";
 
-function renderAt(path, { user, minRole, allowIf } = {}) {
+function renderAt(path, { user, minRole, allowIf, initializing } = {}) {
 	return render(
-		<AuthContext.Provider value={{ user }}>
+		<AuthContext.Provider value={{ user, initializing }}>
 			<MemoryRouter initialEntries={[path]}>
 				<Routes>
 					<Route path="/login" element={<div>Login Page</div>} />
@@ -118,5 +118,32 @@ describe("RoleRoute", () => {
 
 		expect(screen.getByText("Home Page")).toBeInTheDocument();
 		expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
+	});
+});
+
+describe("RoleRoute while the stored session is still being checked", () => {
+	// RoleRoute is used standalone in App.jsx (e.g. /artists, /expenses), not nested inside
+	// AuthRoute, so it needs this same gate independently - see the equivalent tests in
+	// AuthRoute.test.jsx for the full reasoning.
+	it("renders nothing - not the login redirect, not the content - while initializing", () => {
+		renderAt("/artist/artist-1", { user: null, minRole: ROLES.SHOP_STAFF, initializing: true });
+
+		expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
+		expect(screen.queryByText("Login Page")).not.toBeInTheDocument();
+		expect(screen.queryByText("Home Page")).not.toBeInTheDocument();
+	});
+
+	it("still waits even for an already-sufficiently-privileged user", () => {
+		const user = { id: "u1", role: ROLES.SHOP_ADMIN };
+		renderAt("/artist/artist-1", { user, minRole: ROLES.SHOP_STAFF, initializing: true });
+
+		expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
+	});
+
+	it("proceeds to the normal role check once initializing is false", () => {
+		const user = { id: "u1", role: ROLES.SHOP_ADMIN };
+		renderAt("/artist/artist-1", { user, minRole: ROLES.SHOP_STAFF, initializing: false });
+
+		expect(screen.getByText("Protected Content")).toBeInTheDocument();
 	});
 });
