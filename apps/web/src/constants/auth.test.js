@@ -1,5 +1,5 @@
 // describe/it/expect come from Vitest's `globals: true` config - see the comment in
-// src/services/CacheService.test.js for why there's no `import { describe } from "vitest"` here.
+// src/services/TokenStorageService.test.js for why there's no `import { describe } from "vitest"` here.
 import { ROLES, ROLE_LABELS, roleLabel } from "./auth";
 
 describe("roleLabel", () => {

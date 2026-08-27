@@ -12,7 +12,7 @@ import { MockedProvider } from "@apollo/client/testing";
 import IBChatBox from "./IBChatBox";
 import { AuthContext } from "../../context/auth";
 import MessengerService from "../../services/MessengerService";
-import { CacheService } from "../../services/CacheService";
+import { TokenStorageService } from "../../services/TokenStorageService";
 
 // Deterministic stand-in for bson's ObjectID - see Project.test.jsx's own comment on why the
 // whole module is replaced rather than exercised for real (a real ObjectID's internal shape can't
@@ -110,7 +110,7 @@ function renderChatBox({
 
 beforeEach(() => {
 	localStorage.clear();
-	CacheService.setItem("token", JSON.stringify({ accessToken: "test-access-token" }));
+	TokenStorageService.setItemAsync("token", JSON.stringify({ accessToken: "test-access-token" }));
 	mockSocket.on.mockClear();
 	mockSocket.off.mockClear();
 	mockSocket.emit.mockClear();

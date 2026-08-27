@@ -1,7 +1,7 @@
-import React, { useReducer, createContext, useState, useContext } from "react";
+import React, { useReducer, createContext, useState, useContext, useEffect } from "react";
 import { useApolloClient } from "@apollo/client";
 import jwtDecode from "jwt-decode";
-import { CacheService } from "../services/CacheService";
+import { TokenStorageService } from "../services/TokenStorageService";
 import { signInWithCustomToken, signOut } from "firebase/auth";
 import { auth } from "../firebase/firebase";
 import { AUTH_SETTINGS_CONSTANTS } from "../constants";
@@ -11,26 +11,12 @@ const initialState = {
 	firebaseUser: null,
 };
 
-if (CacheService.getItem(AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE)) {
-	const token = jwtDecode(
-		CacheService.getItem(AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE)
-			.accessToken
-	);
-
-	if (token.exp * 1000 < Date.now()) {
-		CacheService.removeItem(AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE);
-	} else {
-		initialState.user = CacheService.getItem(
-			AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE
-		);
-	}
-}
-
 const AuthContext = createContext({
 	user: null,
 	firebaseUser: null,
 	login: (userData) => {},
 	logout: () => {},
+	initializing: true,
 });
 
 export const useAuth = () => {
@@ -84,6 +70,57 @@ function AuthProvider(props) {
 		location: "",
 	});
 	const [loading, setLoading] = useState(false);
+	// Whether the stored session is still being read. Distinct from `loading` above on purpose -
+	// `loading` is a general-purpose in-flight flag several unrelated screens already set/read for
+	// their own reasons, and conflating the two would mean some screen's setLoading(true) could
+	// make AuthRoute think a signed-in user is still logged out, or vice versa. Starts true: there
+	// is exactly one render, on mount, before the async storage read below has had a chance to
+	// resolve.
+	const [initializing, setInitializing] = useState(true);
+
+	// Restores a previously signed-in user from storage on first mount. This used to be a
+	// synchronous check at MODULE load (read directly into `initialState`, before React ever
+	// rendered) - CacheService.getItem was synchronous, so that worked. TokenStorageService's
+	// getItemAsync is async even on web (see that file's own comment on why), so the check has to
+	// move into an effect, and the rest of the app has to be able to tell "still checking" apart
+	// from "checked, and there's no one signed in" - see `initializing` above and AuthRoute.jsx,
+	// which is the one place that distinction actually matters.
+	useEffect(() => {
+		let cancelled = false;
+
+		(async () => {
+			const raw = await TokenStorageService.getItemAsync(
+				AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE
+			);
+
+			if (raw) {
+				const userData = JSON.parse(raw);
+				const decoded = jwtDecode(userData.accessToken);
+
+				if (decoded.exp * 1000 < Date.now()) {
+					await TokenStorageService.deleteItemAsync(
+						AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE
+					);
+				} else if (!cancelled) {
+					dispatch({
+						type: AUTH_SETTINGS_CONSTANTS.AUTH_REDUCER_TYPES.LOGIN,
+						payload: userData,
+					});
+				}
+			}
+
+			if (!cancelled) {
+				setInitializing(false);
+			}
+		})();
+
+		// Guards against setting state after a fast unmount (e.g. a test that renders and tears
+		// down before the microtask above settles) - not a real race in the running app, since
+		// AuthProvider lives for the lifetime of the tab, but cheap enough to include regardless.
+		return () => {
+			cancelled = true;
+		};
+	}, []);
 
 	/**
 	 * Throws away everything the previous session cached.
@@ -134,16 +171,20 @@ function AuthProvider(props) {
 	 * that covered both. A new session-ending path (a token expiring, a forced sign-out, anything
 	 * added later) goes through here and inherits the wipe rather than having to remember it.
 	 *
+	 * Async now that the storage write is (TokenStorageService.setItemAsync/deleteItemAsync) -
+	 * discardSessionCache() itself is still called synchronously and first, so the cache reset
+	 * still closes before anything below it awaits.
+	 *
 	 * @param {object|null} userData - null ends the session.
 	 */
-	const setSession = (userData) => {
+	const setSession = async (userData) => {
 		// UNCONDITIONAL, not "only when the id changed". A rule with no exceptions is one that
 		// cannot be reasoned about wrongly at three in the morning, and the cost of the case it
 		// over-covers - the same person authenticating twice in a row - is one round trip.
 		discardSessionCache();
 
 		if (userData) {
-			CacheService.setItem(
+			await TokenStorageService.setItemAsync(
 				AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE,
 				JSON.stringify(userData)
 			);
@@ -152,13 +193,15 @@ function AuthProvider(props) {
 				payload: userData,
 			});
 		} else {
-			CacheService.removeItem(AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE);
+			await TokenStorageService.deleteItemAsync(
+				AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE
+			);
 			dispatch({ type: AUTH_SETTINGS_CONSTANTS.AUTH_REDUCER_TYPES.LOGOUT });
 		}
 	};
 
-	const login = (userData) => {
-		setSession(userData);
+	const login = async (userData) => {
+		await setSession(userData);
 
 		// Sign into Firebase as this specific user (for Storage access - project images, avatars,
 		// etc.), using a short-lived custom token the server minted for this exact account.
@@ -196,8 +239,8 @@ function AuthProvider(props) {
 	 * name would refetch the entire screen they are standing on. The distinction that matters for
 	 * the leak is "whose session is this", and that is exactly what has not changed here.
 	 */
-	const updateCurrentUser = (userData) => {
-		CacheService.setItem(
+	const updateCurrentUser = async (userData) => {
+		await TokenStorageService.setItemAsync(
 			AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE,
 			JSON.stringify(userData)
 		);
@@ -207,8 +250,8 @@ function AuthProvider(props) {
 		});
 	};
 
-	const logout = () => {
-		setSession(null);
+	const logout = async () => {
+		await setSession(null);
 		// Now that each user gets their own real Firebase identity (rather than everyone sharing
 		// one static account), it matters that logging out of the app also ends that Firebase
 		// session - otherwise it lingers in the browser, which is a real concern on a shared
@@ -230,6 +273,7 @@ function AuthProvider(props) {
 				setAlert,
 				loading,
 				setLoading,
+				initializing,
 			}}
 			{...props}
 		/>
