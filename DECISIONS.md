@@ -753,6 +753,37 @@ verbatim once that structure exists, no rewrite needed at that point.
 
 ---
 
+## Process
+
+### PR1. Tests are written alongside the feature or fix, not queued for a later pass
+
+Every real test run this project has ever done, client and server alike, has found at least one
+genuine bug that a syntax check or read-through missed - two missing React imports, a
+wrong-on-paper `getByRole` query, a required-field asterisk breaking an exact label match, a
+shipped production bug (the password visibility toggle silently dead since the MUI v9 migration,
+found only because fixing its test forced reading the real component), `cache.toReference` having
+been removed from Apollo Client's own public API, a null-ref crash in `GuestConversation.jsx`, a
+flaky short-delay mock. PRODUCTION_ROADMAP.md's Phase 6 section says it outright: "every real run
+of either suite so far has found at least one genuine bug a syntax check alone missed - that streak
+is unbroken." That is not a string of coincidences. It is what happens when a test is written once,
+later, in a separate pass, against code that has already moved on to the next thing - it catches
+what a same-commit test would have caught days or weeks earlier, for a fraction of the cost.
+
+This was already the stated intent for Phase 6 ("stood up incrementally starting in Phase 1, not
+bolted on at the end") but was not consistently followed - features shipped, tests followed later
+in batches, and every batch found real bugs the gap had let ship. This decision makes it the actual
+rule instead of an intention stated once and drifted from.
+
+**Rule, effective now, for all new work** - web, server, and mobile once it exists: a feature or fix
+ships with its test in the same commit that introduces it, not queued for a later coverage pass.
+
+This does not retroactively demand tests for everything already shipped without them - the existing
+test-coverage backlog (PRODUCTION_ROADMAP.md Phase 6, item 10: `utils/appChrome.js` and the
+remaining component/server-util tail) is a separate, already-tracked cleanup, not reopened by this
+rule. This is about what ships from here forward.
+
+---
+
 ## Sequencing
 
 UI standardisation onto the register-page aesthetic goes **last**, as a design-token and shared
@@ -789,6 +820,7 @@ share → UI surfaces → dashboard fixes. Standalone fixes pulled forward.
 | Rewriting existing server/client JS to TypeScript now | A real migration bundled into an unrelated task ships neither well |
 | A fixed schema-deprecation window decided before mobile has real usage data | Fiction before there's an actual update-adoption rate to set it from |
 | Keeping tokens.css hand-written, tokens.mjs as a manual second copy | The exact drift the single-source change exists to prevent |
+| Deferring tests to a later, separate coverage pass | Every real run so far has found bugs a syntax check alone missed |
 
 ---
 
