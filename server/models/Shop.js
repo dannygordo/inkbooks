@@ -60,10 +60,10 @@ const ShopSchema = new mongoose.Schema({
 	// an unaffiliated artist able to configure a tax rate and unable to charge anything.
 	//
 	// The seven old fields (squareConnected, squareMerchantId, squareLocationId, both encrypted
-	// tokens, squareTokenExpiresAt, squareConnectedAt) are deliberately still on existing DOCUMENTS
-	// until scripts/migrate-square-accounts.js has run everywhere and charges are confirmed
-	// working. Nothing reads them - not this schema, not the resolvers - only that script does.
-	// Drop them in a follow-up once the migration is settled.
+	// tokens, squareTokenExpiresAt, squareConnectedAt) predated SquareAccount and are not declared
+	// here - dropped from existing DOCUMENTS by scripts/drop-legacy-square-shop-fields.js, run
+	// once real charges were confirmed working against the migrated SquareAccount rows
+	// (2026-08-27). Nothing reads them any more, not this schema, not the resolvers.
 
 	// --- Square pricing configuration -----------------------------------------------------------
 	// These stay. They are BUSINESS settings, not credentials, and they are read on every charge

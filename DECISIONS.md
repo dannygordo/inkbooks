@@ -705,6 +705,85 @@ without changing it for the two callers that still want it (`Project.jsx`'s thre
 
 ---
 
+## Architecture and cross-platform
+
+### X1. TypeScript is adopted going forward, not retrofitted onto existing JS
+
+New code in `packages/api`/`packages/shared` (once the mobile-app monorepo split happens) is
+TypeScript from the start. Existing `server/` and `client/` JavaScript is **not** rewritten as
+part of that migration - same precedent as declining the React Router v6->v7 jump mid-task
+(PRODUCTION_ROADMAP.md): a real migration bundled into an unrelated task is how both end up half
+done. The reason to adopt TypeScript at all, rather than defer it again, is concrete: GraphQL Code
+Generator's actual value is compile errors at the exact call site a schema change breaks, and that
+requires a TypeScript consumer on the other end - a generated `.d.ts` file nothing imports as types
+is decoration. TypeScript reaching the rest of the codebase, if it ever does, is a separate,
+later, explicitly-scoped decision - not an assumed consequence of this one.
+
+### X2. GraphQL schema changes are additive-only once a second client exists, with a deprecation window before removal
+
+Today, one client (the web app) exists, and it gets fresh code on every page load - a breaking
+schema change and a client update ship together, atomically, because there's no gap for them to
+disagree in. That stops being true the moment a mobile app exists: a phone sitting on someone's
+home screen keeps running whatever version was on it when they last updated, for however long they
+go before updating again. A field renamed or removed on the server can break an app already in the
+wild with no code push able to fix it - the server doesn't get to force a client-side update the
+way a web deploy does.
+
+Rule: prefer additive changes (a new field alongside an old one, not a rename). When a field
+genuinely must be removed, mark it `@deprecated` in the schema with a reason, keep it fully
+functional, and don't delete it until either every client is confirmed to have moved off it or a
+minimum window has passed long enough to cover realistic update adoption (a fixed number here would
+be fiction before there's real usage data to set it from - decide the actual window once the
+mobile app has real install/update-rate numbers to look at, not in the abstract now). Additive
+schema changes need no version negotiation at all; a hard removal, if one is ever unavoidable
+before the window closes, needs the server to detect the caller's client/version and branch - not
+built until a real case demands it.
+
+### X3. Design tokens have one source, in plain JS, not CSS
+
+`client/src/theme/tokens.mjs` is the single source for every color value the app uses - `tokens.css`
+is generated from it (`npm run tokens:generate`), and `theme.js`'s MUI palette imports it directly,
+closing the "keep two copies in sync by hand" gap that existed between those two files. Plain JS
+rather than CSS custom properties because CSS custom properties don't exist in React Native -
+mobile theming (Tamagui or React Native Paper, Phase 5) needs plain values regardless, and the
+question was only ever whether that source gets built now, once, correctly, or invented a second
+time under deadline once mobile work is already underway. Staged in `client/src/theme/` ahead of
+the monorepo split described in PRODUCTION_ROADMAP.md's Phase 5 - moves into `packages/shared`
+verbatim once that structure exists, no rewrite needed at that point.
+
+---
+
+## Process
+
+### PR1. Tests are written alongside the feature or fix, not queued for a later pass
+
+Every real test run this project has ever done, client and server alike, has found at least one
+genuine bug that a syntax check or read-through missed - two missing React imports, a
+wrong-on-paper `getByRole` query, a required-field asterisk breaking an exact label match, a
+shipped production bug (the password visibility toggle silently dead since the MUI v9 migration,
+found only because fixing its test forced reading the real component), `cache.toReference` having
+been removed from Apollo Client's own public API, a null-ref crash in `GuestConversation.jsx`, a
+flaky short-delay mock. PRODUCTION_ROADMAP.md's Phase 6 section says it outright: "every real run
+of either suite so far has found at least one genuine bug a syntax check alone missed - that streak
+is unbroken." That is not a string of coincidences. It is what happens when a test is written once,
+later, in a separate pass, against code that has already moved on to the next thing - it catches
+what a same-commit test would have caught days or weeks earlier, for a fraction of the cost.
+
+This was already the stated intent for Phase 6 ("stood up incrementally starting in Phase 1, not
+bolted on at the end") but was not consistently followed - features shipped, tests followed later
+in batches, and every batch found real bugs the gap had let ship. This decision makes it the actual
+rule instead of an intention stated once and drifted from.
+
+**Rule, effective now, for all new work** - web, server, and mobile once it exists: a feature or fix
+ships with its test in the same commit that introduces it, not queued for a later coverage pass.
+
+This does not retroactively demand tests for everything already shipped without them - the existing
+test-coverage backlog (PRODUCTION_ROADMAP.md Phase 6, item 10: `utils/appChrome.js` and the
+remaining component/server-util tail) is a separate, already-tracked cleanup, not reopened by this
+rule. This is about what ships from here forward.
+
+---
+
 ## Sequencing
 
 UI standardisation onto the register-page aesthetic goes **last**, as a design-token and shared
@@ -738,6 +817,10 @@ share → UI surfaces → dashboard fixes. Standalone fixes pulled forward.
 | Charging a deposit before recording it | Charged and recorded become two numbers that can differ |
 | Two shapes of shop admin | Every gate carries two questions forever, and the answers drift |
 | Dropping the role floor on the client gates | Would let any artist at a shop archive that shop's clients |
+| Rewriting existing server/client JS to TypeScript now | A real migration bundled into an unrelated task ships neither well |
+| A fixed schema-deprecation window decided before mobile has real usage data | Fiction before there's an actual update-adoption rate to set it from |
+| Keeping tokens.css hand-written, tokens.mjs as a manual second copy | The exact drift the single-source change exists to prevent |
+| Deferring tests to a later, separate coverage pass | Every real run so far has found bugs a syntax check alone missed |
 
 ---
 

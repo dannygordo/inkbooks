@@ -99,9 +99,13 @@ describe("an independent artist (no shop)", () => {
 		expect(
 			await screen.findByRole("heading", { name: "Your Response Time" }),
 		).toBeInTheDocument();
-		// 480 minutes -> 8 hours, 180 minutes -> 3 hours.
-		expect(screen.getByLabelText("Nudge after (hours unanswered)")).toHaveValue(8);
-		expect(screen.getByLabelText("Repeat every (hours)")).toHaveValue(3);
+		// 480 minutes -> 8 hours, 180 minutes -> 3 hours. Awaited: the fields' values come from a
+		// useEffect keyed off `settings`, which commits one render AFTER the one that first shows
+		// the heading - asserting synchronously here races that effect.
+		await waitFor(() => {
+			expect(screen.getByLabelText("Nudge after (hours unanswered)")).toHaveValue(8);
+			expect(screen.getByLabelText("Repeat every (hours)")).toHaveValue(3);
+		});
 		expect(screen.getAllByRole("heading", { name: /Response Time/ })).toHaveLength(1);
 	});
 
@@ -255,8 +259,12 @@ describe("a shop admin who is also an artist", () => {
 		const artistCard = await cardFor("Your Response Time");
 		const shopCard = await cardFor("Iron Anchor Tattoo Response Time");
 
-		expect(within(artistCard).getByLabelText("Nudge after (hours unanswered)")).toHaveValue(2);
-		expect(within(shopCard).getByLabelText("Nudge after (hours unanswered)")).toHaveValue(10);
+		// Same race as the independent-artist test above - each field's value lands one render
+		// after its card's heading does, via a useEffect keyed off `settings`.
+		await waitFor(() => {
+			expect(within(artistCard).getByLabelText("Nudge after (hours unanswered)")).toHaveValue(2);
+			expect(within(shopCard).getByLabelText("Nudge after (hours unanswered)")).toHaveValue(10);
+		});
 	});
 
 	// Shops have no ceiling above them - shopCeiling is only ever populated on an ARTIST's own

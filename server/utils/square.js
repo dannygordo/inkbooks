@@ -7,19 +7,43 @@ const tokenCrypto = require('./token-crypto');
 // specific slice of their API surface, plain `fetch` (Node 20+, already required by
 // package.json's engines field) keeps this self-contained with nothing new to `npm install`.
 //
-// VERIFIED AGAINST A REAL SQUARE SANDBOX SELLER, 2026-08-11, as far as the Payments call:
-// authorization URL -> consent -> token exchange -> encrypted storage -> decrypt -> POST /v2/payments
-// all work end to end against Square rather than against these docs. The charge itself was refused
-// for a missing scope (see OAUTH_SCOPES below), which is a permission granted at authorization -
-// so it proves the whole handshake ran and the stored token was genuinely usable.
-//
-// STILL UNVERIFIED: a payment that actually succeeds, and everything downstream of it -
-// createShopCutInvoice, publishing that invoice, and the webhook flipping an Appointment to 'paid'.
-// The rest of this file was built against Square's published REST docs (OAuth, Invoices, Orders,
-// Customers, webhook signature scheme - see PRODUCTION_ROADMAP.md's "Shop-cut ledger" section).
+// VERIFIED AGAINST A REAL SQUARE SANDBOX SELLER. The OAuth handshake (authorization URL ->
+// consent -> token exchange -> encrypted storage -> decrypt) and the shop-cut invoice path
+// (createAndPublishShopCutInvoice -> publish -> webhook flipping an Appointment to 'paid') were
+// confirmed live 2026-08-01/02 - see PRODUCTION_ROADMAP.md's "Shop-cut ledger" section. The direct
+// card-charge path (createPaymentForAccount, POST /v2/payments) was blocked on a missing OAuth
+// scope as of 2026-08-11 (see OAUTH_SCOPES below - since fixed) and was the one piece still
+// unverified as of the "Suggested sequencing" doc's item 6; per Danny's own confirmation
+// 2026-08-27 that real sandbox deposit and session charges have been working through the app's UI
+// for a while, that gap is closed too. The rest of this file (Orders, Customers, webhook signature
+// scheme) was built against Square's published REST docs rather than exercised individually.
 
 function getEnvironment() {
   return process.env.SQUARE_ENVIRONMENT === 'production' ? 'production' : 'sandbox';
+}
+
+// A single kill switch in front of the only two places this file ever moves or requests real
+// money: a direct card charge (createPaymentForAccount) and a shop-cut invoice
+// (createAndPublishShopCutInvoice). Everything else in here - OAuth, token refresh, webhook
+// verification - stays live either way, so Settings' Square panel keeps working for connect/
+// disconnect while this is off.
+//
+// Defaults to enabled (unset behaves exactly as before this existed) - set
+// SQUARE_PAYMENTS_ENABLED=false in Render/`.env.*` to turn real charges off without touching code
+// or redeploying anything else. The thrown error carries both `.status` (the REST route at
+// routes/squarePayments.js already forwards `err.status` unchanged) and `.code` (so the GraphQL
+// side, shopCutPayments.js, can catch this one condition specifically and re-throw it as a
+// UserInputError instead of letting it fall through to formatError as an unexpected failure).
+function assertPaymentsEnabled() {
+  if (process.env.SQUARE_PAYMENTS_ENABLED === 'false') {
+    const error = new Error(
+      'Real Square payments are turned off in this environment (SQUARE_PAYMENTS_ENABLED=false). ' +
+        'Set it to true (or unset it) to take a real charge or send a real invoice.',
+    );
+    error.status = 503;
+    error.code = 'SQUARE_PAYMENTS_DISABLED';
+    throw error;
+  }
 }
 
 function getBaseUrl() {
@@ -282,6 +306,7 @@ async function createAndPublishShopCutInvoice({
   description,
   paymentMethod = 'ach',
 }) {
+  assertPaymentsEnabled();
   if (!account || !account.locationId) {
     throw new Error('This Square connection is missing a location id - reconnect Square.');
   }
@@ -463,6 +488,7 @@ function isInsufficientScopeError(data) {
 }
 
 async function createPaymentForAccount({ account, sourceId, amountCents, idempotencyKey, note }) {
+  assertPaymentsEnabled();
   if (!account || !account.locationId) {
     throw new Error('This Square connection is missing a location id - reconnect Square.');
   }

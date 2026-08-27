@@ -243,6 +243,13 @@ router.post('/square/process-payment', express.json(), async (req, res) => {
       await sendAutoResponsesForTrigger({ trigger: 'SESSION_COMPLETED', appointment });
     }
 
+    // PAYMENT_RECEIVED fires for BOTH branches - a receipt is owed for a deposit exactly as much
+    // as for a session charge, and unlike SESSION_COMPLETED above it isn't reachable any other way
+    // (there is no manual/cash equivalent call site for it yet). Safe to call unconditionally
+    // here: the idempotency checks earlier in this route (depositSquarePaymentId/squarePaymentId)
+    // already guarantee this success path runs at most once per appointment per charge type.
+    await sendAutoResponsesForTrigger({ trigger: 'PAYMENT_RECEIVED', appointment });
+
     await recordEvent({
       entityType: 'Appointment',
       entityId: appointment._id,

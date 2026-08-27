@@ -585,6 +585,80 @@ Target is iPhone + iPad, engineered for maximum UX on those two — not a lowest
 - **Face ID / Touch ID app unlock**, via `expo-local-authentication` — pairs naturally with the `expo-secure-store` token storage already planned above, and is a meaningfully better login experience than typing a password on a phone every time.
 - **Stretch, not core scope:** a home-screen widget or Lock Screen Live Activity showing today's appointments. Worth a line in a future planning pass once the core app is built and stable — not something to scope into the initial build.
 
+### Gaps closed and order of operations, added 2026-08-27
+
+A review pass asked directly whether the plan above is ready for a professional, production-worthy
+app — answer: the architecture is right, but the plan as originally written had six real gaps
+between "sound direction" and "ready to build on." None of them contradict anything above; this
+section completes it and fixes the build order into a walking-skeleton-first sequence rather than
+"restructure into a monorepo, then build the whole app."
+
+**Prerequisites — decide/land before any monorepo or RN code exists, not alongside it:**
+
+1. **TypeScript adoption.** GraphQL Code Generator's actual value is compile errors at broken call
+   sites, which requires TypeScript actually consuming the generated types - nothing in this
+   codebase is TypeScript yet. Land it in `packages/api`/`packages/shared` as they're created.
+2. **A GraphQL schema-evolution policy**, written down (a `DECISIONS.md` entry, matching this
+   repo's own rules-live-in-DECISIONS.md convention). Web redeploys instantly on every page load;
+   a phone sitting on someone's home screen doesn't. Additive-only changes and an explicit
+   deprecation window before removing or renaming any field, once a second, slower-updating client
+   exists to break.
+3. **Shared design tokens.** Pull `theme/tokens.css`'s copper palette into `packages/shared` as
+   plain values now, before mobile theming (Tamagui/React Native Paper) starts from scratch and
+   drifts from web's.
+
+**Folded into the walking-skeleton phase, not deferred to "later cleanup":**
+
+4. **Mobile CI/CD** - EAS Build plus an EAS Update channel strategy (dev/preview/production). This
+   is the actual "ease of management" lever: JS-only fixes ship without an app-store review cycle.
+5. **`@sentry/react-native`** - its own DSN/project and source-map upload for readable native stack
+   traces. Same no-code-risk, just-needs-doing category as the web/server Sentry setup already
+   live (2026-08-26).
+6. **A mobile test strategy** - Jest + React Native Testing Library (RN doesn't run on Vite's
+   toolchain, so this is a second setup, not an extension of the existing Vitest config). Decided
+   before code exists, and tests written alongside the walking-skeleton screen, not retrofitted -
+   every real test run this project has ever done has found at least one genuine bug a syntax
+   check alone missed (see Phase 6 below); no reason mobile would be the exception.
+7. **App Store Guideline 3.1.1 payment-review check**, against the actual deposit-collection flow.
+   A native app mediating a real-world service booking is not generally subject to Apple's 30% IAP
+   cut, but "generally fine" is not a plan - read the guideline against this app's real flow before
+   relying on App Store approval on a timeline.
+
+**Order of operations:**
+
+1. Decide items 1-3 above. These are decisions and small extractions, not long phases - they block
+   nothing else from starting once written down, but any monorepo/RN code written before they're
+   decided risks being built against the wrong assumption.
+2. Turborepo scaffold, the existing web app moved in verbatim. CI must stay green throughout; zero
+   behavior change is the acceptance criterion for this step.
+3. `packages/api`: GraphQL Codegen wired to the real schema, ONE existing web service (e.g.
+   `ProjectService`) migrated to the generated hooks. Proves the codegen pipeline against a
+   platform with a full, fast, already-green test suite - the cheapest place to find plumbing bugs.
+4. Auth token storage interface, shipped on web first (`expo-secure-store`'s eventual mobile
+   implementation and web's `localStorage` implementation sit behind the same interface). Also
+   closes the XSS/localStorage token-theft exposure flagged in the original security audit.
+5. Expo app scaffolded inside the monorepo. Items 4-7 above (mobile CI/CD, Sentry RN, test
+   harness, App Store payment check) stood up immediately here, before feature screens - not
+   after the app is "mostly done."
+6. ONE real screen, end to end, on a physical device via the EAS dev client: today's
+   calendar/appointments (highest-traffic screen; touches auth, GraphQL, lists, and offline
+   caching all at once - a deliberate forcing function). Real Face ID/secure-store auth, real data
+   through `packages/api`, `FlashList` for the list, Apollo cache persistence
+   (`apollo3-cache-persist`) for offline reads with a visible "offline - showing cached data"
+   banner. Deliberately NOT building queued-write offline mutations for v1 - conflict resolution
+   for a booking/payment app is a much larger problem than this migration already is, and this
+   app's real usage pattern (staff mostly connected) doesn't justify it yet.
+7. Server-side: a device-push-token registration mutation, and Expo push added as a fourth channel
+   through the existing `notifySafely`/audience-resolution dispatch point (`utils/notifications.js`)
+   - not a parallel notification system alongside email/SMS/in-app.
+8. Only once step 6 is proven on a real device - auth, data, lists, offline behavior all sane - does
+   work fan out to the remaining ~40 screens, each screen shipped with its own test file (same
+   coverage discipline the web client suite now has).
+9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
+   closer to real paying users - not a mobile-specific gate).
+10. TestFlight beta, then App Store submission - Guideline 3.1.1 already checked in step 5, so this
+    isn't a review-risk surprise at the end.
+
 ---
 
 ## Phase 6 — Testing, monitoring, and the production checklist
@@ -2156,18 +2230,26 @@ see the note above. It is not on this list at any priority, not because it was f
 5. **Set a real tax rate for every existing shop and independent artist in Settings** before any
    charge path goes live - every row is currently 0, not from a migration bug but because there was
    never a way to set one until recently.
-6. **Pick the deferred Square-payment verification back up when ready**: run
-   `scripts/migrate-square-accounts.js`, connect a real Square sandbox seller, and take one real
-   payment + deposit end to end, confirming the figures in Square's own dashboard match what
-   InkBooks recorded. Nothing in the charge arithmetic has ever touched a real Square API beyond
-   the OAuth handshake itself (verified 2026-08-11). Any Square account connected before
-   2026-08-11 needs to disconnect and reconnect first to pick up the `PAYMENTS_WRITE` scope.
-7. **Once #6 is verified**: run the shop-admin migration
-   (`scripts/migrate-shop-admins-to-artists.js --dry-run` first - a `STAFF`-typed shop admin has no
-   Settings page today), drop the seven now-unread legacy `square*` fields on `Shop`, and wire the
-   `PAYMENT_RECEIVED` Auto-Response trigger to the real charge success path in
+6. ~~Pick the deferred Square-payment verification back up when ready~~ — **done, per Danny's
+   own confirmation 2026-08-27.** Real sandbox deposit and session charges have been run through
+   the app's own UI for a while and both work, including the downstream effects (appointment
+   status, shop-cut math off the real charged amount). Not independently re-verified against
+   Square's own dashboard in this session the way the Aug 1-2 shop-cut-invoice pass was - taken on
+   Danny's word, which is the authority that matters here. `utils/square.js`'s header comment,
+   which still said "STILL UNVERIFIED: a payment that actually succeeds," was stale and has been
+   corrected to match. Also added, same session: `SQUARE_PAYMENTS_ENABLED` (default true/unset,
+   `utils/square.js`'s `assertPaymentsEnabled()`) as a dev-time kill switch in front of both real
+   money-moving calls (`createPaymentForAccount`, `createAndPublishShopCutInvoice`), so real
+   payments can be switched off in Render/`.env.*` without touching code while other Square
+   testing (including a connected real sandbox seller) continues.
+7. **Now unblocked** (see #6). The shop-admin migration piece is **not needed** - the divergent-
+   shape bug was fixed at the source in `seed.js`/`seed-large.js` and Danny already re-ran them to
+   correct the seed data (2026-08-27), so `migrate-shop-admins-to-artists.js` has nothing to find
+   against current data; it stays in the repo as a rescue tool if a real signup path ever produces
+   a `STAFF`-only admin again. Still open: drop the seven now-unread legacy `square*` fields on
+   `Shop`, and wire the `PAYMENT_RECEIVED` Auto-Response trigger to the real charge success path in
    `routes/squarePayments.js` (the template and toggle already exist in Settings; nothing calls it
-   yet, deliberately, until #6 is trustworthy).
+   yet).
 8. ~~Wire `ClientFlagType.ensureSeeded()` into application boot~~ — **already done**, confirmed
    2026-08-21/22 by reading `server/index.js` directly (`await ClientFlagType.ensureSeeded()` at
    boot). This item was stale, not the underlying code.
@@ -2194,11 +2276,13 @@ see the note above. It is not on this list at any priority, not because it was f
 
 Phase 0 today, if any of it is still outstanding. Phase 1 this week — it's the part where real damage is currently possible. Phase 2 the following 1-2 weeks, since it's what keeps Phase 1 fixed. Phase 3 (modernization, including the monorepo/TypeScript scaffolding that Phase 5 needs) can run in parallel with Phase 2 once the auth wrapper pattern is settled. Phase 4 (real payments) whenever you're ready to actually take deposits — see item 6 above for exactly where that stands. Phase 5 (mobile) starts once Phase 0-2 are done and the monorepo shape from Phase 3 exists — don't build a mobile UI against an API that's still wide open. Phase 6 items — tests, CI, monitoring — should be stood up incrementally starting in Phase 1, not bolted on at the end; retrofitting tests onto already-migrated code (or two clients instead of one) is much more expensive than writing them alongside the fixes.
 
-**Danny's own stated sequencing, reconfirmed 2026-08-25**: items 2 (Sentry/Atlas backups) and 5
-(real tax rates) are the only other pre-launch items with no code left to write - both need his own
-accounts/business data, not more engineering. Item 6 (real Square payment verification) is
-deliberately the very last item before mobile app work starts, not before - do not raise it again
-until that stage is reached.
+**Danny's own stated sequencing, reconfirmed 2026-08-25, updated 2026-08-27**: item 2 (Sentry)
+is done; Atlas backups are explicitly deferred by Danny until closer to real paying users, not
+forgotten. Item 5 (real tax rates) is done - configured in Settings. Item 6 (real Square payment
+verification) is done, per Danny's own confirmation - see #6 above. As of 2026-08-27, the only
+items with anything left before mobile work starts are #7's two remaining sub-tasks (legacy
+`square*` field cleanup, wiring the `PAYMENT_RECEIVED` trigger) and #10's test-coverage tail -
+neither is a blocking gate the way #6 was.
 
 ---
 

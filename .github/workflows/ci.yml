@@ -1,7 +1,7 @@
 name: CI
 
 # Runs the full test suite (and the client production build) on every push to main and every PR
-# targeting main. Two independent jobs, since server/ and client/ are separate npm projects with
+# targeting main. Two independent jobs, since server/ and apps/web/ are separate npm projects with
 # their own package.json/lockfile - a failure in one shouldn't block visibility into the other.
 on:
   push:
@@ -40,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: client
+        working-directory: apps/web
     steps:
       - uses: actions/checkout@v4
 
@@ -48,7 +48,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: client/package-lock.json
+          cache-dependency-path: apps/web/package-lock.json
 
       - run: npm ci
       - run: npm test

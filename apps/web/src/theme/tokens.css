@@ -1,5 +1,9 @@
 /* InkBooks design tokens - light and dark.
  *
+ * GENERATED FILE. Source of truth is tokens.mjs in this same directory - edit there, then run
+ * `npm run tokens:generate` from client/. Do not hand-edit this file; the next regeneration
+ * overwrites it.
+ *
  * Built around the register wizard's blue originally, then rebuilt around a dark copper primary
  * (#9c5a30) at the shop's direction, with every other color matched off that scheme rather than
  * left as whatever the previous 67-file, 475-hex-literal sprawl happened to land on. See
@@ -10,7 +14,8 @@
  * .css file in this app, AND by MUI's own cssVariables config (theme.js's `colorSchemeSelector:
  * "data-theme"`) - so a single toggle in Settings flips the hand-rolled CSS and every MUI
  * component's palette together. Two separate theme systems that don't share a switch is how they
- * drift apart; this is the one place that switch lives.
+ * drift apart; this is the one place that switch lives. theme.js's own palette now imports
+ * tokens.mjs directly rather than hardcoding a second copy, for the same reason.
  *
  * NAMING: --ib-* prefix throughout, so nothing here collides with MUI's own --mui-palette-* custom
  * properties once cssVariables is on - both live on :root/[data-theme] at once.
@@ -56,9 +61,10 @@
   --ib-primary-bg: #f7ece3;
   --ib-primary-border: #e0c4a8;
   --ib-primary-contrast: #ffffff;
-  /* A disabled primary button's own fill - deliberately not just text-disabled or a mid-gray, the
-     way the pre-copper app used #9dc2f2 for a washed-out blue. Same hue, less saturation, so a
-     disabled "Pay" button still visually reads as the primary action, just not an available one. */
+  /* A disabled primary button's own fill - deliberately not just text-disabled or a
+     mid-gray, the way the pre-copper app used #9dc2f2 for a washed-out blue. Same hue,
+     less saturation, so a disabled "Pay" button still visually reads as the primary
+     action, just not an available one. */
   --ib-primary-disabled: #d9b89a;
 
   --ib-error: #b3452e;
@@ -69,10 +75,9 @@
   --ib-success-bg: #eaf0e2;
   --ib-success-border: #c3d6b0;
 
-  /* "Archived" badge - a muted gold, deliberately NOT primary (an archived tag reading as clickable/
-     actionable would be the wrong signal) and not gray (loses the "this used to matter" warmth an
-     archive implies vs. a plain disabled state). Replaces the old #4a3a1a/#e0c072 pair, which was
-     hardcoded dark-on-light regardless of mode - wrong in light mode, coincidentally fine in dark. */
+  /* "Archived" badge - a muted gold, deliberately NOT primary (an archived tag reading as
+     clickable/actionable would be the wrong signal) and not gray (loses the "this used to
+     matter" warmth an archive implies vs. a plain disabled state). */
   --ib-archived-bg: #f0e0c0;
   --ib-archived-text: #7a5a12;
 
@@ -97,8 +102,8 @@
   --ib-primary-hover: #e29e68;
   --ib-primary-bg: #3a2a1c;
   --ib-primary-border: #5c4530;
-  /* Light copper needs dark text to hold contrast, not white - see theme.js's dark palette for
-     the same call on MUI's own primary.contrastText. */
+  /* Light copper needs dark text to hold contrast, not white - see theme.js's dark
+     palette for the same call on MUI's own primary.contrastText. */
   --ib-primary-contrast: #241c17;
   --ib-primary-disabled: #5c4530;
 
@@ -113,9 +118,9 @@
   --ib-archived-bg: #4a3a1a;
   --ib-archived-text: #e0c072;
 
-  /* Dark mode's own drop shadows are heavier and slightly cooler than a straight light-mode
-     black - this is the one deliberate exception noted above, kept as a variable rather than a
-     literal so it stays discoverable from this file instead of hidden in whichever component
-     needed it first. */
+  /* Dark mode's own drop shadows are heavier and slightly cooler than a straight
+     light-mode black - this is the one deliberate exception noted above, kept as a
+     variable rather than a literal so it stays discoverable from this file instead of
+     hidden in whichever component needed it first. */
   --ib-shadow-color: 0, 0, 0;
 }
