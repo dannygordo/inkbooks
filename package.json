@@ -1,4 +1,8 @@
 {
   "name": "inkbooks",
-  "private": true
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
 }

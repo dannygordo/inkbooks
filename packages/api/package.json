@@ -1,0 +1,37 @@
+{
+  "name": "@inkbooks/api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Generated, typed GraphQL operations and Apollo hooks shared across InkBooks clients (web now, mobile in Phase 5).",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "codegen": "graphql-codegen --config codegen.ts",
+    "codegen:watch": "graphql-codegen --config codegen.ts --watch",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "peerDependencies": {
+    "@apollo/client": "^3.5.8",
+    "react": "^19.0.0"
+  },
+  "dependencies": {
+    "graphql": "^16.14.2"
+  },
+  "devDependencies": {
+    "@apollo/client": "^3.5.8",
+    "@graphql-codegen/cli": "^5.0.7",
+    "@graphql-codegen/typescript": "^4.1.6",
+    "@graphql-codegen/typescript-operations": "^4.6.1",
+    "@graphql-codegen/typescript-react-apollo": "^4.3.3",
+    "react": "^19.2.8",
+    "typescript": "^5.9.3"
+  }
+}

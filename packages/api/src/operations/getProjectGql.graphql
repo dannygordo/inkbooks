@@ -1,0 +1,94 @@
+# Mirrors ProjectService's second, lighter-weight query (previously the module-scope
+# GQL_FETCH_PROJECT_QUERY, exported as fetchProjectGQL) - no conversation thread, no
+# consultAppointment, and artist/image sub-selections trimmed down. Kept as its own named
+# operation rather than folded into GetProject since the two have never shared a selection set
+# and nothing in apps/web currently calls fetchProjectGQL outside ProjectService's own tests.
+query GetProjectGql($projectId: ID!) {
+	getProject(projectId: $projectId) {
+		id
+		title
+		description
+		placement
+		size
+		palette
+		artistId
+		artist {
+			firstName
+			lastName
+			email
+			id
+			shop {
+				id
+				name
+			}
+		}
+		clientId
+		client {
+			firstName
+			lastName
+			email
+			id
+		}
+		referenceImages {
+			url
+			avatar
+			title
+			uploadedByDisplayName
+			userId
+			userInfo {
+				firstName
+				lastName
+				avatar
+			}
+			tags
+			updatedAt
+			createdAt
+		}
+		bodyImages {
+			url
+			avatar
+			title
+			uploadedByDisplayName
+			userId
+			userInfo {
+				firstName
+				lastName
+				avatar
+			}
+			tags
+			updatedAt
+			createdAt
+		}
+		designImages {
+			url
+			avatar
+			uploadedByDisplayName
+			userId
+			userInfo {
+				firstName
+				lastName
+				avatar
+			}
+			tags
+			updatedAt
+			createdAt
+		}
+		materialsUsed
+		notes {
+			author
+			note
+			createdAt
+			updatedAt
+		}
+		tags
+		status
+		depositCollectedCents
+		depositAvailableCents
+		deposits {
+			id
+			depositCents
+			depositPaymentMethod
+			depositCollectedAt
+		}
+	}
+}

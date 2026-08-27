@@ -1,0 +1,26 @@
+# Mirrors ProjectService._FETCH_PROJECTS_BY_ARTIST_QUERY. Powers the artist dashboard's "Active
+# Projects" count - see the fetchPolicy note on the migrated hook's call site for why this one
+# stays cache-and-network.
+query GetProjectsByArtist($artistId: ID!) {
+	getProjectsByArtist(artistId: $artistId) {
+		id
+		title
+		description
+		client {
+			user {
+				id
+				firstName
+				lastName
+				avatar
+			}
+		}
+		artist {
+			user {
+				id
+				firstName
+				lastName
+				avatar
+			}
+		}
+	}
+}

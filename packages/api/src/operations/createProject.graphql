@@ -1,0 +1,24 @@
+# Mirrors ProjectService._CREATE_PROJECT_MUTATION. Flat arguments, not a wrapped ProjectInput -
+# matches the server's createProject signature exactly (see server/graphql/typeDefs.js).
+mutation CreateProject(
+	$title: String!
+	$description: String!
+	$placement: String
+	$size: String
+	$artistId: ID!
+	$clientId: ID!
+	$status: String!
+) {
+	createProject(
+		title: $title
+		description: $description
+		placement: $placement
+		size: $size
+		artistId: $artistId
+		clientId: $clientId
+		status: $status
+	) {
+		id
+		title
+	}
+}
