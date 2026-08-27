@@ -7,16 +7,16 @@ const tokenCrypto = require('./token-crypto');
 // specific slice of their API surface, plain `fetch` (Node 20+, already required by
 // package.json's engines field) keeps this self-contained with nothing new to `npm install`.
 //
-// VERIFIED AGAINST A REAL SQUARE SANDBOX SELLER, 2026-08-11, as far as the Payments call:
-// authorization URL -> consent -> token exchange -> encrypted storage -> decrypt -> POST /v2/payments
-// all work end to end against Square rather than against these docs. The charge itself was refused
-// for a missing scope (see OAUTH_SCOPES below), which is a permission granted at authorization -
-// so it proves the whole handshake ran and the stored token was genuinely usable.
-//
-// STILL UNVERIFIED: a payment that actually succeeds, and everything downstream of it -
-// createShopCutInvoice, publishing that invoice, and the webhook flipping an Appointment to 'paid'.
-// The rest of this file was built against Square's published REST docs (OAuth, Invoices, Orders,
-// Customers, webhook signature scheme - see PRODUCTION_ROADMAP.md's "Shop-cut ledger" section).
+// VERIFIED AGAINST A REAL SQUARE SANDBOX SELLER. The OAuth handshake (authorization URL ->
+// consent -> token exchange -> encrypted storage -> decrypt) and the shop-cut invoice path
+// (createAndPublishShopCutInvoice -> publish -> webhook flipping an Appointment to 'paid') were
+// confirmed live 2026-08-01/02 - see PRODUCTION_ROADMAP.md's "Shop-cut ledger" section. The direct
+// card-charge path (createPaymentForAccount, POST /v2/payments) was blocked on a missing OAuth
+// scope as of 2026-08-11 (see OAUTH_SCOPES below - since fixed) and was the one piece still
+// unverified as of the "Suggested sequencing" doc's item 6; per Danny's own confirmation
+// 2026-08-27 that real sandbox deposit and session charges have been working through the app's UI
+// for a while, that gap is closed too. The rest of this file (Orders, Customers, webhook signature
+// scheme) was built against Square's published REST docs rather than exercised individually.
 
 function getEnvironment() {
   return process.env.SQUARE_ENVIRONMENT === 'production' ? 'production' : 'sandbox';
