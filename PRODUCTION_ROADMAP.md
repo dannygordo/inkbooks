@@ -644,6 +644,38 @@ section completes it and fixes the build order into a walking-skeleton-first seq
 3. `packages/api`: GraphQL Codegen wired to the real schema, ONE existing web service (e.g.
    `ProjectService`) migrated to the generated hooks. Proves the codegen pipeline against a
    platform with a full, fast, already-green test suite - the cheapest place to find plumbing bugs.
+   ✅ Done (2026-08-27) - `packages/api` scaffolded as a TypeScript package (see DECISIONS.md's
+   X1/X4); GraphQL Code Generator's `client-preset`-equivalent plugin set (`typescript` +
+   `typescript-operations` + `typescript-react-apollo`) wired against `server/graphql/typeDefs.js`
+   directly (no separate SDL file to keep in sync - codegen's code-file loader statically extracts
+   the schema from the real `gql`` tag). ProjectService's seven operations (the six it already had,
+   plus the second `getProject` variant it exported as `fetchProjectGQL`) ported field-for-field
+   into `packages/api/src/operations/*.graphql`, generating typed hooks
+   (`useGetProjectQuery`/`useGetProjectsQuery`/`useGetProjectsByArtistQuery`) and typed documents
+   for the mutation-returning exports (`updateProject`/`updateProjectNotes`/`updateProjectTags`/
+   `CREATE_PROJECT_MUTATION`). `apps/web/src/services/ProjectService.js` rewritten as a thin
+   adapter over the generated exports with its public shape byte-for-byte unchanged, so every
+   existing caller (`Project.jsx`, `Projects.jsx`, `AppointmentWizard.jsx`,
+   `IBProgressListProject.jsx`) kept working with zero call-site changes. `ProjectService.test.js`
+   and `Project.test.jsx` (the one other file with its own hand-copied reconstruction of the
+   `updateProject` mutation document) now import the generated documents directly instead of
+   hand-copying field selections, closing the drift gap those reconstructions could previously
+   only detect, never prevent. `apps/web`'s dependency on `@inkbooks/api` is a concrete
+   `file:../../packages/api` reference rather than bare workspace-range resolution, and CI now
+   installs from the repo root with one lockfile covering apps/web + packages/api (see
+   DECISIONS.md's X4 for why, including the empirical finding behind it) - added a third CI job
+   (`packages-api`) that builds, typechecks, and re-runs codegen against a fresh checkout to fail
+   loudly on generated-output drift. Full verification before landing: `packages/api` builds and
+   typechecks clean; codegen is reproducible byte-for-byte from a fresh `server/graphql/typeDefs.js`
+   read; all 2119 tests across apps/web's 179 test files pass (including the 26/26 in
+   `Project.test.jsx` and 17/17 in the new `ProjectService.test.js`); `apps/web`'s production build
+   succeeds. Root-level `npm ci`/`npm install` inside this remote-bridge sandbox is unreliable (the
+   bridge's mounted filesystem rejects the file deletes/renames npm's install process depends on),
+   so both the codegen run and the full-suite/build verification were done in a disposable Linux
+   build sandbox mirroring the real repo, then only the resulting source/lockfile/build-output files
+   were written back to the actual project - noted here since it explains why `node_modules` at the
+   repo root may look incompletely installed if inspected directly; a real `npm ci` from a normal
+   terminal is unaffected by this and is how CI itself installs.
 4. Auth token storage interface, shipped on web first (`expo-secure-store`'s eventual mobile
    implementation and web's `localStorage` implementation sit behind the same interface). Also
    closes the XSS/localStorage token-theft exposure flagged in the original security audit.

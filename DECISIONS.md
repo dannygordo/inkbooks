@@ -751,6 +751,37 @@ time under deadline once mobile work is already underway. Staged in `client/src/
 the monorepo split described in PRODUCTION_ROADMAP.md's Phase 5 - moves into `packages/shared`
 verbatim once that structure exists, no rewrite needed at that point.
 
+### X4. apps/web depends on packages/api via `file:`, not bare npm workspace resolution - and CI installs from the repo root
+
+Root `package.json` now declares `"workspaces": ["apps/*", "packages/*"]` (step 1 deferred this to
+step 2 - see PRODUCTION_ROADMAP.md's Phase 5 order-of-operations). That field alone doesn't decide
+*how* apps/web resolves `@inkbooks/api` - two real options, and this picked the second:
+
+Bare workspace resolution (`"@inkbooks/api": "^0.1.0"` in apps/web/package.json, relying on npm to
+match it against the local workspace package by name+version) is the more "idiomatic" workspaces
+pattern, but it only resolves during a root-level `npm install`/`npm ci` - it does nothing for
+`apps/web`'s own standalone install. Confirmed empirically (same finding as step 1's note on the
+`workspaces` field itself): once a package's ancestor declares `workspaces`, `npm ci` run with cwd
+inside that package stops managing its own independent lockfile the way it used to, and starts
+deferring to the root - so apps/web's `npm ci` silently stopped being self-sufficient the moment
+`workspaces` was added, regardless of which resolution mechanism `@inkbooks/api` used.
+
+Given that's already true, the decision was to make it explicit rather than accidental:
+apps/web/package.json depends on `"@inkbooks/api": "file:../../packages/api"` - a concrete path,
+not a version-range match - and CI's `client`/`packages-api` jobs both run `npm ci` at the repo
+root (one lockfile, `package-lock.json`, covering apps/web + packages/api together), then target
+a single project's scripts with `npm run <script> --workspace=<name>` rather than `cd`-ing into
+it. `server/` is unaffected either way - it was never added to the `workspaces` array (it isn't
+part of the apps/mobile monorepo split PRODUCTION_ROADMAP.md's Phase 5 describes), so its own
+`npm ci` in its own CI job keeps working exactly as it did before this step.
+
+Practical effect for anyone working locally: `apps/web`'s own previously-standalone
+`package-lock.json` is gone (moved to `_to_delete/` rather than deleted outright, since these
+remote-bridge sessions can't delete files - safe for a human to remove) - it stopped being
+accurate the moment `workspaces` landed and would only have kept lying about what `npm ci` there
+actually does. Run `npm ci` (or `npm install`) once from the repo root; that's what both CI jobs
+and any future workspace member (packages/shared, apps/mobile) will do too.
+
 ---
 
 ## Process
