@@ -7,7 +7,10 @@ node_modules/
 .expo/
 dist/
 web-build/
-expo-env.d.ts
+
+# expo-env.d.ts is deliberately NOT ignored here, unlike the Expo template default - see the
+# comment inside that file for why: CI's `tsc --noEmit` needs it and never runs an Expo CLI
+# command that would generate it.
 
 # Native
 .kotlin/
