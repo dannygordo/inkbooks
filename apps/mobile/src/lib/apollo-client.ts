@@ -1,5 +1,9 @@
-import { ApolloClient, InMemoryCache, createHttpLink } from '@apollo/client';
+import { ApolloClient, InMemoryCache, createHttpLink, from } from '@apollo/client';
+import { setContext } from '@apollo/client/link/context';
 import Constants from 'expo-constants';
+
+import { AUTH_SETTINGS_CONSTANTS } from '@/constants/auth';
+import { TokenStorageService } from '@/services/TokenStorageService';
 
 // Mirrors apps/web's index.jsx httpLink setup (see that file's own header comment for the same
 // "one place this is read" reasoning). The RN/Expo equivalent of Vite's import.meta.env.VITE_*
@@ -12,13 +16,26 @@ export const apiUrl =
   (Constants.expoConfig?.extra?.apiUrl as string | undefined) ??
   'http://localhost:5500';
 
-// No auth link yet, unlike apps/web's client (index.jsx's authLink). That's step 6
-// (PRODUCTION_ROADMAP.md's Phase 5 order-of-operations) - it needs a real, expo-secure-store-
-// backed TokenStorageService implementation and a real login screen to read a token from, neither
-// of which exist yet at this scaffolding step. Wiring an authLink against nothing to authenticate
-// would be dead code, not a head start.
+const httpLink = createHttpLink({ uri: apiUrl });
+
+// Direct port of apps/web's index.jsx authLink - TokenStorageService.getItemAsync was already
+// shaped for this (see that file's own comment), so nothing about the link chain itself needed to
+// change to go from web's localStorage-backed version to this SecureStore-backed one.
+const authLink = setContext(async (_, { headers }) => {
+  const raw = await TokenStorageService.getItemAsync(
+    AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE,
+  );
+  const token = raw ? JSON.parse(raw) : null;
+  return {
+    headers: {
+      ...headers,
+      authorization: token ? `Bearer ${token.accessToken}` : '',
+    },
+  };
+});
+
 export const apolloClient = new ApolloClient({
-  link: createHttpLink({ uri: apiUrl }),
+  link: from([authLink, httpLink]),
   cache: new InMemoryCache(),
   clientAwareness: { name: 'InkBooks Mobile' },
 });

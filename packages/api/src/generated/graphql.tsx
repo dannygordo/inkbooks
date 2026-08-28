@@ -2806,6 +2806,14 @@ export type GetProjectsByArtistQueryVariables = Exact<{
 
 export type GetProjectsByArtistQuery = { __typename?: 'Query', getProjectsByArtist?: Array<{ __typename?: 'Project', id: string, title: string, description: string, client?: { __typename?: 'Client', user?: { __typename?: 'User', id: string, firstName?: string | null, lastName?: string | null, avatar?: string | null } | null } | null, artist?: { __typename?: 'Artist', user?: { __typename?: 'User', id: string, firstName?: string | null, lastName?: string | null, avatar?: string | null } | null } | null } | null> | null };
 
+export type LoginMutationVariables = Exact<{
+  email: Scalars['String']['input'];
+  password: Scalars['String']['input'];
+}>;
+
+
+export type LoginMutation = { __typename?: 'Mutation', login: { __typename?: 'User', id: string, email: string, firstName?: string | null, lastName?: string | null, avatar?: string | null, role: number, userType: string, tagColor?: string | null, themePreference?: string | null, accessToken: string, userInfo?: { __typename?: 'Artist', id: string, firstName: string, lastName: string, avatar?: string | null, hourlyRate?: number | null, shop?: { __typename?: 'Shop', id: string, name: string } | null } | { __typename?: 'Client', id: string, firstName: string, lastName: string, avatar?: string | null } | { __typename?: 'Staff', id: string, firstName: string, lastName: string, avatar?: string | null, title?: string | null, shop?: { __typename?: 'Shop', id: string, name: string } | null } | null } };
+
 export type UpdateProjectMutationVariables = Exact<{
   project?: InputMaybe<ProjectInput>;
 }>;
@@ -3350,6 +3358,79 @@ export type GetProjectsByArtistQueryHookResult = ReturnType<typeof useGetProject
 export type GetProjectsByArtistLazyQueryHookResult = ReturnType<typeof useGetProjectsByArtistLazyQuery>;
 export type GetProjectsByArtistSuspenseQueryHookResult = ReturnType<typeof useGetProjectsByArtistSuspenseQuery>;
 export type GetProjectsByArtistQueryResult = Apollo.QueryResult<GetProjectsByArtistQuery, GetProjectsByArtistQueryVariables>;
+export const LoginDocument = gql`
+    mutation Login($email: String!, $password: String!) {
+  login(email: $email, password: $password) {
+    id
+    email
+    firstName
+    lastName
+    avatar
+    role
+    userType
+    tagColor
+    themePreference
+    accessToken
+    userInfo {
+      ... on Artist {
+        id
+        firstName
+        lastName
+        avatar
+        hourlyRate
+        shop {
+          id
+          name
+        }
+      }
+      ... on Client {
+        id
+        firstName
+        lastName
+        avatar
+      }
+      ... on Staff {
+        id
+        firstName
+        lastName
+        avatar
+        title
+        shop {
+          id
+          name
+        }
+      }
+    }
+  }
+}
+    `;
+export type LoginMutationFn = Apollo.MutationFunction<LoginMutation, LoginMutationVariables>;
+
+/**
+ * __useLoginMutation__
+ *
+ * To run a mutation, you first call `useLoginMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useLoginMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [loginMutation, { data, loading, error }] = useLoginMutation({
+ *   variables: {
+ *      email: // value for 'email'
+ *      password: // value for 'password'
+ *   },
+ * });
+ */
+export function useLoginMutation(baseOptions?: Apollo.MutationHookOptions<LoginMutation, LoginMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<LoginMutation, LoginMutationVariables>(LoginDocument, options);
+      }
+export type LoginMutationHookResult = ReturnType<typeof useLoginMutation>;
+export type LoginMutationResult = Apollo.MutationResult<LoginMutation>;
+export type LoginMutationOptions = Apollo.BaseMutationOptions<LoginMutation, LoginMutationVariables>;
 export const UpdateProjectDocument = gql`
     mutation UpdateProject($project: ProjectInput) {
   updateProject(project: $project) {

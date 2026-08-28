@@ -941,6 +941,55 @@ charge, gated to the appointment's owner or `SHOP_ADMIN`. Nothing about a succes
 access to any app feature or content - the transaction pays for work performed in a tattoo chair,
 not for anything the app itself provides.
 
+### X8. Mobile auth ships app-token-only; Firebase sign-in stays web-only until mobile has an image-upload feature
+
+PRODUCTION_ROADMAP.md's Phase 5, step 6 calls for one real screen end-to-end (the appointments
+list) with real auth ahead of it. Scoped with the user up front to two decisions, both intentional
+narrowings of what X6's walking skeleton left open: the feature itself is the full read/write
+wizard (not a read-only list), but auth is the app's own login only - no Firebase custom-token
+sign-in alongside it.
+
+`apps/web/src/context/auth.jsx`'s `login()` does two things after a successful `LOGIN_USER`
+mutation: `setSession(userData)` (the app's own token, persisted, cache-wiped), then
+`signInWithCustomToken(userData.firebaseToken)`. Those are separable because they exist for
+different reasons - the app token is what every GraphQL request authenticates with; the Firebase
+sign-in exists solely so an authenticated client can write to Firebase Storage (reference-image
+uploads). Mobile has no image-upload feature yet, so there is nothing for a Firebase session to
+authorize here - porting it now would be a second, live auth flow with no caller. `apps/mobile/src/context/auth.tsx`
+is `auth.jsx` minus exactly that piece: no `firebaseUser` state, no `FIREBASE_LOGIN` action, no
+`signInWithCustomToken`/`signOut` calls. `login.graphql` mirrors `LOGIN_USER`'s selection minus
+`firebaseToken` for the same reason - nothing on mobile reads it. Everything session-lifecycle-
+related that has nothing to do with Firebase - the cache-wipe-on-session-change fix (`cache.reset()`
++ `clearStore()` on every `setSession`, not just when the user id changes - a single long-lived
+`InMemoryCache` means a second user's screen can otherwise render the first user's cached data with
+no network request, so no server-side scoping check ever runs to catch it), the async
+`SecureStore`-backed session restore with a JWT-expiry check (`jwt-decode`'s `exp` compared against
+`Date.now()`, stored session discarded rather than restored if already expired), and the
+`initializing` flag distinguishing "still checking" from "checked, signed out" - is unchanged,
+because the bug class each exists to prevent is identical on mobile. When mobile does grow an
+image-upload feature, Firebase sign-in is additive to this file, not a rework of it.
+
+`CurrentUser` (`apps/mobile/src/context/auth.tsx`) is `LoginMutation['login']` - read off
+`packages/api`'s generated type rather than hand-declared, so a field added to or removed from
+`login.graphql` is a compile error at every place that assumed the old shape, not a silent runtime
+mismatch. `login.graphql` itself selects `shop.id`/`shop.name` on `Artist`/`Staff`'s `userInfo`
+now, even though nothing reads it yet - every shop-scoped query the appointments screens need next
+needs it, and re-running codegen later for one more field is pure overhead against getting it now.
+
+Navigation IA: `_layout.tsx` uses expo-router's `Stack.Protected` (`guard` prop) rather than a
+manually-managed `<Redirect>` - the currently-documented pattern, confirmed against
+`docs.expo.dev/router/advanced/protected` rather than assumed from training data, since this is
+exactly the kind of API surface that moves across Expo SDK versions. It re-evaluates on every
+render, so the moment `login()`/`logout()` flips `user`, the Stack swaps which screen group is
+reachable on its own - no `navigate()` call needed at either call site, and no flash of the wrong
+screen while `initializing` is true (the Stack renders `null` until it resolves, matching X5's
+`initializing`-gated `AuthRoute`/`RoleRoute` pattern on web).
+
+`apps/mobile/src/constants/auth.ts` duplicates (not shares) `ROLES`/`AUTH_SETTINGS_CONSTANTS`/
+`AUTH_ERROR_MESSAGES` from web's `constants/auth.js`, trimmed to what auth actually needs so far -
+same `packages/shared`-doesn't-exist-yet staging precedent as X3 and X5, both of which note their
+own duplication the same way.
+
 ---
 
 ## Process
