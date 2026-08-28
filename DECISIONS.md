@@ -833,6 +833,114 @@ interface first, so swapping the storage backend later (closing the XSS/localSto
 exposure the original security audit flagged) is a one-file change here, not an app-wide
 search-and-replace.
 
+### X6. `apps/mobile` is a real Expo/TypeScript app from the first commit, not a placeholder folder - CI/CD, Sentry, and a test harness stood up before any feature screen exists
+
+`apps/mobile` was added via `npx create-expo-app@latest` (Expo SDK ~57.0.17, React Native 0.86.3,
+React 19.2.3, TypeScript ~6.0.3, expo-router with typed routes), then stripped of every
+template-only demo (the "Welcome to Expo" tab layout and its icons/images, `scripts/reset-project.js`,
+the template's own `README.md`/`CLAUDE.md`/`AGENTS.md`) while keeping the genuinely reusable
+primitives the template ships (`ThemedText`/`ThemedView`, the color-scheme hooks, `tsconfig.json`'s
+`@/*` path alias). It joins root `package.json`'s existing `"workspaces": ["apps/*", "packages/*"]`
+(X4) as a third member, and depends on `@inkbooks/api` the identical `file:../../packages/api` way
+apps/web does - `src/app/index.tsx` type-only-imports `GetProjectsQuery` from it specifically to
+prove that resolves and typechecks from a second, non-web client, which is packages/api's entire
+reason to exist (X1).
+
+**What's real vs. deliberately deferred, in the walking-skeleton screen itself
+(`src/app/index.tsx`, `src/app/_layout.tsx`):** an Apollo Client pointed at
+`EXPO_PUBLIC_API_URL` (`src/lib/apollo-client.ts` - Expo's env-var convention, the RN/Expo
+equivalent of Vite's `VITE_*` prefix requirement; only `EXPO_PUBLIC_*`-prefixed vars get inlined
+into the built app), no auth link yet (needs a real `expo-secure-store`-backed
+`TokenStorageService` implementation and a real login screen to read a token from - neither exists
+until step 6), no tab bar or navigation IA (one screen isn't navigation, it's decoration - a real
+decision once there's a second screen to navigate between), no InkBooks "copper" theme (still the
+template's generic light/dark placeholder colors - `packages/shared` and the token migration X3
+already anticipates is step 6's work, not this one).
+
+**Mobile CI/CD (roadmap item 4) - stood up, EAS Build itself is not.** `apps/mobile/eas.json`
+declares `development`/`preview`/`production` build profiles (internal distribution for the first
+two, an EAS Update channel per profile, `EXPO_PUBLIC_API_URL` set per-environment) - the channel
+strategy the roadmap calls for. What it cannot do yet: actually run. EAS Build needs a real
+Expo/EAS account, `eas init` run against it (which writes a real `extra.eas.projectId` into
+`app.json` - deliberately absent rather than faked, so it can't be mistaken for a working one), and
+an `EXPO_TOKEN` secret in the repo's CI. None of those exist in this environment. `.github/workflows/ci.yml`
+gained a fourth job, `mobile` (typecheck + `jest` on every push/PR to `main`, same pattern as the
+existing `server`/`packages-api`/`client` jobs) - that part needs no account and runs today; an
+`eas build` step is a follow-up once the account exists, noted inline in the workflow file itself.
+
+**`@sentry/react-native` (roadmap item 5) - the no-DSN-means-off contract, not source-map upload.**
+`src/lib/sentry.ts`'s `initSentry()` mirrors the exact contract `apps/web`'s `index.jsx` and
+`server/utils/error-reporting.js` already use: `Sentry.init()` only runs if
+`EXPO_PUBLIC_SENTRY_DSN` is set, so this is safe to ship with no Sentry React Native project behind
+it yet. What real crash reporting with readable native stack traces additionally needs - the
+`@sentry/react-native` Expo config plugin in `app.json`, wired to a real org/project slug and auth
+token so EAS Build can upload source maps - is deliberately not added, since wiring a config plugin
+against credentials that don't exist would be dead configuration, not a head start.
+
+**Mobile test strategy (roadmap item 6) - Jest + React Native Testing Library, wired and green.**
+`jest-expo` as the preset (RN doesn't run on Vite's toolchain - PR1's "tests ship with the feature"
+rule needed a working harness before `__tests__/index.test.tsx` could exist, not after).
+`__tests__/` sits at the top level of `apps/mobile`, not inside `src/app/` next to the screen it
+tests, because expo-router treats every file under `src/app/` as a candidate route and there's no
+documented guarantee it skips `.test.tsx` files the way some bundlers skip `__tests__` directories
+by convention - keeping test files out of the routes tree entirely removes the question rather than
+relying on unverified exclusion behavior. Two real bugs the first test run caught, exactly PR1's
+point: `react-native-safe-area-context`'s own jest mock (`react-native-safe-area-context/jest/mock`)
+ships as `export default {...}` with no named exports, so `jest.mock`ing it by requiring that file
+verbatim silently made every named import (`SafeAreaView` included) resolve to `undefined` -
+`jest.setup.js` unwraps `.default` before returning it. Global CSS (`src/global.css`, imported by
+`theme.ts` for the template's web output target) has no Jest transform for real CSS syntax by
+default - `jest.css-mock.js` stubs it to `{}` since nothing under test asserts on stylesheet
+effects.
+
+**A real npm-workspace version-hoisting bug, found and fixed, worth recording so it isn't
+rediscovered the hard way:** `create-expo-app`'s scaffold pins `react`/`react-dom` to an *exact*
+`19.2.3` and `jest-expo`'s own `package.json` hard-pins its `react-test-renderer` dependency to
+that same exact `19.2.3` - both narrower than react-native 0.86.3's own peer range (`^19.2.3`).
+Meanwhile apps/web already forces the workspace root to hoist `react@19.2.8` (its own
+`^19.2.8`). With `react`/`react-test-renderer` left at exact `19.2.3` in apps/mobile, npm nested a
+*second* copy of `react` inside `apps/mobile/node_modules` to satisfy the exact pin, while
+`@testing-library/react-native` (hoisted to the shared root, alongside root's `react@19.2.8`)
+resolved a *different* `react` instance than the app code under test did - two separate copies of
+React's internal reconciler state, which breaks `act()` tracking in a way that fails silently and
+confusingly (`render()` appears to succeed; `screen.getByText` then throws "`render` function has
+not been called," or "Can't access `.root` on unmounted test renderer," neither of which mentions
+React at all). Loosening apps/mobile's `react`/`react-dom` to `^19.2.3` (react-native's own peer
+range, still satisfied) let npm hoist a single shared `react` instead of nesting a second copy - but
+`react-test-renderer` still resolved to the mismatched `19.2.3` sitting at the root, because nothing
+forced it off the version `jest-expo`'s own exact pin was content to share. The actual fix: a root
+`package.json` `"overrides": { "react-test-renderer": "19.2.8" }`, forcing every consumer -
+including `jest-expo`'s own internal one - onto the single version that matches the hoisted `react`
+it needs to pair with. `@testing-library/react-native` was also downgraded from its just-released
+`14.x` to `^13.3.3`: `14.x`'s `screen` API failed to register a render result at all in this
+environment (same symptom as the mismatch above, but present even after the version-hoisting fix),
+and `13.x` is the version this project's actual `jest-expo`/RN combination was verified against,
+not a version chased for its own sake.
+
+### X7. App Store Guideline 3.1.3(e) requires Square for the deposit/session-charge flow, not merely permits it
+
+Researched against Apple's own current App Store Review Guidelines text (guideline 3.1, "In-App
+Purchase") and this app's actual `server/routes/squarePayments.js` route, not written from memory
+or general App Store folklore. Guideline 3.1.1 requires In-App Purchase for unlocking features or
+content *within the app itself*. That is not what Inkbooks' Square flow does: a client's deposit or
+session-charge payment settles a real-world tattoo appointment delivered in person, later, outside
+the app - it unlocks nothing in the software. Guideline 3.1.3(e), "Goods and Services Outside of the
+App," covers exactly this case and, read closely, does more than permit an alternative to IAP for
+it - it's the clause that would make using Apple's IAP for a real-world service *non-compliant* in
+the first place, since IAP is scoped to digital content and unlocks consumed inside the app.
+Guideline 3.1.3(d), "Person-to-Person Services" (a marketplace connecting a client to a service
+provider for work delivered outside the app - the artist/client relationship here, precisely), is
+the secondary, reinforcing clause.
+
+Grounded in what the route actually does, confirmed by reading `squarePayments.js` in full: charges
+land in **the artist's own connected Square account**, never Inkbooks' platform account, even for a
+shop-employed artist (M9's existing rule - what the artist owes the shop is settled separately,
+afterward, through the shop-cut ledger); the charge amount is computed server-side from stored
+rates, never accepted from the client; and the route handles both a deposit and a full session
+charge, gated to the appointment's owner or `SHOP_ADMIN`. Nothing about a successful charge grants
+access to any app feature or content - the transaction pays for work performed in a tattoo chair,
+not for anything the app itself provides.
+
 ---
 
 ## Process

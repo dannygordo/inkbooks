@@ -93,3 +93,29 @@ jobs:
       # Square app id, GraphQL endpoint) change whether the build itself succeeds, so no secrets
       # are needed here just to confirm the app compiles.
       - run: npm run build --workspace=apps/web
+
+  mobile:
+    name: Mobile typecheck + tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - run: npm ci
+      # Same reason as the client job: apps/mobile's "@inkbooks/api" file: dependency needs a
+      # real dist/ before its own typecheck/test can import generated types/hooks from it.
+      - run: npm run build --workspace=packages/api
+      - run: npm run typecheck --workspace=apps/mobile
+      - run: npm test --workspace=apps/mobile
+
+      # Deliberately NOT here yet: an `eas build` step. EAS Build needs a real Expo/EAS account
+      # and an EXPO_TOKEN secret this repo doesn't have - see eas.json's header comment and
+      # DECISIONS.md's step-4 entry for exactly what the user still needs to do (create the
+      # account, run `eas init`, add the secret) before that step can be added here. Typecheck +
+      # unit tests on every PR is the part that doesn't need any of that, so it ships now instead
+      # of waiting on it.

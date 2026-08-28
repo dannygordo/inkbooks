@@ -700,7 +700,27 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    yet.
 5. Expo app scaffolded inside the monorepo. Items 4-7 above (mobile CI/CD, Sentry RN, test
    harness, App Store payment check) stood up immediately here, before feature screens - not
-   after the app is "mostly done."
+   after the app is "mostly done." ✅ Done (2026-08-27) - `apps/mobile` added as a fourth
+   `file:`/workspace member (Expo SDK ~57.0.17, RN 0.86.3, TypeScript, expo-router), template demo
+   content stripped, `@inkbooks/api` consumption proven via a type-only import in
+   `src/app/index.tsx` (see DECISIONS.md's X6). Items 4-6 stood up: `eas.json`'s
+   dev/preview/production build profiles and a fourth `mobile` CI job (typecheck + `jest` on every
+   push/PR) exist and run today; `@sentry/react-native`'s `initSentry()` follows the same
+   no-DSN-means-off contract as web/server; `jest-expo` + React Native Testing Library are wired
+   with a real passing test (`__tests__/index.test.tsx`) - two genuine bugs found and fixed by that
+   first test run, consistent with PR1's rule (see X6 for both). Item 7 (App Store Guideline 3.1.1)
+   researched against Apple's actual guideline text and this app's real `squarePayments.js` route -
+   see DECISIONS.md's X7: 3.1.3(e) requires Square for this flow, not merely permits it. Still
+   needs the user's own action before it's more than scaffolding: a real Expo/EAS account and
+   `eas init` (for EAS Build to actually run and for a real `app.json` bundle identifier/package
+   name to replace the current `com.inkbooks.mobile` placeholder), an Apple Developer account, a
+   real Sentry React Native project (DSN + the source-map-upload config plugin), and real InkBooks
+   brand icon/splash assets in place of the template's generic Expo ones. Full verification before
+   landing: `apps/mobile` typechecks clean (`tsc --noEmit`) and its test suite passes, both from a
+   real `npm ci` at the repo root followed by `npm run build --workspace=packages/api` (the same
+   sequence the new CI job runs) - done in the same disposable cloud sandbox mirror technique noted
+   on steps 3-4 above, for the same reason (this remote-bridge sandbox's mounted filesystem doesn't
+   support the deletes/renames a real `npm install` needs).
 6. ONE real screen, end to end, on a physical device via the EAS dev client: today's
    calendar/appointments (highest-traffic screen; touches auth, GraphQL, lists, and offline
    caching all at once - a deliberate forcing function). Real Face ID/secure-store auth, real data
