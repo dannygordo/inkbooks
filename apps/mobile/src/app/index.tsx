@@ -1,33 +1,41 @@
-import { StyleSheet } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-// Type-only import, zero runtime cost - proves @inkbooks/api resolves and typechecks from
-// apps/mobile the same way it already does from apps/web (packages/api's whole reason to exist -
-// see DECISIONS.md's X1/X4). Not referenced at runtime; a real generated hook wired to a real
-// query and a real screen is step 6 (PRODUCTION_ROADMAP.md's Phase 5 order-of-operations), not
-// this scaffolding step.
-import type { GetProjectsQuery } from '@inkbooks/api';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import { apiUrl } from '@/lib/apollo-client';
+import { useAuth } from '@/context/auth';
+import { useTheme } from '@/hooks/use-theme';
 
-type _ProvesGeneratedTypesResolve = GetProjectsQuery;
-
+// Authenticated home screen (guarded by _layout.tsx's Stack.Protected - unreachable while
+// `user` is null). Still the walking-skeleton placeholder from step 4/5, now proven end-to-end
+// with a real signed-in session instead of a type-only import: Phase 2 (PRODUCTION_ROADMAP.md's
+// Phase 5, step 6) replaces this with the real appointments list, at which point this becomes
+// that screen rather than a second one alongside it.
 export default function HomeScreen() {
+  const theme = useTheme();
+  const { user, logout } = useAuth();
+
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <ThemedText type="title" style={styles.title}>
           InkBooks
         </ThemedText>
-        <ThemedText type="default" themeColor="textSecondary" style={styles.subtitle}>
-          Mobile scaffold. Real screens start with the calendar/appointments view - see
-          PRODUCTION_ROADMAP.md's Phase 5, step 6.
+        <ThemedText type="default" themeColor="textSecondary" style={styles.subtitle} testID="welcome-message">
+          {/* firstName is nullable in the schema (server/graphql/typeDefs.js's User type) - a
+              signed-in session with no name set falls back to email rather than rendering
+              "Welcome, " with nothing after it. */}
+          Welcome, {user?.firstName ?? user?.email}
         </ThemedText>
-        <ThemedText type="small" themeColor="textSecondary" testID="api-url">
-          API: {apiUrl}
-        </ThemedText>
+
+        <Pressable
+          onPress={() => logout()}
+          testID="logout-button"
+          style={[styles.button, { borderColor: theme.backgroundSelected }]}
+        >
+          <ThemedText type="default">Log out</ThemedText>
+        </Pressable>
       </SafeAreaView>
     </ThemedView>
   );
@@ -42,12 +50,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: Spacing.four,
-    gap: Spacing.two,
+    gap: Spacing.three,
   },
   title: {
     textAlign: 'center',
   },
   subtitle: {
     textAlign: 'center',
+  },
+  button: {
+    borderWidth: 1,
+    borderRadius: Spacing.two,
+    paddingHorizontal: Spacing.four,
+    paddingVertical: Spacing.two,
   },
 });

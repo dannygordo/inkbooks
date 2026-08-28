@@ -1,0 +1,51 @@
+# Mirrors apps/web's Login.jsx LOGIN_USER mutation field-for-field, minus firebaseToken - mobile
+# doesn't sign into Firebase (no image-upload feature yet to need Storage access for; see
+# DECISIONS.md's step-6 entry). userInfo's inline fragments are the three concrete UserInfo
+# implementations (Artist/Client/Staff) straight off server/graphql/typeDefs.js - selecting shop.id
+# on Artist/Staff now even though nothing reads it yet, since every shop-scoped query the
+# appointments screen needs next (Phase 2) needs it and re-running codegen for one extra field
+# later is pure overhead.
+mutation Login($email: String!, $password: String!) {
+	login(email: $email, password: $password) {
+		id
+		email
+		firstName
+		lastName
+		avatar
+		role
+		userType
+		tagColor
+		themePreference
+		accessToken
+		userInfo {
+			... on Artist {
+				id
+				firstName
+				lastName
+				avatar
+				hourlyRate
+				shop {
+					id
+					name
+				}
+			}
+			... on Client {
+				id
+				firstName
+				lastName
+				avatar
+			}
+			... on Staff {
+				id
+				firstName
+				lastName
+				avatar
+				title
+				shop {
+					id
+					name
+				}
+			}
+		}
+	}
+}
