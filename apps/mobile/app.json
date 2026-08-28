@@ -9,10 +9,10 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.inkbooks.mobile"
+      "bundleIdentifier": "net.inkbooks.mobile"
     },
     "android": {
-      "package": "com.inkbooks.mobile",
+      "package": "net.inkbooks.mobile",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -39,6 +39,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "9add6b59-0cef-46d2-91aa-b2eea400ed83"
+      }
     }
   }
 }
