@@ -33,7 +33,7 @@
   "scripts": {
     "start": "vite",
     "dev": "vite",
-    "build": "vite build",
+    "build": "npm run build --workspace=@inkbooks/api && vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

@@ -108,4 +108,27 @@ describe('AuthProvider', () => {
     await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('signed-out'));
     expect(mockStore.has(AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE)).toBe(false);
   });
+
+  it('discards an undecodable token instead of hanging on "initializing"', async () => {
+    // Ported verbatim from auth.jsx during Phase 1, this file had the identical bug: jwtDecode
+    // throwing synchronously on a corrupted/non-JWT accessToken was uncaught inside the restore
+    // effect's async IIFE, so setInitializing(false) never ran and every screen gated on
+    // `initializing` (Stack.Protected in _layout.tsx) hung on the splash screen forever.
+    const userData = { ...USER, accessToken: 'not-a-jwt' };
+    mockStore.set(AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE, JSON.stringify(userData));
+
+    renderWithProvider();
+
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('signed-out'));
+    expect(mockStore.has(AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE)).toBe(false);
+  });
+
+  it('discards a cache entry that is not valid JSON instead of hanging on "initializing"', async () => {
+    mockStore.set(AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE, '{not-json');
+
+    renderWithProvider();
+
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('signed-out'));
+    expect(mockStore.has(AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE)).toBe(false);
+  });
 });

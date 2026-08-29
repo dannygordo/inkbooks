@@ -94,18 +94,33 @@ function AuthProvider(props) {
 			);
 
 			if (raw) {
-				const userData = JSON.parse(raw);
-				const decoded = jwtDecode(userData.accessToken);
+				let userData;
+				let decoded;
 
-				if (decoded.exp * 1000 < Date.now()) {
+				try {
+					userData = JSON.parse(raw);
+					decoded = jwtDecode(userData.accessToken);
+				} catch {
+					// Corrupt/undecodable cache entry (bad JSON, or a token jwt-decode can't parse).
+					// Treat it the same as an expired session rather than crashing the mount: drop
+					// it and fall through to signed-out, instead of leaving `initializing` stuck at
+					// true forever (see the unreachable setInitializing(false) below, pre-fix).
+					userData = null;
+				}
+
+				if (userData && decoded.exp * 1000 < Date.now()) {
 					await TokenStorageService.deleteItemAsync(
 						AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE
 					);
-				} else if (!cancelled) {
+				} else if (userData && !cancelled) {
 					dispatch({
 						type: AUTH_SETTINGS_CONSTANTS.AUTH_REDUCER_TYPES.LOGIN,
 						payload: userData,
 					});
+				} else if (!userData) {
+					await TokenStorageService.deleteItemAsync(
+						AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE
+					);
 				}
 			}
 
