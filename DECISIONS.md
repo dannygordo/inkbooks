@@ -990,6 +990,74 @@ screen while `initializing` is true (the Stack renders `null` until it resolves,
 same `packages/shared`-doesn't-exist-yet staging precedent as X3 and X5, both of which note their
 own duplication the same way.
 
+### X9. The mobile appointments screen is read-only, fixed to "this week," and reuses web's exact shop/personal query split - FlashList and Apollo cache persistence are the actual point of this phase
+
+`apps/mobile/src/app/index.tsx` becomes the real appointments list this phase, as X6's and X8's own
+comments on that file already said it would - not a second screen alongside the placeholder.
+PRODUCTION_ROADMAP.md's Phase 5, step 6 asked for four things at once here: real data through
+packages/api, `FlashList` for the list, Apollo cache persistence for offline reads, and a visible
+offline banner. Everything else about the screen - which appointments it shows, what window, what
+a row displays - is deliberately the minimum that makes those four things demonstrable end to end,
+not a first draft of the full web feature.
+
+**Which queries fire is copied from `AppointmentsList.jsx`, not simplified.** A shop-connected
+artist reads the shop's whole calendar (`getAppointmentsByShop`) plus their own personal entries
+merged in separately (`getAppointmentsByShop` excludes `isPersonal` rows server-side, no exceptions
+- see `resolvers/appointments.js`'s own comment - so a second `getAppointmentsByArtist` call with
+`isPersonal: true` is the only way to see them); an independent artist reads
+`getAppointmentsByArtist` alone. This looked like a place to cut a corner for a first mobile pass -
+it isn't, because the exclusion it's built around is a privacy boundary (a personal appointment is
+never visible to anyone but its owner, full stop), not a display preference. Simplifying to "just
+call getAppointmentsByArtist" would have silently dropped a shop-connected artist's own personal
+calendar off their own phone. `packages/api/src/operations/appointments.graphql` defines one
+`AppointmentListItem` fragment shared by both operations - web's two queries copy-paste the
+identical field list across two `gql` templates; a fragment gets the same result without keeping
+two lists in sync by hand, worth doing now that it's being authored fresh rather than ported
+verbatim.
+
+**Fixed to the current ISO week, no range picker, no pager.** Web's `AppointmentsList.jsx` carries
+a full range picker (This month/Next month/This week/Next week/custom) and real pagination over an
+arbitrary window - both genuinely useful, neither necessary to prove FlashList and cache
+persistence work. `utils/dateRanges.ts` ports only `getDefaultScheduleRange`'s Monday-start ISO
+week math (native `Date`, not `moment` - the entire reason to add `moment` as a mobile dependency
+would have been this one calculation), fetched at a fixed `{ limit: 200 }` the same way web's
+*calendar*-view queries do (not the paged list's), since a bounded one-week window needs no pager
+of its own. The picker and real paging are additive later, against the same query shape - not a
+second implementation.
+
+**Offline banner is driven by NetInfo's device-level signal, not by inspecting the Apollo query
+result.** `OfflineBanner.tsx` reads `@react-native-community/netinfo`'s `useNetInfo().isConnected`
+directly rather than asking "did this query's fetch fail" or "is this data serving from cache."
+Those usually agree, but they're not the same fact, and deriving the banner from one query's own
+error/network state would tie a UI promise ("you're offline") to that query's particular
+retry/error-policy behavior as a side effect rather than a guarantee. `isConnected` starts `null`
+(not yet determined) and is treated as online rather than flashing the banner on every cold start
+before NetInfo has reported in.
+
+**Cache persistence gets its own readiness flag, the same shape as auth's `initializing`.**
+`apollo-client.ts` exports the `InMemoryCache` instance separately from the `ApolloClient` that
+wraps it, plus an `initCachePersistence()` that awaits `apollo3-cache-persist`'s `persistCache()`
+against it. `_layout.tsx`'s `RootNavigator` now gates on `initializing || !cacheReady` instead of
+`initializing` alone, keeping the splash screen up through both async bootstrap steps - restoring
+AsyncStorage's saved cache is itself async, and a cold launch offline would otherwise render an
+empty list for one frame before the restore finishes, which is the exact flash persisting the
+cache exists to prevent. One root-level readiness flag per async bootstrap step, not a per-screen
+loading check invented separately for each one.
+
+**Dependency versions are Expo SDK 57's own pins, not each package's latest.** `@react-native-async-storage/async-storage`
+(`2.2.0`), `@react-native-community/netinfo` (`12.0.1`), and `@shopify/flash-list` (`2.0.2`) are
+pinned to exactly what `expo`'s own `bundledNativeModules.json` lists for this SDK - the same
+reasoning X6's dependency work already established for `expo-secure-store` (X8): a version `expo
+install` wouldn't have chosen risks native-module/JS mismatches EAS Build isn't set up to catch
+until a real device build fails. `apollo3-cache-persist` isn't Expo-managed (pure JS, no native
+module) and is pinned to its latest (`0.15.0`) instead.
+
+Not done, and deliberately out of scope for this phase: opening an appointment (a session's
+project, a consult's detail page) - Phase 3's wizard is where that navigation and the write side
+both land together, rather than building read-only navigation now and rewiring it once editing
+exists. `AppointmentTypeChip`'s consult/session/personal visual distinction is also not ported -
+the row shows `appointmentType` as plain text for this pass.
+
 ---
 
 ## Process

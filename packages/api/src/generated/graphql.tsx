@@ -2765,6 +2765,26 @@ export type UserUpdateInput = {
   userType?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type AppointmentListItemFragment = { __typename?: 'Appointment', id: string, projectId?: string | null, userId?: string | null, bookingRequestId?: string | null, shopId?: string | null, isPersonal: boolean, title?: string | null, description?: string | null, appointmentType: string, appointmentDate: string, durationMinutes: number, appointmentEnd: string, appointmentStatus: string, totalCents?: number | null, tipCents?: number | null, shopCutStatus: string, shopCutCents?: number | null, shopCutPaymentMethod?: string | null, shopCutSquareInvoiceId?: string | null, project?: { __typename?: 'Project', id: string, title: string, depositCollectedCents?: number | null, client?: { __typename?: 'Client', id: string, user?: { __typename?: 'User', id: string, firstName?: string | null, lastName?: string | null, avatar?: string | null } | null } | null } | null, bookingRequest?: { __typename?: 'BookingRequest', id: string, client?: { __typename?: 'Client', id: string, firstName: string, lastName: string } | null } | null, user?: { __typename?: 'User', id: string, tagColor?: string | null, firstName?: string | null, lastName?: string | null, avatar?: string | null } | null };
+
+export type GetAppointmentsByShopQueryVariables = Exact<{
+  shopId: Scalars['ID']['input'];
+  filter?: InputMaybe<AppointmentFilter>;
+  page?: InputMaybe<PageInput>;
+}>;
+
+
+export type GetAppointmentsByShopQuery = { __typename?: 'Query', getAppointmentsByShop: { __typename?: 'AppointmentPage', items: Array<{ __typename?: 'Appointment', id: string, projectId?: string | null, userId?: string | null, bookingRequestId?: string | null, shopId?: string | null, isPersonal: boolean, title?: string | null, description?: string | null, appointmentType: string, appointmentDate: string, durationMinutes: number, appointmentEnd: string, appointmentStatus: string, totalCents?: number | null, tipCents?: number | null, shopCutStatus: string, shopCutCents?: number | null, shopCutPaymentMethod?: string | null, shopCutSquareInvoiceId?: string | null, project?: { __typename?: 'Project', id: string, title: string, depositCollectedCents?: number | null, client?: { __typename?: 'Client', id: string, user?: { __typename?: 'User', id: string, firstName?: string | null, lastName?: string | null, avatar?: string | null } | null } | null } | null, bookingRequest?: { __typename?: 'BookingRequest', id: string, client?: { __typename?: 'Client', id: string, firstName: string, lastName: string } | null } | null, user?: { __typename?: 'User', id: string, tagColor?: string | null, firstName?: string | null, lastName?: string | null, avatar?: string | null } | null }>, pageInfo: { __typename?: 'PageInfo', totalCount: number, hasMore: boolean, limit: number, offset: number } } };
+
+export type GetAppointmentsByArtistQueryVariables = Exact<{
+  userId: Scalars['ID']['input'];
+  filter?: InputMaybe<AppointmentFilter>;
+  page?: InputMaybe<PageInput>;
+}>;
+
+
+export type GetAppointmentsByArtistQuery = { __typename?: 'Query', getAppointmentsByArtist: { __typename?: 'AppointmentPage', items: Array<{ __typename?: 'Appointment', id: string, projectId?: string | null, userId?: string | null, bookingRequestId?: string | null, shopId?: string | null, isPersonal: boolean, title?: string | null, description?: string | null, appointmentType: string, appointmentDate: string, durationMinutes: number, appointmentEnd: string, appointmentStatus: string, totalCents?: number | null, tipCents?: number | null, shopCutStatus: string, shopCutCents?: number | null, shopCutPaymentMethod?: string | null, shopCutSquareInvoiceId?: string | null, project?: { __typename?: 'Project', id: string, title: string, depositCollectedCents?: number | null, client?: { __typename?: 'Client', id: string, user?: { __typename?: 'User', id: string, firstName?: string | null, lastName?: string | null, avatar?: string | null } | null } | null } | null, bookingRequest?: { __typename?: 'BookingRequest', id: string, client?: { __typename?: 'Client', id: string, firstName: string, lastName: string } | null } | null, user?: { __typename?: 'User', id: string, tagColor?: string | null, firstName?: string | null, lastName?: string | null, avatar?: string | null } | null }>, pageInfo: { __typename?: 'PageInfo', totalCount: number, hasMore: boolean, limit: number, offset: number } } };
+
 export type CreateProjectMutationVariables = Exact<{
   title: Scalars['String']['input'];
   description: Scalars['String']['input'];
@@ -2837,7 +2857,164 @@ export type UpdateProjectTagsMutationVariables = Exact<{
 
 export type UpdateProjectTagsMutation = { __typename?: 'Mutation', updateProjectTags?: { __typename?: 'Project', tags?: Array<string | null> | null } | null };
 
+export const AppointmentListItemFragmentDoc = gql`
+    fragment AppointmentListItem on Appointment {
+  id
+  projectId
+  userId
+  bookingRequestId
+  project {
+    id
+    title
+    client {
+      id
+      user {
+        id
+        firstName
+        lastName
+        avatar
+      }
+    }
+    depositCollectedCents
+  }
+  bookingRequest {
+    id
+    client {
+      id
+      firstName
+      lastName
+    }
+  }
+  shopId
+  isPersonal
+  user {
+    id
+    tagColor
+    firstName
+    lastName
+    avatar
+  }
+  title
+  description
+  appointmentType
+  appointmentDate
+  durationMinutes
+  appointmentEnd
+  appointmentStatus
+  totalCents
+  tipCents
+  shopCutStatus
+  shopCutCents
+  shopCutPaymentMethod
+  shopCutSquareInvoiceId
+}
+    `;
+export const GetAppointmentsByShopDocument = gql`
+    query GetAppointmentsByShop($shopId: ID!, $filter: AppointmentFilter, $page: PageInput) {
+  getAppointmentsByShop(shopId: $shopId, filter: $filter, page: $page) {
+    items {
+      ...AppointmentListItem
+    }
+    pageInfo {
+      totalCount
+      hasMore
+      limit
+      offset
+    }
+  }
+}
+    ${AppointmentListItemFragmentDoc}`;
 
+/**
+ * __useGetAppointmentsByShopQuery__
+ *
+ * To run a query within a React component, call `useGetAppointmentsByShopQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetAppointmentsByShopQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetAppointmentsByShopQuery({
+ *   variables: {
+ *      shopId: // value for 'shopId'
+ *      filter: // value for 'filter'
+ *      page: // value for 'page'
+ *   },
+ * });
+ */
+export function useGetAppointmentsByShopQuery(baseOptions: Apollo.QueryHookOptions<GetAppointmentsByShopQuery, GetAppointmentsByShopQueryVariables> & ({ variables: GetAppointmentsByShopQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetAppointmentsByShopQuery, GetAppointmentsByShopQueryVariables>(GetAppointmentsByShopDocument, options);
+      }
+export function useGetAppointmentsByShopLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetAppointmentsByShopQuery, GetAppointmentsByShopQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetAppointmentsByShopQuery, GetAppointmentsByShopQueryVariables>(GetAppointmentsByShopDocument, options);
+        }
+// @ts-ignore
+export function useGetAppointmentsByShopSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetAppointmentsByShopQuery, GetAppointmentsByShopQueryVariables>): Apollo.UseSuspenseQueryResult<GetAppointmentsByShopQuery, GetAppointmentsByShopQueryVariables>;
+export function useGetAppointmentsByShopSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetAppointmentsByShopQuery, GetAppointmentsByShopQueryVariables>): Apollo.UseSuspenseQueryResult<GetAppointmentsByShopQuery | undefined, GetAppointmentsByShopQueryVariables>;
+export function useGetAppointmentsByShopSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetAppointmentsByShopQuery, GetAppointmentsByShopQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetAppointmentsByShopQuery, GetAppointmentsByShopQueryVariables>(GetAppointmentsByShopDocument, options);
+        }
+export type GetAppointmentsByShopQueryHookResult = ReturnType<typeof useGetAppointmentsByShopQuery>;
+export type GetAppointmentsByShopLazyQueryHookResult = ReturnType<typeof useGetAppointmentsByShopLazyQuery>;
+export type GetAppointmentsByShopSuspenseQueryHookResult = ReturnType<typeof useGetAppointmentsByShopSuspenseQuery>;
+export type GetAppointmentsByShopQueryResult = Apollo.QueryResult<GetAppointmentsByShopQuery, GetAppointmentsByShopQueryVariables>;
+export const GetAppointmentsByArtistDocument = gql`
+    query GetAppointmentsByArtist($userId: ID!, $filter: AppointmentFilter, $page: PageInput) {
+  getAppointmentsByArtist(userId: $userId, filter: $filter, page: $page) {
+    items {
+      ...AppointmentListItem
+    }
+    pageInfo {
+      totalCount
+      hasMore
+      limit
+      offset
+    }
+  }
+}
+    ${AppointmentListItemFragmentDoc}`;
+
+/**
+ * __useGetAppointmentsByArtistQuery__
+ *
+ * To run a query within a React component, call `useGetAppointmentsByArtistQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetAppointmentsByArtistQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetAppointmentsByArtistQuery({
+ *   variables: {
+ *      userId: // value for 'userId'
+ *      filter: // value for 'filter'
+ *      page: // value for 'page'
+ *   },
+ * });
+ */
+export function useGetAppointmentsByArtistQuery(baseOptions: Apollo.QueryHookOptions<GetAppointmentsByArtistQuery, GetAppointmentsByArtistQueryVariables> & ({ variables: GetAppointmentsByArtistQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetAppointmentsByArtistQuery, GetAppointmentsByArtistQueryVariables>(GetAppointmentsByArtistDocument, options);
+      }
+export function useGetAppointmentsByArtistLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetAppointmentsByArtistQuery, GetAppointmentsByArtistQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetAppointmentsByArtistQuery, GetAppointmentsByArtistQueryVariables>(GetAppointmentsByArtistDocument, options);
+        }
+// @ts-ignore
+export function useGetAppointmentsByArtistSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetAppointmentsByArtistQuery, GetAppointmentsByArtistQueryVariables>): Apollo.UseSuspenseQueryResult<GetAppointmentsByArtistQuery, GetAppointmentsByArtistQueryVariables>;
+export function useGetAppointmentsByArtistSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetAppointmentsByArtistQuery, GetAppointmentsByArtistQueryVariables>): Apollo.UseSuspenseQueryResult<GetAppointmentsByArtistQuery | undefined, GetAppointmentsByArtistQueryVariables>;
+export function useGetAppointmentsByArtistSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetAppointmentsByArtistQuery, GetAppointmentsByArtistQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetAppointmentsByArtistQuery, GetAppointmentsByArtistQueryVariables>(GetAppointmentsByArtistDocument, options);
+        }
+export type GetAppointmentsByArtistQueryHookResult = ReturnType<typeof useGetAppointmentsByArtistQuery>;
+export type GetAppointmentsByArtistLazyQueryHookResult = ReturnType<typeof useGetAppointmentsByArtistLazyQuery>;
+export type GetAppointmentsByArtistSuspenseQueryHookResult = ReturnType<typeof useGetAppointmentsByArtistSuspenseQuery>;
+export type GetAppointmentsByArtistQueryResult = Apollo.QueryResult<GetAppointmentsByArtistQuery, GetAppointmentsByArtistQueryVariables>;
 export const CreateProjectDocument = gql`
     mutation CreateProject($title: String!, $description: String!, $placement: String, $size: String, $artistId: ID!, $clientId: ID!, $status: String!) {
   createProject(

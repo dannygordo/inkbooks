@@ -1,0 +1,96 @@
+# Selection mirrors apps/web's AppointmentService.js _FETCH_APPOINTMENTS_BY_SHOP /
+# _FETCH_APPOINTMENTS_BY_ARTIST_FOR_CALENDAR field-for-field (those two are themselves identical
+# selections on web, just copy-pasted across two gql`` templates - a fragment here gets the same
+# result without keeping two field lists in sync by hand). shopCut*/totalCents/tipCents are
+# selected even though the read-only list screen doesn't render them yet - the same "select once,
+# use later" call login.graphql's header comment already made for Artist.shop.id, and Phase 3's
+# appointment detail view needs exactly these fields.
+fragment AppointmentListItem on Appointment {
+  id
+  projectId
+  userId
+  bookingRequestId
+  project {
+    id
+    title
+    client {
+      id
+      user {
+        id
+        firstName
+        lastName
+        avatar
+      }
+    }
+    depositCollectedCents
+  }
+  # A consult has no Project yet (server/models/Appointment.js) - its client is only reachable via
+  # the original booking request. Same fallback the row rendering below needs.
+  bookingRequest {
+    id
+    client {
+      id
+      firstName
+      lastName
+    }
+  }
+  shopId
+  isPersonal
+  user {
+    id
+    tagColor
+    firstName
+    lastName
+    avatar
+  }
+  title
+  description
+  appointmentType
+  appointmentDate
+  durationMinutes
+  appointmentEnd
+  appointmentStatus
+  totalCents
+  tipCents
+  shopCutStatus
+  shopCutCents
+  shopCutPaymentMethod
+  shopCutSquareInvoiceId
+}
+
+# The shop calendar - every artist's appointments at a shop-connected user's shop. Scoped and
+# authorized server-side (resolvers/appointments.js's callerBelongsToShop); isPersonal entries are
+# excluded here even for the caller's own rows (server-enforced, belt-and-suspenders on this
+# query specifically - see that resolver's own comment), which is why the personal-appointments
+# query below exists as a second, separate fetch.
+query GetAppointmentsByShop($shopId: ID!, $filter: AppointmentFilter, $page: PageInput) {
+  getAppointmentsByShop(shopId: $shopId, filter: $filter, page: $page) {
+    items {
+      ...AppointmentListItem
+    }
+    pageInfo {
+      totalCount
+      hasMore
+      limit
+      offset
+    }
+  }
+}
+
+# One artist's own appointments - used two ways, same as web's AppointmentsList.jsx: with the
+# caller's own userId and no shop (an independent artist's entire schedule), or with the caller's
+# own userId and `filter: { isPersonal: true }` layered on top of a shop-connected artist's shop
+# fetch above, to pull in the personal entries getAppointmentsByShop always excludes.
+query GetAppointmentsByArtist($userId: ID!, $filter: AppointmentFilter, $page: PageInput) {
+  getAppointmentsByArtist(userId: $userId, filter: $filter, page: $page) {
+    items {
+      ...AppointmentListItem
+    }
+    pageInfo {
+      totalCount
+      hasMore
+      limit
+      offset
+    }
+  }
+}
