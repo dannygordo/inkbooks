@@ -80,15 +80,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       );
 
       if (raw) {
-        const userData: CurrentUser = JSON.parse(raw);
-        const decoded = jwtDecode<{ exp: number }>(userData.accessToken);
+        let userData: CurrentUser | null = null;
+        let decoded: { exp: number } | undefined;
 
-        if (decoded.exp * 1000 < Date.now()) {
+        try {
+          userData = JSON.parse(raw) as CurrentUser;
+          decoded = jwtDecode<{ exp: number }>(userData.accessToken);
+        } catch {
+          // Corrupt/undecodable cache entry (bad JSON, or a token jwt-decode can't parse). Treat
+          // it the same as an expired session rather than crashing the mount - see auth.jsx's
+          // identical fix for the bug class (unreachable setInitializing(false) below on throw).
+          userData = null;
+        }
+
+        if (userData && decoded && decoded.exp * 1000 < Date.now()) {
           await TokenStorageService.deleteItemAsync(
             AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE,
           );
-        } else if (!cancelled) {
+        } else if (userData && decoded && !cancelled) {
           dispatch({ type: 'LOGIN', payload: userData });
+        } else if (!userData) {
+          await TokenStorageService.deleteItemAsync(
+            AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE,
+          );
         }
       }
 

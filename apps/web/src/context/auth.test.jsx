@@ -294,6 +294,37 @@ describe("initial session restore", () => {
 		expect(screen.getByTestId("user")).toHaveTextContent("no-user");
 		expect(localStorage.getItem(AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE)).toBeNull();
 	});
+
+	it("discards an undecodable token found in storage instead of crashing the mount", async () => {
+		// THE REPORTED BUG: jwtDecode throwing synchronously (a corrupted/non-JWT accessToken, or a
+		// stored value that isn't even valid JSON) used to be uncaught inside the effect's async IIFE
+		// - an unhandled rejection reaching Sentry, and worse, setInitializing(false) never ran, so
+		// `initializing` stayed true forever and every screen gated on it (AuthRoute) hung.
+		localStorage.setItem(
+			AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE,
+			JSON.stringify({ id: "1", email: "gordo@example.com", accessToken: "not-a-jwt" }),
+		);
+
+		renderWithProvider();
+
+		await waitFor(() => {
+			expect(screen.getByTestId("initializing")).toHaveTextContent("false");
+		});
+		expect(screen.getByTestId("user")).toHaveTextContent("no-user");
+		expect(localStorage.getItem(AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE)).toBeNull();
+	});
+
+	it("discards a cache entry that isn't valid JSON instead of crashing the mount", async () => {
+		localStorage.setItem(AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE, "{not-json");
+
+		renderWithProvider();
+
+		await waitFor(() => {
+			expect(screen.getByTestId("initializing")).toHaveTextContent("false");
+		});
+		expect(screen.getByTestId("user")).toHaveTextContent("no-user");
+		expect(localStorage.getItem(AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE)).toBeNull();
+	});
 });
 
 describe("one session's data never reaches the next", () => {
