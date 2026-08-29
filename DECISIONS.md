@@ -1060,6 +1060,24 @@ the row shows `appointmentType` as plain text for this pass.
 
 ---
 
+### X10. iOS/iPadOS is the primary target platform; Android support is required, not optional, but never blocks an iOS decision
+
+Stated directly by the user once there was a real build to test: focus is iPhone/iPad first,
+Android has to keep working too, but nothing ships that works on Android and not on iOS/iPadOS -
+the reverse (works on iOS, Android trails) is the acceptable temporary state, never the other way
+around.
+
+Practical consequence for how this project sequences work from here: a platform-specific bug or
+EAS build issue gets fixed for iOS before Android if only one can be done first; a new dependency
+gets its iOS behavior verified even when Android was what happened to be built/tested first (as it
+was for Phase 1/2 - the only dev client built so far is Android); and any future UI decision that
+would read fine on a phone but awkwardly on an iPad (fixed single-column layouts, phone-only
+navigation chrome) is a real defect against this project's own stated priority, not a nice-to-have.
+Nothing so far has been iPad-specific - Phase 2's appointments list is unstyled for tablet width
+because no screen has needed that judgment call yet, not because it was decided against.
+
+---
+
 ## Process
 
 ### PR1. Tests are written alongside the feature or fix, not queued for a later pass
