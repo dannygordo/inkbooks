@@ -1,11 +1,11 @@
 import { ApolloProvider } from '@apollo/client';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useColorScheme } from 'react-native';
 
 import { AuthProvider, useAuth } from '@/context/auth';
-import { apolloClient } from '@/lib/apollo-client';
+import { apolloClient, initCachePersistence } from '@/lib/apollo-client';
 import { initSentry } from '@/lib/sentry';
 
 SplashScreen.preventAutoHideAsync();
@@ -19,18 +19,37 @@ initSentry();
 // second real authenticated screen (Phase 2's appointments list) is what actually decides that.
 function RootNavigator() {
   const { user, initializing } = useAuth();
+  // Mirrors `initializing` above - a second, independent async bootstrap step (restoring the
+  // persisted Apollo cache from AsyncStorage - see apollo-client.ts's own comment) that has to
+  // finish before the appointments screen's first query runs, or a cold launch offline renders an
+  // empty list for one frame instead of what cache persistence exists to show. Started once, here,
+  // rather than inside the appointments screen itself - screen-mount timing would race the
+  // Stack.Protected guard below rendering that screen at all.
+  const [cacheReady, setCacheReady] = useState(false);
 
   useEffect(() => {
-    // Splash stays up through the async SecureStore read (see auth.tsx's `initializing`) so a
-    // previously-signed-in user never sees a flash of the login screen before their session
-    // restores - hiding it here, gated on `initializing`, is what makes that true instead of
-    // just hoped-for.
-    if (!initializing) {
+    let cancelled = false;
+    initCachePersistence().finally(() => {
+      if (!cancelled) {
+        setCacheReady(true);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    // Splash stays up through both async bootstrap steps (the SecureStore session read - see
+    // auth.tsx's `initializing` - and the cache restore above) so nothing renders half-ready
+    // underneath it: a previously-signed-in user never sees a flash of the login screen, and the
+    // appointments screen never mounts before its offline cache is actually in place.
+    if (!initializing && cacheReady) {
       SplashScreen.hideAsync();
     }
-  }, [initializing]);
+  }, [initializing, cacheReady]);
 
-  if (initializing) {
+  if (initializing || !cacheReady) {
     return null;
   }
 

@@ -1,5 +1,7 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ApolloClient, InMemoryCache, createHttpLink, from } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
+import { AsyncStorageWrapper, persistCache } from 'apollo3-cache-persist';
 import Constants from 'expo-constants';
 
 import { AUTH_SETTINGS_CONSTANTS } from '@/constants/auth';
@@ -34,8 +36,31 @@ const authLink = setContext(async (_, { headers }) => {
   };
 });
 
+// A named export (not created inside the ApolloClient constructor call) because
+// initCachePersistence below needs the same instance the client reads from - persistCache
+// rehydrates it in place before anything renders, then keeps writing every update back to
+// AsyncStorage as normal reads/writes happen.
+export const cache = new InMemoryCache();
+
 export const apolloClient = new ApolloClient({
   link: from([authLink, httpLink]),
-  cache: new InMemoryCache(),
+  cache,
   clientAwareness: { name: 'InkBooks Mobile' },
 });
+
+// PRODUCTION_ROADMAP.md's Phase 5 step 6: "Apollo cache persistence for offline reads." Restoring
+// AsyncStorage's saved cache into `cache` is itself async, and has to finish before the
+// appointments screen's first query runs - otherwise a cold app launch offline renders an empty
+// list for one frame (nothing restored yet) instead of what was last seen, which is the entire
+// point of persisting it. `_layout.tsx` awaits this the same way auth.tsx's `initializing` gates
+// the session restore - one root-level readiness flag per async bootstrap step, not layered ad
+// hoc per screen.
+//
+// No `maxSize` override: apollo3-cache-persist's own default (1MB) comfortably covers a
+// currently-signed-in user's own upcoming appointment window, which is all this persists.
+export async function initCachePersistence(): Promise<void> {
+  await persistCache({
+    cache,
+    storage: new AsyncStorageWrapper(AsyncStorage),
+  });
+}
