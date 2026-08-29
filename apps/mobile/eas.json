@@ -11,6 +11,9 @@
       "channel": "development",
       "env": {
         "EXPO_PUBLIC_API_URL": "http://localhost:5500"
+      },
+      "ios": {
+        "simulator": true
       }
     },
     "preview": {
