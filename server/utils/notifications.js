@@ -2,6 +2,13 @@ const Notification = require('../models/Notification');
 const User = require('../models/User');
 const { emailModeFor, IMMEDIATE, DIGEST, OFF } = require('./notification-preferences');
 const { reportError } = require('./error-reporting');
+// NOT destructured - referenced as `push.sendPushForRecipients(...)` at the call site below so
+// test/unit/push.test.js and friends can `vi.spyOn(push, 'sendPushForRecipients')` and have it
+// actually take effect here. A destructured `const { sendPushForRecipients } = require('./push')`
+// captures the function reference at require time, before any spy exists - see
+// test/integration/shopCutLedger.test.js's comment on why this codebase's CommonJS test setup
+// needs vi.spyOn on the module object rather than vi.mock().
+const push = require('./push');
 
 /**
  * Creating notifications, in one place.
@@ -86,6 +93,15 @@ async function notify({
   );
   const byId = new Map(users.map((u) => [String(u._id), u]));
 
+  // Push reuses email's exact per-recipient IMMEDIATE/DIGEST/OFF resolution (§7's "per category x
+  // per channel", notification-preferences.js's emailModeFor) rather than a separate push-specific
+  // preference - a fourth channel through the existing dispatch point, not a parallel system with
+  // its own noise decision to get right a second time. A shop admin whose money category is DIGEST
+  // doesn't want their phone buzzing for the same 60-80 weekly events either. Gated on `email` too:
+  // `email: false` already means "in-app only," and push leaves the device even more than email
+  // does, so it inherits that gate rather than getting its own.
+  const pushEligibleIds = [];
+
   const rows = recipients.map((userId) => {
     const recipient = byId.get(String(userId));
     // A recipient we can't load gets the in-app row and no email. The notification still exists -
@@ -100,6 +116,7 @@ async function notify({
       // notification, never a side effect of creating one.
       emailStatus = 'pending';
       emailAfter = new Date(now.getTime() + EMAIL_GRACE_MS);
+      pushEligibleIds.push(userId);
     } else if (mode === DIGEST) {
       // Left as 'digest' so the digest job can find it and the immediate sweep can't. Two
       // different queries over one field, rather than a second field that could disagree with it.
@@ -122,7 +139,22 @@ async function notify({
     };
   });
 
-  return Notification.insertMany(rows);
+  const created = await Notification.insertMany(rows);
+
+  // Deliberately not awaited. sendPushForRecipients() reports its own failures and never rejects
+  // (see utils/push.js), but not awaiting it here means an Expo outage or a slow response can
+  // never add latency to the deposit/booking/etc. that triggered this notify() call - the same
+  // reason email is queued for a sweep to send rather than sent synchronously here. The rows above
+  // are already written and are the source of truth regardless of what push does next.
+  if (pushEligibleIds.length > 0) {
+    push.sendPushForRecipients(pushEligibleIds, { title, body }).catch((err) => {
+      reportError(err, {
+        context: `[notifications] push send failed for a ${type} notification`,
+      });
+    });
+  }
+
+  return created;
 }
 
 /**

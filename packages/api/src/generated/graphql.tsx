@@ -1034,6 +1034,7 @@ export type Mutation = {
   redactClient?: Maybe<RedactionResult>;
   redeemGiftCard: RedeemGiftCardResult;
   registerAccount: User;
+  registerDeviceToken: Scalars['Boolean']['output'];
   removeSharedImageFromList: Scalars['Boolean']['output'];
   requestPasswordReset: Scalars['Boolean']['output'];
   resetSessionTimer: Appointment;
@@ -1052,6 +1053,7 @@ export type Mutation = {
   unarchiveArtist?: Maybe<Artist>;
   unarchiveClient?: Maybe<Client>;
   unarchiveStaff?: Maybe<Staff>;
+  unregisterDeviceToken: Scalars['Boolean']['output'];
   updateAppointment?: Maybe<Appointment>;
   updateArtist?: Maybe<Artist>;
   updateArtistRateSettings: Artist;
@@ -1477,6 +1479,12 @@ export type MutationRegisterAccountArgs = {
 };
 
 
+export type MutationRegisterDeviceTokenArgs = {
+  platform: Scalars['String']['input'];
+  token: Scalars['String']['input'];
+};
+
+
 export type MutationRemoveSharedImageFromListArgs = {
   sharedImageId: Scalars['ID']['input'];
 };
@@ -1581,6 +1589,11 @@ export type MutationUnarchiveClientArgs = {
 
 export type MutationUnarchiveStaffArgs = {
   staffId: Scalars['ID']['input'];
+};
+
+
+export type MutationUnregisterDeviceTokenArgs = {
+  token: Scalars['String']['input'];
 };
 
 
@@ -2834,6 +2847,21 @@ export type LoginMutationVariables = Exact<{
 
 export type LoginMutation = { __typename?: 'Mutation', login: { __typename?: 'User', id: string, email: string, firstName?: string | null, lastName?: string | null, avatar?: string | null, role: number, userType: string, tagColor?: string | null, themePreference?: string | null, accessToken: string, userInfo?: { __typename?: 'Artist', id: string, firstName: string, lastName: string, avatar?: string | null, hourlyRate?: number | null, shop?: { __typename?: 'Shop', id: string, name: string } | null } | { __typename?: 'Client', id: string, firstName: string, lastName: string, avatar?: string | null } | { __typename?: 'Staff', id: string, firstName: string, lastName: string, avatar?: string | null, title?: string | null, shop?: { __typename?: 'Shop', id: string, name: string } | null } | null } };
 
+export type RegisterDeviceTokenMutationVariables = Exact<{
+  token: Scalars['String']['input'];
+  platform: Scalars['String']['input'];
+}>;
+
+
+export type RegisterDeviceTokenMutation = { __typename?: 'Mutation', registerDeviceToken: boolean };
+
+export type UnregisterDeviceTokenMutationVariables = Exact<{
+  token: Scalars['String']['input'];
+}>;
+
+
+export type UnregisterDeviceTokenMutation = { __typename?: 'Mutation', unregisterDeviceToken: boolean };
+
 export type UpdateProjectMutationVariables = Exact<{
   project?: InputMaybe<ProjectInput>;
 }>;
@@ -3608,6 +3636,69 @@ export function useLoginMutation(baseOptions?: Apollo.MutationHookOptions<LoginM
 export type LoginMutationHookResult = ReturnType<typeof useLoginMutation>;
 export type LoginMutationResult = Apollo.MutationResult<LoginMutation>;
 export type LoginMutationOptions = Apollo.BaseMutationOptions<LoginMutation, LoginMutationVariables>;
+export const RegisterDeviceTokenDocument = gql`
+    mutation RegisterDeviceToken($token: String!, $platform: String!) {
+  registerDeviceToken(token: $token, platform: $platform)
+}
+    `;
+export type RegisterDeviceTokenMutationFn = Apollo.MutationFunction<RegisterDeviceTokenMutation, RegisterDeviceTokenMutationVariables>;
+
+/**
+ * __useRegisterDeviceTokenMutation__
+ *
+ * To run a mutation, you first call `useRegisterDeviceTokenMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useRegisterDeviceTokenMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [registerDeviceTokenMutation, { data, loading, error }] = useRegisterDeviceTokenMutation({
+ *   variables: {
+ *      token: // value for 'token'
+ *      platform: // value for 'platform'
+ *   },
+ * });
+ */
+export function useRegisterDeviceTokenMutation(baseOptions?: Apollo.MutationHookOptions<RegisterDeviceTokenMutation, RegisterDeviceTokenMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<RegisterDeviceTokenMutation, RegisterDeviceTokenMutationVariables>(RegisterDeviceTokenDocument, options);
+      }
+export type RegisterDeviceTokenMutationHookResult = ReturnType<typeof useRegisterDeviceTokenMutation>;
+export type RegisterDeviceTokenMutationResult = Apollo.MutationResult<RegisterDeviceTokenMutation>;
+export type RegisterDeviceTokenMutationOptions = Apollo.BaseMutationOptions<RegisterDeviceTokenMutation, RegisterDeviceTokenMutationVariables>;
+export const UnregisterDeviceTokenDocument = gql`
+    mutation UnregisterDeviceToken($token: String!) {
+  unregisterDeviceToken(token: $token)
+}
+    `;
+export type UnregisterDeviceTokenMutationFn = Apollo.MutationFunction<UnregisterDeviceTokenMutation, UnregisterDeviceTokenMutationVariables>;
+
+/**
+ * __useUnregisterDeviceTokenMutation__
+ *
+ * To run a mutation, you first call `useUnregisterDeviceTokenMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUnregisterDeviceTokenMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [unregisterDeviceTokenMutation, { data, loading, error }] = useUnregisterDeviceTokenMutation({
+ *   variables: {
+ *      token: // value for 'token'
+ *   },
+ * });
+ */
+export function useUnregisterDeviceTokenMutation(baseOptions?: Apollo.MutationHookOptions<UnregisterDeviceTokenMutation, UnregisterDeviceTokenMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<UnregisterDeviceTokenMutation, UnregisterDeviceTokenMutationVariables>(UnregisterDeviceTokenDocument, options);
+      }
+export type UnregisterDeviceTokenMutationHookResult = ReturnType<typeof useUnregisterDeviceTokenMutation>;
+export type UnregisterDeviceTokenMutationResult = Apollo.MutationResult<UnregisterDeviceTokenMutation>;
+export type UnregisterDeviceTokenMutationOptions = Apollo.BaseMutationOptions<UnregisterDeviceTokenMutation, UnregisterDeviceTokenMutationVariables>;
 export const UpdateProjectDocument = gql`
     mutation UpdateProject($project: ProjectInput) {
   updateProject(project: $project) {

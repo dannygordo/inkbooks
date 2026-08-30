@@ -2616,6 +2616,15 @@ module.exports = gql`
     markNotificationsRead(notificationIds: [ID!]): Int!
     # Handled, not merely seen. See models/Notification.js on why these are different.
     markNotificationsDone(notificationIds: [ID!]!): Int!
+    # Registers (or reassigns) an Expo push token for the CALLER - upserted by token, not by
+    # (userId, token), because the token belongs to the device/app install, not to whoever is
+    # signed in when it registers (see models/PushToken.js). platform is "ios" or "android" - a
+    # plain String rather than a GraphQL enum, matching this schema's existing convention of
+    # validating such values server-side (see ReminderLog's channel field) rather than declaring
+    # enum types.
+    registerDeviceToken(token: String!, platform: String!): Boolean!
+    # Called on logout - a signed-out device stops receiving push for the account it just left.
+    unregisterDeviceToken(token: String!): Boolean!
     markConversationRead(conversationId: ID!): Conversation!
     # The reverse of markConversationRead - see conversation-reads.js's markConversationUnreadForUser
     # for why this needs no new storage. Idempotent on an already-unread conversation.
