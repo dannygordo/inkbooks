@@ -1136,15 +1136,15 @@ register regardless.
 
 Not done, and deliberately out of scope for this phase: a notification-tap deep link (opening the
 appointment/message the push was about, rather than just the app) - `data` is already attached to
-every outgoing message for this to build on later, but nothing yet reads it on the client. Also
-not done: the server-side `mongodb-memory-server`-backed Vitest run for
-`test/unit/push.test.js`/`test/integration/pushNotifications.test.js` - this session's cloud
-sandbox has that binary's download blocked by network policy, so both files were verified instead
-via standalone Node scripts exercising the real modules with hand-built mocks, and via a real
-`ApolloServer(...).start()` confirming the full schema (including the two new mutations) builds.
-Neither file has been run through the real suite yet; that should happen on the first machine that
-can reach `fastdl.mongodb.org` before this step is called fully proven, the same bar X9's own note
-on the mobile appointments screen already set for Simulator-only testing.
+every outgoing message for this to build on later, but nothing yet reads it on the client.
+
+The server-side `mongodb-memory-server`-backed Vitest run for
+`test/unit/push.test.js`/`test/integration/pushNotifications.test.js` could not be done inside the
+cloud sandbox that authored this phase (that binary's download is blocked there by network policy
+- both files were verified instead via standalone Node scripts exercising the real modules with
+hand-built mocks, and via a real `ApolloServer(...).start()` confirming the full schema, including
+the two new mutations, builds), but IS done now: run for real on Danny's own machine
+(2026-08-30) and passing, closing the one gap this entry originally flagged.
 
 ---
 

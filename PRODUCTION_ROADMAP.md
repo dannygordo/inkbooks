@@ -772,17 +772,21 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    `__esModule: true`, so the test's own mutation of `Device.isDevice` was silently invisible to
    the module under test until that was added. A full `ApolloServer(...).start()` against the real
    schema (typeDefs + resolvers, including both new mutations) confirmed the schema itself builds.
-   **Not verified: the real server-side Vitest run** for `test/unit/push.test.js` and
-   `test/integration/pushNotifications.test.js` - both files were written to this project's
-   established conventions (CommonJS `vi.spyOn` on the module object, not `vi.mock`; the same
-   fixture/helper shapes every other integration test uses) and every assertion in them was
-   independently confirmed correct via standalone Node scripts exercising the real modules with
-   hand-built mocks, but `mongodb-memory-server`'s binary download is blocked by this session's
-   cloud sandbox network policy (`fastdl.mongodb.org` returns a `connect_rejected` from the egress
-   proxy), so neither file has actually been run through `vitest run` anywhere yet. That should
-   happen - and any bug PR1's own track record says a real run is likely to find, fixed - on the
-   first machine that can reach it (Danny's own machine, or real CI) before this step clears the
-   same bar step 6 already set for itself above. Also not done, out of scope for this pass: a
+   The real server-side Vitest run for `test/unit/push.test.js` and
+   `test/integration/pushNotifications.test.js` could not happen inside the cloud sandbox that
+   authored this phase - `mongodb-memory-server`'s binary download is blocked there by network
+   policy (`fastdl.mongodb.org` returns a `connect_rejected` from the egress proxy) - so both files
+   were verified there only via standalone Node scripts exercising the real modules with hand-built
+   mocks. **Now confirmed for real: full `server` Vitest suite run on Danny's own machine
+   (2026-08-30) and passing**, closing that gap - the one thing this step's own note originally
+   flagged as unverified. One real install snag surfaced and was fixed along the way, worth a
+   PR1-style note since it's exactly the class of bug a real run catches and a syntax check can't:
+   `expo-server-sdk` had been added to `server/package.json` and verified only in a disposable
+   cloud clone, never actually installed into the real `server/node_modules` on Danny's machine
+   (the git sync moved file content, not `node_modules`, and `server/` is deliberately outside the
+   npm workspace - X4 - so it needed its own `npm install`, not the root one) - every one of the 49
+   affected suites failed identically with `Cannot find module 'expo-server-sdk'` until `cd server
+   && npm install` was actually run there. Also not done, out of scope for this pass: a
    notification-tap deep link back into the app (the `data` payload is attached to every outgoing
    push already; nothing reads it client-side yet).
 8. Only once step 6 is proven on a real device - auth, data, lists, offline behavior all sane - does
