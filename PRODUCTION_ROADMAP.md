@@ -728,7 +728,23 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    (`apollo3-cache-persist`) for offline reads with a visible "offline - showing cached data"
    banner. Deliberately NOT building queued-write offline mutations for v1 - conflict resolution
    for a booking/payment app is a much larger problem than this migration already is, and this
-   app's real usage pattern (staff mostly connected) doesn't justify it yet.
+   app's real usage pattern (staff mostly connected) doesn't justify it yet. ✅ Proven on Simulator
+   (2026-08-30) - end-to-end via the EAS `development` profile dev client (`eas build:run -p ios
+   --latest` installs it, `npx expo start --dev-client` run from `apps/mobile` serves JS live, so
+   this same installed build picks up JS-only fixes with no rebuild). All four checks held: (1)
+   cold launch lands on the login screen rather than hanging on the splash screen - the exact
+   failure the session's auth-restore-crash fix (jwtDecode throwing uncaught on a bad stored token,
+   leaving `initializing` stuck true) existed to prevent; (2) real login against the local server,
+   appointments render via `useGetAppointmentsByShopQuery`/`useGetAppointmentsByArtistQuery`,
+   FlashList grouped by day; (3) offline banner + cached data confirmed with the Mac's Wi-Fi
+   actually off - stopping only the local server first was tried and, correctly, changed nothing
+   visible: `NetInfo` reflects device network-interface reachability, not per-endpoint
+   availability, so a local server being down while the device's network is otherwise up is
+   invisible to it. Known gap, not a defect - a real API-health check is out of this phase's scope
+   (see X9 below); (4) Wi-Fi restored, relaunch clears the banner and restores the session straight
+   to the appointments list, no login-screen flash. Not yet run on a physical iPhone/iPad -
+   Simulator-only pass; a physical-device pass is still open before this fully clears the project's
+   own iOS-first bar (X10).
 7. Server-side: a device-push-token registration mutation, and Expo push added as a fourth channel
    through the existing `notifySafely`/audience-resolution dispatch point (`utils/notifications.js`)
    - not a parallel notification system alongside email/SMS/in-app.
