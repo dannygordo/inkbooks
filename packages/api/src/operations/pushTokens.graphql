@@ -1,0 +1,12 @@
+# Registers (or reassigns) an Expo push token for the caller - upserted by token, not by
+# (userId, token), because the token belongs to the device/app install, not to whoever is signed
+# in when it registers. See server/models/PushToken.js for the full reasoning, and
+# apps/mobile/src/lib/push-notifications.ts for where this is called (on login, and once more on
+# cold start if a session restores) and unregisterDeviceToken (on logout).
+mutation RegisterDeviceToken($token: String!, $platform: String!) {
+	registerDeviceToken(token: $token, platform: $platform)
+}
+
+mutation UnregisterDeviceToken($token: String!) {
+	unregisterDeviceToken(token: $token)
+}

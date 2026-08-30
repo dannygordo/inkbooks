@@ -747,7 +747,44 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    own iOS-first bar (X10).
 7. Server-side: a device-push-token registration mutation, and Expo push added as a fourth channel
    through the existing `notifySafely`/audience-resolution dispatch point (`utils/notifications.js`)
-   - not a parallel notification system alongside email/SMS/in-app.
+   - not a parallel notification system alongside email/SMS/in-app. ✅ Done (2026-08-30) - see
+   DECISIONS.md's X11 for the full design (one `PushToken` row per device upserted by token, not
+   per user; push reuses email's exact IMMEDIATE/DIGEST/OFF resolution rather than a separate
+   preference; fire-and-forget send gated by the same `email: false` flag; only
+   `DeviceNotRegistered` prunes a token, no receipts-polling sweep). Server: `models/PushToken.js`,
+   `utils/push.js` (`sendPushForRecipients`, Expo SDK pinned to `^6.1.0` for the `node>=20` engines
+   constraint), `graphql/resolvers/pushTokens.js` (`registerDeviceToken`/`unregisterDeviceToken`,
+   both `withAuth`), and `utils/notifications.js`'s `notify()` wired to call it non-awaited after
+   the in-app rows are written. Mobile: `apps/mobile/src/lib/push-notifications.ts`
+   (`registerForPushNotifications`/`unregisterPushNotifications`, both take the caller's
+   `ApolloClient` as a parameter and never throw), wired into `context/auth.tsx` - register on
+   login and on a restored cold-start session, unregister on logout before the session's auth
+   token is cleared - plus the `expo-notifications`/`expo-device` dependencies and app.json's
+   `expo-notifications` config plugin. `packages/api/src/operations/pushTokens.graphql` added and
+   codegen regenerated (`useRegisterDeviceTokenMutation`/`useUnregisterDeviceTokenMutation`).
+   Verified: `packages/api` and `apps/mobile` both typecheck clean (`tsc --noEmit`); the full
+   `apps/mobile` Jest suite passes (46/46, including 10 new cases in
+   `__tests__/push-notifications.test.ts` covering granted/denied/undetermined permission, the
+   Simulator no-op, a failed mutation, Expo itself rejecting, a missing EAS project ID, and both
+   directions of the register/unregister round trip) - real bug caught and fixed by that run, not
+   just a syntax check: Babel's CJS interop wraps a plain `jest.mock('expo-device', () => ({...}))`
+   factory in a fresh copy per `import * as Device` call site unless the factory sets
+   `__esModule: true`, so the test's own mutation of `Device.isDevice` was silently invisible to
+   the module under test until that was added. A full `ApolloServer(...).start()` against the real
+   schema (typeDefs + resolvers, including both new mutations) confirmed the schema itself builds.
+   **Not verified: the real server-side Vitest run** for `test/unit/push.test.js` and
+   `test/integration/pushNotifications.test.js` - both files were written to this project's
+   established conventions (CommonJS `vi.spyOn` on the module object, not `vi.mock`; the same
+   fixture/helper shapes every other integration test uses) and every assertion in them was
+   independently confirmed correct via standalone Node scripts exercising the real modules with
+   hand-built mocks, but `mongodb-memory-server`'s binary download is blocked by this session's
+   cloud sandbox network policy (`fastdl.mongodb.org` returns a `connect_rejected` from the egress
+   proxy), so neither file has actually been run through `vitest run` anywhere yet. That should
+   happen - and any bug PR1's own track record says a real run is likely to find, fixed - on the
+   first machine that can reach it (Danny's own machine, or real CI) before this step clears the
+   same bar step 6 already set for itself above. Also not done, out of scope for this pass: a
+   notification-tap deep link back into the app (the `data` payload is attached to every outgoing
+   push already; nothing reads it client-side yet).
 8. Only once step 6 is proven on a real device - auth, data, lists, offline behavior all sane - does
    work fan out to the remaining ~40 screens, each screen shipped with its own test file (same
    coverage discipline the web client suite now has).

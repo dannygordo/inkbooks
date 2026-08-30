@@ -13,6 +13,7 @@ const projectMutations = require('../mutations/projects');
 const conversationMutations = require('../mutations/conversations');
 const conversationResolvers = require('./conversations');
 const notificationResolvers = require('./notifications');
+const pushTokenResolvers = require('./pushTokens');
 const messageMutations = require('../mutations/messages');
 const messageResolvers = require('./messages');
 const projectResolvers = require('./projects');
@@ -148,6 +149,7 @@ module.exports = {
     ...passwordMutations,
     ...accountMutations,
     ...notificationResolvers.Mutation,
+    ...pushTokenResolvers.Mutation,
     ...reminderResolvers.Mutation
   },
   Project: {

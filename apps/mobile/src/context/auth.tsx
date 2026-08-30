@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { createContext, useContext, useEffect, useReducer, useState } from 'react';
 
 import { AUTH_SETTINGS_CONSTANTS } from '@/constants/auth';
+import { registerForPushNotifications, unregisterPushNotifications } from '@/lib/push-notifications';
 import { TokenStorageService } from '@/services/TokenStorageService';
 
 // The full logged-in user record - whatever shape login.graphql's Login mutation actually
@@ -99,6 +100,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           );
         } else if (userData && decoded && !cancelled) {
           dispatch({ type: 'LOGIN', payload: userData });
+          // Fire-and-forget, same as login() below - a permission prompt or a slow Expo round
+          // trip must never delay the splash screen clearing on a restored session.
+          void registerForPushNotifications(apollo);
         } else if (!userData) {
           await TokenStorageService.deleteItemAsync(
             AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE,
@@ -144,6 +148,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (userData: CurrentUser) => {
     await setSession(userData);
+    // After setSession, not before: registerForPushNotifications' mutation needs the auth token
+    // setSession just stored to be attached by lib/apollo-client.ts's authLink. Fire-and-forget -
+    // a permission dialog or a slow Expo round trip must never delay the login screen resolving.
+    void registerForPushNotifications(apollo);
   };
 
   const updateCurrentUser = async (userData: CurrentUser) => {
@@ -155,6 +163,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
+    // Before setSession, not after: unregisterDeviceToken requires auth (see
+    // server/graphql/resolvers/pushTokens.js), so the session's auth token has to still be in
+    // TokenStorageService when this call is made. Awaited, unlike registration - the mutation
+    // itself never throws (push-notifications.ts swallows its own failures), so this adds no
+    // meaningful delay, and awaiting keeps the unregister call from racing setSession's
+    // apollo.clearStore().
+    await unregisterPushNotifications(apollo);
     await setSession(null);
   };
 

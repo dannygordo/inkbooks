@@ -1078,6 +1078,76 @@ because no screen has needed that judgment call yet, not because it was decided 
 
 ---
 
+### X11. Push is a fourth channel through the existing notification dispatch point, not a parallel system - one row per device, gated by email's own IMMEDIATE/DIGEST/OFF resolution
+
+PRODUCTION_ROADMAP.md's Phase 5 step 7. `notify()` (`server/utils/notifications.js`) already
+resolves, per recipient, whether an event is worth an immediate interruption, a daily digest, or
+nothing (`notification-preferences.js`'s `emailModeFor`) - the artist-versus-shop-admin,
+money-versus-schedule story NOTIFICATIONS_DESIGN.md §6/§7 exists to tell. Push had two honest
+options: reuse that resolution, or invent its own noise judgment and get it right a second time.
+It reuses it. A shop admin whose money category is already DIGEST because a six-artist shop
+throws 60-80 money events a week does not want their phone buzzing for the same 60-80 events their
+inbox is already sparing them from - so push fires only when `emailModeFor` resolves `IMMEDIATE`,
+and is gated by the same `email: false` flag that already means "in-app only" for an event, since
+a push notification leaves the device even more than an email does. No separate
+`pushPrefs`/`platform` preference exists, and none should be added later without first asking why
+the email resolution stopped being the right one for push too.
+
+**`PushToken` is one row per device, not per user, upserted by token.** A studio's front-desk
+iPad is signed in as whoever is at the counter; the same physical device's Expo token has to be
+reassignable across accounts rather than accumulating one abandoned row per person who ever signed
+in there. `registerDeviceToken` (`server/graphql/resolvers/pushTokens.js`) upserts
+`findOneAndUpdate({ token }, { $set: { userId, platform, lastSeenAt } }, { upsert: true })` -
+keyed on the token, never on `(userId, token)`. `platform` is a plain validated `String!`
+(`ios`/`android`), matching this schema's existing convention of no GraphQL enums anywhere
+(`ReminderLog`'s channel field is the same shape) rather than introducing the first one for this.
+
+**Send is fire-and-forget from `notify()`, exactly like email is queued rather than sent inline.**
+`push.sendPushForRecipients(...).catch(...)` is deliberately not awaited - an Expo outage or a
+slow response must never add latency to the deposit/booking/etc. that triggered the notification.
+The in-app `Notification` rows, written first and synchronously, remain the source of truth
+regardless of what push does after.
+
+**Only `DeviceNotRegistered` prunes a token; nothing else does, and there is no receipts sweep.**
+Expo's ticket-level errors distinguish a genuinely dead token (app uninstalled, token revoked -
+permanent, prune it) from everything else (rate limits, transient provider errors - report and
+leave the token alone; it may well work next time). Expo also offers a second, delayed
+receipts-check API for confirming a ticket that came back `ok` was actually delivered; this phase
+does not poll it. That is a deliberate v1 scope trim - the ticket-level signal already catches the
+one failure mode (a dead device) that matters for keeping `PushToken` clean - not an oversight to
+silently fix later.
+
+**`expo-server-sdk` is pinned to `^6.1.0`, not latest.** `7.2.0` requires `node>=22.12.0`, which
+`server/package.json`'s own `engines: { node: '>=20' }` does not guarantee; `6.1.0` requires only
+`node>=20` and exposes every API surface this phase uses (`Expo`, `Expo.isExpoPushToken`,
+`chunkPushNotifications`, `sendPushNotificationsAsync`) unchanged.
+
+**Registration is called from `apps/mobile/src/lib/push-notifications.ts`, on login and on a
+restored cold-start session; unregistration is called on logout, before the session's auth token
+is cleared** (`unregisterDeviceToken` requires auth, the same as every other mutation here). Both
+directions take the caller's `ApolloClient` as a parameter rather than importing a client
+singleton - the same injectable-client shape `server/utils/push.js`'s `expoClient` and
+`server/utils/email.js`'s `send` already use for testability - and neither function ever throws:
+a failed push registration is a worse notification experience, never a reason to fail login or
+logout. `Device.isDevice` (from `expo-device`, added alongside `expo-notifications`) is checked
+before ever requesting permission or asking Expo for a token, since the Simulator/emulator throws
+out of `getExpoPushTokenAsync` rather than returning nothing, and there is no real device to
+register regardless.
+
+Not done, and deliberately out of scope for this phase: a notification-tap deep link (opening the
+appointment/message the push was about, rather than just the app) - `data` is already attached to
+every outgoing message for this to build on later, but nothing yet reads it on the client. Also
+not done: the server-side `mongodb-memory-server`-backed Vitest run for
+`test/unit/push.test.js`/`test/integration/pushNotifications.test.js` - this session's cloud
+sandbox has that binary's download blocked by network policy, so both files were verified instead
+via standalone Node scripts exercising the real modules with hand-built mocks, and via a real
+`ApolloServer(...).start()` confirming the full schema (including the two new mutations) builds.
+Neither file has been run through the real suite yet; that should happen on the first machine that
+can reach `fastdl.mongodb.org` before this step is called fully proven, the same bar X9's own note
+on the mobile appointments screen already set for Simulator-only testing.
+
+---
+
 ## Process
 
 ### PR1. Tests are written alongside the feature or fix, not queued for a later pass
