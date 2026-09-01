@@ -789,9 +789,112 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    && npm install` was actually run there. Also not done, out of scope for this pass: a
    notification-tap deep link back into the app (the `data` payload is attached to every outgoing
    push already; nothing reads it client-side yet).
-8. Only once step 6 is proven on a real device - auth, data, lists, offline behavior all sane - does
-   work fan out to the remaining ~40 screens, each screen shipped with its own test file (same
-   coverage discipline the web client suite now has).
+8. **Done - the appointments list's row tap now opens something, for the first of the ~40 screens
+   step 8 covers - and Charge via Square/image upload, originally deferred, are now built too.**
+   Scoped down from an open-ended "~40 screens" into one concrete, user-confirmed slice via two
+   rounds of clarifying questions rather than guessed: all three destinations
+   `AppointmentsList.jsx`'s `openAppointment()` branches to (full parity, not one at a time),
+   Square-charge and image-upload originally deliberately omitted (separate infra projects), and
+   consult-to-session conversion originally cash-only. Built as one uninterrupted slice and shipped
+   as one PR, per Danny's own delivery-cadence choice. Full reasoning for every original scope
+   call: DECISIONS.md X12. That deferral was then explicitly reversed before this PR shipped -
+   "image upload is an absolute requirement, firebase storage sign-in is a must," with Square
+   charging confirmed in scope too when asked directly - held rather than shipped first, and built
+   into this same branch/PR. Full reasoning for the reversal and every new architecture call
+   (Firebase JS SDK not `@react-native-firebase`, Square via a `WebView` not the native In-App
+   Payments SDK, both chosen specifically to avoid this port's first native rebuild): DECISIONS.md
+   X13.
+
+   New screens, each a real `expo-router` `<Stack.Screen>` registered in `_layout.tsx`'s
+   authenticated block: `app/appointment/[id].tsx` (personal entry - edit/delete, owner-gated
+   delete matching web's `event.userId === user.id`), `app/consult/[id].tsx` (intake details +
+   convert-to-session via `components/BookSessionDatesForm.tsx`, a cash-only port of
+   `BookSessionDatesForm.jsx`), `app/project/[id].tsx` (autosave-on-blur Details, read-only
+   Deposit readout + cash-only Add Deposit, Notes, Tags - `components/ProjectSessionsList.tsx` for
+   the Sessions sub-list), and `app/session/[id].tsx` (`components/SessionDetailForm.tsx` - timer
+   controls, the live tax/tip/total quote preview, deposit-apply, adjustments, save/close/delete).
+   `index.tsx`'s row `onPress` now runs the same three-way `openAppointment` split web's own does,
+   gated by `canManageAppointment` (a row this user can't manage still renders, its tap is a no-op
+   - same "visible but inert" choice as web's row-level gate).
+
+   New shared UI primitives, since none existed on mobile before this (only
+   `OfflineBanner`/`ThemedText`/`ThemedView` did): `components/Button.tsx`, `components/
+   FormField.tsx`, `components/DurationPicker.tsx` (wraps the new `utils/duration.ts`),
+   `components/DateTimeField.tsx` (wraps `@react-native-community/datetimepicker@9.1.0`, pinned to
+   Expo SDK 57's own `bundledNativeModules.json` value per X9's convention - iOS renders it
+   inline via a real `mode="datetime"` control, Android has no such mode and drives
+   `DateTimePickerAndroid.open` as a chained date-dialog-then-time-dialog instead, per the
+   library's own type surface).
+
+   New pure-logic utils, each with its own test file per PR1 (35 + 2 tests, all passing):
+   `utils/duration.ts` (`combineDuration`/`minuteOptionsFor`/`describeDuration`, direct port of
+   `DurationPicker.jsx`'s logic), `utils/money.ts` (`formatCents`/`centsToDollars`/
+   `dollarsToCents`, port of `utils/money.js`), `utils/sessionRate.ts`
+   (`getEffectiveRate`/`computeSessionSubtotalCents`/`getLiveElapsedSeconds`/`formatElapsed`, port
+   of `utils/sessionRate.js`), `utils/permissions.ts` (`canManageAppointment`, port of
+   `utils/permissions.js`), `utils/objectId.ts` (`generateObjectId` - a client-generated
+   Mongo-style id for a new note, without adding `bson` as a mobile dependency; see X12).
+
+   New/changed `packages/api` GraphQL operations, codegen regenerated and both `packages/api`/
+   `apps/mobile` confirmed typechecking clean (`tsc --noEmit`): `appointmentDetail.graphql`
+   (`GetAppointment`/`UpdateAppointment`/`DeleteAppointment`/`CreateAppointment`),
+   `consultDetail.graphql` (`GetConsultAppointment`), `convertBookingRequest.graphql`,
+   `deposits.graphql` (`RecordDeposit`/`GetAvailableDeposits`/`ApplyDeposit` - `RecordDeposit`
+   gained the `$pending` variable, X12's own comment had explicitly left it out),
+   `sessionTimer.graphql` (start/stop/reset), `chargeQuote.graphql` (`GetChargeQuote`, now also
+   selecting `canCharge` for the Charge via Square button's up-front "no Square account
+   connected" check), `adjustments.graphql` (`RecordAdjustment`), `sessionDetail.graphql`
+   (`UpdateSessionDetails` - a narrower field selection than `UpdateAppointment`, matching only
+   what Session Detail actually owns), `appointmentsByProject.graphql`
+   (`GetAppointmentsByProject`), `artistShopConnections.graphql`
+   (`GetArtistShopConnections`), `login.graphql` (now selecting `firebaseToken`, needed for
+   Firebase sign-in - see below), and `projectDetail.graphql` (`GetProjectDetail`/
+   `UpdateProjectDetail` - a leaner sibling of web's `getProject`/`updateProject` that still never
+   selects `conversation` - Messages stays out of scope, see X13 - but now DOES select the three
+   `IBImage` arrays via a shared `ProjectImageFields` fragment, for the image upload/gallery
+   sections below).
+
+   **Firebase Storage sign-in, image upload, and Charge via Square - all originally deferred in
+   this same step, now built (DECISIONS.md X13):**
+   - `context/auth.tsx` signs into Firebase with the server-minted custom token on login, mirroring
+     `auth.jsx`'s `firebaseUser`/`FIREBASE_LOGIN`/`signInWithCustomToken`/`signOut`, using the
+     plain `firebase` JS SDK (`firebase/firebase.ts`, `initializeAuth` +
+     `getReactNativePersistence(AsyncStorage)`) rather than `@react-native-firebase` - no native
+     module linking, no rebuild of this app's actual binary.
+   - `components/ImagesUpload.tsx` (`expo-image-picker` + `firebase/uploadFile.ts`'s
+     `uploadBytesResumable`-with-progress) and `components/ImagesGallery.tsx` (grid + a full-screen
+     `Modal` lightbox + delete via `firebase/deleteFile.ts`) are wired into three new sections on
+     `app/project/[id].tsx` - References, Design, Finished Tattoo - matching web's
+     `IBImagesUpload`/`IBImagesList` pair, collapsed from web's four/two-file split into two RN
+     components since mobile has no second caller needing that split's reuse yet.
+   - `components/SquarePaymentForm.tsx` hosts Square's Web Payments SDK inside a `react-native-
+     webview` (no native Square SDK, no rebuild - same reasoning as Firebase above), wired into a
+     new "Charge via Square" button on `components/SessionDetailForm.tsx` and back into
+     `components/BookSessionDatesForm.tsx`'s consult-conversion deposit flow (the Cash/Card choice
+     and `pendingCardDeposit` branch X12 had removed for the cash-only cut).
+   - New pure-logic utils, each with its own test file per PR1:
+     `utils/imagePath.ts`/`utils/projectImages.ts` (Storage path + `IBImageInput` shaping),
+     `utils/timeAgo.ts` (a hand-rolled "x time ago", no new `moment`/`dayjs` dependency),
+     `utils/restApi.ts` (`restApiUrl`/`getAccessToken`, for the plain Express `square/config`/
+     `square/process-payment` routes GraphQL codegen doesn't cover).
+
+   **Verified:** `packages/api` and `apps/mobile` both typecheck clean; the full `apps/mobile`
+   Jest suite passes (108/108, no regressions - the prior 86 plus 22 new cases across
+   `imagePath`/`timeAgo`/`projectImages`/`restApi`/2 new Firebase-sign-in cases in `auth.test.tsx`).
+   Not yet run for real: this sandbox's `expo lint`/`expo install` both need network access this
+   sandbox's egress policy blocks for `react-native-directory`/ESLint auto-config specifically
+   (`HTTP Proxy Network Error: Forbidden`) - worked around by resolving `expo-image-picker`/
+   `react-native-webview`'s exact Expo-SDK-57-compatible versions from Expo's own published SDK
+   docs instead of `npx expo install`, and by no ESLint config existing anywhere in this repo yet
+   (noted already in Phase 6's CI section - not a regression this pass introduced). These new
+   files have been typechecked and tested, not linted. The server-side and web suites were not
+   touched or re-run - no files outside `apps/mobile`/`packages/api` changed in this pass.
+
+   Work continues to the rest of the ~40-screen list from here (Settings/avatar upload, Messages,
+   the client dashboard's shared-images panel, and everything else not yet ported all remain
+   future work, explicitly - see X13) - this step lands the appointment-opening slice plus its
+   image-upload/Square-charge follow-up as one PR, per Danny's own delivery-cadence choice, not
+   the whole remaining list at once.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).
 10. TestFlight beta, then App Store submission - Guideline 3.1.1 already checked in step 5, so this

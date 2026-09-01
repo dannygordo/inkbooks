@@ -1,6 +1,7 @@
-# Mirrors apps/web's Login.jsx LOGIN_USER mutation field-for-field, minus firebaseToken - mobile
-# doesn't sign into Firebase (no image-upload feature yet to need Storage access for; see
-# DECISIONS.md's step-6 entry). userInfo's inline fragments are the three concrete UserInfo
+# Mirrors apps/web's Login.jsx LOGIN_USER mutation field-for-field, INCLUDING firebaseToken now -
+# step 8's image-upload/Square follow-up added Firebase Storage sign-in to mobile (auth.tsx signs
+# into Firebase with this the same way web's auth.jsx does), so there is now a caller for it here.
+# See DECISIONS.md's X13 entry. userInfo's inline fragments are the three concrete UserInfo
 # implementations (Artist/Client/Staff) straight off server/graphql/typeDefs.js - selecting shop.id
 # on Artist/Staff now even though nothing reads it yet, since every shop-scoped query the
 # appointments screen needs next (Phase 2) needs it and re-running codegen for one extra field
@@ -17,6 +18,7 @@ mutation Login($email: String!, $password: String!) {
 		tagColor
 		themePreference
 		accessToken
+		firebaseToken
 		userInfo {
 			... on Artist {
 				id

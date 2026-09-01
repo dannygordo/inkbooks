@@ -29,6 +29,7 @@ const LOGIN_RESPONSE = {
   tagColor: null,
   themePreference: null,
   accessToken: 'fake.jwt.token',
+  firebaseToken: 'fake-firebase-custom-token',
   userInfo: {
     __typename: 'Artist',
     id: '1',

@@ -1,0 +1,41 @@
+# A DIFFERENT, narrower shape than UpdateAppointment (appointmentDetail.graphql) hitting the same
+# updateAppointment server mutation - deliberately, matching apps/web's SessionDetail.jsx. That
+# screen never touches shopCutStatus/title/isPersonal/etc, so it never resends stale copies of
+# them the way the personal-edit screen's full-object-echo has to. Only the fields SessionDetail
+# actually owns are sent: appointmentDate, subtotalCents, tipCents, sessionNotes, plus
+# appointmentStatus: "completed" on Close. taxCents/feeCents/totalCents come from a FRESH (not the
+# debounced-preview) GetChargeQuote call made immediately before this fires - see
+# chargeQuote.graphql's own comment.
+mutation UpdateSessionDetails($appointmentInput: AppointmentInput) {
+	updateAppointment(appointmentInput: $appointmentInput) {
+		id
+		appointmentDate
+		durationMinutes
+		appointmentEnd
+		subtotalCents
+		taxCents
+		feeCents
+		tipCents
+		totalCents
+		shopCutCents
+		shopCutStatus
+		shopCutPercentApplied
+		sessionNotes
+		appointmentStatus
+		depositCreditCents
+		timerStatus
+		timerStartedAt
+		accumulatedSeconds
+		adjustments {
+			id
+			amountCents
+			reason
+			createdAt
+			createdBy {
+				id
+				firstName
+				lastName
+			}
+		}
+	}
+}

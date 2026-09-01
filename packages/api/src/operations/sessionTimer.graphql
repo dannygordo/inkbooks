@@ -1,0 +1,32 @@
+# Server-persisted session timer - see server/graphql/typeDefs.js's AppointmentInput comment on
+# why timerStatus/timerStartedAt/accumulatedSeconds are only ever changed through these three
+# dedicated mutations, never through the generic UpdateAppointment/UpdateSessionDetails. The
+# elapsed total while running is always recomputed on read (accumulatedSeconds + now -
+# timerStartedAt), never itself stored or trusted from these mutations' response alone - see
+# apps/mobile/src/utils/sessionRate.ts's getLiveElapsedSeconds.
+mutation StartSessionTimer($appointmentId: ID!) {
+	startSessionTimer(appointmentId: $appointmentId) {
+		id
+		timerStatus
+		timerStartedAt
+		accumulatedSeconds
+	}
+}
+
+mutation StopSessionTimer($appointmentId: ID!) {
+	stopSessionTimer(appointmentId: $appointmentId) {
+		id
+		timerStatus
+		timerStartedAt
+		accumulatedSeconds
+	}
+}
+
+mutation ResetSessionTimer($appointmentId: ID!) {
+	resetSessionTimer(appointmentId: $appointmentId) {
+		id
+		timerStatus
+		timerStartedAt
+		accumulatedSeconds
+	}
+}

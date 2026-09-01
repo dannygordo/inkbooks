@@ -1,0 +1,19 @@
+# A documented reversal that already happened by hand in Square - never touches
+# subtotalCents/tipCents/totalCents (DECISIONS.md M4). Server validates amountCents > 0 and a
+# non-empty reason (utils/validation.js's recordAdjustmentInputSchema) - the mobile form only
+# needs to guard against submitting nothing typed.
+mutation RecordAdjustment($input: RecordAdjustmentInput!) {
+	recordAdjustment(input: $input) {
+		id
+		appointmentId
+		amountCents
+		reason
+		createdByUserId
+		createdBy {
+			id
+			firstName
+			lastName
+		}
+		createdAt
+	}
+}

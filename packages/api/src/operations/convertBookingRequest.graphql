@@ -1,0 +1,27 @@
+# Books the FIRST session date out of a consult (or declines/no-shows it) - see
+# server/graphql/mutations/bookingRequests.js's own extensive comment on why this one call also
+# creates the Project (for outcome "session_booked") and closes out the originating consult.
+# Every additional session date in a multi-sitting booking goes through the plain CreateAppointment
+# mutation instead (appointmentDetail.graphql), pointed at the projectId this mutation returns -
+# see BookSessionDatesForm.jsx's own comment for why: no second server capability was needed.
+mutation ConvertBookingRequest(
+	$bookingRequestId: ID!
+	$outcome: String!
+	$appointmentInput: AppointmentInput
+	$projectTitle: String
+) {
+	convertBookingRequest(
+		bookingRequestId: $bookingRequestId
+		outcome: $outcome
+		appointmentInput: $appointmentInput
+		projectTitle: $projectTitle
+	) {
+		id
+		status
+		resultingAppointmentId
+		resultingAppointment {
+			id
+			projectId
+		}
+	}
+}

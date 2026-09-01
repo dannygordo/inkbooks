@@ -1,0 +1,45 @@
+# The Sessions sub-list on the Project screen. Selection mirrors apps/web's ProjectSessionsList.jsx
+# plus SessionDetail.jsx's own needs (this same query result seeds the modal it opens) - a plain
+# array, not paginated, since one project's session count is small by construction.
+query GetAppointmentsByProject($projectId: ID!) {
+	getAppointmentsByProject(projectId: $projectId) {
+		id
+		projectId
+		userId
+		shopId
+		title
+		description
+		appointmentType
+		appointmentDate
+		durationMinutes
+		appointmentEnd
+		appointmentStatus
+		subtotalCents
+		taxCents
+		feeCents
+		tipCents
+		totalCents
+		shopCutCents
+		shopCutStatus
+		shopCutPercentApplied
+		depositCents
+		depositStatus
+		depositCreditCents
+		depositCreditFromAppointmentId
+		timerStatus
+		timerStartedAt
+		accumulatedSeconds
+		sessionNotes
+		adjustments {
+			id
+			amountCents
+			reason
+			createdAt
+			createdBy {
+				id
+				firstName
+				lastName
+			}
+		}
+	}
+}

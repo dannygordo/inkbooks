@@ -119,3 +119,9 @@ dist
 # holds public-safe values (Firebase web config, Square application/location IDs) and needs to
 # be committed for the Netlify build to have it at all.
 server/config.js
+# Expo local build/dev-server cache (apps/mobile)
+.expo/
+
+# Scratch folder used by the device-bridge git-lock workaround (mv .git/*.lock here before
+# retrying a git command) - never intended to be committed.
+_to_delete/

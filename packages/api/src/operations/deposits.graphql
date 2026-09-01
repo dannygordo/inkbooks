@@ -1,0 +1,59 @@
+# RECORD FIRST, THEN CHARGE - see BookSessionDatesForm.tsx's own comment on why this is the
+# reverse of the old order. `pending` is now used by mobile too (DECISIONS.md's X13 entry reversed
+# the earlier cash-only deferral): the Square deposit branch calls this with
+# paymentMethod: "square", pending: true BEFORE any card is taken, and the charge route
+# (square/process-payment) is what flips depositStatus from 'pending' to 'available'. Cash is
+# still recorded immediately with no `pending` argument at all - it's an assertion, not a
+# provisional figure. Used three ways: the consult-conversion deposit (BookSessionDatesForm, cash
+# or square), and the Project screen's cash-only "Add Deposit" top-up, which sends the FULL NEW
+# TOTAL (existing + added), not a delta - see Project.jsx's own comment on why that's only safe
+# for cash.
+mutation RecordDeposit(
+	$appointmentId: ID!
+	$depositCents: Int!
+	$paymentMethod: String!
+	$pending: Boolean
+) {
+	recordDeposit(
+		appointmentId: $appointmentId
+		depositCents: $depositCents
+		paymentMethod: $paymentMethod
+		pending: $pending
+	) {
+		id
+		depositCents
+		depositStatus
+		depositPaymentMethod
+		depositCollectedAt
+	}
+}
+
+# Skipped once appointment.depositCreditCents is already set (SessionDetail.jsx) - a deposit
+# applied elsewhere must vanish from every other session's list immediately, not offer something
+# already spent.
+query GetAvailableDeposits($appointmentId: ID!) {
+	getAvailableDeposits(appointmentId: $appointmentId) {
+		id
+		depositCents
+		appointmentDate
+		appointmentType
+	}
+}
+
+# One-way, single-use - the server refuses a second credit atomically (depositStatus transitions
+# available -> applied and stays there). Returns the recomputed session, not the spent deposit.
+mutation ApplyDeposit($depositAppointmentId: ID!, $targetAppointmentId: ID!) {
+	applyDeposit(
+		depositAppointmentId: $depositAppointmentId
+		targetAppointmentId: $targetAppointmentId
+	) {
+		id
+		depositCreditCents
+		depositCreditFromAppointmentId
+		subtotalCents
+		totalCents
+		shopCutCents
+		shopCutPercentApplied
+		shopCutStatus
+	}
+}

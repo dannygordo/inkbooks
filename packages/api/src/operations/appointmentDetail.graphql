@@ -1,0 +1,78 @@
+# Single-appointment fetch, used by the mobile personal-appointment edit screen to seed its form
+# (the list screen's AppointmentListItem fragment doesn't carry every field a personal edit needs,
+# and fetching one appointment by id is cheap - a field resolver, not a stored join, see
+# resolvers/index.js's Appointment.bookingRequest).
+query GetAppointment($appointmentId: ID!) {
+	getAppointment(appointmentId: $appointmentId) {
+		id
+		projectId
+		userId
+		shopId
+		isPersonal
+		title
+		description
+		appointmentDate
+		durationMinutes
+		appointmentEnd
+		appointmentStatus
+		appointmentType
+		shopCutStatus
+		shopCutCents
+		createdAt
+		updatedAt
+	}
+}
+
+# Full-object-echo update, matching apps/web's UpdateEventDialog.jsx exactly (see
+# server/graphql/typeDefs.js's AppointmentInput comment - this is a replace, not a patch, so every
+# unrelated field the appointment already has must be resent unchanged alongside whatever actually
+# changed). Used for the personal-appointment edit screen only; SessionDetail's save/close path
+# uses the narrower UpdateSessionDetails operation in sessionDetail.graphql instead, on purpose -
+# see that file's own comment.
+mutation UpdateAppointment($appointmentInput: AppointmentInput) {
+	updateAppointment(appointmentInput: $appointmentInput) {
+		id
+		projectId
+		userId
+		shopId
+		isPersonal
+		title
+		description
+		appointmentDate
+		durationMinutes
+		appointmentEnd
+		appointmentStatus
+		appointmentType
+		shopCutStatus
+		shopCutCents
+		createdAt
+		updatedAt
+	}
+}
+
+# Shared by the personal-appointment screen's delete action and SessionDetail's delete-session
+# action - same mutation, same "String" return (a plain confirmation message, not the deleted
+# appointment - there's nothing left to select fields from).
+mutation DeleteAppointment($appointmentId: ID) {
+	deleteAppointment(appointmentId: $appointmentId)
+}
+
+# Used for every additional session date in a multi-sitting booking (BookSessionDatesForm's
+# "restSittings" loop - the first date always goes through ConvertBookingRequest instead, since
+# that's the one call that creates the Project) and for ProjectSessionsList's own "Add Session"
+# action against an existing project.
+mutation CreateAppointment($appointmentInput: AppointmentInput) {
+	createAppointment(appointmentInput: $appointmentInput) {
+		id
+		projectId
+		userId
+		shopId
+		title
+		appointmentType
+		appointmentDate
+		durationMinutes
+		appointmentEnd
+		appointmentStatus
+		shopCutStatus
+	}
+}

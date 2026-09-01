@@ -1,0 +1,33 @@
+# The consult branch of "open an appointment" (apps/web/src/pages/consults/ConsultDetail.jsx).
+# bookingRequest is a field resolver (Appointment.bookingRequest, resolvers/index.js), not a
+# stored join - fine for a single-appointment fetch, deliberately not added to the list queries
+# (see appointments.graphql's AppointmentListItem comment on the same tradeoff elsewhere).
+query GetConsultAppointment($appointmentId: ID!) {
+	getAppointment(appointmentId: $appointmentId) {
+		id
+		title
+		appointmentType
+		appointmentDate
+		durationMinutes
+		appointmentStatus
+		projectId
+		bookingRequestId
+		bookingRequest {
+			id
+			status
+			description
+			placement
+			size
+			budget
+			isCoverUp
+			referenceImages
+			client {
+				id
+				firstName
+				lastName
+				email
+				phone
+			}
+		}
+	}
+}
