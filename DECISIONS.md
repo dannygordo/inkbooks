@@ -1396,6 +1396,35 @@ test-coverage backlog (PRODUCTION_ROADMAP.md Phase 6, item 10: `utils/appChrome.
 remaining component/server-util tail) is a separate, already-tracked cleanup, not reopened by this
 rule. This is about what ships from here forward.
 
+### PR2. `npm install`/`npm ci` never runs directly against the connected-folder mount - only against a local mirror, synced back with a plain file copy
+
+Discovered 2026-08-31/09-01 shipping X13's dependencies (`firebase`, `react-native-webview`,
+`expo-image-picker`, `@react-native-community/datetimepicker`) onto the real device: `npm
+install`/`npm ci` in the mounted project directory repeatedly failed with `ENOTEMPTY` on
+`fs.rename()`, and not only for those new packages - eventually on packages already installed and
+completely unrelated to this change (`caniuse-lite`, `esprima`, `jest-expo`, `@expo/fingerprint`,
+`@radix-ui/*`). Root cause: npm's install strategy backs up an existing package directory by
+renaming it to a hidden `.name-RANDOM` sibling before replacing it, and the connected-folder mount
+(a FUSE bridge to the real filesystem, `stat -f`'s `fuseblk` type) does not reliably support an
+atomic rename of a non-empty directory - not corruption, a genuine capability gap. Deleting the one
+named directory and retrying made progress but never converged (adding one dependency touches the
+hoisting/dedup of a large fraction of the whole tree), and repeated 178-second command-timeout
+kills of a still-running install compounded it with real partial-write debris on top.
+
+**Fix, and the pattern to reuse next time a mobile/API dependency needs to change:** run
+`npm install` in a local mirror OUTSIDE the mounted folder (just the `package.json`s + lockfile,
+`--ignore-scripts` since no source is present to run a workspace's own build script against), which
+hits none of this - plain local disk, no FUSE, completes in ~2 minutes for the whole monorepo. Then
+copy the resulting `node_modules` trees (root + every workspace with its own nested one) into the
+mounted project with `rsync -a` run repeatedly until it reports no more work (each pass is a plain
+create, never a rename-of-existing-content, so it never hits the same wall - just needs enough
+178-second passes for ~1.5GB). **This still leaves `package-lock.json` stale**, since the copy
+never touched it - it was updated separately here with `npm install --package-lock-only` (run
+directly against the mount; a lockfile-only run never touches `node_modules` so the rename problem
+never applies) and verified with `npm ci --dry-run` before committing. Skipping that step is
+exactly what shipped once already and broke `npm ci` in CI - see the fix commit on
+`feat/push-notifications` (`ea56888`) for what that looked like from the outside.
+
 ---
 
 ## Sequencing

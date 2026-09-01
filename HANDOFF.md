@@ -4,7 +4,62 @@
 has not been verified. `DECISIONS.md` is *rules* — the settled calls and why. They change at
 different rates, which is why they are separate files.
 
-Last updated: 2026-08-26.
+Last updated: 2026-09-01.
+
+---
+
+### 2026-09-01: Step 8's mobile appointment screens + the reversed Firebase/image-upload/Square scope are built, synced to the real device, committed, and pushed - CI status not yet confirmed
+
+**Start here.** Everything below is done; the one open item is confirming CI is green on
+`feat/push-notifications` after the second fix commit, then merging. See DECISIONS.md X12/X13 for
+the architecture, DECISIONS.md's Process section (PR2) for the device-sync mechanics, and
+PRODUCTION_ROADMAP.md Phase 5 item 8 for the full writeup - this entry is the short version.
+
+**What shipped:** the appointment/consult/project/session-detail screens (step 8's first concrete
+slice of the ~40-screen mobile port), plus - reversing X12's original deferral, per Danny's own
+explicit call mid-build - Firebase Storage sign-in, image upload/gallery on Project Detail, and
+Charge via Square on Session Detail + the consult-booking deposit flow. Full reasoning in X12/X13;
+this entry is about what happened getting it from "built and tested in a sandbox clone" to
+"live on Danny's machine, committed, pushed."
+
+**Three commits on `feat/push-notifications`, in order:**
+- `b008ffa` - the feature itself. Typechecked and Jest-passing (108/108) in the sandbox clone.
+- `ea56888` - fixes `package-lock.json`. The on-device dependency install used a workaround (see
+  next paragraph) that updates `node_modules` without ever touching the lockfile, so `b008ffa`
+  shipped with a stale one - broke CI's `npm ci` immediately (`EUSAGE`, "Missing: firebase@12.18.0
+  from lock file" and ~60 similar lines for every new transitive dependency). Fixed with
+  `npm install --package-lock-only` (updates the lockfile only, never touches `node_modules`, so
+  none of the below applies to it) and verified with `npm ci --dry-run` before this push.
+- `c6b3284` - an unrelated pre-existing flaky test, surfaced by the same CI run, fixed per Danny's
+  explicit go-ahead (asked first, since it's outside this PR's mobile-only scope) rather than
+  deferred, since it was the only thing left blocking green. `RemindersPanel.test.jsx`'s hydration
+  test checked a MUI Switch's checked state with a synchronous `getByRole` right after an awaited
+  `findByRole` for the heading - the Switch's `checked` prop commits a render later than the
+  heading (the component hydrates `emailEnabled`/`smsEnabled` from a `useEffect`, not the initial
+  render), so the assertion could observe it before that commit landed. Confirmed unrelated to this
+  branch: the affected files were last touched in the already-merged PR #9. Fixed by awaiting that
+  assertion too (`findByRole`), matching the file's own style elsewhere; verified with 4 consecutive
+  clean on-device `vitest` runs of the file before committing.
+
+**What's NOT yet confirmed: whether CI passed after `c6b3284`, and whether the PR has been merged.**
+Danny pushed after each fix; the actual CI result of the third push was never reported back into
+this session. That's the first thing to check picking this back up - `gh pr checks` /
+`gh pr view --json mergeable,statusCheckRollup` on `feat/push-notifications` (no `gh` on the
+connected device as of this session - check the sandbox or ask Danny) or just asking Danny directly.
+If it's green and merged, move on to whatever's next in Suggested sequencing. If it's still red,
+the failure log is the fastest way back into whatever's actually wrong - paste it rather than
+re-deriving state from the repo.
+
+**A real environment finding worth knowing before it costs another round of `ENOTEMPTY` debugging:
+`npm install`/`npm ci` must never run directly against the connected-folder mount.** It's a FUSE
+bridge to the real filesystem and doesn't reliably support the atomic rename-of-non-empty-directory
+npm's install strategy depends on - not corruption, a real capability gap, confirmed by watching it
+fail on completely unrelated already-installed packages, not just the new ones. Full writeup and
+the fix (install in a local mirror off the mount, `rsync` the result in, `--package-lock-only`
+separately since a copy never touches the lockfile) is DECISIONS.md's Process section, PR2. Budget
+real wall-clock for this next time - the on-device sync+install+verify step alone took the better
+part of this session, almost entirely `rsync` copying ~1.5GB across many 178-second command
+windows, not application logic.
 
 ---
 

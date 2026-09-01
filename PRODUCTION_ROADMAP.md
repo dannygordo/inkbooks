@@ -878,17 +878,35 @@ section completes it and fixes the build order into a walking-skeleton-first seq
      `utils/restApi.ts` (`restApiUrl`/`getAccessToken`, for the plain Express `square/config`/
      `square/process-payment` routes GraphQL codegen doesn't cover).
 
-   **Verified:** `packages/api` and `apps/mobile` both typecheck clean; the full `apps/mobile`
-   Jest suite passes (108/108, no regressions - the prior 86 plus 22 new cases across
-   `imagePath`/`timeAgo`/`projectImages`/`restApi`/2 new Firebase-sign-in cases in `auth.test.tsx`).
-   Not yet run for real: this sandbox's `expo lint`/`expo install` both need network access this
-   sandbox's egress policy blocks for `react-native-directory`/ESLint auto-config specifically
-   (`HTTP Proxy Network Error: Forbidden`) - worked around by resolving `expo-image-picker`/
-   `react-native-webview`'s exact Expo-SDK-57-compatible versions from Expo's own published SDK
-   docs instead of `npx expo install`, and by no ESLint config existing anywhere in this repo yet
-   (noted already in Phase 6's CI section - not a regression this pass introduced). These new
-   files have been typechecked and tested, not linted. The server-side and web suites were not
-   touched or re-run - no files outside `apps/mobile`/`packages/api` changed in this pass.
+   **Verified, twice - once in a sandbox clone, once for real on Danny's own machine.**
+   `packages/api` and `apps/mobile` both typecheck clean and the full `apps/mobile` Jest suite
+   passes (108/108, no regressions) in BOTH places. The sandbox clone pass came first; the on-device
+   pass (synced via `SendUserFile`/`device_commit_files`, MD5-verified file-for-file) is the one
+   that actually matters, and is where the dependency install itself needed a real workaround - see
+   DECISIONS.md PR2 for the connected-folder-mount `ENOTEMPTY` issue and its fix (install in a local
+   mirror off the mount, `rsync` the result in). Not yet run for real: this sandbox's `expo lint`/
+   `expo install` both need network access this sandbox's egress policy blocks for
+   `react-native-directory`/ESLint auto-config specifically (`HTTP Proxy Network Error: Forbidden`)
+   - worked around by resolving `expo-image-picker`/`react-native-webview`'s exact
+   Expo-SDK-57-compatible versions from Expo's own published SDK docs instead of `npx expo install`,
+   and by no ESLint config existing anywhere in this repo yet (noted already in Phase 6's CI section
+   - not a regression this pass introduced). These new files have been typechecked and tested, not
+   linted.
+
+   **Committed as three commits on `feat/push-notifications`, pushed by Danny 2026-09-01:**
+   `b008ffa` (the feature itself, above), `ea56888` (fixes `package-lock.json`, which the
+   `rsync`-based device install never touched and which shipped stale in `b008ffa` - broke CI's
+   `npm ci` with a "Missing: firebase@12.18.0 from lock file" EUSAGE error; regenerated with
+   `npm install --package-lock-only` and verified with `npm ci --dry-run` before this second push),
+   and `c6b3284` (an unrelated pre-existing flaky test CI then surfaced -
+   `RemindersPanel.test.jsx`'s hydration test asserted a MUI Switch's checked state with a
+   synchronous `getByRole` immediately after an awaited `findByRole` for the heading; the Switch
+   commits its `checked` prop a render later than the heading, so the assertion could observe it
+   pre-hydration under CI's timing. Confirmed unrelated to this branch's mobile work - the affected
+   files were last touched in the already-merged PR #9 - and fixed per Danny's explicit go-ahead to
+   keep it in this PR rather than deferring, since it was the only thing left blocking CI green).
+   **Not yet confirmed: whether CI is green after `c6b3284`, and whether the PR has been merged** -
+   that's the next thing to check from here, before touching anything else in this step.
 
    Work continues to the rest of the ~40-screen list from here (Settings/avatar upload, Messages,
    the client dashboard's shared-images panel, and everything else not yet ported all remain
