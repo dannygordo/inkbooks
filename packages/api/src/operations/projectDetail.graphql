@@ -1,0 +1,147 @@
+# Mobile's own narrower sibling of getProject.graphql/updateProject.graphql - deliberately NOT
+# reusing those. Web's versions also carry conversation.messages, because Project.jsx renders
+# IBChatBox against it; mobile still doesn't (messaging was never part of any port's scope) - see
+# DECISIONS.md's X13 entry for why the three IBImage arrays below WERE added back, reversing the
+# original step-8 deferral (X12) once image upload became an explicit requirement.
+#
+# ProjectImageFields is shared between the query and the mutation's return selection on purpose:
+# ImagesUpload.tsx/ImagesGallery.tsx and every mutation that touches one image array
+# (ImagesUploadList's batch-complete save, ImagesGallery's delete) use the SAME
+# useUpdateProjectDetailMutation hook, so its response has to carry the field back in the same
+# shape the query fetched it in for Apollo's normalized cache to merge it with no manual refetch -
+# see utils/sessionRate.ts-adjacent screens' own "Apollo-normalized-cache-driven" convention
+# (DECISIONS.md X12).
+fragment ProjectImageFields on IBImage {
+  id
+  url
+  title
+  uploadedByDisplayName
+  userId
+  userInfo {
+    firstName
+    lastName
+    avatar
+  }
+  avatar
+  tags
+  createdAt
+  updatedAt
+}
+
+query GetProjectDetail($projectId: ID!) {
+  getProject(projectId: $projectId) {
+    id
+    title
+    description
+    placement
+    size
+    palette
+    artistId
+    # Needed for the Sessions sub-list's "Add Session" (shopId comes from the PROJECT's artist,
+    # not the viewer - a shop admin adding a session to someone else's project needs that
+    # artist's own shop, see ProjectSessionsList.jsx's own comment), for Session Detail's rate
+    # calc (utils/sessionRate.ts's getEffectiveRate), and now for image upload's Firebase Storage
+    # path (ImagesUpload.tsx builds `${shop?.id ?? 'independent'}/${artistId}/${project.id}/${title}`,
+    # mirroring IBProgressItemProject.jsx) - all read directly off this, not a second query, since
+    # a project's artist/shop billing info doesn't change while this screen is open.
+    artist {
+      id
+      billingType
+      hourlyRate
+      flatRate
+      shop {
+        id
+        billingType
+        hourlyRate
+        flatRate
+      }
+    }
+    clientId
+    client {
+      id
+      firstName
+      lastName
+    }
+    tags
+    notes {
+      id
+      author
+      note
+      createdAt
+      updatedAt
+    }
+    status
+    depositCollectedCents
+    depositAvailableCents
+    deposits {
+      id
+      depositCents
+      depositPaymentMethod
+      depositCollectedAt
+    }
+    consultAppointment {
+      id
+      depositCents
+      depositStatus
+      depositPaymentMethod
+      depositCollectedAt
+    }
+    referenceImages {
+      ...ProjectImageFields
+    }
+    designImages {
+      ...ProjectImageFields
+    }
+    bodyImages {
+      ...ProjectImageFields
+    }
+  }
+}
+
+# Same field selection as the query above, minus client/deposits/consultAppointment (all
+# server-resolved/read-only - see typeDefs.js's Project.consultAppointment/deposits comments -
+# never sent as part of a save and re-read via GetProjectDetail's own cache entry after a mutation
+# response merges by id, same as every other Apollo-normalized write in this app).
+#
+# Every caller of this mutation sends ONLY the required ProjectInput scalars
+# (id/title/description/clientId/artistId/status) plus the ONE field it actually changed -
+# mirroring apps/web's handleProjectReferencesUpdate/handleProjectDesignsUpdate/
+# handleProjectBodyImagesUpdate (Project.jsx), not its IBProgressListProject.jsx upload-batch
+# handler, which redundantly echoes all three image arrays plus notes/palette/tags every time.
+# Both work - server/graphql/mutations/projects.js's updateProject resolver calls
+# Project.findByIdAndUpdate with a plain object, which Mongoose auto-wraps in $set, so a field
+# left out of the input is left untouched, never nulled (DECISIONS.md X12) - but sending only what
+# changed is simpler and cheaper, so mobile standardizes on it everywhere rather than copying
+# web's inconsistency between handlers.
+mutation UpdateProjectDetail($project: ProjectInput) {
+  updateProject(project: $project) {
+    id
+    title
+    description
+    placement
+    size
+    palette
+    artistId
+    clientId
+    tags
+    notes {
+      id
+      author
+      note
+      createdAt
+      updatedAt
+    }
+    status
+    depositCollectedCents
+    depositAvailableCents
+    referenceImages {
+      ...ProjectImageFields
+    }
+    designImages {
+      ...ProjectImageFields
+    }
+    bodyImages {
+      ...ProjectImageFields
+    }
+  }
+}

@@ -76,7 +76,11 @@ describe("once settings have loaded", () => {
 		// MUI's Switch renders its underlying <input> with role="switch" (confirmed against this
 		// test's own printed accessible-roles dump), not "checkbox" - matching this codebase's
 		// other MUI Switch tests (see AutoResponsesPanel.test.jsx).
-		expect(screen.getByRole("switch", { name: "Email reminders" })).toBeChecked();
+		// The heading commits on Apollo's data-arrival render, but MUI's Switch commits its
+		// `checked` prop to the underlying <input> a tick later (its own internal re-render) - an
+		// unawaited getByRole right after the heading could observe the input before that commit.
+		// findByRole (awaited) settles on the first one; by then the second has settled too.
+		expect(await screen.findByRole("switch", { name: "Email reminders" })).toBeChecked();
 		expect(screen.getByRole("switch", { name: "Text reminders" })).not.toBeChecked();
 	});
 

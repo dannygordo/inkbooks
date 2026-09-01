@@ -1,0 +1,15 @@
+# Needed for SessionDetail's effective-rate calculation (apps/mobile/src/utils/sessionRate.ts's
+# getEffectiveRate, ported from apps/web/src/utils/sessionRate.js) - specifically rateSource,
+# which decides whether a shop-connected artist's sessions bill against the shop's rate or their
+# own. GetProject already selects artist.hourlyRate/flatRate/billingType and
+# artist.shop.hourlyRate/flatRate/billingType, so this query exists only to supply the one field
+# neither of those carries.
+query GetArtistShopConnections($artistId: ID!) {
+	getArtistShopConnections(artistId: $artistId) {
+		id
+		artistId
+		shopId
+		status
+		rateSource
+	}
+}

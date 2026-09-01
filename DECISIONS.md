@@ -1136,15 +1136,234 @@ register regardless.
 
 Not done, and deliberately out of scope for this phase: a notification-tap deep link (opening the
 appointment/message the push was about, rather than just the app) - `data` is already attached to
-every outgoing message for this to build on later, but nothing yet reads it on the client. Also
-not done: the server-side `mongodb-memory-server`-backed Vitest run for
-`test/unit/push.test.js`/`test/integration/pushNotifications.test.js` - this session's cloud
-sandbox has that binary's download blocked by network policy, so both files were verified instead
-via standalone Node scripts exercising the real modules with hand-built mocks, and via a real
-`ApolloServer(...).start()` confirming the full schema (including the two new mutations) builds.
-Neither file has been run through the real suite yet; that should happen on the first machine that
-can reach `fastdl.mongodb.org` before this step is called fully proven, the same bar X9's own note
-on the mobile appointments screen already set for Simulator-only testing.
+every outgoing message for this to build on later, but nothing yet reads it on the client.
+
+The server-side `mongodb-memory-server`-backed Vitest run for
+`test/unit/push.test.js`/`test/integration/pushNotifications.test.js` could not be done inside the
+cloud sandbox that authored this phase (that binary's download is blocked there by network policy
+- both files were verified instead via standalone Node scripts exercising the real modules with
+hand-built mocks, and via a real `ApolloServer(...).start()` confirming the full schema, including
+the two new mutations, builds), but IS done now: run for real on Danny's own machine
+(2026-08-30) and passing, closing the one gap this entry originally flagged.
+
+---
+
+### X12. Mobile's appointment-opening screens are full parity on money/timer/deposit/booking logic, with Square charging and image upload deliberately deferred - not stubbed
+
+PRODUCTION_ROADMAP.md's Phase 5 step 8: the mobile appointments list's row tap now opens the same
+three destinations `AppointmentsList.jsx`'s `openAppointment()` branches to on web - a personal
+entry's quick edit/delete (`app/appointment/[id].tsx`), a consult's detail + convert-to-session
+(`app/consult/[id].tsx`), and a session's Project, including its Sessions sub-list and the Session
+Detail screen the sub-list drills into (`app/project/[id].tsx`, `components/ProjectSessionsList`,
+`app/session/[id].tsx`). Scope was chosen deliberately, not defaulted into: all three destinations,
+built as one slice and shipped as one PR, per Danny's own call rather than a per-screen check-in
+cadence.
+
+**Charge via Square and image upload are both omitted entirely, not stubbed/grayed-out.** Neither
+has the infrastructure mobile would need - a Square React Native SDK for the former, Firebase
+Storage (X8 already keeps Firebase sign-in web-only for exactly this reason) for the latter - and
+building either was a separate infra project outside this slice's scope, Danny's own call when
+asked. Session Detail's port (`components/SessionDetailForm.tsx`) has no "Charge via Square"
+button and no `IBSquarePaymentForm` at all; Consult/Project have no reference/design/body image
+upload or gallery. Everything a card charge or an image upload would otherwise gate - the
+tax/fee/total quote preview, the deposit-apply flow, adjustments, notes, tags - is full parity
+regardless, since none of it actually depends on either missing piece.
+
+**Consult-to-session conversion is cash-only**, ported from `BookSessionDatesForm.jsx` into
+`components/BookSessionDatesForm.tsx` with the entire Square branch removed: no
+`pendingCardDeposit` state, no payment-method `ToggleButtonGroup` (there is only one method, so
+there is nothing to toggle), no `IBSquarePaymentForm`. The deposit field's label says "cash only"
+rather than defaulting silently to one option a shop might expect a choice about. Mechanically
+unchanged otherwise: the first sitting always goes through `convertBookingRequest` (the only call
+that creates the Project from the BookingRequest's own intake fields), every additional sitting is
+a plain `createAppointment` against the resulting `projectId`, and a cash deposit - when given - is
+recorded after the booking succeeds, against the *consult* appointment, never rolling back the
+booking on a deposit-record failure. Same reasoning as X8's Square deferral: this is the same
+missing infrastructure, not a second decision.
+
+**The per-sitting `DaySchedule` conflict-check panel (web's "what's already on the books that
+day" hint) is left out of the mobile booking form - a documented v1 simplification, not a silent
+one.** Web's version issues a live query per row as dates/durations change; porting it well needs
+its own mobile-sized presentation (nothing on mobile shows a day's schedule as a strip yet), and
+the booking flow works correctly without it - an artist can already see their own day on the main
+appointments list before opening a consult. Add it back as its own follow-up, not bundled into a
+form that already does five other things.
+
+**Two narrower GraphQL operations exist purely for the mobile Project screen -
+`GetProjectDetail`/`UpdateProjectDetail` (`packages/api/src/operations/projectDetail.graphql`) -
+deliberately not reusing web's `getProject`/`updateProject`.** Web's versions carry
+`conversation.messages` and all three `IBImage` arrays, because `Project.jsx` renders `IBChatBox`
+and `IBImagesUpload`/`IBImagesList` against them; this port renders neither (messaging was never
+in this slice's scope at all, images are the same deferred infra as above). Selecting those fields
+anyway would mean every open of this screen pulls a full chat history and every image's metadata
+over a mobile connection to display none of it - the same "don't pay for what you don't render"
+reasoning `sessionDetail.graphql`'s narrower selection already applies next to
+`appointmentDetail.graphql`'s full `UpdateAppointment`.
+
+**Every `updateProject`/`updateAppointment` call from mobile echoes back only the required fields
+plus whichever one field actually changed - never `referenceImages`/`bodyImages`/`designImages`/
+`materialsUsed`, which this port never fetches at all.** This is safe, not an oversight: both
+resolvers call Mongoose's `findByIdAndUpdate` with a plain object with no `$`-prefixed keys, which
+Mongoose wraps in `$set` automatically - an omitted key is left untouched, not nulled out. Web's
+own `handleDetailFieldBlur`/`handleNotesUpdate`/`handleTagsUpdate` already rely on this same
+behavior for the same reason (none of them send the image arrays either); this port's leaner
+queries just make that pre-existing assumption explicit instead of accidental.
+
+**A client-generated Mongo-style id for a new `IBNote`, without adding `bson` as a mobile
+dependency.** Web's `handleNotesUpdate` calls `new ObjectID()` (the `bson` package) to give a new
+note a client-side id before the save round-trip, matching a server that remaps `IBNoteInput.id`
+straight onto the subdocument's real `_id` (`server/graphql/mutations/projects.js`'s
+`remapIdToMongoId`) - Mongoose casts that to `mongoose.Schema.Types.ObjectId`, which only requires
+12 bytes of valid hex, not `bson`'s specific timestamp/counter encoding. `bson` itself is a
+Node/`Buffer`-oriented package with no React Native build. `apps/mobile/src/utils/objectId.ts`'s
+`generateObjectId()` produces a random 24-hex-character string instead - satisfies the same
+Mongoose cast, adds no dependency, one field.
+
+**Timer/save/close/deposit-apply mutations are read back through Apollo's normalized cache rather
+than a manually-mirrored local `appointment` state.** Web's `SessionDetail.jsx` keeps its own
+`useState(initialAppointment)` and merges every mutation response into it by hand - necessary
+there because `appointment` arrives as a prop passed into a global modal, with no query of its own
+in that component. `components/SessionDetailForm.tsx` instead receives `appointment` sourced from
+its parent's own live `GetAppointmentsByProject` query; every timer/save/close/applyDeposit
+mutation here returns Appointment-shaped fields with a matching `id`, which Apollo's cache
+normalizes and merges into that already-mounted query on its own, re-rendering this component with
+the fresh value without any manual merge step. The one exception is `recordAdjustment`, whose
+response is a single new `Adjustment` with nothing for normalized cache to append it to (Apollo
+has no way to know it belongs on this Appointment's `adjustments` array) - that handler explicitly
+calls `refetchSessions()` afterward instead, the same refetch-based pattern this port already uses
+for Add Deposit and Add Session elsewhere on the Project screen.
+
+### X13. X12's deferred Square charging and image upload are now built - Firebase Storage sign-in ported to mobile, Square charge ported via a WebView, both scoped to the three screens X12 already shipped
+
+Reverses X12's (and X8's) deferral: Danny's own call, made explicitly after X12 shipped -
+"image upload is an absolute requirement, firebase storage sign-in is a must," with Square
+charging confirmed in scope too when asked directly. Held X12's already-verified, already-tested
+PR rather than shipping it first, per Danny's own choice, and added this work onto the same
+branch/PR instead of a follow-up.
+
+**Scope stayed bounded to what X12's three screens actually needed, not "port the entire web
+app."** "All functionality of the web app is required" is, read literally, a much bigger claim
+than image upload + Square charge - it would also reach Settings' avatar upload
+(`AccountPanel.jsx`'s plain `IBUploadFile.js`, no progress bar, a different screen mobile doesn't
+have at all yet), the whole Messages/`IBChatBox` thread (Firestore-backed, never scoped into any
+mobile port so far), the client-dashboard shared-images panel, and every other web page not yet
+ported to mobile. Confirmed directly rather than assumed: asked whether "all functionality" reached
+Square charging specifically (yes) and whether Firebase sign-in should port `auth.jsx`'s flow
+as-is (yes) - not asked, and so not read as in scope, is anything belonging to a screen this port
+has never touched. Avatar upload, Messages, and the rest of the web app remain tracked as future
+work, the same status X12 already left every other unported screen in.
+
+**Firebase: the plain `firebase` JS SDK, not `@react-native-firebase/*`.** Web already uses the JS
+SDK (`firebase/app`, `firebase/auth`, `firebase/storage`), and Expo's own docs confirm it needs no
+native linking or `metro.config.js` changes to work in RN - unlike `@react-native-firebase`, which
+requires linking native iOS/Android modules and would mean this port's first native rebuild, a
+different order of operation than everything verified so far (`npm install` + `tsc` + `jest`, no
+EAS/Xcode/Gradle step ever exercised in this environment). `apps/mobile/src/firebase/firebase.ts`
+mirrors `apps/web/src/firebase/firebase.js` minus `getAnalytics` (DOM-only, no RN equivalent, same
+test-mode-skip reasoning that file already documents for itself) and `getFirestore`/`db` (nothing
+in scope needs Firestore - Messages stays out, see above). Auth persistence uses
+`initializeAuth(app, { persistence: getReactNativePersistence(AsyncStorage) })`, the officially
+documented RN pattern (`expo.fyi/firebase-js-auth-setup`) - plain `getAuth()` would silently fall
+back to in-memory persistence and sign every user out on every cold start.
+`getReactNativePersistence` needs a `// @ts-expect-error` at its import: the `firebase` wrapper
+package's own published `.d.ts` for the `firebase/auth` subpath doesn't forward the `"react-native"`
+package.json export condition the way `@firebase/auth` itself does, even though the *runtime* JS
+correctly resolves to the RN build via Metro's bundler-condition resolution (`customConditions:
+["react-native"]`, set in `expo/tsconfig.base.json`) - a long-standing upstream types-only gap
+(`firebase/firebase-js-sdk` issues #7584/#7615/#9316, still open), not an app bug, and the
+documented community workaround. `config.ts`'s `FIREBASE` object duplicates web's `config.js`
+values rather than importing them - same "two separate deployables sharing only `@inkbooks/api`"
+reasoning every other cross-cutting mobile constant already follows - with `EXPO_PUBLIC_FIREBASE_*`
+overrides for the same reason `apiUrl`/Sentry's `dsn` read `EXPO_PUBLIC_*` first.
+
+`login.graphql` now selects `firebaseToken` (X8 deliberately omitted it - "mobile doesn't sign
+into Firebase"); `auth.tsx` gained back exactly what X8 subtracted from `auth.jsx`: `firebaseUser`
+state, the `FIREBASE_LOGIN` action, `signInWithCustomToken`/`signOut` calls in `login()`/`logout()`,
+fire-and-forget in `login()` for the identical reason push registration already is there - a slow
+or failed Firebase handshake must never block the login screen, and app auth has already fully
+succeeded via `setSession` regardless of whether this succeeds.
+
+**Uploading a picked image needs one real RN-specific step web never had to think about: turning a
+local file URI into a `Blob`.** Web's `File` object (from `<input type=file>`) is already a `Blob`
+subclass `uploadBytesResumable` accepts directly; `expo-image-picker`'s `launchImageLibraryAsync`
+instead hands back a `file://`/`content://` URI - a path, not file data.
+`apps/mobile/src/firebase/uploadFile.ts` reads it with RN's documented `fetch(uri).then(r =>
+r.blob())` pattern before handing the Blob to `uploadBytesResumable`, otherwise a direct, corrected
+port of `IBUploadFileWithProgress.js` - **corrected** because that file's `upload.on("state_change",
+...)` is a typo (Firebase's real event name is `"state_changed"`; the mistyped version silently
+never fires progress callbacks) not worth reproducing. `deleteFile.ts` is a direct, uncorrected
+port of `IBDeleteFile.js`.
+
+**Image upload/gallery: two RN components (`ImagesUpload.tsx`, `ImagesGallery.tsx`) replace web's
+four-file split (`IBImagesUpload`/`IBImagesUploadForm`/`IBProgressListProject`/`IBProgressItemProject`
+plus `IBImagesList`/`IBImagesListOptions`).** Web's split exists to support reuse
+`IBImagesList`/`IBImagesListOptions` get elsewhere (the client-dashboard shared-images panel, with
+its own non-destructive delete) - mobile has no such second caller yet, so collapsing to two files
+matching web's own two-component boundary (upload vs. display) is simpler with nothing lost.
+`expo-image-picker`'s `launchImageLibraryAsync({ allowsMultipleSelection: true })` stands in for
+web's multi-file `<input>`; each picked image uploads with its own progress, and ONE
+`updateProjectDetail` call saves the merged array only once every image in the batch finishes -
+same batching web's `hasSubmittedBatch` ref exists to guarantee (an async mutation is a real side
+effect, so it can't fire directly from a state setter), done here with an equivalent ref.
+
+**No swipeable multi-image lightbox - a documented v1 simplification, not a silently dropped
+feature.** Web's `yet-another-react-lightbox` renders every image in a section as slides with
+next/prev navigation; `ImagesGallery.tsx`'s tap-to-open uses a plain RN `Modal` showing one image
+full-screen with Close/Delete. Viewing one image at a time and deleting it are the two things this
+list actually needs to do; add swipe-between if it's ever actually asked for.
+
+**Every image-array mutation (upload-batch-complete, delete) standardizes on the SAME leaner
+payload shape mobile already uses for Notes/Tags: the required `ProjectInput` scalars
+(`id`/`title`/`description`/`clientId`/`artistId`/`status`) plus the ONE image field that changed -
+not web's `IBProgressListProject.jsx`, which redundantly echoes all three image arrays plus notes/
+tags every time it saves.** Web itself is inconsistent between handlers here -
+`handleProjectReferencesUpdate`/`handleProjectDesignsUpdate`/`handleProjectBodyImagesUpdate`
+(`Project.jsx`, used by delete/tag-update) already send only the one changed field, while
+`IBProgressListProject.jsx`'s upload-batch handler sends all three arrays regardless. Both work,
+for the reason X12 already established (Mongoose's `$set`-auto-wrap leaves an omitted key
+untouched) - mobile just doesn't copy the more wasteful of the two, on both code paths. A shared
+`ProjectImageFields` GraphQL fragment (`projectDetail.graphql`) keeps `GetProjectDetail`'s fetch
+and `UpdateProjectDetail`'s echoed-back selection in exact sync, so Apollo's normalized cache
+merges every image-array mutation's response with no manual refetch - same "Apollo-normalized-
+cache-driven" convention X12 already established for Session Detail.
+
+**Square: a `WebView` hosting the same Web Payments SDK web uses, not Square's React Native "In-App
+Payments SDK."** That plugin exists and isn't formally deprecated, but it requires linking native
+iOS/Android modules - a full EAS/Xcode/Gradle build, the same category of infeasible-from-here
+problem the Firebase native-SDK path above was ruled out for, and not something verifiable end-to-
+end in an environment that has only ever run `npm install`/`tsc`/`jest` against this app.
+`components/SquarePaymentForm.tsx` instead renders a self-contained HTML string (Square's sandbox
+`square.js`, a card container, a Pay button, all inline - never fetched, never a bundled file) via
+`source={{ html }}`; on tap it calls `card.tokenize()` inside the WebView and posts the result back
+to RN with `window.ReactNativeWebView.postMessage`. This is a documented working pattern (confirmed
+via Square's own developer forum), with one real caveat: a WebView engine too old to parse ES2020
+(`??`) will fail to load the minified SDK - not a concern on anything Expo SDK 57 itself still
+supports. **The app's own bearer token never enters the WebView** - only Square's public
+`applicationId`/`locationId` (fetched from `GET square/config`, unauthenticated, same public-
+identifier reasoning `squareConfig.js` already documents) do. The actual authenticated POST to
+`POST square/process-payment` happens in RN after the WebView hands back a token, mirroring
+`IBSquarePaymentForm.jsx`'s `handlePay` field-for-field: same idempotency-key-per-mount (a
+`Math.random`-based fallback string, not `crypto.randomUUID` - RN's `crypto` global support is
+inconsistent across engines/versions, and this key only needs to be unique per mounted form, not a
+strict UUID), same request body, same "the server decides what the charge actually is" contract
+(`amountCents` is display-only everywhere on mobile too). `apps/mobile/src/utils/restApi.ts`'s
+`restApiUrl()` is a direct port of `apps/web/src/utils/apiUrl.js` - safe to reuse the existing
+`apiUrl` (apollo-client.ts) as the REST base because web's own `GRAPHQL_SERVER_URL` is already the
+bare host GraphQL is POSTed to at root, confirmed by reading `index.jsx`'s own httpLink setup
+before assuming it.
+
+**`chargeQuote.graphql` gained `canCharge`** (`ChargeQuote.canCharge: Boolean!`, already on the
+schema, never previously selected) so Session Detail's "Charge via Square" button can say "this
+shop/artist has no Square account connected" *before* the artist reaches for a card, matching
+`handleChargeViaSquare`'s own check - not discovered only after a failed charge attempt.
+`SessionDetailForm.tsx` gained the button (save-first-then-quote-then-render-`SquarePaymentForm`-
+in-a-`Modal`, disabled until there's a subtotal, exact mirror of web's own gating) and
+`BookSessionDatesForm.tsx` gained back the Cash/Card choice (`needsMethod`, no default
+preselected - a wrong answer accepted in a hurry is worse than an unanswered one) and the
+`pendingCardDeposit` post-booking branch, both removed by X12's cash-only scoping and now restored
+field-for-field against web's `ToggleButtonGroup`/`pendingCardDeposit` logic, including
+`recordDeposit`'s `pending: true` argument (`deposits.graphql` gained the `$pending` variable X12's
+own comment had explicitly left out).
 
 ---
 

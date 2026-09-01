@@ -1,0 +1,35 @@
+# The server-computed live preview AND the source of truth for what a session's tax/fees/total
+# actually are - the client never sums these components itself (see server/utils/charge-quote.js).
+# Called two ways from SessionDetail: debounced (400ms) as subtotal/tip/fee-offset change, for the
+# live preview only; and fresh/non-debounced right before Save, Close, or Charge via Square, whose
+# result is what's actually written - see UpdateSessionDetails in sessionDetail.graphql.
+# subtotalCentsOverride is PREVIEW-ONLY - the real charge route always reads the saved
+# subtotalCents instead. canCharge added for the Charge via Square button (DECISIONS.md X13) - the
+# UI needs to say the owner has no usable Square connection BEFORE the artist reaches for a card,
+# not after IBSquarePaymentForm's server-side charge attempt fails.
+query GetChargeQuote(
+	$appointmentId: ID!
+	$applyFeeOffset: Boolean
+	$tipCents: Int
+	$subtotalCentsOverride: Int
+) {
+	getChargeQuote(
+		appointmentId: $appointmentId
+		applyFeeOffset: $applyFeeOffset
+		tipCents: $tipCents
+		subtotalCentsOverride: $subtotalCentsOverride
+	) {
+		subtotalCents
+		depositCreditCents
+		netSubtotalCents
+		feeOffsetCents
+		taxableCents
+		taxCents
+		tipCents
+		totalCents
+		giftCardCents
+		amountDueCents
+		source
+		canCharge
+	}
+}

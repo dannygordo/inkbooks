@@ -2778,6 +2778,41 @@ export type UserUpdateInput = {
   userType?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type RecordAdjustmentMutationVariables = Exact<{
+  input: RecordAdjustmentInput;
+}>;
+
+
+export type RecordAdjustmentMutation = { __typename?: 'Mutation', recordAdjustment: { __typename?: 'Adjustment', id: string, appointmentId: string, amountCents: number, reason: string, createdByUserId: string, createdAt: string, createdBy?: { __typename?: 'User', id: string, firstName?: string | null, lastName?: string | null } | null } };
+
+export type GetAppointmentQueryVariables = Exact<{
+  appointmentId: Scalars['ID']['input'];
+}>;
+
+
+export type GetAppointmentQuery = { __typename?: 'Query', getAppointment?: { __typename?: 'Appointment', id: string, projectId?: string | null, userId?: string | null, shopId?: string | null, isPersonal: boolean, title?: string | null, description?: string | null, appointmentDate: string, durationMinutes: number, appointmentEnd: string, appointmentStatus: string, appointmentType: string, shopCutStatus: string, shopCutCents?: number | null, createdAt?: string | null, updatedAt?: string | null } | null };
+
+export type UpdateAppointmentMutationVariables = Exact<{
+  appointmentInput?: InputMaybe<AppointmentInput>;
+}>;
+
+
+export type UpdateAppointmentMutation = { __typename?: 'Mutation', updateAppointment?: { __typename?: 'Appointment', id: string, projectId?: string | null, userId?: string | null, shopId?: string | null, isPersonal: boolean, title?: string | null, description?: string | null, appointmentDate: string, durationMinutes: number, appointmentEnd: string, appointmentStatus: string, appointmentType: string, shopCutStatus: string, shopCutCents?: number | null, createdAt?: string | null, updatedAt?: string | null } | null };
+
+export type DeleteAppointmentMutationVariables = Exact<{
+  appointmentId?: InputMaybe<Scalars['ID']['input']>;
+}>;
+
+
+export type DeleteAppointmentMutation = { __typename?: 'Mutation', deleteAppointment?: string | null };
+
+export type CreateAppointmentMutationVariables = Exact<{
+  appointmentInput?: InputMaybe<AppointmentInput>;
+}>;
+
+
+export type CreateAppointmentMutation = { __typename?: 'Mutation', createAppointment?: { __typename?: 'Appointment', id: string, projectId?: string | null, userId?: string | null, shopId?: string | null, title?: string | null, appointmentType: string, appointmentDate: string, durationMinutes: number, appointmentEnd: string, appointmentStatus: string, shopCutStatus: string } | null };
+
 export type AppointmentListItemFragment = { __typename?: 'Appointment', id: string, projectId?: string | null, userId?: string | null, bookingRequestId?: string | null, shopId?: string | null, isPersonal: boolean, title?: string | null, description?: string | null, appointmentType: string, appointmentDate: string, durationMinutes: number, appointmentEnd: string, appointmentStatus: string, totalCents?: number | null, tipCents?: number | null, shopCutStatus: string, shopCutCents?: number | null, shopCutPaymentMethod?: string | null, shopCutSquareInvoiceId?: string | null, project?: { __typename?: 'Project', id: string, title: string, depositCollectedCents?: number | null, client?: { __typename?: 'Client', id: string, user?: { __typename?: 'User', id: string, firstName?: string | null, lastName?: string | null, avatar?: string | null } | null } | null } | null, bookingRequest?: { __typename?: 'BookingRequest', id: string, client?: { __typename?: 'Client', id: string, firstName: string, lastName: string } | null } | null, user?: { __typename?: 'User', id: string, tagColor?: string | null, firstName?: string | null, lastName?: string | null, avatar?: string | null } | null };
 
 export type GetAppointmentsByShopQueryVariables = Exact<{
@@ -2798,6 +2833,47 @@ export type GetAppointmentsByArtistQueryVariables = Exact<{
 
 export type GetAppointmentsByArtistQuery = { __typename?: 'Query', getAppointmentsByArtist: { __typename?: 'AppointmentPage', items: Array<{ __typename?: 'Appointment', id: string, projectId?: string | null, userId?: string | null, bookingRequestId?: string | null, shopId?: string | null, isPersonal: boolean, title?: string | null, description?: string | null, appointmentType: string, appointmentDate: string, durationMinutes: number, appointmentEnd: string, appointmentStatus: string, totalCents?: number | null, tipCents?: number | null, shopCutStatus: string, shopCutCents?: number | null, shopCutPaymentMethod?: string | null, shopCutSquareInvoiceId?: string | null, project?: { __typename?: 'Project', id: string, title: string, depositCollectedCents?: number | null, client?: { __typename?: 'Client', id: string, user?: { __typename?: 'User', id: string, firstName?: string | null, lastName?: string | null, avatar?: string | null } | null } | null } | null, bookingRequest?: { __typename?: 'BookingRequest', id: string, client?: { __typename?: 'Client', id: string, firstName: string, lastName: string } | null } | null, user?: { __typename?: 'User', id: string, tagColor?: string | null, firstName?: string | null, lastName?: string | null, avatar?: string | null } | null }>, pageInfo: { __typename?: 'PageInfo', totalCount: number, hasMore: boolean, limit: number, offset: number } } };
 
+export type GetAppointmentsByProjectQueryVariables = Exact<{
+  projectId: Scalars['ID']['input'];
+}>;
+
+
+export type GetAppointmentsByProjectQuery = { __typename?: 'Query', getAppointmentsByProject?: Array<{ __typename?: 'Appointment', id: string, projectId?: string | null, userId?: string | null, shopId?: string | null, title?: string | null, description?: string | null, appointmentType: string, appointmentDate: string, durationMinutes: number, appointmentEnd: string, appointmentStatus: string, subtotalCents?: number | null, taxCents?: number | null, feeCents?: number | null, tipCents?: number | null, totalCents?: number | null, shopCutCents?: number | null, shopCutStatus: string, shopCutPercentApplied?: number | null, depositCents?: number | null, depositStatus?: string | null, depositCreditCents?: number | null, depositCreditFromAppointmentId?: string | null, timerStatus?: string | null, timerStartedAt?: string | null, accumulatedSeconds?: number | null, sessionNotes?: string | null, adjustments: Array<{ __typename?: 'Adjustment', id: string, amountCents: number, reason: string, createdAt: string, createdBy?: { __typename?: 'User', id: string, firstName?: string | null, lastName?: string | null } | null }> } | null> | null };
+
+export type GetArtistShopConnectionsQueryVariables = Exact<{
+  artistId: Scalars['ID']['input'];
+}>;
+
+
+export type GetArtistShopConnectionsQuery = { __typename?: 'Query', getArtistShopConnections?: Array<{ __typename?: 'ArtistShopConnection', id: string, artistId: string, shopId: string, status: string, rateSource: string } | null> | null };
+
+export type GetChargeQuoteQueryVariables = Exact<{
+  appointmentId: Scalars['ID']['input'];
+  applyFeeOffset?: InputMaybe<Scalars['Boolean']['input']>;
+  tipCents?: InputMaybe<Scalars['Int']['input']>;
+  subtotalCentsOverride?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+
+export type GetChargeQuoteQuery = { __typename?: 'Query', getChargeQuote: { __typename?: 'ChargeQuote', subtotalCents: number, depositCreditCents: number, netSubtotalCents: number, feeOffsetCents: number, taxableCents: number, taxCents: number, tipCents: number, totalCents: number, giftCardCents: number, amountDueCents: number, source: string, canCharge: boolean } };
+
+export type GetConsultAppointmentQueryVariables = Exact<{
+  appointmentId: Scalars['ID']['input'];
+}>;
+
+
+export type GetConsultAppointmentQuery = { __typename?: 'Query', getAppointment?: { __typename?: 'Appointment', id: string, title?: string | null, appointmentType: string, appointmentDate: string, durationMinutes: number, appointmentStatus: string, projectId?: string | null, bookingRequestId?: string | null, bookingRequest?: { __typename?: 'BookingRequest', id: string, status: string, description: string, placement?: string | null, size?: string | null, budget?: string | null, isCoverUp?: boolean | null, referenceImages?: Array<string | null> | null, client?: { __typename?: 'Client', id: string, firstName: string, lastName: string, email: string, phone: string } | null } | null } | null };
+
+export type ConvertBookingRequestMutationVariables = Exact<{
+  bookingRequestId: Scalars['ID']['input'];
+  outcome: Scalars['String']['input'];
+  appointmentInput?: InputMaybe<AppointmentInput>;
+  projectTitle?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type ConvertBookingRequestMutation = { __typename?: 'Mutation', convertBookingRequest: { __typename?: 'BookingRequest', id: string, status: string, resultingAppointmentId?: string | null, resultingAppointment?: { __typename?: 'Appointment', id: string, projectId?: string | null } | null } };
+
 export type CreateProjectMutationVariables = Exact<{
   title: Scalars['String']['input'];
   description: Scalars['String']['input'];
@@ -2810,6 +2886,31 @@ export type CreateProjectMutationVariables = Exact<{
 
 
 export type CreateProjectMutation = { __typename?: 'Mutation', createProject: { __typename?: 'Project', id: string, title: string } };
+
+export type RecordDepositMutationVariables = Exact<{
+  appointmentId: Scalars['ID']['input'];
+  depositCents: Scalars['Int']['input'];
+  paymentMethod: Scalars['String']['input'];
+  pending?: InputMaybe<Scalars['Boolean']['input']>;
+}>;
+
+
+export type RecordDepositMutation = { __typename?: 'Mutation', recordDeposit?: { __typename?: 'Appointment', id: string, depositCents?: number | null, depositStatus?: string | null, depositPaymentMethod?: string | null, depositCollectedAt?: string | null } | null };
+
+export type GetAvailableDepositsQueryVariables = Exact<{
+  appointmentId: Scalars['ID']['input'];
+}>;
+
+
+export type GetAvailableDepositsQuery = { __typename?: 'Query', getAvailableDeposits?: Array<{ __typename?: 'Appointment', id: string, depositCents?: number | null, appointmentDate: string, appointmentType: string } | null> | null };
+
+export type ApplyDepositMutationVariables = Exact<{
+  depositAppointmentId: Scalars['ID']['input'];
+  targetAppointmentId: Scalars['ID']['input'];
+}>;
+
+
+export type ApplyDepositMutation = { __typename?: 'Mutation', applyDeposit?: { __typename?: 'Appointment', id: string, depositCreditCents?: number | null, depositCreditFromAppointmentId?: string | null, subtotalCents?: number | null, totalCents?: number | null, shopCutCents?: number | null, shopCutPercentApplied?: number | null, shopCutStatus: string } | null };
 
 export type GetProjectQueryVariables = Exact<{
   projectId: Scalars['ID']['input'];
@@ -2845,7 +2946,23 @@ export type LoginMutationVariables = Exact<{
 }>;
 
 
-export type LoginMutation = { __typename?: 'Mutation', login: { __typename?: 'User', id: string, email: string, firstName?: string | null, lastName?: string | null, avatar?: string | null, role: number, userType: string, tagColor?: string | null, themePreference?: string | null, accessToken: string, userInfo?: { __typename?: 'Artist', id: string, firstName: string, lastName: string, avatar?: string | null, hourlyRate?: number | null, shop?: { __typename?: 'Shop', id: string, name: string } | null } | { __typename?: 'Client', id: string, firstName: string, lastName: string, avatar?: string | null } | { __typename?: 'Staff', id: string, firstName: string, lastName: string, avatar?: string | null, title?: string | null, shop?: { __typename?: 'Shop', id: string, name: string } | null } | null } };
+export type LoginMutation = { __typename?: 'Mutation', login: { __typename?: 'User', id: string, email: string, firstName?: string | null, lastName?: string | null, avatar?: string | null, role: number, userType: string, tagColor?: string | null, themePreference?: string | null, accessToken: string, firebaseToken?: string | null, userInfo?: { __typename?: 'Artist', id: string, firstName: string, lastName: string, avatar?: string | null, hourlyRate?: number | null, shop?: { __typename?: 'Shop', id: string, name: string } | null } | { __typename?: 'Client', id: string, firstName: string, lastName: string, avatar?: string | null } | { __typename?: 'Staff', id: string, firstName: string, lastName: string, avatar?: string | null, title?: string | null, shop?: { __typename?: 'Shop', id: string, name: string } | null } | null } };
+
+export type ProjectImageFieldsFragment = { __typename?: 'IBImage', id: string, url: string, title?: string | null, uploadedByDisplayName?: string | null, userId: string, avatar?: string | null, tags?: Array<string | null> | null, createdAt?: string | null, updatedAt?: string | null, userInfo?: { __typename?: 'User', firstName?: string | null, lastName?: string | null, avatar?: string | null } | null };
+
+export type GetProjectDetailQueryVariables = Exact<{
+  projectId: Scalars['ID']['input'];
+}>;
+
+
+export type GetProjectDetailQuery = { __typename?: 'Query', getProject?: { __typename?: 'Project', id: string, title: string, description: string, placement?: string | null, size?: string | null, palette?: string | null, artistId: string, clientId: string, tags?: Array<string | null> | null, status: string, depositCollectedCents?: number | null, depositAvailableCents?: number | null, artist?: { __typename?: 'Artist', id: string, billingType?: string | null, hourlyRate?: number | null, flatRate?: number | null, shop?: { __typename?: 'Shop', id: string, billingType?: string | null, hourlyRate?: number | null, flatRate?: number | null } | null } | null, client?: { __typename?: 'Client', id: string, firstName: string, lastName: string } | null, notes?: Array<{ __typename?: 'IBNote', id: string, author: string, note: string, createdAt?: string | null, updatedAt?: string | null } | null> | null, deposits?: Array<{ __typename?: 'Appointment', id: string, depositCents?: number | null, depositPaymentMethod?: string | null, depositCollectedAt?: string | null } | null> | null, consultAppointment?: { __typename?: 'Appointment', id: string, depositCents?: number | null, depositStatus?: string | null, depositPaymentMethod?: string | null, depositCollectedAt?: string | null } | null, referenceImages?: Array<{ __typename?: 'IBImage', id: string, url: string, title?: string | null, uploadedByDisplayName?: string | null, userId: string, avatar?: string | null, tags?: Array<string | null> | null, createdAt?: string | null, updatedAt?: string | null, userInfo?: { __typename?: 'User', firstName?: string | null, lastName?: string | null, avatar?: string | null } | null } | null> | null, designImages?: Array<{ __typename?: 'IBImage', id: string, url: string, title?: string | null, uploadedByDisplayName?: string | null, userId: string, avatar?: string | null, tags?: Array<string | null> | null, createdAt?: string | null, updatedAt?: string | null, userInfo?: { __typename?: 'User', firstName?: string | null, lastName?: string | null, avatar?: string | null } | null } | null> | null, bodyImages?: Array<{ __typename?: 'IBImage', id: string, url: string, title?: string | null, uploadedByDisplayName?: string | null, userId: string, avatar?: string | null, tags?: Array<string | null> | null, createdAt?: string | null, updatedAt?: string | null, userInfo?: { __typename?: 'User', firstName?: string | null, lastName?: string | null, avatar?: string | null } | null } | null> | null } | null };
+
+export type UpdateProjectDetailMutationVariables = Exact<{
+  project?: InputMaybe<ProjectInput>;
+}>;
+
+
+export type UpdateProjectDetailMutation = { __typename?: 'Mutation', updateProject?: { __typename?: 'Project', id: string, title: string, description: string, placement?: string | null, size?: string | null, palette?: string | null, artistId: string, clientId: string, tags?: Array<string | null> | null, status: string, depositCollectedCents?: number | null, depositAvailableCents?: number | null, notes?: Array<{ __typename?: 'IBNote', id: string, author: string, note: string, createdAt?: string | null, updatedAt?: string | null } | null> | null, referenceImages?: Array<{ __typename?: 'IBImage', id: string, url: string, title?: string | null, uploadedByDisplayName?: string | null, userId: string, avatar?: string | null, tags?: Array<string | null> | null, createdAt?: string | null, updatedAt?: string | null, userInfo?: { __typename?: 'User', firstName?: string | null, lastName?: string | null, avatar?: string | null } | null } | null> | null, designImages?: Array<{ __typename?: 'IBImage', id: string, url: string, title?: string | null, uploadedByDisplayName?: string | null, userId: string, avatar?: string | null, tags?: Array<string | null> | null, createdAt?: string | null, updatedAt?: string | null, userInfo?: { __typename?: 'User', firstName?: string | null, lastName?: string | null, avatar?: string | null } | null } | null> | null, bodyImages?: Array<{ __typename?: 'IBImage', id: string, url: string, title?: string | null, uploadedByDisplayName?: string | null, userId: string, avatar?: string | null, tags?: Array<string | null> | null, createdAt?: string | null, updatedAt?: string | null, userInfo?: { __typename?: 'User', firstName?: string | null, lastName?: string | null, avatar?: string | null } | null } | null> | null } | null };
 
 export type RegisterDeviceTokenMutationVariables = Exact<{
   token: Scalars['String']['input'];
@@ -2861,6 +2978,34 @@ export type UnregisterDeviceTokenMutationVariables = Exact<{
 
 
 export type UnregisterDeviceTokenMutation = { __typename?: 'Mutation', unregisterDeviceToken: boolean };
+
+export type UpdateSessionDetailsMutationVariables = Exact<{
+  appointmentInput?: InputMaybe<AppointmentInput>;
+}>;
+
+
+export type UpdateSessionDetailsMutation = { __typename?: 'Mutation', updateAppointment?: { __typename?: 'Appointment', id: string, appointmentDate: string, durationMinutes: number, appointmentEnd: string, subtotalCents?: number | null, taxCents?: number | null, feeCents?: number | null, tipCents?: number | null, totalCents?: number | null, shopCutCents?: number | null, shopCutStatus: string, shopCutPercentApplied?: number | null, sessionNotes?: string | null, appointmentStatus: string, depositCreditCents?: number | null, timerStatus?: string | null, timerStartedAt?: string | null, accumulatedSeconds?: number | null, adjustments: Array<{ __typename?: 'Adjustment', id: string, amountCents: number, reason: string, createdAt: string, createdBy?: { __typename?: 'User', id: string, firstName?: string | null, lastName?: string | null } | null }> } | null };
+
+export type StartSessionTimerMutationVariables = Exact<{
+  appointmentId: Scalars['ID']['input'];
+}>;
+
+
+export type StartSessionTimerMutation = { __typename?: 'Mutation', startSessionTimer: { __typename?: 'Appointment', id: string, timerStatus?: string | null, timerStartedAt?: string | null, accumulatedSeconds?: number | null } };
+
+export type StopSessionTimerMutationVariables = Exact<{
+  appointmentId: Scalars['ID']['input'];
+}>;
+
+
+export type StopSessionTimerMutation = { __typename?: 'Mutation', stopSessionTimer: { __typename?: 'Appointment', id: string, timerStatus?: string | null, timerStartedAt?: string | null, accumulatedSeconds?: number | null } };
+
+export type ResetSessionTimerMutationVariables = Exact<{
+  appointmentId: Scalars['ID']['input'];
+}>;
+
+
+export type ResetSessionTimerMutation = { __typename?: 'Mutation', resetSessionTimer: { __typename?: 'Appointment', id: string, timerStatus?: string | null, timerStartedAt?: string | null, accumulatedSeconds?: number | null } };
 
 export type UpdateProjectMutationVariables = Exact<{
   project?: InputMaybe<ProjectInput>;
@@ -2937,6 +3082,247 @@ export const AppointmentListItemFragmentDoc = gql`
   shopCutSquareInvoiceId
 }
     `;
+export const ProjectImageFieldsFragmentDoc = gql`
+    fragment ProjectImageFields on IBImage {
+  id
+  url
+  title
+  uploadedByDisplayName
+  userId
+  userInfo {
+    firstName
+    lastName
+    avatar
+  }
+  avatar
+  tags
+  createdAt
+  updatedAt
+}
+    `;
+export const RecordAdjustmentDocument = gql`
+    mutation RecordAdjustment($input: RecordAdjustmentInput!) {
+  recordAdjustment(input: $input) {
+    id
+    appointmentId
+    amountCents
+    reason
+    createdByUserId
+    createdBy {
+      id
+      firstName
+      lastName
+    }
+    createdAt
+  }
+}
+    `;
+export type RecordAdjustmentMutationFn = Apollo.MutationFunction<RecordAdjustmentMutation, RecordAdjustmentMutationVariables>;
+
+/**
+ * __useRecordAdjustmentMutation__
+ *
+ * To run a mutation, you first call `useRecordAdjustmentMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useRecordAdjustmentMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [recordAdjustmentMutation, { data, loading, error }] = useRecordAdjustmentMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useRecordAdjustmentMutation(baseOptions?: Apollo.MutationHookOptions<RecordAdjustmentMutation, RecordAdjustmentMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<RecordAdjustmentMutation, RecordAdjustmentMutationVariables>(RecordAdjustmentDocument, options);
+      }
+export type RecordAdjustmentMutationHookResult = ReturnType<typeof useRecordAdjustmentMutation>;
+export type RecordAdjustmentMutationResult = Apollo.MutationResult<RecordAdjustmentMutation>;
+export type RecordAdjustmentMutationOptions = Apollo.BaseMutationOptions<RecordAdjustmentMutation, RecordAdjustmentMutationVariables>;
+export const GetAppointmentDocument = gql`
+    query GetAppointment($appointmentId: ID!) {
+  getAppointment(appointmentId: $appointmentId) {
+    id
+    projectId
+    userId
+    shopId
+    isPersonal
+    title
+    description
+    appointmentDate
+    durationMinutes
+    appointmentEnd
+    appointmentStatus
+    appointmentType
+    shopCutStatus
+    shopCutCents
+    createdAt
+    updatedAt
+  }
+}
+    `;
+
+/**
+ * __useGetAppointmentQuery__
+ *
+ * To run a query within a React component, call `useGetAppointmentQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetAppointmentQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetAppointmentQuery({
+ *   variables: {
+ *      appointmentId: // value for 'appointmentId'
+ *   },
+ * });
+ */
+export function useGetAppointmentQuery(baseOptions: Apollo.QueryHookOptions<GetAppointmentQuery, GetAppointmentQueryVariables> & ({ variables: GetAppointmentQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetAppointmentQuery, GetAppointmentQueryVariables>(GetAppointmentDocument, options);
+      }
+export function useGetAppointmentLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetAppointmentQuery, GetAppointmentQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetAppointmentQuery, GetAppointmentQueryVariables>(GetAppointmentDocument, options);
+        }
+// @ts-ignore
+export function useGetAppointmentSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetAppointmentQuery, GetAppointmentQueryVariables>): Apollo.UseSuspenseQueryResult<GetAppointmentQuery, GetAppointmentQueryVariables>;
+export function useGetAppointmentSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetAppointmentQuery, GetAppointmentQueryVariables>): Apollo.UseSuspenseQueryResult<GetAppointmentQuery | undefined, GetAppointmentQueryVariables>;
+export function useGetAppointmentSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetAppointmentQuery, GetAppointmentQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetAppointmentQuery, GetAppointmentQueryVariables>(GetAppointmentDocument, options);
+        }
+export type GetAppointmentQueryHookResult = ReturnType<typeof useGetAppointmentQuery>;
+export type GetAppointmentLazyQueryHookResult = ReturnType<typeof useGetAppointmentLazyQuery>;
+export type GetAppointmentSuspenseQueryHookResult = ReturnType<typeof useGetAppointmentSuspenseQuery>;
+export type GetAppointmentQueryResult = Apollo.QueryResult<GetAppointmentQuery, GetAppointmentQueryVariables>;
+export const UpdateAppointmentDocument = gql`
+    mutation UpdateAppointment($appointmentInput: AppointmentInput) {
+  updateAppointment(appointmentInput: $appointmentInput) {
+    id
+    projectId
+    userId
+    shopId
+    isPersonal
+    title
+    description
+    appointmentDate
+    durationMinutes
+    appointmentEnd
+    appointmentStatus
+    appointmentType
+    shopCutStatus
+    shopCutCents
+    createdAt
+    updatedAt
+  }
+}
+    `;
+export type UpdateAppointmentMutationFn = Apollo.MutationFunction<UpdateAppointmentMutation, UpdateAppointmentMutationVariables>;
+
+/**
+ * __useUpdateAppointmentMutation__
+ *
+ * To run a mutation, you first call `useUpdateAppointmentMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateAppointmentMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateAppointmentMutation, { data, loading, error }] = useUpdateAppointmentMutation({
+ *   variables: {
+ *      appointmentInput: // value for 'appointmentInput'
+ *   },
+ * });
+ */
+export function useUpdateAppointmentMutation(baseOptions?: Apollo.MutationHookOptions<UpdateAppointmentMutation, UpdateAppointmentMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<UpdateAppointmentMutation, UpdateAppointmentMutationVariables>(UpdateAppointmentDocument, options);
+      }
+export type UpdateAppointmentMutationHookResult = ReturnType<typeof useUpdateAppointmentMutation>;
+export type UpdateAppointmentMutationResult = Apollo.MutationResult<UpdateAppointmentMutation>;
+export type UpdateAppointmentMutationOptions = Apollo.BaseMutationOptions<UpdateAppointmentMutation, UpdateAppointmentMutationVariables>;
+export const DeleteAppointmentDocument = gql`
+    mutation DeleteAppointment($appointmentId: ID) {
+  deleteAppointment(appointmentId: $appointmentId)
+}
+    `;
+export type DeleteAppointmentMutationFn = Apollo.MutationFunction<DeleteAppointmentMutation, DeleteAppointmentMutationVariables>;
+
+/**
+ * __useDeleteAppointmentMutation__
+ *
+ * To run a mutation, you first call `useDeleteAppointmentMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useDeleteAppointmentMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [deleteAppointmentMutation, { data, loading, error }] = useDeleteAppointmentMutation({
+ *   variables: {
+ *      appointmentId: // value for 'appointmentId'
+ *   },
+ * });
+ */
+export function useDeleteAppointmentMutation(baseOptions?: Apollo.MutationHookOptions<DeleteAppointmentMutation, DeleteAppointmentMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<DeleteAppointmentMutation, DeleteAppointmentMutationVariables>(DeleteAppointmentDocument, options);
+      }
+export type DeleteAppointmentMutationHookResult = ReturnType<typeof useDeleteAppointmentMutation>;
+export type DeleteAppointmentMutationResult = Apollo.MutationResult<DeleteAppointmentMutation>;
+export type DeleteAppointmentMutationOptions = Apollo.BaseMutationOptions<DeleteAppointmentMutation, DeleteAppointmentMutationVariables>;
+export const CreateAppointmentDocument = gql`
+    mutation CreateAppointment($appointmentInput: AppointmentInput) {
+  createAppointment(appointmentInput: $appointmentInput) {
+    id
+    projectId
+    userId
+    shopId
+    title
+    appointmentType
+    appointmentDate
+    durationMinutes
+    appointmentEnd
+    appointmentStatus
+    shopCutStatus
+  }
+}
+    `;
+export type CreateAppointmentMutationFn = Apollo.MutationFunction<CreateAppointmentMutation, CreateAppointmentMutationVariables>;
+
+/**
+ * __useCreateAppointmentMutation__
+ *
+ * To run a mutation, you first call `useCreateAppointmentMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCreateAppointmentMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [createAppointmentMutation, { data, loading, error }] = useCreateAppointmentMutation({
+ *   variables: {
+ *      appointmentInput: // value for 'appointmentInput'
+ *   },
+ * });
+ */
+export function useCreateAppointmentMutation(baseOptions?: Apollo.MutationHookOptions<CreateAppointmentMutation, CreateAppointmentMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<CreateAppointmentMutation, CreateAppointmentMutationVariables>(CreateAppointmentDocument, options);
+      }
+export type CreateAppointmentMutationHookResult = ReturnType<typeof useCreateAppointmentMutation>;
+export type CreateAppointmentMutationResult = Apollo.MutationResult<CreateAppointmentMutation>;
+export type CreateAppointmentMutationOptions = Apollo.BaseMutationOptions<CreateAppointmentMutation, CreateAppointmentMutationVariables>;
 export const GetAppointmentsByShopDocument = gql`
     query GetAppointmentsByShop($shopId: ID!, $filter: AppointmentFilter, $page: PageInput) {
   getAppointmentsByShop(shopId: $shopId, filter: $filter, page: $page) {
@@ -3043,6 +3429,309 @@ export type GetAppointmentsByArtistQueryHookResult = ReturnType<typeof useGetApp
 export type GetAppointmentsByArtistLazyQueryHookResult = ReturnType<typeof useGetAppointmentsByArtistLazyQuery>;
 export type GetAppointmentsByArtistSuspenseQueryHookResult = ReturnType<typeof useGetAppointmentsByArtistSuspenseQuery>;
 export type GetAppointmentsByArtistQueryResult = Apollo.QueryResult<GetAppointmentsByArtistQuery, GetAppointmentsByArtistQueryVariables>;
+export const GetAppointmentsByProjectDocument = gql`
+    query GetAppointmentsByProject($projectId: ID!) {
+  getAppointmentsByProject(projectId: $projectId) {
+    id
+    projectId
+    userId
+    shopId
+    title
+    description
+    appointmentType
+    appointmentDate
+    durationMinutes
+    appointmentEnd
+    appointmentStatus
+    subtotalCents
+    taxCents
+    feeCents
+    tipCents
+    totalCents
+    shopCutCents
+    shopCutStatus
+    shopCutPercentApplied
+    depositCents
+    depositStatus
+    depositCreditCents
+    depositCreditFromAppointmentId
+    timerStatus
+    timerStartedAt
+    accumulatedSeconds
+    sessionNotes
+    adjustments {
+      id
+      amountCents
+      reason
+      createdAt
+      createdBy {
+        id
+        firstName
+        lastName
+      }
+    }
+  }
+}
+    `;
+
+/**
+ * __useGetAppointmentsByProjectQuery__
+ *
+ * To run a query within a React component, call `useGetAppointmentsByProjectQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetAppointmentsByProjectQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetAppointmentsByProjectQuery({
+ *   variables: {
+ *      projectId: // value for 'projectId'
+ *   },
+ * });
+ */
+export function useGetAppointmentsByProjectQuery(baseOptions: Apollo.QueryHookOptions<GetAppointmentsByProjectQuery, GetAppointmentsByProjectQueryVariables> & ({ variables: GetAppointmentsByProjectQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetAppointmentsByProjectQuery, GetAppointmentsByProjectQueryVariables>(GetAppointmentsByProjectDocument, options);
+      }
+export function useGetAppointmentsByProjectLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetAppointmentsByProjectQuery, GetAppointmentsByProjectQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetAppointmentsByProjectQuery, GetAppointmentsByProjectQueryVariables>(GetAppointmentsByProjectDocument, options);
+        }
+// @ts-ignore
+export function useGetAppointmentsByProjectSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetAppointmentsByProjectQuery, GetAppointmentsByProjectQueryVariables>): Apollo.UseSuspenseQueryResult<GetAppointmentsByProjectQuery, GetAppointmentsByProjectQueryVariables>;
+export function useGetAppointmentsByProjectSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetAppointmentsByProjectQuery, GetAppointmentsByProjectQueryVariables>): Apollo.UseSuspenseQueryResult<GetAppointmentsByProjectQuery | undefined, GetAppointmentsByProjectQueryVariables>;
+export function useGetAppointmentsByProjectSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetAppointmentsByProjectQuery, GetAppointmentsByProjectQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetAppointmentsByProjectQuery, GetAppointmentsByProjectQueryVariables>(GetAppointmentsByProjectDocument, options);
+        }
+export type GetAppointmentsByProjectQueryHookResult = ReturnType<typeof useGetAppointmentsByProjectQuery>;
+export type GetAppointmentsByProjectLazyQueryHookResult = ReturnType<typeof useGetAppointmentsByProjectLazyQuery>;
+export type GetAppointmentsByProjectSuspenseQueryHookResult = ReturnType<typeof useGetAppointmentsByProjectSuspenseQuery>;
+export type GetAppointmentsByProjectQueryResult = Apollo.QueryResult<GetAppointmentsByProjectQuery, GetAppointmentsByProjectQueryVariables>;
+export const GetArtistShopConnectionsDocument = gql`
+    query GetArtistShopConnections($artistId: ID!) {
+  getArtistShopConnections(artistId: $artistId) {
+    id
+    artistId
+    shopId
+    status
+    rateSource
+  }
+}
+    `;
+
+/**
+ * __useGetArtistShopConnectionsQuery__
+ *
+ * To run a query within a React component, call `useGetArtistShopConnectionsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetArtistShopConnectionsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetArtistShopConnectionsQuery({
+ *   variables: {
+ *      artistId: // value for 'artistId'
+ *   },
+ * });
+ */
+export function useGetArtistShopConnectionsQuery(baseOptions: Apollo.QueryHookOptions<GetArtistShopConnectionsQuery, GetArtistShopConnectionsQueryVariables> & ({ variables: GetArtistShopConnectionsQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetArtistShopConnectionsQuery, GetArtistShopConnectionsQueryVariables>(GetArtistShopConnectionsDocument, options);
+      }
+export function useGetArtistShopConnectionsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetArtistShopConnectionsQuery, GetArtistShopConnectionsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetArtistShopConnectionsQuery, GetArtistShopConnectionsQueryVariables>(GetArtistShopConnectionsDocument, options);
+        }
+// @ts-ignore
+export function useGetArtistShopConnectionsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetArtistShopConnectionsQuery, GetArtistShopConnectionsQueryVariables>): Apollo.UseSuspenseQueryResult<GetArtistShopConnectionsQuery, GetArtistShopConnectionsQueryVariables>;
+export function useGetArtistShopConnectionsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetArtistShopConnectionsQuery, GetArtistShopConnectionsQueryVariables>): Apollo.UseSuspenseQueryResult<GetArtistShopConnectionsQuery | undefined, GetArtistShopConnectionsQueryVariables>;
+export function useGetArtistShopConnectionsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetArtistShopConnectionsQuery, GetArtistShopConnectionsQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetArtistShopConnectionsQuery, GetArtistShopConnectionsQueryVariables>(GetArtistShopConnectionsDocument, options);
+        }
+export type GetArtistShopConnectionsQueryHookResult = ReturnType<typeof useGetArtistShopConnectionsQuery>;
+export type GetArtistShopConnectionsLazyQueryHookResult = ReturnType<typeof useGetArtistShopConnectionsLazyQuery>;
+export type GetArtistShopConnectionsSuspenseQueryHookResult = ReturnType<typeof useGetArtistShopConnectionsSuspenseQuery>;
+export type GetArtistShopConnectionsQueryResult = Apollo.QueryResult<GetArtistShopConnectionsQuery, GetArtistShopConnectionsQueryVariables>;
+export const GetChargeQuoteDocument = gql`
+    query GetChargeQuote($appointmentId: ID!, $applyFeeOffset: Boolean, $tipCents: Int, $subtotalCentsOverride: Int) {
+  getChargeQuote(
+    appointmentId: $appointmentId
+    applyFeeOffset: $applyFeeOffset
+    tipCents: $tipCents
+    subtotalCentsOverride: $subtotalCentsOverride
+  ) {
+    subtotalCents
+    depositCreditCents
+    netSubtotalCents
+    feeOffsetCents
+    taxableCents
+    taxCents
+    tipCents
+    totalCents
+    giftCardCents
+    amountDueCents
+    source
+    canCharge
+  }
+}
+    `;
+
+/**
+ * __useGetChargeQuoteQuery__
+ *
+ * To run a query within a React component, call `useGetChargeQuoteQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetChargeQuoteQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetChargeQuoteQuery({
+ *   variables: {
+ *      appointmentId: // value for 'appointmentId'
+ *      applyFeeOffset: // value for 'applyFeeOffset'
+ *      tipCents: // value for 'tipCents'
+ *      subtotalCentsOverride: // value for 'subtotalCentsOverride'
+ *   },
+ * });
+ */
+export function useGetChargeQuoteQuery(baseOptions: Apollo.QueryHookOptions<GetChargeQuoteQuery, GetChargeQuoteQueryVariables> & ({ variables: GetChargeQuoteQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetChargeQuoteQuery, GetChargeQuoteQueryVariables>(GetChargeQuoteDocument, options);
+      }
+export function useGetChargeQuoteLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetChargeQuoteQuery, GetChargeQuoteQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetChargeQuoteQuery, GetChargeQuoteQueryVariables>(GetChargeQuoteDocument, options);
+        }
+// @ts-ignore
+export function useGetChargeQuoteSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetChargeQuoteQuery, GetChargeQuoteQueryVariables>): Apollo.UseSuspenseQueryResult<GetChargeQuoteQuery, GetChargeQuoteQueryVariables>;
+export function useGetChargeQuoteSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetChargeQuoteQuery, GetChargeQuoteQueryVariables>): Apollo.UseSuspenseQueryResult<GetChargeQuoteQuery | undefined, GetChargeQuoteQueryVariables>;
+export function useGetChargeQuoteSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetChargeQuoteQuery, GetChargeQuoteQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetChargeQuoteQuery, GetChargeQuoteQueryVariables>(GetChargeQuoteDocument, options);
+        }
+export type GetChargeQuoteQueryHookResult = ReturnType<typeof useGetChargeQuoteQuery>;
+export type GetChargeQuoteLazyQueryHookResult = ReturnType<typeof useGetChargeQuoteLazyQuery>;
+export type GetChargeQuoteSuspenseQueryHookResult = ReturnType<typeof useGetChargeQuoteSuspenseQuery>;
+export type GetChargeQuoteQueryResult = Apollo.QueryResult<GetChargeQuoteQuery, GetChargeQuoteQueryVariables>;
+export const GetConsultAppointmentDocument = gql`
+    query GetConsultAppointment($appointmentId: ID!) {
+  getAppointment(appointmentId: $appointmentId) {
+    id
+    title
+    appointmentType
+    appointmentDate
+    durationMinutes
+    appointmentStatus
+    projectId
+    bookingRequestId
+    bookingRequest {
+      id
+      status
+      description
+      placement
+      size
+      budget
+      isCoverUp
+      referenceImages
+      client {
+        id
+        firstName
+        lastName
+        email
+        phone
+      }
+    }
+  }
+}
+    `;
+
+/**
+ * __useGetConsultAppointmentQuery__
+ *
+ * To run a query within a React component, call `useGetConsultAppointmentQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetConsultAppointmentQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetConsultAppointmentQuery({
+ *   variables: {
+ *      appointmentId: // value for 'appointmentId'
+ *   },
+ * });
+ */
+export function useGetConsultAppointmentQuery(baseOptions: Apollo.QueryHookOptions<GetConsultAppointmentQuery, GetConsultAppointmentQueryVariables> & ({ variables: GetConsultAppointmentQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetConsultAppointmentQuery, GetConsultAppointmentQueryVariables>(GetConsultAppointmentDocument, options);
+      }
+export function useGetConsultAppointmentLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetConsultAppointmentQuery, GetConsultAppointmentQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetConsultAppointmentQuery, GetConsultAppointmentQueryVariables>(GetConsultAppointmentDocument, options);
+        }
+// @ts-ignore
+export function useGetConsultAppointmentSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetConsultAppointmentQuery, GetConsultAppointmentQueryVariables>): Apollo.UseSuspenseQueryResult<GetConsultAppointmentQuery, GetConsultAppointmentQueryVariables>;
+export function useGetConsultAppointmentSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetConsultAppointmentQuery, GetConsultAppointmentQueryVariables>): Apollo.UseSuspenseQueryResult<GetConsultAppointmentQuery | undefined, GetConsultAppointmentQueryVariables>;
+export function useGetConsultAppointmentSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetConsultAppointmentQuery, GetConsultAppointmentQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetConsultAppointmentQuery, GetConsultAppointmentQueryVariables>(GetConsultAppointmentDocument, options);
+        }
+export type GetConsultAppointmentQueryHookResult = ReturnType<typeof useGetConsultAppointmentQuery>;
+export type GetConsultAppointmentLazyQueryHookResult = ReturnType<typeof useGetConsultAppointmentLazyQuery>;
+export type GetConsultAppointmentSuspenseQueryHookResult = ReturnType<typeof useGetConsultAppointmentSuspenseQuery>;
+export type GetConsultAppointmentQueryResult = Apollo.QueryResult<GetConsultAppointmentQuery, GetConsultAppointmentQueryVariables>;
+export const ConvertBookingRequestDocument = gql`
+    mutation ConvertBookingRequest($bookingRequestId: ID!, $outcome: String!, $appointmentInput: AppointmentInput, $projectTitle: String) {
+  convertBookingRequest(
+    bookingRequestId: $bookingRequestId
+    outcome: $outcome
+    appointmentInput: $appointmentInput
+    projectTitle: $projectTitle
+  ) {
+    id
+    status
+    resultingAppointmentId
+    resultingAppointment {
+      id
+      projectId
+    }
+  }
+}
+    `;
+export type ConvertBookingRequestMutationFn = Apollo.MutationFunction<ConvertBookingRequestMutation, ConvertBookingRequestMutationVariables>;
+
+/**
+ * __useConvertBookingRequestMutation__
+ *
+ * To run a mutation, you first call `useConvertBookingRequestMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useConvertBookingRequestMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [convertBookingRequestMutation, { data, loading, error }] = useConvertBookingRequestMutation({
+ *   variables: {
+ *      bookingRequestId: // value for 'bookingRequestId'
+ *      outcome: // value for 'outcome'
+ *      appointmentInput: // value for 'appointmentInput'
+ *      projectTitle: // value for 'projectTitle'
+ *   },
+ * });
+ */
+export function useConvertBookingRequestMutation(baseOptions?: Apollo.MutationHookOptions<ConvertBookingRequestMutation, ConvertBookingRequestMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<ConvertBookingRequestMutation, ConvertBookingRequestMutationVariables>(ConvertBookingRequestDocument, options);
+      }
+export type ConvertBookingRequestMutationHookResult = ReturnType<typeof useConvertBookingRequestMutation>;
+export type ConvertBookingRequestMutationResult = Apollo.MutationResult<ConvertBookingRequestMutation>;
+export type ConvertBookingRequestMutationOptions = Apollo.BaseMutationOptions<ConvertBookingRequestMutation, ConvertBookingRequestMutationVariables>;
 export const CreateProjectDocument = gql`
     mutation CreateProject($title: String!, $description: String!, $placement: String, $size: String, $artistId: ID!, $clientId: ID!, $status: String!) {
   createProject(
@@ -3091,6 +3780,141 @@ export function useCreateProjectMutation(baseOptions?: Apollo.MutationHookOption
 export type CreateProjectMutationHookResult = ReturnType<typeof useCreateProjectMutation>;
 export type CreateProjectMutationResult = Apollo.MutationResult<CreateProjectMutation>;
 export type CreateProjectMutationOptions = Apollo.BaseMutationOptions<CreateProjectMutation, CreateProjectMutationVariables>;
+export const RecordDepositDocument = gql`
+    mutation RecordDeposit($appointmentId: ID!, $depositCents: Int!, $paymentMethod: String!, $pending: Boolean) {
+  recordDeposit(
+    appointmentId: $appointmentId
+    depositCents: $depositCents
+    paymentMethod: $paymentMethod
+    pending: $pending
+  ) {
+    id
+    depositCents
+    depositStatus
+    depositPaymentMethod
+    depositCollectedAt
+  }
+}
+    `;
+export type RecordDepositMutationFn = Apollo.MutationFunction<RecordDepositMutation, RecordDepositMutationVariables>;
+
+/**
+ * __useRecordDepositMutation__
+ *
+ * To run a mutation, you first call `useRecordDepositMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useRecordDepositMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [recordDepositMutation, { data, loading, error }] = useRecordDepositMutation({
+ *   variables: {
+ *      appointmentId: // value for 'appointmentId'
+ *      depositCents: // value for 'depositCents'
+ *      paymentMethod: // value for 'paymentMethod'
+ *      pending: // value for 'pending'
+ *   },
+ * });
+ */
+export function useRecordDepositMutation(baseOptions?: Apollo.MutationHookOptions<RecordDepositMutation, RecordDepositMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<RecordDepositMutation, RecordDepositMutationVariables>(RecordDepositDocument, options);
+      }
+export type RecordDepositMutationHookResult = ReturnType<typeof useRecordDepositMutation>;
+export type RecordDepositMutationResult = Apollo.MutationResult<RecordDepositMutation>;
+export type RecordDepositMutationOptions = Apollo.BaseMutationOptions<RecordDepositMutation, RecordDepositMutationVariables>;
+export const GetAvailableDepositsDocument = gql`
+    query GetAvailableDeposits($appointmentId: ID!) {
+  getAvailableDeposits(appointmentId: $appointmentId) {
+    id
+    depositCents
+    appointmentDate
+    appointmentType
+  }
+}
+    `;
+
+/**
+ * __useGetAvailableDepositsQuery__
+ *
+ * To run a query within a React component, call `useGetAvailableDepositsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetAvailableDepositsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetAvailableDepositsQuery({
+ *   variables: {
+ *      appointmentId: // value for 'appointmentId'
+ *   },
+ * });
+ */
+export function useGetAvailableDepositsQuery(baseOptions: Apollo.QueryHookOptions<GetAvailableDepositsQuery, GetAvailableDepositsQueryVariables> & ({ variables: GetAvailableDepositsQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetAvailableDepositsQuery, GetAvailableDepositsQueryVariables>(GetAvailableDepositsDocument, options);
+      }
+export function useGetAvailableDepositsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetAvailableDepositsQuery, GetAvailableDepositsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetAvailableDepositsQuery, GetAvailableDepositsQueryVariables>(GetAvailableDepositsDocument, options);
+        }
+// @ts-ignore
+export function useGetAvailableDepositsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetAvailableDepositsQuery, GetAvailableDepositsQueryVariables>): Apollo.UseSuspenseQueryResult<GetAvailableDepositsQuery, GetAvailableDepositsQueryVariables>;
+export function useGetAvailableDepositsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetAvailableDepositsQuery, GetAvailableDepositsQueryVariables>): Apollo.UseSuspenseQueryResult<GetAvailableDepositsQuery | undefined, GetAvailableDepositsQueryVariables>;
+export function useGetAvailableDepositsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetAvailableDepositsQuery, GetAvailableDepositsQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetAvailableDepositsQuery, GetAvailableDepositsQueryVariables>(GetAvailableDepositsDocument, options);
+        }
+export type GetAvailableDepositsQueryHookResult = ReturnType<typeof useGetAvailableDepositsQuery>;
+export type GetAvailableDepositsLazyQueryHookResult = ReturnType<typeof useGetAvailableDepositsLazyQuery>;
+export type GetAvailableDepositsSuspenseQueryHookResult = ReturnType<typeof useGetAvailableDepositsSuspenseQuery>;
+export type GetAvailableDepositsQueryResult = Apollo.QueryResult<GetAvailableDepositsQuery, GetAvailableDepositsQueryVariables>;
+export const ApplyDepositDocument = gql`
+    mutation ApplyDeposit($depositAppointmentId: ID!, $targetAppointmentId: ID!) {
+  applyDeposit(
+    depositAppointmentId: $depositAppointmentId
+    targetAppointmentId: $targetAppointmentId
+  ) {
+    id
+    depositCreditCents
+    depositCreditFromAppointmentId
+    subtotalCents
+    totalCents
+    shopCutCents
+    shopCutPercentApplied
+    shopCutStatus
+  }
+}
+    `;
+export type ApplyDepositMutationFn = Apollo.MutationFunction<ApplyDepositMutation, ApplyDepositMutationVariables>;
+
+/**
+ * __useApplyDepositMutation__
+ *
+ * To run a mutation, you first call `useApplyDepositMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useApplyDepositMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [applyDepositMutation, { data, loading, error }] = useApplyDepositMutation({
+ *   variables: {
+ *      depositAppointmentId: // value for 'depositAppointmentId'
+ *      targetAppointmentId: // value for 'targetAppointmentId'
+ *   },
+ * });
+ */
+export function useApplyDepositMutation(baseOptions?: Apollo.MutationHookOptions<ApplyDepositMutation, ApplyDepositMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<ApplyDepositMutation, ApplyDepositMutationVariables>(ApplyDepositDocument, options);
+      }
+export type ApplyDepositMutationHookResult = ReturnType<typeof useApplyDepositMutation>;
+export type ApplyDepositMutationResult = Apollo.MutationResult<ApplyDepositMutation>;
+export type ApplyDepositMutationOptions = Apollo.BaseMutationOptions<ApplyDepositMutation, ApplyDepositMutationVariables>;
 export const GetProjectDocument = gql`
     query GetProject($projectId: ID!) {
   getProject(projectId: $projectId) {
@@ -3576,6 +4400,7 @@ export const LoginDocument = gql`
     tagColor
     themePreference
     accessToken
+    firebaseToken
     userInfo {
       ... on Artist {
         id
@@ -3636,6 +4461,166 @@ export function useLoginMutation(baseOptions?: Apollo.MutationHookOptions<LoginM
 export type LoginMutationHookResult = ReturnType<typeof useLoginMutation>;
 export type LoginMutationResult = Apollo.MutationResult<LoginMutation>;
 export type LoginMutationOptions = Apollo.BaseMutationOptions<LoginMutation, LoginMutationVariables>;
+export const GetProjectDetailDocument = gql`
+    query GetProjectDetail($projectId: ID!) {
+  getProject(projectId: $projectId) {
+    id
+    title
+    description
+    placement
+    size
+    palette
+    artistId
+    artist {
+      id
+      billingType
+      hourlyRate
+      flatRate
+      shop {
+        id
+        billingType
+        hourlyRate
+        flatRate
+      }
+    }
+    clientId
+    client {
+      id
+      firstName
+      lastName
+    }
+    tags
+    notes {
+      id
+      author
+      note
+      createdAt
+      updatedAt
+    }
+    status
+    depositCollectedCents
+    depositAvailableCents
+    deposits {
+      id
+      depositCents
+      depositPaymentMethod
+      depositCollectedAt
+    }
+    consultAppointment {
+      id
+      depositCents
+      depositStatus
+      depositPaymentMethod
+      depositCollectedAt
+    }
+    referenceImages {
+      ...ProjectImageFields
+    }
+    designImages {
+      ...ProjectImageFields
+    }
+    bodyImages {
+      ...ProjectImageFields
+    }
+  }
+}
+    ${ProjectImageFieldsFragmentDoc}`;
+
+/**
+ * __useGetProjectDetailQuery__
+ *
+ * To run a query within a React component, call `useGetProjectDetailQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetProjectDetailQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetProjectDetailQuery({
+ *   variables: {
+ *      projectId: // value for 'projectId'
+ *   },
+ * });
+ */
+export function useGetProjectDetailQuery(baseOptions: Apollo.QueryHookOptions<GetProjectDetailQuery, GetProjectDetailQueryVariables> & ({ variables: GetProjectDetailQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetProjectDetailQuery, GetProjectDetailQueryVariables>(GetProjectDetailDocument, options);
+      }
+export function useGetProjectDetailLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetProjectDetailQuery, GetProjectDetailQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetProjectDetailQuery, GetProjectDetailQueryVariables>(GetProjectDetailDocument, options);
+        }
+// @ts-ignore
+export function useGetProjectDetailSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetProjectDetailQuery, GetProjectDetailQueryVariables>): Apollo.UseSuspenseQueryResult<GetProjectDetailQuery, GetProjectDetailQueryVariables>;
+export function useGetProjectDetailSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetProjectDetailQuery, GetProjectDetailQueryVariables>): Apollo.UseSuspenseQueryResult<GetProjectDetailQuery | undefined, GetProjectDetailQueryVariables>;
+export function useGetProjectDetailSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetProjectDetailQuery, GetProjectDetailQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetProjectDetailQuery, GetProjectDetailQueryVariables>(GetProjectDetailDocument, options);
+        }
+export type GetProjectDetailQueryHookResult = ReturnType<typeof useGetProjectDetailQuery>;
+export type GetProjectDetailLazyQueryHookResult = ReturnType<typeof useGetProjectDetailLazyQuery>;
+export type GetProjectDetailSuspenseQueryHookResult = ReturnType<typeof useGetProjectDetailSuspenseQuery>;
+export type GetProjectDetailQueryResult = Apollo.QueryResult<GetProjectDetailQuery, GetProjectDetailQueryVariables>;
+export const UpdateProjectDetailDocument = gql`
+    mutation UpdateProjectDetail($project: ProjectInput) {
+  updateProject(project: $project) {
+    id
+    title
+    description
+    placement
+    size
+    palette
+    artistId
+    clientId
+    tags
+    notes {
+      id
+      author
+      note
+      createdAt
+      updatedAt
+    }
+    status
+    depositCollectedCents
+    depositAvailableCents
+    referenceImages {
+      ...ProjectImageFields
+    }
+    designImages {
+      ...ProjectImageFields
+    }
+    bodyImages {
+      ...ProjectImageFields
+    }
+  }
+}
+    ${ProjectImageFieldsFragmentDoc}`;
+export type UpdateProjectDetailMutationFn = Apollo.MutationFunction<UpdateProjectDetailMutation, UpdateProjectDetailMutationVariables>;
+
+/**
+ * __useUpdateProjectDetailMutation__
+ *
+ * To run a mutation, you first call `useUpdateProjectDetailMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateProjectDetailMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateProjectDetailMutation, { data, loading, error }] = useUpdateProjectDetailMutation({
+ *   variables: {
+ *      project: // value for 'project'
+ *   },
+ * });
+ */
+export function useUpdateProjectDetailMutation(baseOptions?: Apollo.MutationHookOptions<UpdateProjectDetailMutation, UpdateProjectDetailMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<UpdateProjectDetailMutation, UpdateProjectDetailMutationVariables>(UpdateProjectDetailDocument, options);
+      }
+export type UpdateProjectDetailMutationHookResult = ReturnType<typeof useUpdateProjectDetailMutation>;
+export type UpdateProjectDetailMutationResult = Apollo.MutationResult<UpdateProjectDetailMutation>;
+export type UpdateProjectDetailMutationOptions = Apollo.BaseMutationOptions<UpdateProjectDetailMutation, UpdateProjectDetailMutationVariables>;
 export const RegisterDeviceTokenDocument = gql`
     mutation RegisterDeviceToken($token: String!, $platform: String!) {
   registerDeviceToken(token: $token, platform: $platform)
@@ -3699,6 +4684,175 @@ export function useUnregisterDeviceTokenMutation(baseOptions?: Apollo.MutationHo
 export type UnregisterDeviceTokenMutationHookResult = ReturnType<typeof useUnregisterDeviceTokenMutation>;
 export type UnregisterDeviceTokenMutationResult = Apollo.MutationResult<UnregisterDeviceTokenMutation>;
 export type UnregisterDeviceTokenMutationOptions = Apollo.BaseMutationOptions<UnregisterDeviceTokenMutation, UnregisterDeviceTokenMutationVariables>;
+export const UpdateSessionDetailsDocument = gql`
+    mutation UpdateSessionDetails($appointmentInput: AppointmentInput) {
+  updateAppointment(appointmentInput: $appointmentInput) {
+    id
+    appointmentDate
+    durationMinutes
+    appointmentEnd
+    subtotalCents
+    taxCents
+    feeCents
+    tipCents
+    totalCents
+    shopCutCents
+    shopCutStatus
+    shopCutPercentApplied
+    sessionNotes
+    appointmentStatus
+    depositCreditCents
+    timerStatus
+    timerStartedAt
+    accumulatedSeconds
+    adjustments {
+      id
+      amountCents
+      reason
+      createdAt
+      createdBy {
+        id
+        firstName
+        lastName
+      }
+    }
+  }
+}
+    `;
+export type UpdateSessionDetailsMutationFn = Apollo.MutationFunction<UpdateSessionDetailsMutation, UpdateSessionDetailsMutationVariables>;
+
+/**
+ * __useUpdateSessionDetailsMutation__
+ *
+ * To run a mutation, you first call `useUpdateSessionDetailsMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateSessionDetailsMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateSessionDetailsMutation, { data, loading, error }] = useUpdateSessionDetailsMutation({
+ *   variables: {
+ *      appointmentInput: // value for 'appointmentInput'
+ *   },
+ * });
+ */
+export function useUpdateSessionDetailsMutation(baseOptions?: Apollo.MutationHookOptions<UpdateSessionDetailsMutation, UpdateSessionDetailsMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<UpdateSessionDetailsMutation, UpdateSessionDetailsMutationVariables>(UpdateSessionDetailsDocument, options);
+      }
+export type UpdateSessionDetailsMutationHookResult = ReturnType<typeof useUpdateSessionDetailsMutation>;
+export type UpdateSessionDetailsMutationResult = Apollo.MutationResult<UpdateSessionDetailsMutation>;
+export type UpdateSessionDetailsMutationOptions = Apollo.BaseMutationOptions<UpdateSessionDetailsMutation, UpdateSessionDetailsMutationVariables>;
+export const StartSessionTimerDocument = gql`
+    mutation StartSessionTimer($appointmentId: ID!) {
+  startSessionTimer(appointmentId: $appointmentId) {
+    id
+    timerStatus
+    timerStartedAt
+    accumulatedSeconds
+  }
+}
+    `;
+export type StartSessionTimerMutationFn = Apollo.MutationFunction<StartSessionTimerMutation, StartSessionTimerMutationVariables>;
+
+/**
+ * __useStartSessionTimerMutation__
+ *
+ * To run a mutation, you first call `useStartSessionTimerMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useStartSessionTimerMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [startSessionTimerMutation, { data, loading, error }] = useStartSessionTimerMutation({
+ *   variables: {
+ *      appointmentId: // value for 'appointmentId'
+ *   },
+ * });
+ */
+export function useStartSessionTimerMutation(baseOptions?: Apollo.MutationHookOptions<StartSessionTimerMutation, StartSessionTimerMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<StartSessionTimerMutation, StartSessionTimerMutationVariables>(StartSessionTimerDocument, options);
+      }
+export type StartSessionTimerMutationHookResult = ReturnType<typeof useStartSessionTimerMutation>;
+export type StartSessionTimerMutationResult = Apollo.MutationResult<StartSessionTimerMutation>;
+export type StartSessionTimerMutationOptions = Apollo.BaseMutationOptions<StartSessionTimerMutation, StartSessionTimerMutationVariables>;
+export const StopSessionTimerDocument = gql`
+    mutation StopSessionTimer($appointmentId: ID!) {
+  stopSessionTimer(appointmentId: $appointmentId) {
+    id
+    timerStatus
+    timerStartedAt
+    accumulatedSeconds
+  }
+}
+    `;
+export type StopSessionTimerMutationFn = Apollo.MutationFunction<StopSessionTimerMutation, StopSessionTimerMutationVariables>;
+
+/**
+ * __useStopSessionTimerMutation__
+ *
+ * To run a mutation, you first call `useStopSessionTimerMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useStopSessionTimerMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [stopSessionTimerMutation, { data, loading, error }] = useStopSessionTimerMutation({
+ *   variables: {
+ *      appointmentId: // value for 'appointmentId'
+ *   },
+ * });
+ */
+export function useStopSessionTimerMutation(baseOptions?: Apollo.MutationHookOptions<StopSessionTimerMutation, StopSessionTimerMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<StopSessionTimerMutation, StopSessionTimerMutationVariables>(StopSessionTimerDocument, options);
+      }
+export type StopSessionTimerMutationHookResult = ReturnType<typeof useStopSessionTimerMutation>;
+export type StopSessionTimerMutationResult = Apollo.MutationResult<StopSessionTimerMutation>;
+export type StopSessionTimerMutationOptions = Apollo.BaseMutationOptions<StopSessionTimerMutation, StopSessionTimerMutationVariables>;
+export const ResetSessionTimerDocument = gql`
+    mutation ResetSessionTimer($appointmentId: ID!) {
+  resetSessionTimer(appointmentId: $appointmentId) {
+    id
+    timerStatus
+    timerStartedAt
+    accumulatedSeconds
+  }
+}
+    `;
+export type ResetSessionTimerMutationFn = Apollo.MutationFunction<ResetSessionTimerMutation, ResetSessionTimerMutationVariables>;
+
+/**
+ * __useResetSessionTimerMutation__
+ *
+ * To run a mutation, you first call `useResetSessionTimerMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useResetSessionTimerMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [resetSessionTimerMutation, { data, loading, error }] = useResetSessionTimerMutation({
+ *   variables: {
+ *      appointmentId: // value for 'appointmentId'
+ *   },
+ * });
+ */
+export function useResetSessionTimerMutation(baseOptions?: Apollo.MutationHookOptions<ResetSessionTimerMutation, ResetSessionTimerMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<ResetSessionTimerMutation, ResetSessionTimerMutationVariables>(ResetSessionTimerDocument, options);
+      }
+export type ResetSessionTimerMutationHookResult = ReturnType<typeof useResetSessionTimerMutation>;
+export type ResetSessionTimerMutationResult = Apollo.MutationResult<ResetSessionTimerMutation>;
+export type ResetSessionTimerMutationOptions = Apollo.BaseMutationOptions<ResetSessionTimerMutation, ResetSessionTimerMutationVariables>;
 export const UpdateProjectDocument = gql`
     mutation UpdateProject($project: ProjectInput) {
   updateProject(project: $project) {

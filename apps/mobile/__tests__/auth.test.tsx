@@ -1,6 +1,7 @@
 import { ApolloClient, ApolloProvider, HttpLink, InMemoryCache } from '@apollo/client';
-import { render, screen, waitFor } from '@testing-library/react-native';
-import { Text } from 'react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { signInWithCustomToken, signOut } from 'firebase/auth';
+import { Pressable, Text } from 'react-native';
 
 import { AUTH_SETTINGS_CONSTANTS } from '@/constants/auth';
 import { AuthProvider, useAuth } from '@/context/auth';
@@ -59,11 +60,27 @@ function makeClient() {
 }
 
 function Consumer() {
-  const { user, initializing } = useAuth();
+  const { user, firebaseUser, login, logout, initializing } = useAuth();
   if (initializing) {
     return <Text testID="state">initializing</Text>;
   }
-  return <Text testID="state">{user ? `signed-in:${user.email}` : 'signed-out'}</Text>;
+  return (
+    <>
+      <Text testID="state">{user ? `signed-in:${user.email}` : 'signed-out'}</Text>
+      <Text testID="firebase-state">
+        {firebaseUser ? `firebase:${firebaseUser.uid}` : 'firebase:signed-out'}
+      </Text>
+      <Pressable
+        testID="login-with-firebase-token"
+        onPress={() => login({ ...USER, accessToken: fakeToken(Math.floor(Date.now() / 1000) + 3600), firebaseToken: 'a-real-custom-token' })}
+      >
+        <Text>Log in</Text>
+      </Pressable>
+      <Pressable testID="logout" onPress={() => logout()}>
+        <Text>Log out</Text>
+      </Pressable>
+    </>
+  );
 }
 
 function renderWithProvider(client: ApolloClient<unknown> = makeClient()) {
@@ -130,5 +147,42 @@ describe('AuthProvider', () => {
 
     await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('signed-out'));
     expect(mockStore.has(AUTH_SETTINGS_CONSTANTS.CURRENT_USER_CACHE)).toBe(false);
+  });
+
+  it('signs into Firebase with the server-minted custom token on login()', async () => {
+    renderWithProvider();
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('signed-out'));
+
+    fireEvent.press(screen.getByTestId('login-with-firebase-token'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('state')).toHaveTextContent('signed-in:danny@thecopperwolf.com'),
+    );
+    expect(signInWithCustomToken).toHaveBeenCalledWith(
+      expect.anything(),
+      'a-real-custom-token',
+    );
+    // FIREBASE_LOGIN dispatches only after signInWithCustomToken's promise resolves - login()
+    // itself doesn't await it (see auth.tsx's own comment on why: a slow/failed Firebase
+    // handshake must never block the login screen), so this has to be its own waitFor rather than
+    // asserted in the same one as the app-session state above.
+    await waitFor(() =>
+      expect(screen.getByTestId('firebase-state')).toHaveTextContent('firebase:test-firebase-uid'),
+    );
+  });
+
+  it('signs out of Firebase on logout()', async () => {
+    renderWithProvider();
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('signed-out'));
+
+    fireEvent.press(screen.getByTestId('login-with-firebase-token'));
+    await waitFor(() =>
+      expect(screen.getByTestId('firebase-state')).toHaveTextContent('firebase:test-firebase-uid'),
+    );
+
+    fireEvent.press(screen.getByTestId('logout'));
+
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('signed-out'));
+    expect(signOut).toHaveBeenCalled();
   });
 });

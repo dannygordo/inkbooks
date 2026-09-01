@@ -1,10 +1,12 @@
 import { useApolloClient } from '@apollo/client';
 import type { LoginMutation } from '@inkbooks/api';
+import { signInWithCustomToken, signOut, type User as FirebaseUser } from 'firebase/auth';
 import jwtDecode from 'jwt-decode';
 import type { ReactNode } from 'react';
 import { createContext, useContext, useEffect, useReducer, useState } from 'react';
 
 import { AUTH_SETTINGS_CONSTANTS } from '@/constants/auth';
+import { auth as firebaseAuth } from '@/firebase/firebase';
 import { registerForPushNotifications, unregisterPushNotifications } from '@/lib/push-notifications';
 import { TokenStorageService } from '@/services/TokenStorageService';
 
@@ -15,14 +17,16 @@ export type CurrentUser = LoginMutation['login'];
 
 type AuthState = {
   user: CurrentUser | null;
+  firebaseUser: FirebaseUser | null;
 };
 
-const initialState: AuthState = { user: null };
+const initialState: AuthState = { user: null, firebaseUser: null };
 
 type AuthAction =
   | { type: 'LOGIN'; payload: CurrentUser }
   | { type: 'LOGOUT' }
-  | { type: 'UPDATE_USER'; payload: CurrentUser };
+  | { type: 'UPDATE_USER'; payload: CurrentUser }
+  | { type: 'FIREBASE_LOGIN'; payload: FirebaseUser };
 
 function authReducer(state: AuthState, action: AuthAction): AuthState {
   switch (action.type) {
@@ -31,6 +35,8 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
       return { ...state, user: action.payload };
     case 'LOGOUT':
       return { ...state, user: null };
+    case 'FIREBASE_LOGIN':
+      return { ...state, firebaseUser: action.payload };
     default:
       return state;
   }
@@ -38,6 +44,7 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
 
 type AuthContextValue = {
   user: CurrentUser | null;
+  firebaseUser: FirebaseUser | null;
   login: (userData: CurrentUser) => Promise<void>;
   logout: () => Promise<void>;
   updateCurrentUser: (userData: CurrentUser) => Promise<void>;
@@ -46,6 +53,7 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue>({
   user: null,
+  firebaseUser: null,
   login: async () => {},
   logout: async () => {},
   updateCurrentUser: async () => {},
@@ -54,16 +62,15 @@ const AuthContext = createContext<AuthContextValue>({
 
 export const useAuth = () => useContext(AuthContext);
 
-// Direct TypeScript port of apps/web's context/auth.jsx, minus every Firebase-specific piece
-// (firebaseUser state, FIREBASE_LOGIN action, signInWithCustomToken/signOut calls) and the
-// modal/alert/loading UI state that file also carries - those are MUI-page concerns nothing in
-// mobile currently reads. Firebase sign-in exists on web for Storage access (image uploads);
-// mobile has no image-upload feature yet to need it for (deliberate scope decision, not an
-// oversight - see DECISIONS.md's step-6 entry). Everything session-lifecycle-related - the
-// cache-wipe-on-session-change bug fix, the async storage restore with a JWT expiry check, the
-// initializing flag - is unchanged, because the bug class it exists to prevent (a previous user's
-// cached data rendering on the next user's screen) applies identically here: this app has exactly
-// one InMemoryCache too.
+// Direct TypeScript port of apps/web's context/auth.jsx, including Firebase sign-in now
+// (firebaseUser state, FIREBASE_LOGIN action, signInWithCustomToken/signOut calls) - added once
+// mobile grew an actual image-upload feature that needs Storage access, reversing the original
+// step-6/step-8 deferral (see DECISIONS.md's X13 entry for why). Still minus the modal/alert/
+// loading UI state auth.jsx also carries - those are MUI-page concerns nothing in mobile reads.
+// Everything session-lifecycle-related - the cache-wipe-on-session-change bug fix, the async
+// storage restore with a JWT expiry check, the initializing flag - is unchanged, because the bug
+// class it exists to prevent (a previous user's cached data rendering on the next user's screen)
+// applies identically here: this app has exactly one InMemoryCache too.
 export function AuthProvider({ children }: { children: ReactNode }) {
   const apollo = useApolloClient();
   const [state, dispatch] = useReducer(authReducer, initialState);
@@ -152,6 +159,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // setSession just stored to be attached by lib/apollo-client.ts's authLink. Fire-and-forget -
     // a permission dialog or a slow Expo round trip must never delay the login screen resolving.
     void registerForPushNotifications(apollo);
+
+    // Sign into Firebase as this specific user (for Storage access - project images), using a
+    // short-lived custom token the server minted for this exact account. Direct port of
+    // auth.jsx's login() - see that file's own comment on why this replaced one shared hardcoded
+    // Firebase account. Fire-and-forget, same as push registration above: a slow or failed
+    // Firebase handshake must never block the login screen resolving, and app login/auth already
+    // fully succeeded via setSession regardless of whether this succeeds - only Storage features
+    // (image upload/delete) are affected if it doesn't.
+    if (userData.firebaseToken) {
+      signInWithCustomToken(firebaseAuth, userData.firebaseToken)
+        .then((credential) => {
+          dispatch({ type: 'FIREBASE_LOGIN', payload: credential.user });
+        })
+        .catch((error) => {
+          console.log(error.code, error.message);
+        });
+    } else {
+      console.warn(
+        'No firebaseToken returned at login - Firebase Storage features ' +
+          '(image upload/delete) will not work until the server\'s Firebase Admin SDK is configured.',
+      );
+    }
   };
 
   const updateCurrentUser = async (userData: CurrentUser) => {
@@ -171,11 +200,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // apollo.clearStore().
     await unregisterPushNotifications(apollo);
     await setSession(null);
+    // Ends the Firebase session too, same reason auth.jsx's logout() does - each user now has
+    // their own real Firebase identity rather than a shared static one, so leaving it signed in
+    // would linger past app logout (a real concern on a shared shop device). Best-effort, after
+    // setSession like everything else here: the app-level session is already gone regardless.
+    signOut(firebaseAuth).catch((error) => console.log(error.code, error.message));
   };
 
   return (
     <AuthContext.Provider
-      value={{ user: state.user, login, updateCurrentUser, logout, initializing }}
+      value={{
+        user: state.user,
+        firebaseUser: state.firebaseUser,
+        login,
+        updateCurrentUser,
+        logout,
+        initializing,
+      }}
     >
       {children}
     </AuthContext.Provider>

@@ -1,6 +1,7 @@
 import { FlashList } from '@shopify/flash-list';
 import type { AppointmentListItemFragment } from '@inkbooks/api';
 import { useGetAppointmentsByArtistQuery, useGetAppointmentsByShopQuery } from '@inkbooks/api';
+import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,6 +21,7 @@ import {
   getAppointmentTitle,
 } from '@/utils/appointments';
 import { getThisWeekFilter } from '@/utils/dateRanges';
+import { canManageAppointment } from '@/utils/permissions';
 import { getUserShopId } from '@/utils/user';
 
 // A month of one shop's appointments in one response, not paged - same choice
@@ -32,8 +34,10 @@ const PAGE = { limit: 200 };
 /**
  * The appointments screen (guarded by _layout.tsx's Stack.Protected - unreachable while `user` is
  * null). PRODUCTION_ROADMAP.md's Phase 5, step 6: real auth (Phase 1), real data through
- * packages/api, FlashList for the list, Apollo cache persistence for offline reads. Read-only -
- * creating/editing an appointment is Phase 3's wizard.
+ * packages/api, FlashList for the list, Apollo cache persistence for offline reads. The list
+ * itself stays read-only here - creating a brand-new appointment is still Phase 3's wizard - but
+ * step 8 (see openAppointment below) wired up opening an existing one: personal edit/delete,
+ * consult detail + convert-to-session, and a session's Project (Details/Sessions/Notes/Tags).
  *
  * Which queries fire mirrors AppointmentsList.jsx exactly: a shop-connected artist reads the
  * shop's appointments (everyone's, server-scoped) plus their own personal entries (never included
@@ -43,6 +47,7 @@ const PAGE = { limit: 200 };
  */
 export default function AppointmentsScreen() {
   const theme = useTheme();
+  const router = useRouter();
   const { user, logout } = useAuth();
   const shopId = getUserShopId(user);
   // Computed once, on mount, not on every render - matches AppointmentsList.jsx's own
@@ -98,6 +103,24 @@ export default function AppointmentsScreen() {
 
   const entries = useMemo(() => buildListEntries(items), [items]);
 
+  // Same three-way split as apps/web's AppointmentsList.jsx openAppointment(): isPersonal first
+  // (it short-circuits type/project entirely - a personal entry has neither), then
+  // appointmentType === 'consult', else it has a projectId and IS a session. Gated on
+  // canManageAppointment so a fellow artist's row never navigates to a screen the server will
+  // just refuse every mutation on - see that util's own comment.
+  const openAppointment = (appointment: AppointmentListItemFragment) => {
+    if (!canManageAppointment(user, appointment)) {
+      return;
+    }
+    if (appointment.isPersonal) {
+      router.push({ pathname: '/appointment/[id]', params: { id: appointment.id } });
+    } else if (appointment.appointmentType === 'consult') {
+      router.push({ pathname: '/consult/[id]', params: { id: appointment.id } });
+    } else if (appointment.projectId) {
+      router.push({ pathname: '/project/[id]', params: { id: appointment.projectId } });
+    }
+  };
+
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
@@ -147,6 +170,7 @@ export default function AppointmentsScreen() {
                   appointment={item.appointment}
                   showArtist={Boolean(shopId)}
                   borderColor={theme.backgroundSelected}
+                  onPress={() => openAppointment(item.appointment)}
                 />
               )
             }
@@ -158,23 +182,30 @@ export default function AppointmentsScreen() {
 }
 
 /**
- * One row. Extracted (rather than inlined in renderItem) purely for readability - unlike web's
- * AppointmentRow it carries no interaction/hover state of its own, since opening an appointment
- * (a session's project, a consult's detail page) is Phase 3 work, not this read-only list's.
+ * One row. Extracted (rather than inlined in renderItem) purely for readability. Tapping it
+ * routes through the parent's openAppointment() three-way split (see AppointmentsScreen) - a row
+ * this user can't manage (canManageAppointment) still renders normally but its tap is a no-op,
+ * same "visible but inert" choice as web's own row-level gate.
  */
 function AppointmentRow({
   appointment,
   showArtist,
   borderColor,
+  onPress,
 }: {
   appointment: AppointmentListItemFragment;
   showArtist: boolean;
   borderColor: string;
+  onPress: () => void;
 }) {
   const artistName = showArtist ? getAppointmentArtistName(appointment) : '';
   const clientName = getAppointmentClientName(appointment);
   return (
-    <View style={[styles.row, { borderColor }]} testID={`appointment-row-${appointment.id}`}>
+    <Pressable
+      onPress={onPress}
+      style={[styles.row, { borderColor }]}
+      testID={`appointment-row-${appointment.id}`}
+    >
       <ThemedText type="small" style={styles.rowTime}>
         {formatAppointmentTime(appointment.appointmentDate)}
       </ThemedText>
@@ -189,7 +220,7 @@ function AppointmentRow({
       <ThemedText type="small" themeColor="textSecondary">
         {getAppointmentStatusLabel(appointment)}
       </ThemedText>
-    </View>
+    </Pressable>
   );
 }
 
