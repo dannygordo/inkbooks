@@ -143,6 +143,9 @@ export default function AppointmentsScreen() {
             Appointments
           </ThemedText>
           <View style={styles.headerActions}>
+            <Pressable onPress={() => router.push('/clients')} testID="clients-button">
+              <ThemedText type="link">Clients</ThemedText>
+            </Pressable>
             <Pressable onPress={() => router.push('/messages')} testID="messages-button" style={styles.messagesButton}>
               <ThemedText type="link">Messages</ThemedText>
               {unreadCount > 0 ? (

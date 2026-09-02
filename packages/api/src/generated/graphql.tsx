@@ -2857,6 +2857,13 @@ export type GetChargeQuoteQueryVariables = Exact<{
 
 export type GetChargeQuoteQuery = { __typename?: 'Query', getChargeQuote: { __typename?: 'ChargeQuote', subtotalCents: number, depositCreditCents: number, netSubtotalCents: number, feeOffsetCents: number, taxableCents: number, taxCents: number, tipCents: number, totalCents: number, giftCardCents: number, amountDueCents: number, source: string, canCharge: boolean } };
 
+export type GetClientsQueryVariables = Exact<{
+  page?: InputMaybe<PageInput>;
+}>;
+
+
+export type GetClientsQuery = { __typename?: 'Query', getClients: { __typename?: 'ClientPage', items: Array<{ __typename?: 'Client', id: string, firstName: string, lastName: string, email: string, phone: string, avatar?: string | null }>, pageInfo: { __typename?: 'PageInfo', totalCount: number, hasMore: boolean, limit: number, offset: number } } };
+
 export type GetConsultAppointmentQueryVariables = Exact<{
   appointmentId: Scalars['ID']['input'];
 }>;
@@ -3668,6 +3675,62 @@ export type GetChargeQuoteQueryHookResult = ReturnType<typeof useGetChargeQuoteQ
 export type GetChargeQuoteLazyQueryHookResult = ReturnType<typeof useGetChargeQuoteLazyQuery>;
 export type GetChargeQuoteSuspenseQueryHookResult = ReturnType<typeof useGetChargeQuoteSuspenseQuery>;
 export type GetChargeQuoteQueryResult = Apollo.QueryResult<GetChargeQuoteQuery, GetChargeQuoteQueryVariables>;
+export const GetClientsDocument = gql`
+    query GetClients($page: PageInput) {
+  getClients(includeArchived: false, page: $page) {
+    items {
+      id
+      firstName
+      lastName
+      email
+      phone
+      avatar
+    }
+    pageInfo {
+      totalCount
+      hasMore
+      limit
+      offset
+    }
+  }
+}
+    `;
+
+/**
+ * __useGetClientsQuery__
+ *
+ * To run a query within a React component, call `useGetClientsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetClientsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetClientsQuery({
+ *   variables: {
+ *      page: // value for 'page'
+ *   },
+ * });
+ */
+export function useGetClientsQuery(baseOptions?: Apollo.QueryHookOptions<GetClientsQuery, GetClientsQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetClientsQuery, GetClientsQueryVariables>(GetClientsDocument, options);
+      }
+export function useGetClientsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetClientsQuery, GetClientsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetClientsQuery, GetClientsQueryVariables>(GetClientsDocument, options);
+        }
+// @ts-ignore
+export function useGetClientsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetClientsQuery, GetClientsQueryVariables>): Apollo.UseSuspenseQueryResult<GetClientsQuery, GetClientsQueryVariables>;
+export function useGetClientsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetClientsQuery, GetClientsQueryVariables>): Apollo.UseSuspenseQueryResult<GetClientsQuery | undefined, GetClientsQueryVariables>;
+export function useGetClientsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetClientsQuery, GetClientsQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetClientsQuery, GetClientsQueryVariables>(GetClientsDocument, options);
+        }
+export type GetClientsQueryHookResult = ReturnType<typeof useGetClientsQuery>;
+export type GetClientsLazyQueryHookResult = ReturnType<typeof useGetClientsLazyQuery>;
+export type GetClientsSuspenseQueryHookResult = ReturnType<typeof useGetClientsSuspenseQuery>;
+export type GetClientsQueryResult = Apollo.QueryResult<GetClientsQuery, GetClientsQueryVariables>;
 export const GetConsultAppointmentDocument = gql`
     query GetConsultAppointment($appointmentId: ID!) {
   getAppointment(appointmentId: $appointmentId) {

@@ -74,8 +74,13 @@ function RootNavigator() {
             to Log out - the same "who am I, how do I sign out" header spot web's own account
             menu occupies, not a tab. */}
         <Stack.Screen name="settings/index" options={{ headerShown: true, title: 'Settings' }} />
+        {/* The client roster - see clients/index.tsx's own header comment. Reached from
+            index.tsx's header, and the second (real) entry point into client/[id].tsx below -
+            that screen's own X15 comment named this as worth building. */}
+        <Stack.Screen name="clients/index" options={{ headerShown: true, title: 'Clients' }} />
         {/* Client Detail (shared-images panel only for now - see client/[id].tsx's own header
-            comment). Reached from project/[id].tsx's client name link. */}
+            comment). Reached from project/[id].tsx's client name link, and now clients/index.tsx's
+            rows too. */}
         <Stack.Screen name="client/[id]" options={{ headerShown: true, title: 'Client' }} />
         {/* Messages - inbox + thread, see messages/index.tsx and messages/[id].tsx. Reached from
             index.tsx's header, next to the Settings avatar and Log out. */}

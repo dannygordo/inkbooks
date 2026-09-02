@@ -8,6 +8,41 @@ Last updated: 2026-09-02.
 
 ---
 
+### 2026-09-02 (fifth entry): Client roster (list + search) built - Phase 5 step 8's next slice past X13's now-closed three-item list
+
+Picked from the rest of step 8's ~40-screen list, over a booking-requests inbox or finishing
+Settings' password/calendar-color - smaller, and gives `client/[id].tsx` (X15) a real second entry
+point, which that screen's own comment had flagged as worth building. Full reasoning: DECISIONS.md
+X17.
+
+**Built:** `app/clients/index.tsx` (new route, registered in `_layout.tsx`, reached from
+`index.tsx`'s header), `utils/clients.ts` (`matchesClientSearch` + `__tests__/clients.test.ts`),
+`utils/phone.ts` (`formatPhone` + `__tests__/phone.test.ts`), and a new `GetClients` operation in
+`packages/api` (codegen + build both ran clean).
+
+**Real, named limitation, not a bug: search only covers what's already loaded.** `getClients` has
+no server-side search argument - mobile's search box filters the current page client-side, same
+shape as `Messenger.jsx`'s own name filter. Fetches the server's own max page size (200) up front,
+so this is a non-issue for the vast majority of shops; `onEndReached` triggers `fetchMore` for
+anyone past that. No create-client action and no archive/"Show archived" toggle either - both real
+`Clients.jsx` features, neither built here since archiving doesn't exist anywhere on mobile yet.
+
+**One test caught a real bug in the TEST, not the code, while writing this** -
+`matchesClientSearch`'s "missing name doesn't crash" test originally searched for a term
+("marta") that was still present in the fixture's unrelated `email` field, so it passed for the
+wrong reason (matching the email, not exercising the null-name path at all) until the fixture was
+corrected to use an email that doesn't collide. Worth noting per DECISIONS.md PR1's own logged
+history of every real test run finding something - this one found a test bug rather than a
+runtime one, which is the same category of value: it would have hidden a real regression exactly
+where it mattered most.
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+and the full `apps/mobile` Jest suite - 142/142 (133 before this slice, +9: `clients.test.ts` and
+`phone.test.ts`). **Not yet confirmed:** a real device/simulator run, same standing caveat as
+every mobile slice this session.
+
+---
+
 ### 2026-09-02 (fourth entry): Messages built - inbox + thread, polling instead of a socket - closes out X13's three-item list
 
 Last of the three items X13 named as still unported (avatar upload and the client-dashboard

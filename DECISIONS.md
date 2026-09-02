@@ -1530,6 +1530,54 @@ new components (`ConversationRow.tsx`, `MessageBubble.tsx`) and the two Apollo-w
 that screen) so the existing suite keeps passing without a "no matching mock" warning, but that's
 an update to an existing test, not a new screen-level one.
 
+### X17. Client roster (list + search) is next on Phase 5 step 8's remaining list, and the second real entry point into X15's client-detail screen
+
+X13's own three-item list (avatar upload/shared-images/Messages) is fully closed as of X14-X16.
+Asked what to port next from the rest of step 8's ~40-screen list; picked the client roster over
+a booking-requests inbox or finishing Settings' password/calendar-color, both because it's smaller
+and because `client/[id].tsx` (X15) has had exactly one way to reach it since it was built - a
+project's "View Client" link - and that screen's own header comment named a second entry point as
+the thing worth revisiting for. This is that second entry point.
+
+**No create-client action, no archive/"Show archived" toggle.** `Clients.jsx` bundles both onto
+the same page (`IBPageActionBar`, `ArchiveControl`); neither is built on mobile at all yet in any
+form (Phase 5 has no client-creation wizard, no archiving anywhere), so both stay out here rather
+than being the one place they get invented as a side effect of porting a list. `getClients` is
+called with a literal `includeArchived: false`, matching the toggle's own unchecked default -
+archived clients are simply absent, not a state this screen has any way to reveal.
+
+**Search only filters what's already been paged in, not the caller's whole roster - a real
+limitation, not an oversight, and worth being honest about.** `getClients` takes no search
+argument at all (`server/graphql/typeDefs.js`) - the only place a name/email search actually
+exists server-side is `utils/search.js`, behind the separate cross-entity Global Search feature
+(`SearchService`/`GlobalSearch.jsx`/`Search.jsx`), which also spans projects, messages, and shared
+images and is a genuinely separate feature, not a small extension of this one. Mobile's search box
+is a client-side filter over the current page only, same shape as `Messenger.jsx`'s own
+name-filter (`otherMembers`-based, "filters what's rendered without touching what's loaded"),
+extended here to match email too. This is a non-issue in practice for the page size chosen (see
+below) but a real gap past it - `utils/clients.ts`'s own header comment carries this forward for
+whoever builds real server-side search next.
+
+**Page size is the server's own `MAX_LIMIT` (200), not `Clients.jsx`'s 50-with-a-pager default.**
+Same reasoning `index.tsx`'s own appointments `PAGE` constant already uses for a week's worth of
+appointments: fetch the bound most shops fit inside in one request, rather than making every shop
+click "Load more" to see their whole list. `Clients.jsx`'s pager exists because a shop admin
+managing many hundreds of clients is a real case on web; `onEndReached`-triggered `fetchMore` (not
+a page-number pager, which has no natural mobile-list equivalent) covers that same case here
+without it being the common path.
+
+**Phone numbers get their own hand-rolled formatter (`utils/phone.ts`), not
+`libphonenumber-js`.** Same "not worth a new dependency for a small piece of formatting" call
+`utils/timeAgo.ts`/`utils/messageTime.ts` already made against moment/dayjs - this app's phone
+data is US-only in practice (web's own `formatPhone` hardcodes a `+1` prefix before parsing it),
+so a real international parsing library buys nothing a 10-digit format doesn't already cover.
+Falls back to the raw stored value for anything else, matching web's own "don't crash, don't lie"
+contract for missing/malformed numbers.
+
+**No dedicated screen-level test for `clients/index.tsx`**, matching every prior slice's
+precedent - the two new pure logic modules (`utils/clients.ts`'s `matchesClientSearch`,
+`utils/phone.ts`'s `formatPhone`) get their own test files; the Apollo-wired screen doesn't.
+
 ---
 
 ## Process

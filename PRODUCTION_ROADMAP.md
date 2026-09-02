@@ -955,6 +955,16 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    **With Messages built, nothing named as "still unported" in X13/X14/X15 remains open.** The
    ~40-screen list this step originally deferred still has plenty left on it - just nothing this
    doc has singled out by name the way avatar upload/shared-images/Messages were.
+
+   **Client roster (2026-09-02, see DECISIONS.md X17) is the next slice picked from that
+   remaining list.** `app/clients/index.tsx` - list + client-side name/email search, `Load more`
+   pagination via the server's own 200-item max page size, no create/archive (neither exists on
+   mobile at all yet) - and a new `GetClients` operation. Gives `client/[id].tsx` (X15) its second
+   real entry point, alongside project/[id].tsx's own client link. Confirmed in this sandbox:
+   `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean, and the full `apps/mobile`
+   Jest suite (142/142, up from 133 - `clients.test.ts` and `phone.test.ts`). Booking requests and
+   Settings' deferred password/calendar-color are still open, along with everything else on the
+   ~40-screen list not yet named.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).
 10. TestFlight beta, then App Store submission - Guideline 3.1.1 already checked in step 5, so this
