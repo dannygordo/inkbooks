@@ -905,14 +905,29 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    pre-hydration under CI's timing. Confirmed unrelated to this branch's mobile work - the affected
    files were last touched in the already-merged PR #9 - and fixed per Danny's explicit go-ahead to
    keep it in this PR rather than deferring, since it was the only thing left blocking CI green).
-   **Not yet confirmed: whether CI is green after `c6b3284`, and whether the PR has been merged** -
-   that's the next thing to check from here, before touching anything else in this step.
+   **Confirmed 2026-09-02: CI went green after `c6b3284` and PR #11 merged into `main`
+   (`eca520f`, 2026-09-01T14:07:11Z)** - every check passed (`packages/api` build/typecheck/
+   codegen, client tests+build, mobile typecheck+tests, server tests). Nothing left open from
+   this paragraph.
 
-   Work continues to the rest of the ~40-screen list from here (Settings/avatar upload, Messages,
-   the client dashboard's shared-images panel, and everything else not yet ported all remain
-   future work, explicitly - see X13) - this step lands the appointment-opening slice plus its
-   image-upload/Square-charge follow-up as one PR, per Danny's own delivery-cadence choice, not
-   the whole remaining list at once.
+   Work continued to the rest of the ~40-screen list from here (Messages, the client dashboard's
+   shared-images panel, and everything else not yet ported remain future work, explicitly - see
+   X13/X14) - this step landed the appointment-opening slice plus its image-upload/Square-charge
+   follow-up as one PR, per Danny's own delivery-cadence choice, not the whole remaining list at
+   once.
+
+   **Settings' avatar upload (2026-09-02, see DECISIONS.md X14) is the next slice, built as its
+   own separate piece rather than folded into this step's PR**: `app/settings/index.tsx` (photo
+   only - password and calendar color explicitly deferred, X14's own scope note), a new `Avatar`
+   component with an initials fallback, `utils/avatar.ts` (its own test file, matching X12/X13's
+   own screens-get-no-test/logic-gets-tested split), a new `updateUser.graphql` operation, and a
+   Settings entry point on `index.tsx`'s header next to Log out. Confirmed in this sandbox:
+   `packages/api`'s codegen + build (schema comes straight from `server/graphql/typeDefs.js` via
+   `graphql-tag-pluck`, so this needs no live server or network), `apps/mobile`'s `tsc --noEmit`
+   (clean once a stale, gitignored `.expo/types/router.d.ts` left over from an earlier session was
+   removed - CI never has this file present either, since `.expo/` is gitignored and no CI step
+   generates it, so this cost real time here but isn't a real bug), and the full `apps/mobile`
+   Jest suite (115/115, up from 108 - the new `avatar.test.ts`).
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).
 10. TestFlight beta, then App Store submission - Guideline 3.1.1 already checked in step 5, so this

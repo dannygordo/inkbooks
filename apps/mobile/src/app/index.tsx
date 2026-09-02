@@ -6,6 +6,7 @@ import { useMemo } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Avatar } from '@/components/Avatar';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -128,11 +129,21 @@ export default function AppointmentsScreen() {
           <ThemedText type="subtitle" style={styles.title}>
             Appointments
           </ThemedText>
-          <Pressable onPress={() => logout()} testID="logout-button">
-            <ThemedText type="link" themeColor="textSecondary">
-              Log out
-            </ThemedText>
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable onPress={() => router.push('/settings')} testID="settings-button">
+              <Avatar
+                imageUri={user?.avatar}
+                firstName={user?.firstName}
+                lastName={user?.lastName}
+                size={32}
+              />
+            </Pressable>
+            <Pressable onPress={() => logout()} testID="logout-button">
+              <ThemedText type="link" themeColor="textSecondary">
+                Log out
+              </ThemedText>
+            </Pressable>
+          </View>
         </View>
 
         <OfflineBanner />
@@ -238,6 +249,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingTop: Spacing.two,
     paddingBottom: Spacing.two,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
   },
   title: {
     textAlign: 'left',

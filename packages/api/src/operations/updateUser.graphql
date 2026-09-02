@@ -1,0 +1,22 @@
+# Direct equivalent of apps/web's UserService.UPDATE_USER_MUTATION, trimmed to what this app's
+# Settings screen actually reads back (avatar) rather than every field web's version selects -
+# password/tagColor Settings sections aren't built here yet (see PRODUCTION_ROADMAP.md Phase 5
+# step 8's remaining ~40-screen list); widen the selection set when those are.
+#
+# id/email/role ARE REQUIRED ON EVERY CALL, not just when changing them - UserUpdateInput's own
+# schema requires id/email/role regardless of which field the caller actually means to change
+# (see server/graphql/typeDefs.js). Callers must send the CURRENT user's id/email/role alongside
+# whatever they're actually updating.
+#
+# The response's accessToken IS NOT A REAL TOKEN - server/graphql/resolvers/users.js's own
+# updateUser sets `res.accessToken = 'temp_' + Date.now()` and returns that, matching web's own
+# handleUpdateUser, which never reads it back either. A caller must merge only the field it asked
+# to change into the existing CurrentUser (context/auth.tsx's updateCurrentUser), never replace
+# the whole object with this response - doing so would silently overwrite the real session token
+# with that placeholder.
+mutation UpdateUser($user: UserUpdateInput!) {
+	updateUser(user: $user) {
+		id
+		avatar
+	}
+}

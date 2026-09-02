@@ -69,6 +69,11 @@ function RootNavigator() {
         <Stack.Screen name="consult/[id]" options={{ headerShown: true, title: 'Consult' }} />
         <Stack.Screen name="project/[id]" options={{ headerShown: true, title: 'Project' }} />
         <Stack.Screen name="session/[id]" options={{ headerShown: true, title: 'Session' }} />
+        {/* Phase 5 step 8's Settings slice (photo only - see settings/index.tsx's own header
+            comment on what's deliberately not here yet). Reached from index.tsx's header, next
+            to Log out - the same "who am I, how do I sign out" header spot web's own account
+            menu occupies, not a tab. */}
+        <Stack.Screen name="settings/index" options={{ headerShown: true, title: 'Settings' }} />
       </Stack.Protected>
     </Stack>
   );

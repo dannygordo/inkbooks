@@ -1367,6 +1367,62 @@ own comment had explicitly left out).
 
 ---
 
+### X14. Settings' avatar upload is the next slice of X13's still-unported list - photo only, password and calendar color deliberately left for later
+
+X13 named three things still unported: avatar upload, Messages, and the client-dashboard shared-
+images panel. Asked which to build next (three-way clarifying question, matching X12's own
+"scoped down via clarifying questions" precedent) - avatar upload chosen for being the smallest,
+self-contained, and the only one needing no new upload plumbing (reuses `ImagesUpload.tsx`/
+`uploadFile.ts`'s Firebase infra from X13 verbatim).
+
+**Scoped narrower than "port `AccountPanel.jsx`," not just narrower than "the whole web app."**
+That component is three real features - photo, password (`IBUpdatePassword.jsx`), calendar color
+(`getTagColorsByShop` + a shop-mates-collision-avoiding picker) - bundled onto one settings page
+for web's own navigation reasons (see that file's header comment), not because they're one
+feature. Photo is this slice; password and calendar color are follow-up work on the same screen,
+not silently dropped - `app/settings/index.tsx`'s own header comment says so, same as X12/X13's
+convention of naming what a scope cut leaves out rather than letting it read as complete.
+
+**No crop screen, unlike web's `CropEasy.jsx` (`react-easy-crop`, a canvas-based web-only
+library).** `expo-image-picker`'s own `allowsEditing: true` + `aspect: [1, 1]` gives a native
+square-crop UI on both platforms for free - no new dependency, no native module, matching X13's
+own "avoid a native rebuild where RN already has a built-in answer" reasoning (there for Firebase/
+Square, here for cropping). `ImagesUpload.tsx` never needed this (project reference/design/finished
+photos aren't cropped on web either), so this is genuinely new to the port, not a corrected gap.
+
+**Upload order deliberately reversed from web's.** `AccountPanel.jsx`'s `handleSubmit` uploads the
+new avatar, deletes the old one, THEN calls `updateUser` - so an `updateUser` failure after a
+successful upload+delete leaves the account with no avatar reference AND no old file to fall back
+to. `app/settings/index.tsx` deletes the old avatar only after `updateUser` succeeds instead; the
+worst case on any mid-flow failure is an orphaned new file in Storage nothing points at yet, never
+a user left with neither. `firebase/deleteFile.ts`'s `deleteFile()` already accepts a full download
+URL directly (Storage's `ref()` resolves a `gs://` path, a plain storage path, or an `https`
+download URL interchangeably), so this also drops web's own URL-parsing step
+(`user.avatar.split("%2Fprofile%2F")[1]?.split("?")[0]`) entirely rather than porting it.
+
+**`updateUser.graphql` selects only `id`/`avatar`, not web's full field list
+(`email`/`firstName`/`lastName`/`role`/`accessToken`/`userType`/`tagColor`/`themePreference`/
+`userInfo`).** This slice only ever changes one field; widen the selection when password/calendar-
+color are actually built rather than over-fetching now for hypothetical future callers. Same
+"merge the one changed field into the existing `CurrentUser`, never replace it" contract
+`context/auth.tsx`'s `updateCurrentUser` already establishes elsewhere - load-bearing here because
+`updateUser`'s own resolver returns a placeholder `accessToken` (`'temp_' + Date.now()`), not a
+real one; the mutation document's own header comment carries this warning forward for the next
+caller who reaches for it.
+
+**New `Avatar.tsx` component, not a port of `IBAvatar.jsx`.** Web's version falls back to MUI
+Avatar's generic person icon with no image; this one shows the user's own initials in a filled
+circle instead - more legible, and cheap enough to build new rather than reproduce the less useful
+behavior. The `isOnline` presence-dot variant isn't included: nothing in this app has presence/read
+receipts yet (Messages is still X13's other unbuilt item), so there's nothing to wire it to.
+
+**No dedicated screen-level test for `app/settings/index.tsx`**, matching the precedent X12/X13's
+own four screens already set (`appointment/[id].tsx`, `consult/[id].tsx`, `project/[id].tsx`,
+`session/[id].tsx` have none either) - only pure logic gets its own test file
+(`utils/avatar.ts` → `__tests__/avatar.test.ts`), not the Apollo-wired screen component itself.
+
+---
+
 ## Process
 
 ### PR1. Tests are written alongside the feature or fix, not queued for a later pass
