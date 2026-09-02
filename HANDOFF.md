@@ -4,7 +4,75 @@
 has not been verified. `DECISIONS.md` is *rules* — the settled calls and why. They change at
 different rates, which is why they are separate files.
 
-Last updated: 2026-09-01.
+Last updated: 2026-09-02.
+
+---
+
+### 2026-09-02: PR #11 confirmed merged/green; PAYMENT_RECEIVED's roadmap entry was stale, not the code - new route-level tests written, confirmed green on Danny's machine, item 7 fully closed
+
+Picked up from the 2026-09-01 entry's own open item: **confirmed via the GitHub API** (no `gh` on
+the connected device, so `curl`'d `api.github.com` directly) that PR #11
+(`feat/push-notifications`, which by the end carried both step 7's push-notification work and step
+8's appointment-opening/image-upload/Square-charge slice) **merged into `main` 2026-09-01T14:07:11Z
+as `eca520f`, with every check on its final commit (`c6b3284`) green**: `packages/api`
+build/typecheck/codegen, client tests+build, mobile typecheck+tests, server tests, and Cloudflare
+Pages' own checks. Nothing left blocking from that entry.
+
+Asked to "take care of the payment-received trigger" next - PRODUCTION_ROADMAP.md's Suggested
+Sequencing item 7 said this was still open ("the template and toggle already exist in Settings;
+nothing calls it yet"). **It wasn't open - it was done on 2026-08-27, commit `6732aaf`**, the same
+commit that dropped the seven legacy `Shop.square*` fields. `routes/squarePayments.js` already
+calls `sendAutoResponsesForTrigger({ trigger: 'PAYMENT_RECEIVED', appointment })` unconditionally
+on both the deposit and session-charge success branches. The roadmap entry was simply never updated
+after that commit landed - same class of staleness as several other entries this doc has already
+flagged and corrected (see the 2026-08-21/22 entries). Corrected in place rather than left to
+mislead the next session again.
+
+What genuinely was missing: **test coverage.** `test/integration/squarePaymentRoute.test.js` (563
+lines) had zero mentions of `PAYMENT_RECEIVED`/`AutoResponse`/`sendAutoResponsesForTrigger` before
+today, and `auto-responses.test.js` only ever exercises the trigger-agnostic function directly with
+`SESSION_COMPLETED` - nothing proved the *route* actually reaches it. Added a
+`describe('PAYMENT_RECEIVED fires a receipt on a real charge', ...)` block: fires on a session
+charge, fires on a deposit charge, falls back to the shop's response when the artist has none of
+their own (the precedence rule already covered generically in `autoResponses.test.js`, now proven
+through this specific call site too), and the charge still succeeds when nobody has the trigger
+enabled at all (the best-effort contract). Deliberately does NOT `vi.spyOn` the auto-responses
+module the way `square.createPaymentForAccount` is spied on above it in the same file -
+`squarePayments.js` destructures `sendAutoResponsesForTrigger` at `require` time, so a spy applied
+in `beforeEach` would replace a property on the module's exports object after the route already
+closed over the original function reference, and would silently never be called. Asserted on the
+real side effect instead: an `AutoResponseLog` row claimed under the resolved `AutoResponse` for
+the appointment. `client.email` sends nowhere in this sandbox (no `RESEND_API_KEY` - see
+`globalSetup.js`), so the log lands as `status: 'skipped'` rather than `'sent'`; the test only
+asserts the row exists at all, which is what answers "did the route reach the trigger."
+
+**Confirmed for real on Danny's own machine, same day**: both the new
+`describe('PAYMENT_RECEIVED fires a receipt on a real charge', ...)` block and the full client
+suite passed - closing the one gap the sandbox couldn't (same `fastdl.mongodb.org` 403 every other
+server test file here already carries; this sandbox only got as far as `node --check`).
+
+Getting there surfaced one real environment bug, unrelated to this feature: `apps/web`'s root
+`node_modules/@rollup/` held only Linux binaries (`rollup-linux-x64-gnu`/`-musl`), no Darwin
+variant, so `npm test` in `apps/web` failed with `Cannot find module @rollup/rollup-darwin-x64`
+before a single test ran. Root cause: the 2026-09-01 entry's own connected-folder-mount
+workaround (`npm install` in a Linux sandbox, `rsync`'d into the real Mac folder) fixed the mobile
+install but left Linux-native rollup binaries sitting in the ROOT workspace's `node_modules`,
+which `apps/web` hoists from. Fixed the only way that's safe for a real machine: `rm -rf
+node_modules apps/*/node_modules packages/*/node_modules && npm install`, run directly in Danny's
+own Terminal (not this session - this sandbox's own shell is Linux too and would just reproduce
+the contamination). Confirmed via `uname -m` from inside this session's own view of the mount
+that the corrupted binaries were exactly what the error was missing. Left one small,
+correct lockfile change behind: `fsevents`' `dev: true` flag dropped in `package-lock.json` (it's
+a real macOS-only optional dependency Vite's file watcher needs, not a dev-only one - a real
+install on a real Mac resolved it correctly where the sandbox-origin lockfile hadn't).
+
+**Item 7 (see PRODUCTION_ROADMAP.md) is now fully closed.** `scripts/drop-legacy-square-shop-
+fields.js` has been run for real by Danny, against the pre-launch Atlas database (`.env`/
+`.env.production`'s `cluster0.6sz1d.mongodb.net/inkbook` - confirmed with Danny this holds no real
+client data yet, only seed/dev data) - the seven legacy `Shop.square*` fields are gone from
+existing documents. Could not be run from this session either way: this sandbox has no network
+path to that cluster (`querySrv ECONNREFUSED` on the SRV lookup) or to a local dev Mongo (same
+`ECONNREFUSED 127.0.0.1:27017` the 2026-08-19 entry already hit).
 
 ---
 

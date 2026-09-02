@@ -2505,10 +2505,18 @@ see the note above. It is not on this list at any priority, not because it was f
    shape bug was fixed at the source in `seed.js`/`seed-large.js` and Danny already re-ran them to
    correct the seed data (2026-08-27), so `migrate-shop-admins-to-artists.js` has nothing to find
    against current data; it stays in the repo as a rescue tool if a real signup path ever produces
-   a `STAFF`-only admin again. Still open: drop the seven now-unread legacy `square*` fields on
+   a `STAFF`-only admin again. ~~Still open: drop the seven now-unread legacy `square*` fields on
    `Shop`, and wire the `PAYMENT_RECEIVED` Auto-Response trigger to the real charge success path in
-   `routes/squarePayments.js` (the template and toggle already exist in Settings; nothing calls it
-   yet).
+   `routes/squarePayments.js`~~ — **both done, same day (commit `6732aaf`, 2026-08-27)**, this
+   entry was just never updated to say so. `routes/squarePayments.js` calls
+   `sendAutoResponsesForTrigger({ trigger: 'PAYMENT_RECEIVED', appointment })` unconditionally on
+   both the deposit and session-charge success branches, and now has route-level coverage proving
+   it (`test/integration/squarePaymentRoute.test.js`'s "PAYMENT_RECEIVED fires a receipt on a real
+   charge" block, added 2026-09-02 and confirmed passing for real on Danny's own machine the same
+   day - a real AutoResponseLog row claimed per charge, not a mock of the call site, since
+   `squarePayments.js` destructures the function at require time). `scripts/drop-legacy-square-
+   shop-fields.js` has also now been run for real, against the pre-launch Atlas database (no real
+   client data yet). **Item 7 is fully closed.**
 8. ~~Wire `ClientFlagType.ensureSeeded()` into application boot~~ — **already done**, confirmed
    2026-08-21/22 by reading `server/index.js` directly (`await ClientFlagType.ensureSeeded()` at
    boot). This item was stale, not the underlying code.

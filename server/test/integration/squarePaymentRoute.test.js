@@ -19,12 +19,16 @@ const squarePaymentsRouter = require('../../routes/squarePayments');
 const square = require('../../utils/square');
 const Appointment = require('../../models/Appointment');
 const SquareAccount = require('../../models/SquareAccount');
+const AutoResponse = require('../../models/AutoResponse');
+const AutoResponseLog = require('../../models/AutoResponseLog');
 const { signTestToken } = require('../helpers/auth');
 const {
 	createArtistUser,
 	createShopAdminUser,
 	connectArtistToShop,
 	createAppointment,
+	createClientUser,
+	createProject,
 } = require('../helpers/factories');
 
 function buildApp() {
@@ -559,5 +563,121 @@ describe('charging a pending deposit', () => {
 
 		expect(res.status).toBe(409);
 		expect(createPaymentSpy).not.toHaveBeenCalled();
+	});
+});
+
+// PRODUCTION_ROADMAP.md's Phase 5 sequencing (item 7) flagged this as the one still-missing piece
+// after item 7's other cleanups: "the template and toggle already exist in Settings; nothing calls
+// it yet." routes/squarePayments.js's own call site (see the "PAYMENT_RECEIVED fires for BOTH
+// branches" comment above) was actually wired in commit 6732aaf (2026-08-27) - the roadmap entry
+// was just never updated to say so. What was never proven, before this describe block, is that a
+// real POST against this route actually reaches sendAutoResponsesForTrigger end to end.
+//
+// Deliberately not mocked with vi.spyOn the way square.createPaymentForAccount is above:
+// squarePayments.js destructures `const { sendAutoResponsesForTrigger } = require(...)` at
+// require time, so it captures that function reference before this file's beforeEach ever runs -
+// a later vi.spyOn on the auto-responses module's export would replace the module's own property,
+// not the reference squarePayments.js already closed over, and would silently never be called.
+// The real side effect is the trustworthy check instead: an AutoResponseLog row claimed under the
+// resolved AutoResponse. client.email is unset by RESEND_API_KEY-less test env (globalSetup.js) so
+// sendEmailFn no-ops and the log lands as 'skipped' rather than 'sent' - see auto-responses.test.js's
+// own recorder() pattern for the version of this that asserts a real send; what this file cares
+// about is only "did the route reach the trigger at all," which the claimed log row - status aside
+// - already answers.
+describe('PAYMENT_RECEIVED fires a receipt on a real charge', () => {
+	async function artistWithClientProject(user) {
+		const { client } = await createClientUser();
+		const project = await createProject(user.id, client._id);
+		return { client, project };
+	}
+
+	it('logs a PAYMENT_RECEIVED send for a session charge', async () => {
+		const { user, shop } = await artistAtConnectedShop();
+		const { project } = await artistWithClientProject(user);
+		await new AutoResponse({
+			artistUserId: user.id,
+			name: 'Receipt',
+			trigger: 'PAYMENT_RECEIVED',
+			enabled: true,
+			emailEnabled: true,
+		}).save();
+		const appointment = await createAppointment(user.id, {
+			shopId: shop.id,
+			projectId: project.id,
+			subtotalCents: 20000,
+		});
+
+		const res = await post(validBody(appointment.id), user);
+
+		expect(res.status).toBe(200);
+		const logs = await AutoResponseLog.find({ appointmentId: appointment._id });
+		expect(logs).toHaveLength(1);
+		expect(logs[0].ownerType).toBe('ARTIST');
+	});
+
+	it('logs a PAYMENT_RECEIVED send for a deposit charge too - not just a session charge', async () => {
+		const { user, shop } = await artistAtConnectedShop();
+		const { project } = await artistWithClientProject(user);
+		await new AutoResponse({
+			artistUserId: user.id,
+			name: 'Receipt',
+			trigger: 'PAYMENT_RECEIVED',
+			enabled: true,
+			emailEnabled: true,
+		}).save();
+		const appointment = await createAppointment(user.id, {
+			shopId: shop.id,
+			projectId: project.id,
+			appointmentType: 'consult',
+			depositCents: 20000,
+			depositStatus: 'pending',
+		});
+
+		const res = await post(validBody(appointment.id, { chargeType: 'deposit' }), user);
+
+		expect(res.status).toBe(200);
+		const logs = await AutoResponseLog.find({ appointmentId: appointment._id });
+		expect(logs).toHaveLength(1);
+	});
+
+	it("fires the shop's response when the artist has none of their own enabled", async () => {
+		const { user, shop } = await artistAtConnectedShop();
+		const { project } = await artistWithClientProject(user);
+		await new AutoResponse({
+			shopId: shop._id,
+			name: 'Shop receipt',
+			trigger: 'PAYMENT_RECEIVED',
+			enabled: true,
+			emailEnabled: true,
+		}).save();
+		const appointment = await createAppointment(user.id, {
+			shopId: shop.id,
+			projectId: project.id,
+			subtotalCents: 20000,
+		});
+
+		await post(validBody(appointment.id), user);
+
+		const logs = await AutoResponseLog.find({ appointmentId: appointment._id });
+		expect(logs).toHaveLength(1);
+		expect(logs[0].ownerType).toBe('SHOP');
+	});
+
+	// Best-effort per auto-responses.js's own contract: a charge that already succeeded must never
+	// be undone because nobody has a receipt template turned on.
+	it('still charges successfully when nobody has PAYMENT_RECEIVED enabled', async () => {
+		const { user, shop } = await artistAtConnectedShop();
+		const { project } = await artistWithClientProject(user);
+		const appointment = await createAppointment(user.id, {
+			shopId: shop.id,
+			projectId: project.id,
+			subtotalCents: 20000,
+		});
+
+		const res = await post(validBody(appointment.id), user);
+
+		expect(res.status).toBe(200);
+		expect(createPaymentSpy).toHaveBeenCalledTimes(1);
+		expect(await AutoResponseLog.countDocuments({ appointmentId: appointment._id })).toBe(0);
 	});
 });
