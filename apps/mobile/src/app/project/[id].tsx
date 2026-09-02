@@ -58,6 +58,7 @@ export default function ProjectDetailScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const theme = useTheme();
+  const router = useRouter();
 
   const { data, loading, error, refetch } = useGetProjectDetailQuery({
     variables: { projectId: id ?? '' },
@@ -97,9 +98,23 @@ export default function ProjectDetailScreen() {
               {project.title}
             </ThemedText>
             {project.client ? (
-              <ThemedText type="small" themeColor="textSecondary">
-                {project.client.firstName} {project.client.lastName}
-              </ThemedText>
+              <Pressable
+                onPress={() =>
+                  router.push({
+                    pathname: '/client/[id]',
+                    params: {
+                      id: project.clientId,
+                      firstName: project.client?.firstName ?? '',
+                      lastName: project.client?.lastName ?? '',
+                    },
+                  })
+                }
+                testID="view-client-link"
+              >
+                <ThemedText type="link">
+                  {project.client.firstName} {project.client.lastName}
+                </ThemedText>
+              </Pressable>
             ) : null}
           </View>
 

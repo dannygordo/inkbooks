@@ -928,6 +928,17 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    removed - CI never has this file present either, since `.expo/` is gitignored and no CI step
    generates it, so this cost real time here but isn't a real bug), and the full `apps/mobile`
    Jest suite (115/115, up from 108 - the new `avatar.test.ts`).
+
+   **Client Detail + the client-dashboard shared-images panel (2026-09-02, see DECISIONS.md X15)
+   is the next slice after that**, picked together with Messages when asked to do both remaining
+   X13 items. View-only: reads `getSharedImagesForClient` (new operation) into a new
+   `app/client/[id].tsx` screen and `components/SharedImagesGallery.tsx`, reached from
+   `project/[id].tsx`'s client name (now a "View Client" link); web's assign-to-project and
+   delete/re-tag actions on this same list are explicitly not built yet, same
+   name-what's-left-out convention as every slice above. Confirmed in this sandbox: `packages/api`
+   codegen + build, `apps/mobile` `tsc --noEmit` clean, and the full `apps/mobile` Jest suite
+   (119/119, up from 115 - the new `sharedImages.test.ts`). Messages - the other item from "do
+   them both" - is next.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).
 10. TestFlight beta, then App Store submission - Guideline 3.1.1 already checked in step 5, so this

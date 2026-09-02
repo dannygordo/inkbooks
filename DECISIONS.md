@@ -1421,6 +1421,55 @@ own four screens already set (`appointment/[id].tsx`, `consult/[id].tsx`, `proje
 `session/[id].tsx` have none either) - only pure logic gets its own test file
 (`utils/avatar.ts` → `__tests__/avatar.test.ts`), not the Apollo-wired screen component itself.
 
+### X15. Client Detail + the client-dashboard shared-images panel is X14's next slice - view-only, no delete/tag/assign, and no new query for the header
+
+X13/X14 left two items on the still-unported list: Messages and the client-dashboard shared-images
+panel. This is the panel half, plus the screen it has to live on - mobile has no client-detail
+screen at all yet, so building the panel first meant building `app/client/[id].tsx` to hold it.
+
+**View-only, not a port of `SharedImagesPanel.jsx`'s full feature set.** Web's version does three
+things: shows every image shared via a message on this client's conversation(s), lets an
+artist/shop-admin file one onto a project's References/Design/Finished-Tattoo list
+(`assignSharedImageToProject`), and lets them drop a row from the list or edit its tags
+(`removeSharedImageFromList`/`updateSharedImageTags`). This slice only builds the read side -
+`getSharedImagesForClient` - same reasoning as X14's photo-only cut: land the smallest complete
+piece, name what's left rather than let it read as done. Assign/delete/tag-edit are real future
+work on this same screen, not dropped silently - `sharedImages.graphql`, `SharedImagesGallery.tsx`,
+and `client/[id].tsx`'s own header comments all say so.
+
+**`client/[id].tsx` reads the client's name from route params, not a new `getClient` query.** The
+only way to reach this screen today is `project/[id].tsx`'s new "View Client" link, which already
+has `project.client.firstName`/`lastName` in hand from its own existing query - passing those
+through as params avoids a second round-trip for data the caller already fetched, at the cost of
+this screen having nothing to show if it's ever reached another way. Worth revisiting if a second
+entry point (e.g. a client list/search screen) gets built before a proper `getClient` query would
+be needed anyway.
+
+**`SharedImage` stays its own GraphQL type on the mobile side too, not reused as `IbImageInput`
+or folded into `IBImage`.** Web's own `typeDefs.js` already keeps them distinct despite
+`SharedImagesPanel.jsx`'s header comment noting `SharedImage`'s shape "mirrors IBImage's field
+names" - it is a separate MongoDB collection indexing images shared via chat messages, not a
+project's own image list, and a `SharedImage` row keeps existing (and can still be filed onto a
+project later) independently of whatever a project's own References/Design/Body Images arrays
+contain. `sharedImages.ts`'s `SharedImageItem` type is pulled straight from the generated
+`GetSharedImagesForClientQuery`, so this distinction isn't something a caller can accidentally
+blur.
+
+**Auth gate is `canManageClientSharedImages`, stricter than `canAccessClient`, and mobile's own
+error state says so.** `canAccessClient` (what every other client-facing screen in this app checks)
+lets any shop member in, front-desk staff included, plus the client themselves reading their own
+record. `canManageClientSharedImages` (`server/utils/shop-membership.js`) excludes plain
+`SHOP_STAFF` outright (`user.role > SHOP_ADMIN` short-circuits to `false`) and never lets the
+client see their own shared-images list either - this is an artist/shop-admin triage surface, the
+same reasoning `SharedImagesPanel.jsx`'s own header comment gives for why it's mounted
+`!isSelf`-gated on web. `client/[id].tsx`'s error message names this possibility explicitly rather
+than presenting a bare GraphQL error, since a staff account hitting this screen via a future entry
+point is an expected, not exceptional, outcome.
+
+**No dedicated screen-level test for `client/[id].tsx` or `SharedImagesGallery.tsx`**, matching
+X12/X13/X14's own precedent - only the pure logic (`utils/sharedImages.ts`'s `assignedLabel`) gets
+`__tests__/sharedImages.test.ts`, not the Apollo-wired screen or the gallery component itself.
+
 ---
 
 ## Process

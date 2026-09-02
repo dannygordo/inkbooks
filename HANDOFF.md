@@ -8,6 +8,47 @@ Last updated: 2026-09-02.
 
 ---
 
+### 2026-09-02 (third entry): Client Detail screen + client-dashboard shared-images panel built - view-only, second of X13's three still-unported items
+
+Picked up from the second entry below: X13 named Messages and the shared-images panel as the two
+remaining unported items; asked "do them both," starting with the panel since it needed a
+client-detail screen built under it first (mobile had none). Full reasoning and every scope call:
+DECISIONS.md X15.
+
+**Built:** `app/client/[id].tsx` (new route, registered in `_layout.tsx`, reached only from
+`project/[id].tsx`'s client name, now a "View Client" link), `components/SharedImagesGallery.tsx`
+(new - view-only grid+modal, no delete/tag/assign), `utils/sharedImages.ts` (`assignedLabel` +
+`__tests__/sharedImages.test.ts`), and `packages/api/src/operations/sharedImages.graphql` (new
+`getSharedImagesForClient` query - codegen + build both ran clean, same schema-from-typeDefs.js
+path X14 used, no live server needed).
+
+**Deliberately read-only:** web's `SharedImagesPanel.jsx` also lets an artist file an image onto a
+project (`assignSharedImageToProject`) and delete/re-tag a row (`removeSharedImageFromList`/
+`updateSharedImageTags`); none of the three are built here. `client/[id].tsx` gets the client's
+name from the route params `project/[id].tsx` already had in hand, not a new `getClient` query -
+so this screen has nothing to show if reached any other way (nothing else reaches it yet).
+
+**Auth note carried into the UI:** `getSharedImagesForClient` is gated by
+`canManageClientSharedImages`, which excludes plain `SHOP_STAFF` (unlike every other client screen's
+`canAccessClient`) - the screen's error state names this possibility instead of showing a bare
+GraphQL error.
+
+**Also registered in `_layout.tsx` this session, not yet built:** `messages/index` and
+`messages/[id]` route stubs - placeholders for the Messages slice, next up per "do them both."
+Navigating to either right now would fail; nothing links to them yet.
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean
+(stale `.expo/types/router.d.ts` deleted first - same recurring sandbox artifact X14's entry
+documents, now routine to check before every mobile typecheck), and the full `apps/mobile` Jest
+suite - 119/119 (115 before this slice, +4 from `sharedImages.test.ts`). **Not yet confirmed:** a
+real device/simulator run - same caveat as every mobile slice so far, nothing in this sandbox can
+launch Expo Go or a simulator.
+
+**Still open from X13:** Messages (starting now), and password/calendar-color on the Settings
+screen (X14's own deferred items).
+
+---
+
 ### 2026-09-02 (second entry): Settings' avatar upload built - the first of X13's still-unported list, scoped down to photo only
 
 Picked Phase 5's next slice by asking which of X13's three remaining items (avatar upload,

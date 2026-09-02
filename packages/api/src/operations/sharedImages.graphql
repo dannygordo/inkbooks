@@ -1,0 +1,32 @@
+# The client dashboard's "shared images" panel (apps/web's SharedImagesPanel.jsx) - every image
+# shared via a message in this client's conversation(s), NOT images off any Project's
+# referenceImages/designImages/bodyImages arrays. Deliberately a separate query/type from
+# projectDetail.graphql's ProjectImageFields fragment: SharedImage only mirrors IBImage's field
+# names (url/userInfo/tags/createdAt/updatedAt/id), it isn't the same shape - see
+# server/graphql/typeDefs.js's own SharedImage type and DECISIONS.md X15.
+#
+# Server-side auth is stricter than "can this person see the client at all"
+# (canManageClientSharedImages, not canAccessClient - server/utils/shop-membership.js): a plain
+# SHOP_STAFF role gets refused here even though a broader client-detail query might allow them
+# through. Nothing to handle client-side - the server is the real gate, this just means a shop
+# staff account will see this query error rather than an empty list.
+query GetSharedImagesForClient($clientId: ID!) {
+	getSharedImagesForClient(clientId: $clientId) {
+		id
+		url
+		userInfo {
+			id
+			firstName
+			lastName
+			avatar
+		}
+		tags
+		assignedProjectId
+		assignedImageType
+		assignedProject {
+			id
+			title
+		}
+		createdAt
+	}
+}

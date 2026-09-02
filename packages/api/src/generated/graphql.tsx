@@ -3007,6 +3007,13 @@ export type ResetSessionTimerMutationVariables = Exact<{
 
 export type ResetSessionTimerMutation = { __typename?: 'Mutation', resetSessionTimer: { __typename?: 'Appointment', id: string, timerStatus?: string | null, timerStartedAt?: string | null, accumulatedSeconds?: number | null } };
 
+export type GetSharedImagesForClientQueryVariables = Exact<{
+  clientId: Scalars['ID']['input'];
+}>;
+
+
+export type GetSharedImagesForClientQuery = { __typename?: 'Query', getSharedImagesForClient: Array<{ __typename?: 'SharedImage', id: string, url: string, tags: Array<string>, assignedProjectId?: string | null, assignedImageType?: string | null, createdAt: string, userInfo?: { __typename?: 'User', id: string, firstName?: string | null, lastName?: string | null, avatar?: string | null } | null, assignedProject?: { __typename?: 'Project', id: string, title: string } | null }> };
+
 export type UpdateProjectMutationVariables = Exact<{
   project?: InputMaybe<ProjectInput>;
 }>;
@@ -4860,6 +4867,64 @@ export function useResetSessionTimerMutation(baseOptions?: Apollo.MutationHookOp
 export type ResetSessionTimerMutationHookResult = ReturnType<typeof useResetSessionTimerMutation>;
 export type ResetSessionTimerMutationResult = Apollo.MutationResult<ResetSessionTimerMutation>;
 export type ResetSessionTimerMutationOptions = Apollo.BaseMutationOptions<ResetSessionTimerMutation, ResetSessionTimerMutationVariables>;
+export const GetSharedImagesForClientDocument = gql`
+    query GetSharedImagesForClient($clientId: ID!) {
+  getSharedImagesForClient(clientId: $clientId) {
+    id
+    url
+    userInfo {
+      id
+      firstName
+      lastName
+      avatar
+    }
+    tags
+    assignedProjectId
+    assignedImageType
+    assignedProject {
+      id
+      title
+    }
+    createdAt
+  }
+}
+    `;
+
+/**
+ * __useGetSharedImagesForClientQuery__
+ *
+ * To run a query within a React component, call `useGetSharedImagesForClientQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetSharedImagesForClientQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetSharedImagesForClientQuery({
+ *   variables: {
+ *      clientId: // value for 'clientId'
+ *   },
+ * });
+ */
+export function useGetSharedImagesForClientQuery(baseOptions: Apollo.QueryHookOptions<GetSharedImagesForClientQuery, GetSharedImagesForClientQueryVariables> & ({ variables: GetSharedImagesForClientQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetSharedImagesForClientQuery, GetSharedImagesForClientQueryVariables>(GetSharedImagesForClientDocument, options);
+      }
+export function useGetSharedImagesForClientLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetSharedImagesForClientQuery, GetSharedImagesForClientQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetSharedImagesForClientQuery, GetSharedImagesForClientQueryVariables>(GetSharedImagesForClientDocument, options);
+        }
+// @ts-ignore
+export function useGetSharedImagesForClientSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetSharedImagesForClientQuery, GetSharedImagesForClientQueryVariables>): Apollo.UseSuspenseQueryResult<GetSharedImagesForClientQuery, GetSharedImagesForClientQueryVariables>;
+export function useGetSharedImagesForClientSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetSharedImagesForClientQuery, GetSharedImagesForClientQueryVariables>): Apollo.UseSuspenseQueryResult<GetSharedImagesForClientQuery | undefined, GetSharedImagesForClientQueryVariables>;
+export function useGetSharedImagesForClientSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetSharedImagesForClientQuery, GetSharedImagesForClientQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetSharedImagesForClientQuery, GetSharedImagesForClientQueryVariables>(GetSharedImagesForClientDocument, options);
+        }
+export type GetSharedImagesForClientQueryHookResult = ReturnType<typeof useGetSharedImagesForClientQuery>;
+export type GetSharedImagesForClientLazyQueryHookResult = ReturnType<typeof useGetSharedImagesForClientLazyQuery>;
+export type GetSharedImagesForClientSuspenseQueryHookResult = ReturnType<typeof useGetSharedImagesForClientSuspenseQuery>;
+export type GetSharedImagesForClientQueryResult = Apollo.QueryResult<GetSharedImagesForClientQuery, GetSharedImagesForClientQueryVariables>;
 export const UpdateProjectDocument = gql`
     mutation UpdateProject($project: ProjectInput) {
   updateProject(project: $project) {
