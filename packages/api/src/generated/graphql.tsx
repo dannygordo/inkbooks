@@ -3043,6 +3043,13 @@ export type UpdateProjectDetailMutationVariables = Exact<{
 
 export type UpdateProjectDetailMutation = { __typename?: 'Mutation', updateProject?: { __typename?: 'Project', id: string, title: string, description: string, placement?: string | null, size?: string | null, palette?: string | null, artistId: string, clientId: string, tags?: Array<string | null> | null, status: string, depositCollectedCents?: number | null, depositAvailableCents?: number | null, notes?: Array<{ __typename?: 'IBNote', id: string, author: string, note: string, createdAt?: string | null, updatedAt?: string | null } | null> | null, referenceImages?: Array<{ __typename?: 'IBImage', id: string, url: string, title?: string | null, uploadedByDisplayName?: string | null, userId: string, avatar?: string | null, tags?: Array<string | null> | null, createdAt?: string | null, updatedAt?: string | null, userInfo?: { __typename?: 'User', firstName?: string | null, lastName?: string | null, avatar?: string | null } | null } | null> | null, designImages?: Array<{ __typename?: 'IBImage', id: string, url: string, title?: string | null, uploadedByDisplayName?: string | null, userId: string, avatar?: string | null, tags?: Array<string | null> | null, createdAt?: string | null, updatedAt?: string | null, userInfo?: { __typename?: 'User', firstName?: string | null, lastName?: string | null, avatar?: string | null } | null } | null> | null, bodyImages?: Array<{ __typename?: 'IBImage', id: string, url: string, title?: string | null, uploadedByDisplayName?: string | null, userId: string, avatar?: string | null, tags?: Array<string | null> | null, createdAt?: string | null, updatedAt?: string | null, userInfo?: { __typename?: 'User', firstName?: string | null, lastName?: string | null, avatar?: string | null } | null } | null> | null } | null };
 
+export type GetProjectsListQueryVariables = Exact<{
+  page?: InputMaybe<PageInput>;
+}>;
+
+
+export type GetProjectsListQuery = { __typename?: 'Query', getProjects: { __typename?: 'ProjectPage', items: Array<{ __typename?: 'Project', id: string, title: string, description: string, status: string, depositCollectedCents?: number | null, artistId: string, clientId: string, artist?: { __typename?: 'Artist', firstName: string, lastName: string, avatar?: string | null } | null, client?: { __typename?: 'Client', firstName: string, lastName: string } | null }>, pageInfo: { __typename?: 'PageInfo', totalCount: number, hasMore: boolean, limit: number, offset: number } } };
+
 export type RegisterDeviceTokenMutationVariables = Exact<{
   token: Scalars['String']['input'];
   platform: Scalars['String']['input'];
@@ -5241,6 +5248,72 @@ export function useUpdateProjectDetailMutation(baseOptions?: Apollo.MutationHook
 export type UpdateProjectDetailMutationHookResult = ReturnType<typeof useUpdateProjectDetailMutation>;
 export type UpdateProjectDetailMutationResult = Apollo.MutationResult<UpdateProjectDetailMutation>;
 export type UpdateProjectDetailMutationOptions = Apollo.BaseMutationOptions<UpdateProjectDetailMutation, UpdateProjectDetailMutationVariables>;
+export const GetProjectsListDocument = gql`
+    query GetProjectsList($page: PageInput) {
+  getProjects(page: $page) {
+    items {
+      id
+      title
+      description
+      status
+      depositCollectedCents
+      artistId
+      artist {
+        firstName
+        lastName
+        avatar
+      }
+      clientId
+      client {
+        firstName
+        lastName
+      }
+    }
+    pageInfo {
+      totalCount
+      hasMore
+      limit
+      offset
+    }
+  }
+}
+    `;
+
+/**
+ * __useGetProjectsListQuery__
+ *
+ * To run a query within a React component, call `useGetProjectsListQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetProjectsListQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetProjectsListQuery({
+ *   variables: {
+ *      page: // value for 'page'
+ *   },
+ * });
+ */
+export function useGetProjectsListQuery(baseOptions?: Apollo.QueryHookOptions<GetProjectsListQuery, GetProjectsListQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetProjectsListQuery, GetProjectsListQueryVariables>(GetProjectsListDocument, options);
+      }
+export function useGetProjectsListLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetProjectsListQuery, GetProjectsListQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetProjectsListQuery, GetProjectsListQueryVariables>(GetProjectsListDocument, options);
+        }
+// @ts-ignore
+export function useGetProjectsListSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetProjectsListQuery, GetProjectsListQueryVariables>): Apollo.UseSuspenseQueryResult<GetProjectsListQuery, GetProjectsListQueryVariables>;
+export function useGetProjectsListSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetProjectsListQuery, GetProjectsListQueryVariables>): Apollo.UseSuspenseQueryResult<GetProjectsListQuery | undefined, GetProjectsListQueryVariables>;
+export function useGetProjectsListSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetProjectsListQuery, GetProjectsListQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetProjectsListQuery, GetProjectsListQueryVariables>(GetProjectsListDocument, options);
+        }
+export type GetProjectsListQueryHookResult = ReturnType<typeof useGetProjectsListQuery>;
+export type GetProjectsListLazyQueryHookResult = ReturnType<typeof useGetProjectsListLazyQuery>;
+export type GetProjectsListSuspenseQueryHookResult = ReturnType<typeof useGetProjectsListSuspenseQuery>;
+export type GetProjectsListQueryResult = Apollo.QueryResult<GetProjectsListQuery, GetProjectsListQueryVariables>;
 export const RegisterDeviceTokenDocument = gql`
     mutation RegisterDeviceToken($token: String!, $platform: String!) {
   registerDeviceToken(token: $token, platform: $platform)

@@ -156,6 +156,9 @@ export default function AppointmentsScreen() {
             <Pressable onPress={() => router.push('/clients')} testID="clients-button">
               <ThemedText type="link">Clients</ThemedText>
             </Pressable>
+            <Pressable onPress={() => router.push('/projects')} testID="projects-button">
+              <ThemedText type="link">Projects</ThemedText>
+            </Pressable>
             <Pressable
               onPress={() => router.push('/booking-requests')}
               testID="booking-requests-button"

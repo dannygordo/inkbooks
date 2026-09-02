@@ -986,6 +986,20 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    `tsc --noEmit` clean, and the full `apps/mobile` Jest suite (151/151, up from 146 -
    `bookingRequests.test.ts`).
 
+   **Projects list (2026-09-02, see DECISIONS.md X20) is the next slice after that.**
+   `app/projects/index.tsx` - a plain paginated list, no filter or search (matching web's own
+   `Projects.jsx` scope exactly), giving `project/[id].tsx` its first browsable entry point since
+   step 8's original PR (previously reachable only via an appointment tap-through or a
+   booking-request conversion). A new leaner `GetProjectsList` operation
+   (`packages/api/src/operations/projects.graphql`), `utils/projectStatus.ts` (its own test file),
+   and a "Projects" header link on `index.tsx`. Found, and deliberately didn't port, a real web
+   bug along the way: `Projects.jsx`/`Search.jsx`'s status column has rendered blank
+   unconditionally since it was written, because `UtilsService.prettyConstantsListValue` compares
+   uppercase `VALUE`/`LABEL` against `PROJECT_STATUS`'s actual lowercase fields - see DECISIONS.md
+   X20 and the Open section. Confirmed in this sandbox: `packages/api` codegen + build,
+   `apps/mobile` `tsc --noEmit` clean, and the full `apps/mobile` Jest suite (154/154, up from
+   151 - `projectStatus.test.ts`).
+
    Everything else on the ~40-screen list not yet named remains open.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).

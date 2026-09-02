@@ -92,6 +92,10 @@ function RootNavigator() {
             here - see DECISIONS.md X19) feeds into. */}
         <Stack.Screen name="booking-requests/index" options={{ headerShown: true, title: 'Booking Requests' }} />
         <Stack.Screen name="booking-requests/[id]" options={{ headerShown: true, title: 'Request' }} />
+        {/* Projects - see projects/index.tsx's own header comment. Reached from index.tsx's
+            header, and now the browsable entry point project/[id].tsx (built in this step's
+            original PR) had been missing ever since. */}
+        <Stack.Screen name="projects/index" options={{ headerShown: true, title: 'Projects' }} />
       </Stack.Protected>
     </Stack>
   );

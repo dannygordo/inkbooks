@@ -1682,6 +1682,44 @@ itself still has no dedicated test either, consistent with it never having had o
 slice - only `tsc --noEmit` covers its changes directly, same as `consult/[id].tsx`, its one other
 caller.
 
+### X20. Projects list built - a browsable entry point for project/[id].tsx, which has never had one until now
+
+`project/[id].tsx` shipped in step 8's original PR, reachable only by tapping through an
+appointment or converting a booking request - there was never a way to just browse every project.
+This is the smallest remaining item with real, immediate value: a plain list, no filter, no
+search, matching web's own `Projects.jsx` scope exactly (that page has neither either - global
+search is a separate feature, same reasoning X17 already gave for `getClients`).
+
+**New `GetProjectsList` query, not a reuse of web's own `GetProjects`.** Same operation
+(`getProjects(page)`), but web's version selects every reference/body/design image array, every
+note, `materialsUsed`, and `tags` - fields a row summary never renders. Same "leaner sibling" call
+`projectDetail.graphql` already made against web's `getProject`/`updateProject` (step 8's own
+PRODUCTION_ROADMAP.md paragraph). Named `GetProjectsList` specifically so it coexists with web's
+`GetProjects` in the same generated `packages/api` output without colliding.
+
+**Found, not ported: web's own status column has been silently blank since it was written.**
+`Projects.jsx` (and `Search.jsx`, the only other caller) renders status via
+`UtilsService.prettyConstantsListValue(APP_SETTINGS_CONSTANTS.PROJECT_STATUS, project.status)`.
+That helper compares `item.VALUE`/`item.LABEL` (uppercase) against its inputs, but every entry in
+`PROJECT_STATUS` - and everywhere else in `constants/app.js` - uses lowercase `value`/`label`. The
+comparison can never match, so the status cell has rendered as an empty string for every project,
+on both pages, unconditionally, presumably since this helper was written. `utils/projectStatus.ts`
+does a plain lowercase-keyed lookup instead - correct, not a port of the bug. **This is a real web
+bug, left unfixed on web deliberately** - out of scope for a mobile-port slice, not something to
+patch as a drive-by on a file this work never otherwise touches. Flagged here by name so it isn't
+lost, same as every other out-of-scope finding this session has named rather than silently working
+around.
+
+**No "Add Project" button, matching web's own `IBPageActionBar` exactly - not a scope cut.** A
+project is always spawned by the booking workflow (`convertBookingRequest`, building it from a
+booking request's own intake fields) on both platforms; `IBPageActionBar`'s own comment notes the
+button that used to link to a create-project route was already dead before this port started.
+Nothing here removes a real web capability.
+
+**No dedicated screen-level test for `projects/index.tsx`**, matching every prior slice's
+precedent - `utils/projectStatus.ts`'s `projectStatusLabel` gets `__tests__/projectStatus.test.ts`;
+the Apollo-wired screen doesn't.
+
 ---
 
 ## Process
@@ -1786,8 +1824,13 @@ share → UI surfaces → dashboard fixes. Standalone fixes pulled forward.
 
 ## Open
 
-Nothing is blocking. Two things are parked rather than undecided:
+Nothing is blocking. A few things are parked rather than undecided:
 
+- **Web's Projects/Search status column is silently blank** (see X20's own note) -
+  `UtilsService.prettyConstantsListValue`'s uppercase `VALUE`/`LABEL` check never matches
+  `PROJECT_STATUS`'s lowercase `value`/`label` entries. A real, low-risk web bug found while
+  building mobile's own (correct) `projectStatusLabel`; left unfixed since it's outside this
+  mobile-port work's own files, not because it isn't worth fixing.
 - **The reference-image upload 400.** Parked at the user's direction until it recurs and a payload
   exists. `express.json()` was on Express's 100kb default and is now 2mb, but that is **not**
   confirmed as the cause and should not be recorded as the fix.

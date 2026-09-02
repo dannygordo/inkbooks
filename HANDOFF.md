@@ -8,6 +8,35 @@ Last updated: 2026-09-02.
 
 ---
 
+### 2026-09-02 (eighth entry): Projects list built - project/[id].tsx's first browsable entry point
+
+Picked as the next slice, smallest remaining item with real value: `project/[id].tsx` has shipped
+since step 8's original PR but was only ever reachable by tapping through an appointment or
+converting a booking request - never a plain "see all my projects" list. Full reasoning:
+DECISIONS.md X20.
+
+**Built:** `app/projects/index.tsx` (plain paginated list, no filter/search - matching web's own
+`Projects.jsx` scope exactly), `utils/projectStatus.ts` (with `__tests__/projectStatus.test.ts`),
+a new `GetProjectsList` query in `packages/api/src/operations/projects.graphql` (a leaner sibling
+of web's own over-fetching `GetProjects`, named differently so both coexist in the same generated
+file), registered in `_layout.tsx`, and a "Projects" header link on `index.tsx` next to Clients.
+
+**Found a real bug in web while porting the status column, and didn't port it.**
+`Projects.jsx`/`Search.jsx` render project status via a helper (`UtilsService.
+prettyConstantsListValue`) that compares uppercase `VALUE`/`LABEL` fields against
+`PROJECT_STATUS`'s actual lowercase `value`/`label` entries - the comparison can never match, so
+that column has rendered blank on both web pages, unconditionally, seemingly since it was written.
+Mobile's own `projectStatusLabel` does a correct lowercase lookup instead. Left unfixed on web
+itself deliberately - out of scope for this mobile-port slice, flagged in DECISIONS.md's Open
+section instead of silently working around it or silently reproducing it.
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+and the full `apps/mobile` Jest suite - 154/154 (151 before this slice, +3:
+`projectStatus.test.ts`). **Not yet confirmed:** a real device/simulator run, same standing
+caveat as every mobile slice this session.
+
+---
+
 ### 2026-09-02 (seventh entry): Booking Requests inbox built - list + detail, closes out X19
 
 The next slice of Phase 5 step 8's remaining list, paired naturally with X16's Messages (a booking
