@@ -1624,6 +1624,64 @@ derived from.
 this same screen - `utils/tagColors.ts`'s `showAvailableColorTags` gets
 `__tests__/tagColors.test.ts`; the password form and the swatch picker, both Apollo-wired, don't.
 
+### X19. Booking Requests inbox built - the funnel before an Appointment exists, split into list + detail rather than web's one master-detail page
+
+Picked as the next slice of Phase 5 step 8's remaining list, over the rest of the ~40-screen
+backlog, as the natural companion to X16's Messages (a booking request carries a real Conversation
+of its own) and to X13/X17's client-facing work. Reuses `ConvertBookingRequest` (already built for
+`consult/[id].tsx`'s "Convert to Session" flow) for every status transition here too, and
+`messenger.graphql`'s `GetMessagesByConversationId`/`CreateMessage`/`MarkConversationRead` for the
+conversation thread verbatim - a booking request's conversation is the exact same shape Messages
+already renders.
+
+**`apps/web/src/pages/booking/BookingRequest.jsx` is out of scope by construction, not by
+omission.** It is the public guest-facing intake form at `/book/:artistHandle` - a prospective
+client fills it out before any account of theirs exists - not an artist-side tool. Nothing in
+Phase 5 step 8 is porting client-facing web pages to the artist's mobile app; the artist-side
+counterpart, `ArtistBookingRequests.jsx`, is what this slice actually ports.
+
+**List + detail, not one master-detail page.** `ArtistBookingRequests.jsx` renders the list and
+the selected request's full detail (intake fields, conversation, actions) side by side in one
+page - reasonable screen-width use on web, but the same "a phone doesn't have two panes" call
+Messages' own inbox/thread split (X16) already made. `app/booking-requests/index.tsx` is the list;
+`app/booking-requests/[id].tsx` is the detail, reached by row tap, same shape as Messages.
+
+**`BookSessionDatesForm.tsx` generalized to work with or without a consult, matching web's own
+reuse exactly.** `ArtistBookingRequests.jsx` calls the identical session-booking component for
+both a fresh `pending` request and an already-`consult_booked` one, in both cases without a
+consult appointment - so rather than building a second, parallel "book a session directly"
+component, mobile's existing form (previously hard-wired to always require a consult, built for
+`consult/[id].tsx` alone) had its `consultAppointmentId`/`initialDate` props made optional. The
+deposit field is a real correctness point here, not just UI: `recordDeposit` needs a real
+appointment to attach a deposit transaction to, and booking straight from a pending or
+consult-booked request with no consult appointment has none. The entire deposit `FormField` and
+method-toggle block is now hidden outright when there's no `consultAppointmentId` (`{
+consultAppointmentId ? (...) : null }`), and the deposit-recording branch itself is guarded on
+`depositCents > 0 && consultAppointmentId` together, not `depositCents > 0` alone - the two
+previously-separate `if` blocks were combined under that one guard specifically so a mis-wired
+future caller can't type a deposit amount that either silently vanishes or gets submitted with
+`appointmentId: undefined`. This is the same guard web's own code uses, ported exactly, not a new
+rule invented for mobile.
+
+**`markConversationRead` refetches `GetUnreadMessageCount` only, never
+`GetPendingBookingRequestCount`.** The pending-request badge counts requests still owed a
+decision, not unread messages - reading a reply doesn't answer a request, only
+`convertBookingRequest` does, and that mutation is what refetches the pending-count badge instead.
+This is a previously-buggy-then-fixed distinction on web (the two counts used to be conflated) and
+is being ported as the already-correct behavior, not rediscovered here.
+
+**No "Forward to..." reassignment.** `ArtistBookingRequests.jsx` lets a shop admin hand a request
+to a different artist at the same shop. Real, secondary feature - needs a shop-mates picker mobile
+has no equivalent of yet - deliberately left for later rather than built as a rushed side effect
+of this slice.
+
+**No dedicated screen-level test for either new screen**, matching every prior slice's precedent -
+`utils/bookingRequests.ts`'s `bookingRequestStatusLabel` and `BOOKING_REQUEST_FILTERS` get
+`__tests__/bookingRequests.test.ts`; the two Apollo-wired screens don't. `BookSessionDatesForm.tsx`
+itself still has no dedicated test either, consistent with it never having had one before this
+slice - only `tsc --noEmit` covers its changes directly, same as `consult/[id].tsx`, its one other
+caller.
+
 ---
 
 ## Process

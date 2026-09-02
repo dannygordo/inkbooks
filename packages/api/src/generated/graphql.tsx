@@ -2862,6 +2862,27 @@ export type GetArtistShopConnectionsQueryVariables = Exact<{
 
 export type GetArtistShopConnectionsQuery = { __typename?: 'Query', getArtistShopConnections?: Array<{ __typename?: 'ArtistShopConnection', id: string, artistId: string, shopId: string, status: string, rateSource: string } | null> | null };
 
+export type GetBookingRequestsQueryVariables = Exact<{
+  artistId: Scalars['ID']['input'];
+  statuses?: InputMaybe<Array<Scalars['String']['input']> | Scalars['String']['input']>;
+  page?: InputMaybe<PageInput>;
+}>;
+
+
+export type GetBookingRequestsQuery = { __typename?: 'Query', getBookingRequests: { __typename?: 'BookingRequestPage', pageInfo: { __typename?: 'PageInfo', totalCount: number, hasMore: boolean, limit: number, offset: number }, items: Array<{ __typename?: 'BookingRequest', id: string, status: string, description: string, createdAt?: string | null, client?: { __typename?: 'Client', firstName: string, lastName: string } | null, conversation?: { __typename?: 'Conversation', id: string, unreadCount: number } | null }> } };
+
+export type GetBookingRequestQueryVariables = Exact<{
+  bookingRequestId: Scalars['ID']['input'];
+}>;
+
+
+export type GetBookingRequestQuery = { __typename?: 'Query', getBookingRequest?: { __typename?: 'BookingRequest', id: string, artistId: string, status: string, description: string, placement?: string | null, size?: string | null, budget?: string | null, availability?: string | null, isCoverUp?: boolean | null, howHeard?: string | null, referenceImages?: Array<string | null> | null, createdAt?: string | null, client?: { __typename?: 'Client', firstName: string, lastName: string, email: string, phone: string } | null, conversation?: { __typename?: 'Conversation', id: string, unreadCount: number } | null } | null };
+
+export type GetPendingBookingRequestCountQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetPendingBookingRequestCountQuery = { __typename?: 'Query', getPendingBookingRequestCount: number };
+
 export type GetChargeQuoteQueryVariables = Exact<{
   appointmentId: Scalars['ID']['input'];
   applyFeeOffset?: InputMaybe<Scalars['Boolean']['input']>;
@@ -3706,6 +3727,174 @@ export type GetArtistShopConnectionsQueryHookResult = ReturnType<typeof useGetAr
 export type GetArtistShopConnectionsLazyQueryHookResult = ReturnType<typeof useGetArtistShopConnectionsLazyQuery>;
 export type GetArtistShopConnectionsSuspenseQueryHookResult = ReturnType<typeof useGetArtistShopConnectionsSuspenseQuery>;
 export type GetArtistShopConnectionsQueryResult = Apollo.QueryResult<GetArtistShopConnectionsQuery, GetArtistShopConnectionsQueryVariables>;
+export const GetBookingRequestsDocument = gql`
+    query GetBookingRequests($artistId: ID!, $statuses: [String!], $page: PageInput) {
+  getBookingRequests(artistId: $artistId, statuses: $statuses, page: $page) {
+    pageInfo {
+      totalCount
+      hasMore
+      limit
+      offset
+    }
+    items {
+      id
+      status
+      description
+      createdAt
+      client {
+        firstName
+        lastName
+      }
+      conversation {
+        id
+        unreadCount
+      }
+    }
+  }
+}
+    `;
+
+/**
+ * __useGetBookingRequestsQuery__
+ *
+ * To run a query within a React component, call `useGetBookingRequestsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetBookingRequestsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetBookingRequestsQuery({
+ *   variables: {
+ *      artistId: // value for 'artistId'
+ *      statuses: // value for 'statuses'
+ *      page: // value for 'page'
+ *   },
+ * });
+ */
+export function useGetBookingRequestsQuery(baseOptions: Apollo.QueryHookOptions<GetBookingRequestsQuery, GetBookingRequestsQueryVariables> & ({ variables: GetBookingRequestsQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetBookingRequestsQuery, GetBookingRequestsQueryVariables>(GetBookingRequestsDocument, options);
+      }
+export function useGetBookingRequestsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetBookingRequestsQuery, GetBookingRequestsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetBookingRequestsQuery, GetBookingRequestsQueryVariables>(GetBookingRequestsDocument, options);
+        }
+// @ts-ignore
+export function useGetBookingRequestsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetBookingRequestsQuery, GetBookingRequestsQueryVariables>): Apollo.UseSuspenseQueryResult<GetBookingRequestsQuery, GetBookingRequestsQueryVariables>;
+export function useGetBookingRequestsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetBookingRequestsQuery, GetBookingRequestsQueryVariables>): Apollo.UseSuspenseQueryResult<GetBookingRequestsQuery | undefined, GetBookingRequestsQueryVariables>;
+export function useGetBookingRequestsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetBookingRequestsQuery, GetBookingRequestsQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetBookingRequestsQuery, GetBookingRequestsQueryVariables>(GetBookingRequestsDocument, options);
+        }
+export type GetBookingRequestsQueryHookResult = ReturnType<typeof useGetBookingRequestsQuery>;
+export type GetBookingRequestsLazyQueryHookResult = ReturnType<typeof useGetBookingRequestsLazyQuery>;
+export type GetBookingRequestsSuspenseQueryHookResult = ReturnType<typeof useGetBookingRequestsSuspenseQuery>;
+export type GetBookingRequestsQueryResult = Apollo.QueryResult<GetBookingRequestsQuery, GetBookingRequestsQueryVariables>;
+export const GetBookingRequestDocument = gql`
+    query GetBookingRequest($bookingRequestId: ID!) {
+  getBookingRequest(bookingRequestId: $bookingRequestId) {
+    id
+    artistId
+    status
+    description
+    placement
+    size
+    budget
+    availability
+    isCoverUp
+    howHeard
+    referenceImages
+    createdAt
+    client {
+      firstName
+      lastName
+      email
+      phone
+    }
+    conversation {
+      id
+      unreadCount
+    }
+  }
+}
+    `;
+
+/**
+ * __useGetBookingRequestQuery__
+ *
+ * To run a query within a React component, call `useGetBookingRequestQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetBookingRequestQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetBookingRequestQuery({
+ *   variables: {
+ *      bookingRequestId: // value for 'bookingRequestId'
+ *   },
+ * });
+ */
+export function useGetBookingRequestQuery(baseOptions: Apollo.QueryHookOptions<GetBookingRequestQuery, GetBookingRequestQueryVariables> & ({ variables: GetBookingRequestQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetBookingRequestQuery, GetBookingRequestQueryVariables>(GetBookingRequestDocument, options);
+      }
+export function useGetBookingRequestLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetBookingRequestQuery, GetBookingRequestQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetBookingRequestQuery, GetBookingRequestQueryVariables>(GetBookingRequestDocument, options);
+        }
+// @ts-ignore
+export function useGetBookingRequestSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetBookingRequestQuery, GetBookingRequestQueryVariables>): Apollo.UseSuspenseQueryResult<GetBookingRequestQuery, GetBookingRequestQueryVariables>;
+export function useGetBookingRequestSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetBookingRequestQuery, GetBookingRequestQueryVariables>): Apollo.UseSuspenseQueryResult<GetBookingRequestQuery | undefined, GetBookingRequestQueryVariables>;
+export function useGetBookingRequestSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetBookingRequestQuery, GetBookingRequestQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetBookingRequestQuery, GetBookingRequestQueryVariables>(GetBookingRequestDocument, options);
+        }
+export type GetBookingRequestQueryHookResult = ReturnType<typeof useGetBookingRequestQuery>;
+export type GetBookingRequestLazyQueryHookResult = ReturnType<typeof useGetBookingRequestLazyQuery>;
+export type GetBookingRequestSuspenseQueryHookResult = ReturnType<typeof useGetBookingRequestSuspenseQuery>;
+export type GetBookingRequestQueryResult = Apollo.QueryResult<GetBookingRequestQuery, GetBookingRequestQueryVariables>;
+export const GetPendingBookingRequestCountDocument = gql`
+    query GetPendingBookingRequestCount {
+  getPendingBookingRequestCount
+}
+    `;
+
+/**
+ * __useGetPendingBookingRequestCountQuery__
+ *
+ * To run a query within a React component, call `useGetPendingBookingRequestCountQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetPendingBookingRequestCountQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetPendingBookingRequestCountQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetPendingBookingRequestCountQuery(baseOptions?: Apollo.QueryHookOptions<GetPendingBookingRequestCountQuery, GetPendingBookingRequestCountQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetPendingBookingRequestCountQuery, GetPendingBookingRequestCountQueryVariables>(GetPendingBookingRequestCountDocument, options);
+      }
+export function useGetPendingBookingRequestCountLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetPendingBookingRequestCountQuery, GetPendingBookingRequestCountQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetPendingBookingRequestCountQuery, GetPendingBookingRequestCountQueryVariables>(GetPendingBookingRequestCountDocument, options);
+        }
+// @ts-ignore
+export function useGetPendingBookingRequestCountSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetPendingBookingRequestCountQuery, GetPendingBookingRequestCountQueryVariables>): Apollo.UseSuspenseQueryResult<GetPendingBookingRequestCountQuery, GetPendingBookingRequestCountQueryVariables>;
+export function useGetPendingBookingRequestCountSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetPendingBookingRequestCountQuery, GetPendingBookingRequestCountQueryVariables>): Apollo.UseSuspenseQueryResult<GetPendingBookingRequestCountQuery | undefined, GetPendingBookingRequestCountQueryVariables>;
+export function useGetPendingBookingRequestCountSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetPendingBookingRequestCountQuery, GetPendingBookingRequestCountQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetPendingBookingRequestCountQuery, GetPendingBookingRequestCountQueryVariables>(GetPendingBookingRequestCountDocument, options);
+        }
+export type GetPendingBookingRequestCountQueryHookResult = ReturnType<typeof useGetPendingBookingRequestCountQuery>;
+export type GetPendingBookingRequestCountLazyQueryHookResult = ReturnType<typeof useGetPendingBookingRequestCountLazyQuery>;
+export type GetPendingBookingRequestCountSuspenseQueryHookResult = ReturnType<typeof useGetPendingBookingRequestCountSuspenseQuery>;
+export type GetPendingBookingRequestCountQueryResult = Apollo.QueryResult<GetPendingBookingRequestCountQuery, GetPendingBookingRequestCountQueryVariables>;
 export const GetChargeQuoteDocument = gql`
     query GetChargeQuote($appointmentId: ID!, $applyFeeOffset: Boolean, $tipCents: Int, $subtotalCentsOverride: Int) {
   getChargeQuote(

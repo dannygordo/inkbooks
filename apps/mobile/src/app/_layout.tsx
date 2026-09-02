@@ -86,6 +86,12 @@ function RootNavigator() {
             index.tsx's header, next to the Settings avatar and Log out. */}
         <Stack.Screen name="messages/index" options={{ headerShown: true, title: 'Messages' }} />
         <Stack.Screen name="messages/[id]" options={{ headerShown: true, title: 'Conversation' }} />
+        {/* Booking Requests - inbox + detail, see booking-requests/index.tsx and [id].tsx's own
+            header comments. Reached from index.tsx's header, next to Messages - same funnel a
+            prospective client's public intake form (apps/web's BookingRequest.jsx, out of scope
+            here - see DECISIONS.md X19) feeds into. */}
+        <Stack.Screen name="booking-requests/index" options={{ headerShown: true, title: 'Booking Requests' }} />
+        <Stack.Screen name="booking-requests/[id]" options={{ headerShown: true, title: 'Request' }} />
       </Stack.Protected>
     </Stack>
   );

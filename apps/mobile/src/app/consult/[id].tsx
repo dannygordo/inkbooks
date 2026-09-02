@@ -24,8 +24,9 @@ const STATUS_LABELS: Record<string, string> = {
  * direct port). A consult Appointment has no Project of its own to view/edit through - this shows
  * its date and its original intake details off the BookingRequest it was created from
  * (Appointment.bookingRequest field resolver), and, while that request is still at
- * consult_booked, offers "Convert to Session" via BookSessionDatesForm - cash-only on mobile, see
- * that component's own header comment.
+ * consult_booked, offers "Convert to Session" via BookSessionDatesForm, deposit taken here in
+ * cash or by Square card - see that component's own header comment (stale note about being
+ * cash-only fixed while touching this file for DECISIONS.md X19's booking-requests work).
  */
 export default function ConsultDetailScreen() {
   const params = useLocalSearchParams<{ id: string }>();

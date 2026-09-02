@@ -1,0 +1,77 @@
+# The Booking Requests inbox - the funnel for a new prospective client before any Appointment
+# exists. See DECISIONS.md X19 for the full scope cut against apps/web's ArtistBookingRequests.jsx
+# (a single master-detail page; mobile splits it into a list + detail screen, same shape as
+# Messages' inbox/thread split - see app/booking-requests/index.tsx and [id].tsx).
+#
+# Reuses ConvertBookingRequest (convertBookingRequest.graphql, already built for consult/[id].tsx's
+# "Convert to Session" flow) for every status transition here too - decline, consult_booked, and
+# (via the now-dual-mode BookSessionDatesForm) session_booked all go through that same mutation
+# with a different outcome. Reuses messenger.graphql's GetMessagesByConversationId/CreateMessage/
+# MarkConversationRead for the conversation thread and reply composer - a booking request's
+# conversation is the exact same Conversation/Message shape Messages already renders.
+
+# artistId is always the caller's own id on mobile (no shop-admin-viewing-another-artist's-inbox
+# case built here - see DECISIONS.md X19). Server-scoped regardless (assertCanManageArtist).
+query GetBookingRequests($artistId: ID!, $statuses: [String!], $page: PageInput) {
+	getBookingRequests(artistId: $artistId, statuses: $statuses, page: $page) {
+		pageInfo {
+			totalCount
+			hasMore
+			limit
+			offset
+		}
+		items {
+			id
+			status
+			description
+			createdAt
+			client {
+				firstName
+				lastName
+			}
+			conversation {
+				id
+				unreadCount
+			}
+		}
+	}
+}
+
+# Fetched fresh on the detail screen rather than passed as route params - unlike client/[id].tsx's
+# name-only params, a booking request carries enough fields (several optional strings, an
+# unbounded referenceImages array) that serializing it through router params would be its own
+# source of bugs for no real savings; the list row above deliberately stays this over-fetch-free.
+query GetBookingRequest($bookingRequestId: ID!) {
+	getBookingRequest(bookingRequestId: $bookingRequestId) {
+		id
+		artistId
+		status
+		description
+		placement
+		size
+		budget
+		availability
+		isCoverUp
+		howHeard
+		referenceImages
+		createdAt
+		client {
+			firstName
+			lastName
+			email
+			phone
+		}
+		conversation {
+			id
+			unreadCount
+		}
+	}
+}
+
+# The header badge, same shape as GetUnreadMessageCount - "how many requests still owe the caller
+# an answer", not a property of any one request. Takes no argument by design (see this query's own
+# comment in server/graphql/resolvers/bookingRequests.js) - a badge for someone else's inbox isn't
+# a real feature to ask this to support.
+query GetPendingBookingRequestCount {
+	getPendingBookingRequestCount
+}

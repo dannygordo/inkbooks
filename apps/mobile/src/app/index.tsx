@@ -3,6 +3,7 @@ import type { AppointmentListItemFragment } from '@inkbooks/api';
 import {
   useGetAppointmentsByArtistQuery,
   useGetAppointmentsByShopQuery,
+  useGetPendingBookingRequestCountQuery,
   useGetUnreadMessageCountQuery,
 } from '@inkbooks/api';
 import { useRouter } from 'expo-router';
@@ -64,6 +65,15 @@ export default function AppointmentsScreen() {
     pollInterval: 60000,
   });
   const unreadCount = unreadData?.getUnreadMessageCount ?? 0;
+  // Same 60s-poll fallback as the messages badge above - the pending count only ever changes via
+  // convertBookingRequest, which already refetches this query itself on the screens that call it,
+  // so the poll here only has to catch a request that just came in from the public intake form.
+  const { data: pendingRequestData } = useGetPendingBookingRequestCountQuery({
+    skip: !user,
+    fetchPolicy: 'cache-and-network',
+    pollInterval: 60000,
+  });
+  const pendingRequestCount = pendingRequestData?.getPendingBookingRequestCount ?? 0;
   // Computed once, on mount, not on every render - matches AppointmentsList.jsx's own
   // useState(getDefaultScheduleRange), which also fixes the window at the moment the screen opens
   // rather than sliding it every re-render.
@@ -145,6 +155,20 @@ export default function AppointmentsScreen() {
           <View style={styles.headerActions}>
             <Pressable onPress={() => router.push('/clients')} testID="clients-button">
               <ThemedText type="link">Clients</ThemedText>
+            </Pressable>
+            <Pressable
+              onPress={() => router.push('/booking-requests')}
+              testID="booking-requests-button"
+              style={styles.messagesButton}
+            >
+              <ThemedText type="link">Requests</ThemedText>
+              {pendingRequestCount > 0 ? (
+                <View style={styles.messagesBadge} testID="booking-requests-unread-badge">
+                  <ThemedText type="small" style={styles.messagesBadgeText}>
+                    {pendingRequestCount > 9 ? '9+' : pendingRequestCount}
+                  </ThemedText>
+                </View>
+              ) : null}
             </Pressable>
             <Pressable onPress={() => router.push('/messages')} testID="messages-button" style={styles.messagesButton}>
               <ThemedText type="link">Messages</ThemedText>

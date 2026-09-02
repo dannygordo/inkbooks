@@ -972,8 +972,21 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    codegen + build, `apps/mobile` `tsc --noEmit` clean, and the full `apps/mobile` Jest suite
    (146/146, up from 142 - `tagColors.test.ts`).
 
-   Booking requests are still open, along with everything else on the ~40-screen list not yet
-   named.
+   **Booking Requests (2026-09-02, see DECISIONS.md X19) is the next slice after that.** List
+   (`app/booking-requests/index.tsx`) + detail (`app/booking-requests/[id].tsx`), a new
+   `bookingRequests.graphql` operation set, `utils/bookingRequests.ts` (its own test file), and a
+   "Requests" header badge on `index.tsx` next to Clients and Messages. The one change to
+   already-shipped code, not just new screens: `components/BookSessionDatesForm.tsx` (built in
+   step 8's original PR for `consult/[id].tsx` alone) now also works with no consult appointment
+   at all, matching `ArtistBookingRequests.jsx`'s own reuse of that exact component for both
+   cases - the deposit field and its recording logic are both gated on a consult appointment
+   actually existing, since there's nothing for `recordDeposit` to attach to otherwise. No
+   "Forward to..." shop-mate reassignment yet - a real, separate feature needing a picker mobile
+   has no equivalent of. Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile`
+   `tsc --noEmit` clean, and the full `apps/mobile` Jest suite (151/151, up from 146 -
+   `bookingRequests.test.ts`).
+
+   Everything else on the ~40-screen list not yet named remains open.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).
 10. TestFlight beta, then App Store submission - Guideline 3.1.1 already checked in step 5, so this

@@ -8,6 +8,37 @@ Last updated: 2026-09-02.
 
 ---
 
+### 2026-09-02 (seventh entry): Booking Requests inbox built - list + detail, closes out X19
+
+The next slice of Phase 5 step 8's remaining list, paired naturally with X16's Messages (a booking
+request carries a real Conversation of its own). Full reasoning: DECISIONS.md X19.
+
+**Built:** `packages/api/src/operations/bookingRequests.graphql` (`GetBookingRequests`,
+`GetBookingRequest`, `GetPendingBookingRequestCount` - codegen + build both ran clean),
+`utils/bookingRequests.ts` (status labels + filter definitions, with
+`__tests__/bookingRequests.test.ts`), `app/booking-requests/index.tsx` (list, filter pills,
+`fetchMore`-paginated) and `app/booking-requests/[id].tsx` (detail - intake fields, reference
+images, status actions, and the conversation thread reused from Messages), both registered in
+`_layout.tsx`, and a "Requests" header link + pending-count badge on `index.tsx` next to Clients
+and Messages.
+
+**One real, load-bearing change to existing code, not just new screens:** `BookSessionDatesForm.tsx`
+(previously built only for `consult/[id].tsx`, always requiring a consult appointment) is now
+usable with or without one, matching `ArtistBookingRequests.jsx`'s own reuse of the identical
+component for booking a session straight from a pending or consult-booked request. The deposit
+field and its recording logic are both now gated on `consultAppointmentId` actually being present -
+there is no appointment to attach a deposit to otherwise. `consult/[id].tsx`'s own call site is
+unaffected; its props were already always provided.
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+and the full `apps/mobile` Jest suite - 151/151 (146 before this slice, +5:
+`bookingRequests.test.ts`; the three existing `index.test.tsx` cases were also updated with a
+`GetPendingBookingRequestCount` mock for the new header badge, so they run warning-free instead of
+just passing). **Not yet confirmed:** a real device/simulator run, same standing caveat as every
+mobile slice this session.
+
+---
+
 ### 2026-09-02 (sixth entry): Settings' Password + Calendar color built - closes out X14 in full
 
 The two pieces X14 deferred when Photo shipped. Both land as two more cards on the same

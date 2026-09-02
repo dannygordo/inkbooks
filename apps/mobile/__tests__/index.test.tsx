@@ -2,6 +2,7 @@ import { MockedProvider } from '@apollo/client/testing';
 import {
   GetAppointmentsByArtistDocument,
   GetAppointmentsByShopDocument,
+  GetPendingBookingRequestCountDocument,
   GetUnreadMessageCountDocument,
 } from '@inkbooks/api';
 import { render, screen, waitFor } from '@testing-library/react-native';
@@ -99,6 +100,12 @@ describe('AppointmentsScreen', () => {
         maxUsageCount: Number.POSITIVE_INFINITY,
       },
       {
+        request: { query: GetPendingBookingRequestCountDocument },
+        result: { data: { getPendingBookingRequestCount: 0 } },
+        // Same reasoning as the GetUnreadMessageCount mock above, now for the Requests badge.
+        maxUsageCount: Number.POSITIVE_INFINITY,
+      },
+      {
         request: {
           query: GetAppointmentsByArtistDocument,
           variables: {
@@ -134,6 +141,12 @@ describe('AppointmentsScreen', () => {
         // index.tsx's own header badge polls this on a 60s interval - a real count isn't
         // this suite's concern, just that the query has somewhere to land instead of
         // logging a MockedProvider "no matching mock" warning on every render.
+        maxUsageCount: Number.POSITIVE_INFINITY,
+      },
+      {
+        request: { query: GetPendingBookingRequestCountDocument },
+        result: { data: { getPendingBookingRequestCount: 0 } },
+        // Same reasoning as the GetUnreadMessageCount mock above, now for the Requests badge.
         maxUsageCount: Number.POSITIVE_INFINITY,
       },
       {
@@ -195,6 +208,12 @@ describe('AppointmentsScreen', () => {
         // index.tsx's own header badge polls this on a 60s interval - a real count isn't
         // this suite's concern, just that the query has somewhere to land instead of
         // logging a MockedProvider "no matching mock" warning on every render.
+        maxUsageCount: Number.POSITIVE_INFINITY,
+      },
+      {
+        request: { query: GetPendingBookingRequestCountDocument },
+        result: { data: { getPendingBookingRequestCount: 0 } },
+        // Same reasoning as the GetUnreadMessageCount mock above, now for the Requests badge.
         maxUsageCount: Number.POSITIVE_INFINITY,
       },
       {
