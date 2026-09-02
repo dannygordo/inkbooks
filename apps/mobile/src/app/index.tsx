@@ -1,6 +1,10 @@
 import { FlashList } from '@shopify/flash-list';
 import type { AppointmentListItemFragment } from '@inkbooks/api';
-import { useGetAppointmentsByArtistQuery, useGetAppointmentsByShopQuery } from '@inkbooks/api';
+import {
+  useGetAppointmentsByArtistQuery,
+  useGetAppointmentsByShopQuery,
+  useGetUnreadMessageCountQuery,
+} from '@inkbooks/api';
 import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
@@ -51,6 +55,15 @@ export default function AppointmentsScreen() {
   const router = useRouter();
   const { user, logout } = useAuth();
   const shopId = getUserShopId(user);
+  // The header badge - same 60s-poll fallback web's own sidebar badge uses for every page that
+  // isn't the messenger itself (see messages/index.tsx's own header comment on why mobile has no
+  // faster, socket-driven path at all yet).
+  const { data: unreadData } = useGetUnreadMessageCountQuery({
+    skip: !user,
+    fetchPolicy: 'cache-and-network',
+    pollInterval: 60000,
+  });
+  const unreadCount = unreadData?.getUnreadMessageCount ?? 0;
   // Computed once, on mount, not on every render - matches AppointmentsList.jsx's own
   // useState(getDefaultScheduleRange), which also fixes the window at the moment the screen opens
   // rather than sliding it every re-render.
@@ -130,6 +143,16 @@ export default function AppointmentsScreen() {
             Appointments
           </ThemedText>
           <View style={styles.headerActions}>
+            <Pressable onPress={() => router.push('/messages')} testID="messages-button" style={styles.messagesButton}>
+              <ThemedText type="link">Messages</ThemedText>
+              {unreadCount > 0 ? (
+                <View style={styles.messagesBadge} testID="messages-unread-badge">
+                  <ThemedText type="small" style={styles.messagesBadgeText}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </ThemedText>
+                </View>
+              ) : null}
+            </Pressable>
             <Pressable onPress={() => router.push('/settings')} testID="settings-button">
               <Avatar
                 imageUri={user?.avatar}
@@ -254,6 +277,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
+  },
+  messagesButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
+  messagesBadge: {
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    backgroundColor: '#D33',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  messagesBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    lineHeight: 13,
   },
   title: {
     textAlign: 'left',

@@ -2948,6 +2948,42 @@ export type LoginMutationVariables = Exact<{
 
 export type LoginMutation = { __typename?: 'Mutation', login: { __typename?: 'User', id: string, email: string, firstName?: string | null, lastName?: string | null, avatar?: string | null, role: number, userType: string, tagColor?: string | null, themePreference?: string | null, accessToken: string, firebaseToken?: string | null, userInfo?: { __typename?: 'Artist', id: string, firstName: string, lastName: string, avatar?: string | null, hourlyRate?: number | null, shop?: { __typename?: 'Shop', id: string, name: string } | null } | { __typename?: 'Client', id: string, firstName: string, lastName: string, avatar?: string | null } | { __typename?: 'Staff', id: string, firstName: string, lastName: string, avatar?: string | null, title?: string | null, shop?: { __typename?: 'Shop', id: string, name: string } | null } | null } };
 
+export type GetConversationsByMemberIdQueryVariables = Exact<{
+  memberId: Scalars['ID']['input'];
+}>;
+
+
+export type GetConversationsByMemberIdQuery = { __typename?: 'Query', getConversationsByMemberId?: Array<{ __typename?: 'Conversation', id: string, members: Array<string>, updatedAt?: string | null, unreadCount: number, membersInfo?: Array<{ __typename?: 'User', id: string, firstName?: string | null, lastName?: string | null, avatar?: string | null } | null> | null } | null> | null };
+
+export type GetMessagesByConversationIdQueryVariables = Exact<{
+  conversationId: Scalars['ID']['input'];
+}>;
+
+
+export type GetMessagesByConversationIdQuery = { __typename?: 'Query', getMessagesByConversationId?: Array<{ __typename?: 'Message', id: string, conversationId: string, senderId: string, message?: string | null, imageUrls: Array<string>, createdAt?: string | null, user?: { __typename?: 'User', firstName?: string | null, lastName?: string | null, avatar?: string | null } | null }> | null };
+
+export type CreateMessageMutationVariables = Exact<{
+  conversationId: Scalars['ID']['input'];
+  senderId: Scalars['ID']['input'];
+  message?: InputMaybe<Scalars['String']['input']>;
+  imageUrls?: InputMaybe<Array<Scalars['String']['input']> | Scalars['String']['input']>;
+}>;
+
+
+export type CreateMessageMutation = { __typename?: 'Mutation', createMessage: { __typename?: 'Message', id: string, conversationId: string, senderId: string, message?: string | null, imageUrls: Array<string>, createdAt?: string | null } };
+
+export type MarkConversationReadMutationVariables = Exact<{
+  conversationId: Scalars['ID']['input'];
+}>;
+
+
+export type MarkConversationReadMutation = { __typename?: 'Mutation', markConversationRead: { __typename?: 'Conversation', id: string, unreadCount: number } };
+
+export type GetUnreadMessageCountQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetUnreadMessageCountQuery = { __typename?: 'Query', getUnreadMessageCount: number };
+
 export type ProjectImageFieldsFragment = { __typename?: 'IBImage', id: string, url: string, title?: string | null, uploadedByDisplayName?: string | null, userId: string, avatar?: string | null, tags?: Array<string | null> | null, createdAt?: string | null, updatedAt?: string | null, userInfo?: { __typename?: 'User', firstName?: string | null, lastName?: string | null, avatar?: string | null } | null };
 
 export type GetProjectDetailQueryVariables = Exact<{
@@ -4475,6 +4511,231 @@ export function useLoginMutation(baseOptions?: Apollo.MutationHookOptions<LoginM
 export type LoginMutationHookResult = ReturnType<typeof useLoginMutation>;
 export type LoginMutationResult = Apollo.MutationResult<LoginMutation>;
 export type LoginMutationOptions = Apollo.BaseMutationOptions<LoginMutation, LoginMutationVariables>;
+export const GetConversationsByMemberIdDocument = gql`
+    query GetConversationsByMemberId($memberId: ID!) {
+  getConversationsByMemberId(memberId: $memberId) {
+    id
+    members
+    updatedAt
+    unreadCount
+    membersInfo {
+      id
+      firstName
+      lastName
+      avatar
+    }
+  }
+}
+    `;
+
+/**
+ * __useGetConversationsByMemberIdQuery__
+ *
+ * To run a query within a React component, call `useGetConversationsByMemberIdQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetConversationsByMemberIdQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetConversationsByMemberIdQuery({
+ *   variables: {
+ *      memberId: // value for 'memberId'
+ *   },
+ * });
+ */
+export function useGetConversationsByMemberIdQuery(baseOptions: Apollo.QueryHookOptions<GetConversationsByMemberIdQuery, GetConversationsByMemberIdQueryVariables> & ({ variables: GetConversationsByMemberIdQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetConversationsByMemberIdQuery, GetConversationsByMemberIdQueryVariables>(GetConversationsByMemberIdDocument, options);
+      }
+export function useGetConversationsByMemberIdLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetConversationsByMemberIdQuery, GetConversationsByMemberIdQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetConversationsByMemberIdQuery, GetConversationsByMemberIdQueryVariables>(GetConversationsByMemberIdDocument, options);
+        }
+// @ts-ignore
+export function useGetConversationsByMemberIdSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetConversationsByMemberIdQuery, GetConversationsByMemberIdQueryVariables>): Apollo.UseSuspenseQueryResult<GetConversationsByMemberIdQuery, GetConversationsByMemberIdQueryVariables>;
+export function useGetConversationsByMemberIdSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetConversationsByMemberIdQuery, GetConversationsByMemberIdQueryVariables>): Apollo.UseSuspenseQueryResult<GetConversationsByMemberIdQuery | undefined, GetConversationsByMemberIdQueryVariables>;
+export function useGetConversationsByMemberIdSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetConversationsByMemberIdQuery, GetConversationsByMemberIdQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetConversationsByMemberIdQuery, GetConversationsByMemberIdQueryVariables>(GetConversationsByMemberIdDocument, options);
+        }
+export type GetConversationsByMemberIdQueryHookResult = ReturnType<typeof useGetConversationsByMemberIdQuery>;
+export type GetConversationsByMemberIdLazyQueryHookResult = ReturnType<typeof useGetConversationsByMemberIdLazyQuery>;
+export type GetConversationsByMemberIdSuspenseQueryHookResult = ReturnType<typeof useGetConversationsByMemberIdSuspenseQuery>;
+export type GetConversationsByMemberIdQueryResult = Apollo.QueryResult<GetConversationsByMemberIdQuery, GetConversationsByMemberIdQueryVariables>;
+export const GetMessagesByConversationIdDocument = gql`
+    query GetMessagesByConversationId($conversationId: ID!) {
+  getMessagesByConversationId(conversationId: $conversationId) {
+    id
+    conversationId
+    senderId
+    message
+    imageUrls
+    createdAt
+    user {
+      firstName
+      lastName
+      avatar
+    }
+  }
+}
+    `;
+
+/**
+ * __useGetMessagesByConversationIdQuery__
+ *
+ * To run a query within a React component, call `useGetMessagesByConversationIdQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetMessagesByConversationIdQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetMessagesByConversationIdQuery({
+ *   variables: {
+ *      conversationId: // value for 'conversationId'
+ *   },
+ * });
+ */
+export function useGetMessagesByConversationIdQuery(baseOptions: Apollo.QueryHookOptions<GetMessagesByConversationIdQuery, GetMessagesByConversationIdQueryVariables> & ({ variables: GetMessagesByConversationIdQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetMessagesByConversationIdQuery, GetMessagesByConversationIdQueryVariables>(GetMessagesByConversationIdDocument, options);
+      }
+export function useGetMessagesByConversationIdLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetMessagesByConversationIdQuery, GetMessagesByConversationIdQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetMessagesByConversationIdQuery, GetMessagesByConversationIdQueryVariables>(GetMessagesByConversationIdDocument, options);
+        }
+// @ts-ignore
+export function useGetMessagesByConversationIdSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetMessagesByConversationIdQuery, GetMessagesByConversationIdQueryVariables>): Apollo.UseSuspenseQueryResult<GetMessagesByConversationIdQuery, GetMessagesByConversationIdQueryVariables>;
+export function useGetMessagesByConversationIdSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetMessagesByConversationIdQuery, GetMessagesByConversationIdQueryVariables>): Apollo.UseSuspenseQueryResult<GetMessagesByConversationIdQuery | undefined, GetMessagesByConversationIdQueryVariables>;
+export function useGetMessagesByConversationIdSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetMessagesByConversationIdQuery, GetMessagesByConversationIdQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetMessagesByConversationIdQuery, GetMessagesByConversationIdQueryVariables>(GetMessagesByConversationIdDocument, options);
+        }
+export type GetMessagesByConversationIdQueryHookResult = ReturnType<typeof useGetMessagesByConversationIdQuery>;
+export type GetMessagesByConversationIdLazyQueryHookResult = ReturnType<typeof useGetMessagesByConversationIdLazyQuery>;
+export type GetMessagesByConversationIdSuspenseQueryHookResult = ReturnType<typeof useGetMessagesByConversationIdSuspenseQuery>;
+export type GetMessagesByConversationIdQueryResult = Apollo.QueryResult<GetMessagesByConversationIdQuery, GetMessagesByConversationIdQueryVariables>;
+export const CreateMessageDocument = gql`
+    mutation CreateMessage($conversationId: ID!, $senderId: ID!, $message: String, $imageUrls: [String!]) {
+  createMessage(
+    conversationId: $conversationId
+    senderId: $senderId
+    message: $message
+    imageUrls: $imageUrls
+  ) {
+    id
+    conversationId
+    senderId
+    message
+    imageUrls
+    createdAt
+  }
+}
+    `;
+export type CreateMessageMutationFn = Apollo.MutationFunction<CreateMessageMutation, CreateMessageMutationVariables>;
+
+/**
+ * __useCreateMessageMutation__
+ *
+ * To run a mutation, you first call `useCreateMessageMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCreateMessageMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [createMessageMutation, { data, loading, error }] = useCreateMessageMutation({
+ *   variables: {
+ *      conversationId: // value for 'conversationId'
+ *      senderId: // value for 'senderId'
+ *      message: // value for 'message'
+ *      imageUrls: // value for 'imageUrls'
+ *   },
+ * });
+ */
+export function useCreateMessageMutation(baseOptions?: Apollo.MutationHookOptions<CreateMessageMutation, CreateMessageMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<CreateMessageMutation, CreateMessageMutationVariables>(CreateMessageDocument, options);
+      }
+export type CreateMessageMutationHookResult = ReturnType<typeof useCreateMessageMutation>;
+export type CreateMessageMutationResult = Apollo.MutationResult<CreateMessageMutation>;
+export type CreateMessageMutationOptions = Apollo.BaseMutationOptions<CreateMessageMutation, CreateMessageMutationVariables>;
+export const MarkConversationReadDocument = gql`
+    mutation MarkConversationRead($conversationId: ID!) {
+  markConversationRead(conversationId: $conversationId) {
+    id
+    unreadCount
+  }
+}
+    `;
+export type MarkConversationReadMutationFn = Apollo.MutationFunction<MarkConversationReadMutation, MarkConversationReadMutationVariables>;
+
+/**
+ * __useMarkConversationReadMutation__
+ *
+ * To run a mutation, you first call `useMarkConversationReadMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useMarkConversationReadMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [markConversationReadMutation, { data, loading, error }] = useMarkConversationReadMutation({
+ *   variables: {
+ *      conversationId: // value for 'conversationId'
+ *   },
+ * });
+ */
+export function useMarkConversationReadMutation(baseOptions?: Apollo.MutationHookOptions<MarkConversationReadMutation, MarkConversationReadMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<MarkConversationReadMutation, MarkConversationReadMutationVariables>(MarkConversationReadDocument, options);
+      }
+export type MarkConversationReadMutationHookResult = ReturnType<typeof useMarkConversationReadMutation>;
+export type MarkConversationReadMutationResult = Apollo.MutationResult<MarkConversationReadMutation>;
+export type MarkConversationReadMutationOptions = Apollo.BaseMutationOptions<MarkConversationReadMutation, MarkConversationReadMutationVariables>;
+export const GetUnreadMessageCountDocument = gql`
+    query GetUnreadMessageCount {
+  getUnreadMessageCount
+}
+    `;
+
+/**
+ * __useGetUnreadMessageCountQuery__
+ *
+ * To run a query within a React component, call `useGetUnreadMessageCountQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetUnreadMessageCountQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetUnreadMessageCountQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetUnreadMessageCountQuery(baseOptions?: Apollo.QueryHookOptions<GetUnreadMessageCountQuery, GetUnreadMessageCountQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetUnreadMessageCountQuery, GetUnreadMessageCountQueryVariables>(GetUnreadMessageCountDocument, options);
+      }
+export function useGetUnreadMessageCountLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetUnreadMessageCountQuery, GetUnreadMessageCountQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetUnreadMessageCountQuery, GetUnreadMessageCountQueryVariables>(GetUnreadMessageCountDocument, options);
+        }
+// @ts-ignore
+export function useGetUnreadMessageCountSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetUnreadMessageCountQuery, GetUnreadMessageCountQueryVariables>): Apollo.UseSuspenseQueryResult<GetUnreadMessageCountQuery, GetUnreadMessageCountQueryVariables>;
+export function useGetUnreadMessageCountSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetUnreadMessageCountQuery, GetUnreadMessageCountQueryVariables>): Apollo.UseSuspenseQueryResult<GetUnreadMessageCountQuery | undefined, GetUnreadMessageCountQueryVariables>;
+export function useGetUnreadMessageCountSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetUnreadMessageCountQuery, GetUnreadMessageCountQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetUnreadMessageCountQuery, GetUnreadMessageCountQueryVariables>(GetUnreadMessageCountDocument, options);
+        }
+export type GetUnreadMessageCountQueryHookResult = ReturnType<typeof useGetUnreadMessageCountQuery>;
+export type GetUnreadMessageCountLazyQueryHookResult = ReturnType<typeof useGetUnreadMessageCountLazyQuery>;
+export type GetUnreadMessageCountSuspenseQueryHookResult = ReturnType<typeof useGetUnreadMessageCountSuspenseQuery>;
+export type GetUnreadMessageCountQueryResult = Apollo.QueryResult<GetUnreadMessageCountQuery, GetUnreadMessageCountQueryVariables>;
 export const GetProjectDetailDocument = gql`
     query GetProjectDetail($projectId: ID!) {
   getProject(projectId: $projectId) {

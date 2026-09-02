@@ -937,8 +937,24 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    delete/re-tag actions on this same list are explicitly not built yet, same
    name-what's-left-out convention as every slice above. Confirmed in this sandbox: `packages/api`
    codegen + build, `apps/mobile` `tsc --noEmit` clean, and the full `apps/mobile` Jest suite
-   (119/119, up from 115 - the new `sharedImages.test.ts`). Messages - the other item from "do
-   them both" - is next.
+   (119/119, up from 115 - the new `sharedImages.test.ts`).
+
+   **Messages (2026-09-02, see DECISIONS.md X16) closes out X13's three-item list.** Inbox
+   (`app/messages/index.tsx`) + thread (`app/messages/[id].tsx`), a new `messenger.graphql`
+   operation set, `ConversationRow`/`MessageBubble` components, and `utils/conversations.ts`/
+   `utils/messageTime.ts` (each with its own test file). The real decision, not just another scope
+   cut: polling (30s inbox, 4s open-thread) instead of porting web's socket.io-client delivery -
+   mobile has no socket dependency anywhere else in this codebase, and X16 makes the full case for
+   preferring the transport the server already supports as a fallback. Image-attachment composing,
+   shop-wide/group conversations, and per-row "mark unread" are explicitly not built - receiving
+   an image message from web still renders correctly, sending one from mobile does not yet.
+   Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+   and the full `apps/mobile` Jest suite (133/133, up from 119 - `messageTime.test.ts` and
+   `conversations.test.ts`).
+
+   **With Messages built, nothing named as "still unported" in X13/X14/X15 remains open.** The
+   ~40-screen list this step originally deferred still has plenty left on it - just nothing this
+   doc has singled out by name the way avatar upload/shared-images/Messages were.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).
 10. TestFlight beta, then App Store submission - Guideline 3.1.1 already checked in step 5, so this

@@ -1,5 +1,9 @@
 import { MockedProvider } from '@apollo/client/testing';
-import { GetAppointmentsByArtistDocument, GetAppointmentsByShopDocument } from '@inkbooks/api';
+import {
+  GetAppointmentsByArtistDocument,
+  GetAppointmentsByShopDocument,
+  GetUnreadMessageCountDocument,
+} from '@inkbooks/api';
 import { render, screen, waitFor } from '@testing-library/react-native';
 
 import AppointmentsScreen from '@/app/index';
@@ -87,6 +91,14 @@ describe('AppointmentsScreen', () => {
 
     const mocks = [
       {
+        request: { query: GetUnreadMessageCountDocument },
+        result: { data: { getUnreadMessageCount: 0 } },
+        // index.tsx's own header badge polls this on a 60s interval - a real count isn't
+        // this suite's concern, just that the query has somewhere to land instead of
+        // logging a MockedProvider "no matching mock" warning on every render.
+        maxUsageCount: Number.POSITIVE_INFINITY,
+      },
+      {
         request: {
           query: GetAppointmentsByArtistDocument,
           variables: {
@@ -116,6 +128,14 @@ describe('AppointmentsScreen', () => {
     mockUseAuth.mockReturnValue({ user: SHOP_ARTIST, logout: jest.fn() });
 
     const mocks = [
+      {
+        request: { query: GetUnreadMessageCountDocument },
+        result: { data: { getUnreadMessageCount: 0 } },
+        // index.tsx's own header badge polls this on a 60s interval - a real count isn't
+        // this suite's concern, just that the query has somewhere to land instead of
+        // logging a MockedProvider "no matching mock" warning on every render.
+        maxUsageCount: Number.POSITIVE_INFINITY,
+      },
       {
         request: {
           query: GetAppointmentsByShopDocument,
@@ -169,6 +189,14 @@ describe('AppointmentsScreen', () => {
     mockUseAuth.mockReturnValue({ user: INDEPENDENT_ARTIST, logout: jest.fn() });
 
     const mocks = [
+      {
+        request: { query: GetUnreadMessageCountDocument },
+        result: { data: { getUnreadMessageCount: 0 } },
+        // index.tsx's own header badge polls this on a 60s interval - a real count isn't
+        // this suite's concern, just that the query has somewhere to land instead of
+        // logging a MockedProvider "no matching mock" warning on every render.
+        maxUsageCount: Number.POSITIVE_INFINITY,
+      },
       {
         request: {
           query: GetAppointmentsByArtistDocument,

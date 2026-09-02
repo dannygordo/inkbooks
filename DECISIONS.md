@@ -1470,6 +1470,66 @@ point is an expected, not exceptional, outcome.
 X12/X13/X14's own precedent - only the pure logic (`utils/sharedImages.ts`'s `assignedLabel`) gets
 `__tests__/sharedImages.test.ts`, not the Apollo-wired screen or the gallery component itself.
 
+### X16. Messages - the last of X13's three unported items - built as one 1:1-thread inbox + thread, polled instead of socket-delivered
+
+Closes out X13's list: avatar upload (X14) and the client-dashboard shared-images panel (X15)
+were the other two. This is the bigger of the three - a real compose-and-send surface, not a
+read-only view - so it cuts more from web's version than either of those did.
+
+**Polling, not `socket.io-client`, and this is the real decision here, not an afterthought.**
+Web's `IBChatBox.jsx` delivers messages live over a socket (`context/SocketProvider`) and only
+falls back to a 60-second poll (`MessengerService._useUnreadMessageCount`) for pages that aren't
+the messenger itself. Mobile has no socket.io-client dependency anywhere in this codebase, and
+adding one - a persistent connection, a server-side room/emit model to extend to a second client
+type, reconnect-on-backgrounding handling RN needs that a browser tab doesn't - is real ongoing
+complexity for a feature that already has a working fallback path. Same reasoning X12/X13 already
+established for Firebase and Square (native RN answers over native rebuilds) applied here in the
+opposite direction: prefer the simpler transport the server already supports as a fallback, rather
+than port the more complex one, until polling is actually shown to be not good enough. Mobile
+polls the inbox list every 30s (matching web's own fallback interval) and an open thread every 4s
+(shorter, since staring at an open conversation is exactly when latency is most noticeable) -
+`createMessage`'s own `refetchQueries` pulls a just-sent message back immediately regardless, so
+sending never waits out the poll window.
+
+**No image-attachment compose flow.** `routes/messageUploads.js` (the REST upload endpoint
+`IBChatBox.jsx` posts to) isn't called from mobile at all yet - `messenger.graphql`'s
+`createMessage` mutation only ever sends `message`, never `imageUrls`. Receiving still works: a
+message that arrives with `imageUrls` (sent from web) renders its images inline in
+`MessageBubble.tsx`, just without web's own new-tab full-size view - mobile's version has no
+lightbox for this yet either. Composing an image message is real follow-up work, deferred for the
+same "smallest complete piece" reason every slice this session has used, not because it's hard -
+`restApi.ts`'s `restApiUrl`/`getAccessToken` (already built for Square) are the right tool
+whenever it's picked up.
+
+**Scoped to one 1:1-thread list, not the whole of `Messenger.jsx`.** `getConversationsByShopId`
+(shop-wide/staff group conversations) isn't called from mobile - only `getConversationsByMemberId`,
+self-only server-side already (see `resolvers/conversations.js`'s own security-fix comment via
+`messenger.graphql`). `IBConversation.jsx`'s per-row "Mark as unread" menu and `Messenger.jsx`'s
+search-by-name box aren't built either - both are real, but neither is required to read and reply
+to a conversation, which is this slice's whole job.
+
+**Message timestamps get their own port (`utils/messageTime.ts`), not a reuse of
+`utils/timeAgo.ts`.** Web's `utils/messageTime.js` has its own explicit reasoning for why plain
+relative time ("3 days ago") is wrong for this app - artists schedule against a calendar, so a
+message's actual time of day/weekday/date answers real scheduling questions relative time can't.
+`timeAgo.ts` exists for a genuinely different case (image-upload staleness), so this is a second,
+deliberately separate util rather than a shared one stretched to cover both.
+
+**Corrects a stale claim in this same file's own X13 entry**: X13 described the Messages thread as
+"Firestore-backed." It never was - `Conversation`/`Message` are Mongoose models
+(`server/models/Conversation.js`/`Message.js`) behind GraphQL resolvers, delivered live via
+socket.io on web, not Firestore in any capacity. X13's own scope call (no `getFirestore`/`db` on
+mobile) was still the right call, just for the wrong stated reason - nothing in this app has ever
+needed Firestore, this feature included.
+
+**No dedicated screen-level test for `messages/index.tsx` or `messages/[id].tsx`**, matching every
+prior slice's precedent - `utils/messageTime.ts` and `utils/conversations.ts` (the two new pure
+logic modules) get `__tests__/messageTime.test.ts` and `__tests__/conversations.test.ts`; the two
+new components (`ConversationRow.tsx`, `MessageBubble.tsx`) and the two Apollo-wired screens don't.
+`index.test.tsx` gained one new mocked query (`GetUnreadMessageCount`, the header badge added to
+that screen) so the existing suite keeps passing without a "no matching mock" warning, but that's
+an update to an existing test, not a new screen-level one.
+
 ---
 
 ## Process

@@ -8,6 +8,51 @@ Last updated: 2026-09-02.
 
 ---
 
+### 2026-09-02 (fourth entry): Messages built - inbox + thread, polling instead of a socket - closes out X13's three-item list
+
+Last of the three items X13 named as still unported (avatar upload and the client-dashboard
+shared-images panel, the third entry below and X14/X15, were the other two). Full reasoning and
+every scope call: DECISIONS.md X16.
+
+**Built:** `packages/api/src/operations/messenger.graphql` (`GetConversationsByMemberId`,
+`GetMessagesByConversationId`, `CreateMessage`, `MarkConversationRead`, `GetUnreadMessageCount` -
+codegen + build both ran clean), `app/messages/index.tsx` (inbox, registered in `_layout.tsx`),
+`app/messages/[id].tsx` (thread), `components/ConversationRow.tsx`, `components/MessageBubble.tsx`,
+`utils/conversations.ts` (+ `__tests__/conversations.test.ts`), `utils/messageTime.ts` (+
+`__tests__/messageTime.test.ts`), and a header entry point on `index.tsx` (a "Messages" link next
+to the Settings avatar, with the same unread-count badge shape `ConversationRow.tsx` uses per-row).
+
+**The one real architectural call, not just another scope cut: polling instead of porting web's
+socket.io-client delivery.** Mobile has no socket dependency anywhere in this codebase; the inbox
+polls every 30s (web's own documented fallback interval for every non-messenger page) and an open
+thread polls every 4s, with `createMessage`'s `refetchQueries` pulling a just-sent message back
+immediately so sending doesn't feel like it's waiting on the poll. DECISIONS.md X16 has the full
+case for why this is the right call now rather than a stopgap to feel bad about.
+
+**Also cut, all named explicitly rather than silently missing:** composing an image attachment
+(receiving still works - a web-sent image message renders fine in `MessageBubble.tsx`, just
+without a full-size tap-to-view), shop-wide/group conversations (`getConversationsByShopId`),
+per-row "mark unread," and the messenger's search-by-name box.
+
+**Corrected a stale claim in DECISIONS.md's own X13 entry** while writing X16: it called the
+Messages thread "Firestore-backed." It never was - `Conversation`/`Message` are Mongoose models
+behind GraphQL, delivered live via socket.io on web. The scope call X13 made off that wrong premise
+(no Firestore SDK on mobile) was still correct, just for the wrong stated reason.
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean
+(stale `.expo/types/router.d.ts` deleted first, now routine), and the full `apps/mobile` Jest
+suite - 133/133 (119 before this slice, +14: `messageTime.test.ts` and `conversations.test.ts`).
+`index.test.tsx` needed one update (a mocked `GetUnreadMessageCount` response) for the new header
+badge - not a new screen-level test, an update to an existing one. **Not yet confirmed:** a real
+device/simulator run, same standing caveat as every mobile slice this session - nothing here can
+launch Expo Go or a simulator, and polling behavior/keyboard-avoidance on the compose input in
+particular are the two things in this slice most worth actually looking at on a device.
+
+**X13's three-item list is now fully closed.** Nothing named as "still unported" in X13/X14/X15
+remains open from that list - see PRODUCTION_ROADMAP.md's Phase 5 step 8 for what's next instead.
+
+---
+
 ### 2026-09-02 (third entry): Client Detail screen + client-dashboard shared-images panel built - view-only, second of X13's three still-unported items
 
 Picked up from the second entry below: X13 named Messages and the shared-images panel as the two
