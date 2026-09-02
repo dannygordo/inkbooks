@@ -962,9 +962,18 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    mobile at all yet) - and a new `GetClients` operation. Gives `client/[id].tsx` (X15) its second
    real entry point, alongside project/[id].tsx's own client link. Confirmed in this sandbox:
    `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean, and the full `apps/mobile`
-   Jest suite (142/142, up from 133 - `clients.test.ts` and `phone.test.ts`). Booking requests and
-   Settings' deferred password/calendar-color are still open, along with everything else on the
-   ~40-screen list not yet named.
+   Jest suite (142/142, up from 133 - `clients.test.ts` and `phone.test.ts`).
+
+   **Settings' Password and Calendar color (2026-09-02, see DECISIONS.md X18) closes out X14 in
+   full.** A new `accountSettings.graphql` (`ChangePassword`, `GetUserTagColors`), `UpdateUser`'s
+   selection widened to include `tagColor`, and `utils/tagColors.ts`. The one real correctness
+   point: `ChangePassword`'s returned `accessToken` is real (unlike `UpdateUser`'s placeholder)
+   and must be persisted - `settings/index.tsx` does. Confirmed in this sandbox: `packages/api`
+   codegen + build, `apps/mobile` `tsc --noEmit` clean, and the full `apps/mobile` Jest suite
+   (146/146, up from 142 - `tagColors.test.ts`).
+
+   Booking requests are still open, along with everything else on the ~40-screen list not yet
+   named.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).
 10. TestFlight beta, then App Store submission - Guideline 3.1.1 already checked in step 5, so this

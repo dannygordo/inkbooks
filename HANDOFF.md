@@ -8,6 +8,32 @@ Last updated: 2026-09-02.
 
 ---
 
+### 2026-09-02 (sixth entry): Settings' Password + Calendar color built - closes out X14 in full
+
+The two pieces X14 deferred when Photo shipped. Both land as two more cards on the same
+`app/settings/index.tsx`. Full reasoning: DECISIONS.md X18.
+
+**Built:** `ChangePassword` and `GetUserTagColors` in a new `packages/api/src/operations/
+accountSettings.graphql` (codegen + build clean), `UpdateUser`'s selection widened to include
+`tagColor` (predicted by X14's own comment), `utils/tagColors.ts` (the 15-color palette +
+`showAvailableColorTags`, ported from web + `__tests__/tagColors.test.ts`), and the two new cards
+on the Settings screen.
+
+**The one real correctness point, not just a scope note: `ChangePassword`'s `accessToken` is
+REAL** (unlike `UpdateUser`'s placeholder, per X14's own comment) - `handleChangePassword`
+persists it via `updateCurrentUser`, the other two Settings mutations (avatar, tag color)
+correctly still don't. Getting this backwards either way is a real bug, not a style choice -
+DECISIONS.md X18 spells out both failure directions.
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+and the full `apps/mobile` Jest suite - 146/146 (142 before this slice, +4:
+`tagColors.test.ts`). **Not yet confirmed:** a real device/simulator run, same standing caveat as
+every mobile slice this session.
+
+**X14 is now fully closed** - nothing named as deferred in that entry remains open.
+
+---
+
 ### 2026-09-02 (fifth entry): Client roster (list + search) built - Phase 5 step 8's next slice past X13's now-closed three-item list
 
 Picked from the rest of step 8's ~40-screen list, over a booking-requests inbox or finishing

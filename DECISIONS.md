@@ -1578,6 +1578,52 @@ contract for missing/malformed numbers.
 precedent - the two new pure logic modules (`utils/clients.ts`'s `matchesClientSearch`,
 `utils/phone.ts`'s `formatPhone`) get their own test files; the Apollo-wired screen doesn't.
 
+### X18. Settings' Password and Calendar color built - closes out X14's two deferred pieces, in full this time
+
+X14 shipped Settings' Photo section and explicitly deferred Password (`IBUpdatePassword.jsx`) and
+Calendar color (`AccountPanel.jsx`'s tag-color picker) as their own follow-up. This is that
+follow-up - both land in the same `app/settings/index.tsx`, as two more cards under Photo, same
+as web's `AccountPanel.jsx` stacks all three.
+
+**`ChangePassword`'s returned `accessToken` is real, and this is the one place that matters.**
+Every other mutation this app's mobile port has called that returns a `User`-shaped payload
+(`updateUser`) returns a placeholder token (`'temp_' + Date.now()`, per X14's own
+`updateUser.graphql` comment) - callers merge one field and discard the rest. `changePassword`'s
+resolver actually calls `generateToken(res)` and returns a real one, because the password just
+changed underneath the session's existing token. `accountSettings.graphql`'s own header comment
+flags this explicitly, and `handleChangePassword` in `settings/index.tsx` persists it via
+`updateCurrentUser({ ...user, accessToken: ... })` rather than discarding it the way the avatar
+and calendar-color call sites correctly do for their own placeholder responses. Getting this
+backwards in either direction is a real bug: persisting `updateUser`'s placeholder would corrupt
+the session's real token, and discarding `changePassword`'s real one would leave the app running
+on a token the server has already superseded (not broken today, since nothing here invalidates
+old tokens on password change, but wrong regardless, and there's no guarantee that stays true).
+
+**No dedicated logged-out "forgot password" flow, matching web's own present-day scope.** Web's
+`IBUpdatePassword.jsx` used to support an `isPublic` mode for exactly this and it was a full
+account-takeover vulnerability, removed on web already (see that file's own header comment) - so
+there's no unauthenticated flow to even consider porting. Changing a password on mobile always
+requires an active session and the current password, same as web today.
+
+**Calendar-color picker ported faithfully, including a check that's currently always true.**
+`showsOnACalendar = user.userType !== 'client'` is real logic carried over from
+`AccountPanel.jsx`, even though mobile has no client login at all yet (see X15's own note on
+`ClientDashboard`'s `isSelf` mode being out of scope by construction) - so today this is always
+`true` in practice. Ported anyway rather than assumed away, so the day a client account can sign
+into mobile, this screen is already correct for it instead of silently showing a calendar-color
+picker to someone with no calendar.
+
+**Simpler bookkeeping than web's own `stillTaken` state for the same result.** `AccountPanel.jsx`
+hand-maintains a local `tagColors` array so a just-picked color disappears from "available"
+without waiting on a refetch. Mobile's `handleTagColor` instead calls `updateUser` with
+`refetchQueries: ['GetUserTagColors']` - one extra network round-trip per pick, in exchange for
+mobile skipping a second piece of state that has to stay in sync with a query result it's already
+derived from.
+
+**No dedicated screen-level test added for these two sections**, matching X14's own precedent for
+this same screen - `utils/tagColors.ts`'s `showAvailableColorTags` gets
+`__tests__/tagColors.test.ts`; the password form and the swatch picker, both Apollo-wired, don't.
+
 ---
 
 ## Process

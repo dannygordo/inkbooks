@@ -1,0 +1,26 @@
+# The two pieces of Settings X14 deliberately deferred when avatar upload shipped - password
+# change and the calendar-color picker. See DECISIONS.md X18.
+
+# Unlike UpdateUser's own accessToken (a placeholder - see updateUser.graphql's own comment),
+# THIS accessToken is real: server/graphql/resolvers/users.js's changePassword calls
+# generateToken(res) and returns it. A caller must persist it (merge into the existing CurrentUser
+# via context/auth.tsx's updateCurrentUser, same "merge one field, never replace the object"
+# contract as every other caller of that function), not discard it the way UpdateUser callers do.
+mutation ChangePassword($currentPassword: String!, $newPassword: String!) {
+	changePassword(currentPassword: $currentPassword, newPassword: $newPassword) {
+		id
+		accessToken
+	}
+}
+
+# Every color a shop-mate (artist or staff, via findArtistsForShops/Staff.find - see
+# resolvers/users.js) already has on file, so the picker can hide them. Gated server-side by
+# assertCanAccessShop - safe to call with the caller's own shopId directly, same as every other
+# shop-scoped query already on mobile. Skipped entirely for a shop-less independent artist (no
+# shopId to ask about - see app/settings/index.tsx's own use of getUserShopId), same as web's own
+# skip: !shopId.
+query GetUserTagColors($shopId: ID!) {
+	getUserTagColors(shopId: $shopId) {
+		tagColor
+	}
+}

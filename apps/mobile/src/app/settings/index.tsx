@@ -1,26 +1,34 @@
-import { useUpdateUserMutation } from '@inkbooks/api';
+import {
+  useChangePasswordMutation,
+  useGetUserTagColorsQuery,
+  useUpdateUserMutation,
+} from '@inkbooks/api';
 import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
+import { FormField } from '@/components/FormField';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/auth';
+import { useTheme } from '@/hooks/use-theme';
 import { deleteFile } from '@/firebase/deleteFile';
 import { uploadFileWithProgress } from '@/firebase/uploadFile';
 import { avatarFolder, previousAvatarUrl } from '@/utils/avatar';
 import { formatImagePathForFirebaseStorage } from '@/utils/imagePath';
+import { showAvailableColorTags } from '@/utils/tagColors';
 import { getUserShopId } from '@/utils/user';
 
 /**
- * First slice of apps/web's AccountPanel.jsx (Settings > Photo/Password/Calendar color) - photo
- * only. Password change (IBUpdatePassword) and the calendar-color picker (getTagColorsByShop)
- * are each their own real feature and deliberately left for a follow-up screen section rather
- * than folded in here - see PRODUCTION_ROADMAP.md Phase 5 step 8's remaining-work list.
+ * apps/web's AccountPanel.jsx (Settings > Photo/Password/Calendar color), now in full - photo
+ * (the original slice), password change (IBUpdatePassword), and the calendar-color picker
+ * (getTagColorsByShop) all live here. See DECISIONS.md X18 for the password/calendar-color half's
+ * own scope notes (the real-vs-placeholder accessToken distinction between ChangePassword and
+ * UpdateUser in particular).
  *
  * NO CROP SCREEN, UNLIKE WEB'S CropEasy (react-easy-crop, a canvas-based web-only library).
  * expo-image-picker's own `allowsEditing`/`aspect: [1, 1]` gives a native square-crop UI on both
@@ -37,14 +45,85 @@ import { getUserShopId } from '@/utils/user';
  */
 export default function SettingsScreen() {
   const { user, updateCurrentUser } = useAuth();
+  const theme = useTheme();
   const [updateUser] = useUpdateUserMutation();
   const [pickedUri, setPickedUri] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [changePassword, { loading: changingPassword }] = useChangePasswordMutation();
+
+  const shopId = getUserShopId(user);
+  // See getTagColorsByShop's own comment on web (via GetUserTagColors's own header comment) -
+  // skip: !shopId is what stops this firing with an undefined variable against a schema field
+  // typed `shopId: ID!` for a shop-less independent artist.
+  const { data: tagColorsData, loading: tagColorsLoading } = useGetUserTagColorsQuery({
+    variables: { shopId: shopId ?? '' },
+    skip: !shopId,
+  });
+
   if (!user) {
     return null;
   }
+
+  const handleChangePassword = async () => {
+    if (!newPassword.trim()) {
+      setPasswordError('Password must not be empty');
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setPasswordError('Passwords must match');
+      return;
+    }
+    setPasswordError(null);
+    try {
+      const { data } = await changePassword({ variables: { currentPassword, newPassword } });
+      // Unlike UpdateUser's placeholder (see updateUser.graphql's own comment), THIS accessToken
+      // is real and must be persisted, or the app would keep using a token the server has already
+      // moved past.
+      if (data?.changePassword.accessToken) {
+        await updateCurrentUser({ ...user, accessToken: data.changePassword.accessToken });
+      }
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmNewPassword('');
+      Alert.alert('Password updated', 'Your password has been changed.');
+    } catch (err) {
+      setPasswordError((err as Error).message);
+    }
+  };
+
+  const handleTagColor = async (tagValue: string) => {
+    try {
+      const { data } = await updateUser({
+        variables: { user: { id: user.id, email: user.email, role: user.role, tagColor: tagValue } },
+        // Keeps the taken-colors list accurate immediately - the color this user just gave up
+        // becomes available to their shop-mates again, and the one they just took should
+        // disappear from the "available" set on a second device signed into the same shop.
+        // Simpler than web's own hand-maintained `stillTaken` list for the same end result.
+        refetchQueries: ['GetUserTagColors'],
+      });
+      if (data?.updateUser.tagColor) {
+        await updateCurrentUser({ ...user, tagColor: data.updateUser.tagColor });
+      }
+    } catch {
+      Alert.alert('Could not update calendar color', 'Please try again.');
+    }
+  };
+
+  // user.userType, not user.userInfo - same field web's own AccountPanel.jsx reads (see that
+  // file's own comment on the userInfo.userType bug this avoids repeating). A client account
+  // doesn't exist on mobile at all yet (see DECISIONS.md X15's own note on ClientDashboard's
+  // isSelf mode being out of scope by construction), so this is realistically always true today -
+  // ported anyway so it's still correct the day a client login exists.
+  const showsOnACalendar = user.userType !== 'client';
+  const availableTagColors = tagColorsLoading
+    ? []
+    : showAvailableColorTags(tagColorsData?.getUserTagColors ?? [], user.tagColor);
 
   const handlePick = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -152,6 +231,79 @@ export default function SettingsScreen() {
               </View>
             ) : null}
           </View>
+
+          <View style={styles.card}>
+            <ThemedText type="smallBold">Password</ThemedText>
+            <FormField
+              label="Current Password"
+              value={currentPassword}
+              onChangeText={setCurrentPassword}
+              secureTextEntry
+              testID="settings-current-password"
+            />
+            <FormField
+              label="New Password"
+              value={newPassword}
+              onChangeText={setNewPassword}
+              secureTextEntry
+              testID="settings-new-password"
+            />
+            <FormField
+              label="Confirm New Password"
+              value={confirmNewPassword}
+              onChangeText={setConfirmNewPassword}
+              secureTextEntry
+              testID="settings-confirm-new-password"
+            />
+            {passwordError ? (
+              <ThemedText type="small" style={styles.error}>
+                {passwordError}
+              </ThemedText>
+            ) : null}
+            <View style={styles.actions}>
+              <Button
+                label="Update Password"
+                onPress={handleChangePassword}
+                loading={changingPassword}
+                testID="settings-update-password"
+              />
+            </View>
+          </View>
+
+          {showsOnACalendar ? (
+            <View style={styles.card}>
+              <ThemedText type="smallBold">Calendar color</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                How your appointments are labelled on the calendar. Colors already taken by
+                someone else at your shop are not offered.
+              </ThemedText>
+              {tagColorsLoading ? (
+                <ActivityIndicator color={theme.text} testID="settings-tag-colors-loading" />
+              ) : (
+                <View style={styles.swatchGrid}>
+                  {availableTagColors.map((tag) => {
+                    const selected = tag.value === user.tagColor;
+                    return (
+                      <Pressable
+                        key={tag.value}
+                        onPress={() => handleTagColor(tag.value)}
+                        accessibilityLabel={tag.label}
+                        accessibilityState={{ selected }}
+                        style={[styles.swatch, { backgroundColor: tag.value }]}
+                        testID={`settings-tag-color-${tag.value}`}
+                      >
+                        {selected ? (
+                          <ThemedText type="default" style={styles.swatchCheck}>
+                            {'✓'}
+                          </ThemedText>
+                        ) : null}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+          ) : null}
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -183,5 +335,20 @@ const styles = StyleSheet.create({
   },
   error: {
     color: '#D33',
+  },
+  swatchGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
+  },
+  swatch: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  swatchCheck: {
+    color: '#fff',
   },
 });

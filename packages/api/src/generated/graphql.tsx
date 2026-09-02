@@ -2778,6 +2778,21 @@ export type UserUpdateInput = {
   userType?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type ChangePasswordMutationVariables = Exact<{
+  currentPassword: Scalars['String']['input'];
+  newPassword: Scalars['String']['input'];
+}>;
+
+
+export type ChangePasswordMutation = { __typename?: 'Mutation', changePassword: { __typename?: 'User', id: string, accessToken: string } };
+
+export type GetUserTagColorsQueryVariables = Exact<{
+  shopId: Scalars['ID']['input'];
+}>;
+
+
+export type GetUserTagColorsQuery = { __typename?: 'Query', getUserTagColors?: Array<{ __typename?: 'User', tagColor?: string | null } | null> | null };
+
 export type RecordAdjustmentMutationVariables = Exact<{
   input: RecordAdjustmentInput;
 }>;
@@ -3085,7 +3100,7 @@ export type UpdateUserMutationVariables = Exact<{
 }>;
 
 
-export type UpdateUserMutation = { __typename?: 'Mutation', updateUser: { __typename?: 'User', id: string, avatar?: string | null } };
+export type UpdateUserMutation = { __typename?: 'Mutation', updateUser: { __typename?: 'User', id: string, avatar?: string | null, tagColor?: string | null } };
 
 export const AppointmentListItemFragmentDoc = gql`
     fragment AppointmentListItem on Appointment {
@@ -3157,6 +3172,84 @@ export const ProjectImageFieldsFragmentDoc = gql`
   updatedAt
 }
     `;
+export const ChangePasswordDocument = gql`
+    mutation ChangePassword($currentPassword: String!, $newPassword: String!) {
+  changePassword(currentPassword: $currentPassword, newPassword: $newPassword) {
+    id
+    accessToken
+  }
+}
+    `;
+export type ChangePasswordMutationFn = Apollo.MutationFunction<ChangePasswordMutation, ChangePasswordMutationVariables>;
+
+/**
+ * __useChangePasswordMutation__
+ *
+ * To run a mutation, you first call `useChangePasswordMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useChangePasswordMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [changePasswordMutation, { data, loading, error }] = useChangePasswordMutation({
+ *   variables: {
+ *      currentPassword: // value for 'currentPassword'
+ *      newPassword: // value for 'newPassword'
+ *   },
+ * });
+ */
+export function useChangePasswordMutation(baseOptions?: Apollo.MutationHookOptions<ChangePasswordMutation, ChangePasswordMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<ChangePasswordMutation, ChangePasswordMutationVariables>(ChangePasswordDocument, options);
+      }
+export type ChangePasswordMutationHookResult = ReturnType<typeof useChangePasswordMutation>;
+export type ChangePasswordMutationResult = Apollo.MutationResult<ChangePasswordMutation>;
+export type ChangePasswordMutationOptions = Apollo.BaseMutationOptions<ChangePasswordMutation, ChangePasswordMutationVariables>;
+export const GetUserTagColorsDocument = gql`
+    query GetUserTagColors($shopId: ID!) {
+  getUserTagColors(shopId: $shopId) {
+    tagColor
+  }
+}
+    `;
+
+/**
+ * __useGetUserTagColorsQuery__
+ *
+ * To run a query within a React component, call `useGetUserTagColorsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetUserTagColorsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetUserTagColorsQuery({
+ *   variables: {
+ *      shopId: // value for 'shopId'
+ *   },
+ * });
+ */
+export function useGetUserTagColorsQuery(baseOptions: Apollo.QueryHookOptions<GetUserTagColorsQuery, GetUserTagColorsQueryVariables> & ({ variables: GetUserTagColorsQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetUserTagColorsQuery, GetUserTagColorsQueryVariables>(GetUserTagColorsDocument, options);
+      }
+export function useGetUserTagColorsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetUserTagColorsQuery, GetUserTagColorsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetUserTagColorsQuery, GetUserTagColorsQueryVariables>(GetUserTagColorsDocument, options);
+        }
+// @ts-ignore
+export function useGetUserTagColorsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetUserTagColorsQuery, GetUserTagColorsQueryVariables>): Apollo.UseSuspenseQueryResult<GetUserTagColorsQuery, GetUserTagColorsQueryVariables>;
+export function useGetUserTagColorsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetUserTagColorsQuery, GetUserTagColorsQueryVariables>): Apollo.UseSuspenseQueryResult<GetUserTagColorsQuery | undefined, GetUserTagColorsQueryVariables>;
+export function useGetUserTagColorsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetUserTagColorsQuery, GetUserTagColorsQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetUserTagColorsQuery, GetUserTagColorsQueryVariables>(GetUserTagColorsDocument, options);
+        }
+export type GetUserTagColorsQueryHookResult = ReturnType<typeof useGetUserTagColorsQuery>;
+export type GetUserTagColorsLazyQueryHookResult = ReturnType<typeof useGetUserTagColorsLazyQuery>;
+export type GetUserTagColorsSuspenseQueryHookResult = ReturnType<typeof useGetUserTagColorsSuspenseQuery>;
+export type GetUserTagColorsQueryResult = Apollo.QueryResult<GetUserTagColorsQuery, GetUserTagColorsQueryVariables>;
 export const RecordAdjustmentDocument = gql`
     mutation RecordAdjustment($input: RecordAdjustmentInput!) {
   recordAdjustment(input: $input) {
@@ -5429,6 +5522,7 @@ export const UpdateUserDocument = gql`
   updateUser(user: $user) {
     id
     avatar
+    tagColor
   }
 }
     `;

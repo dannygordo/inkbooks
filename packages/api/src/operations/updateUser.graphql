@@ -1,7 +1,9 @@
-# Direct equivalent of apps/web's UserService.UPDATE_USER_MUTATION, trimmed to what this app's
-# Settings screen actually reads back (avatar) rather than every field web's version selects -
-# password/tagColor Settings sections aren't built here yet (see PRODUCTION_ROADMAP.md Phase 5
-# step 8's remaining ~40-screen list); widen the selection set when those are.
+# Direct equivalent of apps/web's UserService.UPDATE_USER_MUTATION. Widened from `id avatar` to
+# also select `tagColor` now that the calendar-color picker is built (see accountSettings.graphql
+# for GetUserTagColors, its companion query) - this file's own header comment predicted this exact
+# moment back when it was avatar-only. Still not web's full field list
+# (email/firstName/lastName/role/accessToken/userType/themePreference/userInfo) - nothing else on
+# mobile's Settings screen changes any of those yet.
 #
 # id/email/role ARE REQUIRED ON EVERY CALL, not just when changing them - UserUpdateInput's own
 # schema requires id/email/role regardless of which field the caller actually means to change
@@ -13,10 +15,11 @@
 # handleUpdateUser, which never reads it back either. A caller must merge only the field it asked
 # to change into the existing CurrentUser (context/auth.tsx's updateCurrentUser), never replace
 # the whole object with this response - doing so would silently overwrite the real session token
-# with that placeholder.
+# with that placeholder. Contrast ChangePassword below, whose accessToken IS real.
 mutation UpdateUser($user: UserUpdateInput!) {
 	updateUser(user: $user) {
 		id
 		avatar
+		tagColor
 	}
 }
