@@ -1204,6 +1204,16 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    `updateReminderSettings` already existed server-side). `AutoResponsesPanel.jsx`,
    `ResponseTimePanel.jsx`, and `SystemMessageTemplatesPanel.jsx` remain the rest of the Messages
    category. Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile`
+   `tsc --noEmit` clean, full `apps/mobile` Jest suite - still 229/229.
+
+   **Messages batch 2 (2026-09-03, see DECISIONS.md X39) is the next slice** - `settings/
+   auto-responses.tsx`: message templates fired automatically on a trigger (session completed,
+   payment received, client message), with two independent sections (an artist's own set, plus
+   their shop's set for a shop-connected shop-admin) rendering at once, matching web exactly.
+   Client-operations-only, everything already existed server-side. No cross-platform modal
+   primitive exists in this app, so web's create/edit Dialog became an inline editor card
+   instead. `ResponseTimePanel.jsx` and `SystemMessageTemplatesPanel.jsx` remain the rest of
+   Messages. Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile`
    `tsc --noEmit` clean, full `apps/mobile` Jest suite - still 229/229. Booth Rent, the rest of
    Messages, Forms' per-artist "Your link" section, Appearance, and Security remain open.
 

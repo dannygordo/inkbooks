@@ -81,14 +81,14 @@ import { getUserShopId } from '@/utils/user';
  * shop-connected, whose rate actually applies to their sessions. `BoothRentPanel`'s "your booth
  * rent" card is a real, separate feature with no existing mobile infrastructure - not folded in.
  *
- * A "Messages" link (X38) routes any artist to `settings/reminders.tsx`, the first of the four
- * web panels (Reminders/AutoResponses/ResponseTime/SystemMessageTemplates) X31 named as the
- * largest remaining chunk - taken one screen at a time, same as the Business/Rates links above,
- * rather than one combined screen. The other three remain open.
+ * A "Messages" card (X38/X39) links to two of the four web panels so far - `settings/
+ * reminders.tsx` and `settings/auto-responses.tsx` - out of the largest remaining chunk X31
+ * named, taken one screen at a time, same as the Business/Rates links above. ResponseTime and
+ * SystemMessageTemplates remain open.
  *
  * Everything else on web's Settings (Appearance, Notifications, Security, Forms' per-artist
- * "Your link" section) remains unported - see DECISIONS.md X31/X34/X36/X37/X38 for the full list
- * and reasoning.
+ * "Your link" section) remains unported - see DECISIONS.md X31/X34/X36/X37/X38/X39 for the full
+ * list and reasoning.
  */
 export default function SettingsScreen() {
   const { user, updateCurrentUser } = useAuth();
@@ -359,7 +359,8 @@ export default function SettingsScreen() {
             <View style={styles.card}>
               <ThemedText type="smallBold">Messages</ThemedText>
               <ThemedText type="small" themeColor="textSecondary">
-                Automatic reminders sent to clients ahead of an appointment.
+                Automatic reminders sent to clients ahead of an appointment, and message
+                templates fired on things like a completed session.
               </ThemedText>
               <View style={styles.linkList}>
                 <Button
@@ -367,6 +368,12 @@ export default function SettingsScreen() {
                   variant="secondary"
                   onPress={() => router.push('/settings/reminders')}
                   testID="settings-reminders-link"
+                />
+                <Button
+                  label="Auto-Responses"
+                  variant="secondary"
+                  onPress={() => router.push('/settings/auto-responses')}
+                  testID="settings-auto-responses-link"
                 />
               </View>
             </View>

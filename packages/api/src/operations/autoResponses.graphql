@@ -1,0 +1,65 @@
+# settings/auto-responses.tsx (DECISIONS.md X39) - message templates fired automatically on a
+# lifecycle event, or sent by hand elsewhere (that manual "Send a message" picker -
+# SendAutoResponseButton.jsx/sendAutoResponseNow - stays out of scope, per SessionDetailForm.tsx's
+# own already-documented cut). Direct port of apps/web's AutoResponsesPanel.jsx.
+#
+# shopId XOR artistUserId scopes every call - but UNLIKE Expenses/Income, a shop-connected artist
+# queries BOTH scopes at once (their own artistUserId set AND their shop's shopId set), never just
+# one. sendAutoResponseNow deliberately omitted - not in scope here.
+query GetAutoResponses($shopId: ID, $artistUserId: ID, $includeInactive: Boolean) {
+	getAutoResponses(shopId: $shopId, artistUserId: $artistUserId, includeInactive: $includeInactive) {
+		id
+		shopId
+		artistUserId
+		name
+		trigger
+		enabled
+		emailEnabled
+		smsEnabled
+		emailSubjectTemplate
+		emailBodyTemplate
+		smsTemplate
+		active
+	}
+}
+
+mutation CreateAutoResponse($input: CreateAutoResponseInput!) {
+	createAutoResponse(input: $input) {
+		id
+		shopId
+		artistUserId
+		name
+		trigger
+		enabled
+		emailEnabled
+		smsEnabled
+		emailSubjectTemplate
+		emailBodyTemplate
+		smsTemplate
+		active
+	}
+}
+
+mutation UpdateAutoResponse($input: UpdateAutoResponseInput!) {
+	updateAutoResponse(input: $input) {
+		id
+		shopId
+		artistUserId
+		name
+		trigger
+		enabled
+		emailEnabled
+		smsEnabled
+		emailSubjectTemplate
+		emailBodyTemplate
+		smsTemplate
+		active
+	}
+}
+
+mutation ArchiveAutoResponse($autoResponseId: ID!) {
+	archiveAutoResponse(autoResponseId: $autoResponseId) {
+		id
+		active
+	}
+}

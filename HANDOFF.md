@@ -8,6 +8,31 @@ Last updated: 2026-09-03.
 
 ---
 
+### 2026-09-03 (twenty-seventh entry): Messages batch 2 - Auto-Responses
+
+Continuing down the Messages sub-slice list from the twenty-sixth entry. Full reasoning:
+DECISIONS.md X39.
+
+New `settings/auto-responses.tsx`, direct port of `AutoResponsesPanel.jsx`: message templates
+fired automatically on a trigger (session completed, payment received, client message) or kept
+for a manual send elsewhere (that manual picker, `sendAutoResponseNow`, stays out - already
+excluded per `SessionDetailForm.tsx`'s own note). New `packages/api/src/operations/
+autoResponses.graphql` - server-side, everything already existed, so client-operations-only.
+
+Two independent sections render at once for a shop-connected shop-admin (own set + shop's set),
+matching web exactly - never a toggle between them. No cross-platform modal primitive exists in
+this app (confirmed by grep), so web's create/edit Dialog became an inline editor card instead -
+one editor slot per section, opened by "New" or a row's "Edit", the same "actions stay on the
+list" shape as FormBuilder (X30) and recurring-expenses.tsx's own add-new-entry layout, extended
+here to also cover editing an existing row.
+
+Not built: `ResponseTimePanel.jsx`, `SystemMessageTemplatesPanel.jsx` - the rest of Messages.
+
+Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+full `apps/mobile` Jest suite - still 229/229. No server-side changes.
+
+---
+
 ### 2026-09-03 (twenty-sixth entry): Messages batch 1 - Reminders
 
 Next slice from the same Settings follow-up list. Full reasoning: DECISIONS.md X38.

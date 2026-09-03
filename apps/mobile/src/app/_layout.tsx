@@ -141,6 +141,10 @@ function RootNavigator() {
             own "Messages" section. AutoResponsesPanel/ResponseTimePanel/SystemMessageTemplatesPanel
             remain open, named in DECISIONS.md X31/X38. */}
         <Stack.Screen name="settings/reminders" options={{ headerShown: true, title: 'Reminders' }} />
+        {/* Messages category, second sub-slice (X39) - Auto-Responses, reached from
+            settings/index.tsx's own "Messages" section. ResponseTimePanel/
+            SystemMessageTemplatesPanel remain open, named in DECISIONS.md X31/X38/X39. */}
+        <Stack.Screen name="settings/auto-responses" options={{ headerShown: true, title: 'Auto-Responses' }} />
         {/* The client roster - see clients/index.tsx's own header comment. Reached from
             index.tsx's header, and the second (real) entry point into client/[id].tsx below -
             that screen's own X15 comment named this as worth building. */}

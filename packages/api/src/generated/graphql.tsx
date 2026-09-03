@@ -2904,6 +2904,36 @@ export type UnarchiveArtistMutationVariables = Exact<{
 
 export type UnarchiveArtistMutation = { __typename?: 'Mutation', unarchiveArtist?: { __typename?: 'Artist', id: string, status?: number | null } | null };
 
+export type GetAutoResponsesQueryVariables = Exact<{
+  shopId?: InputMaybe<Scalars['ID']['input']>;
+  artistUserId?: InputMaybe<Scalars['ID']['input']>;
+  includeInactive?: InputMaybe<Scalars['Boolean']['input']>;
+}>;
+
+
+export type GetAutoResponsesQuery = { __typename?: 'Query', getAutoResponses: Array<{ __typename?: 'AutoResponse', id: string, shopId?: string | null, artistUserId?: string | null, name: string, trigger: string, enabled: boolean, emailEnabled: boolean, smsEnabled: boolean, emailSubjectTemplate?: string | null, emailBodyTemplate?: string | null, smsTemplate?: string | null, active: boolean }> };
+
+export type CreateAutoResponseMutationVariables = Exact<{
+  input: CreateAutoResponseInput;
+}>;
+
+
+export type CreateAutoResponseMutation = { __typename?: 'Mutation', createAutoResponse: { __typename?: 'AutoResponse', id: string, shopId?: string | null, artistUserId?: string | null, name: string, trigger: string, enabled: boolean, emailEnabled: boolean, smsEnabled: boolean, emailSubjectTemplate?: string | null, emailBodyTemplate?: string | null, smsTemplate?: string | null, active: boolean } };
+
+export type UpdateAutoResponseMutationVariables = Exact<{
+  input: UpdateAutoResponseInput;
+}>;
+
+
+export type UpdateAutoResponseMutation = { __typename?: 'Mutation', updateAutoResponse: { __typename?: 'AutoResponse', id: string, shopId?: string | null, artistUserId?: string | null, name: string, trigger: string, enabled: boolean, emailEnabled: boolean, smsEnabled: boolean, emailSubjectTemplate?: string | null, emailBodyTemplate?: string | null, smsTemplate?: string | null, active: boolean } };
+
+export type ArchiveAutoResponseMutationVariables = Exact<{
+  autoResponseId: Scalars['ID']['input'];
+}>;
+
+
+export type ArchiveAutoResponseMutation = { __typename?: 'Mutation', archiveAutoResponse: { __typename?: 'AutoResponse', id: string, active: boolean } };
+
 export type GetBookingRequestsQueryVariables = Exact<{
   artistId: Scalars['ID']['input'];
   statuses?: InputMaybe<Array<Scalars['String']['input']> | Scalars['String']['input']>;
@@ -4444,6 +4474,188 @@ export function useUnarchiveArtistMutation(baseOptions?: Apollo.MutationHookOpti
 export type UnarchiveArtistMutationHookResult = ReturnType<typeof useUnarchiveArtistMutation>;
 export type UnarchiveArtistMutationResult = Apollo.MutationResult<UnarchiveArtistMutation>;
 export type UnarchiveArtistMutationOptions = Apollo.BaseMutationOptions<UnarchiveArtistMutation, UnarchiveArtistMutationVariables>;
+export const GetAutoResponsesDocument = gql`
+    query GetAutoResponses($shopId: ID, $artistUserId: ID, $includeInactive: Boolean) {
+  getAutoResponses(
+    shopId: $shopId
+    artistUserId: $artistUserId
+    includeInactive: $includeInactive
+  ) {
+    id
+    shopId
+    artistUserId
+    name
+    trigger
+    enabled
+    emailEnabled
+    smsEnabled
+    emailSubjectTemplate
+    emailBodyTemplate
+    smsTemplate
+    active
+  }
+}
+    `;
+
+/**
+ * __useGetAutoResponsesQuery__
+ *
+ * To run a query within a React component, call `useGetAutoResponsesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetAutoResponsesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetAutoResponsesQuery({
+ *   variables: {
+ *      shopId: // value for 'shopId'
+ *      artistUserId: // value for 'artistUserId'
+ *      includeInactive: // value for 'includeInactive'
+ *   },
+ * });
+ */
+export function useGetAutoResponsesQuery(baseOptions?: Apollo.QueryHookOptions<GetAutoResponsesQuery, GetAutoResponsesQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetAutoResponsesQuery, GetAutoResponsesQueryVariables>(GetAutoResponsesDocument, options);
+      }
+export function useGetAutoResponsesLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetAutoResponsesQuery, GetAutoResponsesQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetAutoResponsesQuery, GetAutoResponsesQueryVariables>(GetAutoResponsesDocument, options);
+        }
+// @ts-ignore
+export function useGetAutoResponsesSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetAutoResponsesQuery, GetAutoResponsesQueryVariables>): Apollo.UseSuspenseQueryResult<GetAutoResponsesQuery, GetAutoResponsesQueryVariables>;
+export function useGetAutoResponsesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetAutoResponsesQuery, GetAutoResponsesQueryVariables>): Apollo.UseSuspenseQueryResult<GetAutoResponsesQuery | undefined, GetAutoResponsesQueryVariables>;
+export function useGetAutoResponsesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetAutoResponsesQuery, GetAutoResponsesQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetAutoResponsesQuery, GetAutoResponsesQueryVariables>(GetAutoResponsesDocument, options);
+        }
+export type GetAutoResponsesQueryHookResult = ReturnType<typeof useGetAutoResponsesQuery>;
+export type GetAutoResponsesLazyQueryHookResult = ReturnType<typeof useGetAutoResponsesLazyQuery>;
+export type GetAutoResponsesSuspenseQueryHookResult = ReturnType<typeof useGetAutoResponsesSuspenseQuery>;
+export type GetAutoResponsesQueryResult = Apollo.QueryResult<GetAutoResponsesQuery, GetAutoResponsesQueryVariables>;
+export const CreateAutoResponseDocument = gql`
+    mutation CreateAutoResponse($input: CreateAutoResponseInput!) {
+  createAutoResponse(input: $input) {
+    id
+    shopId
+    artistUserId
+    name
+    trigger
+    enabled
+    emailEnabled
+    smsEnabled
+    emailSubjectTemplate
+    emailBodyTemplate
+    smsTemplate
+    active
+  }
+}
+    `;
+export type CreateAutoResponseMutationFn = Apollo.MutationFunction<CreateAutoResponseMutation, CreateAutoResponseMutationVariables>;
+
+/**
+ * __useCreateAutoResponseMutation__
+ *
+ * To run a mutation, you first call `useCreateAutoResponseMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCreateAutoResponseMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [createAutoResponseMutation, { data, loading, error }] = useCreateAutoResponseMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useCreateAutoResponseMutation(baseOptions?: Apollo.MutationHookOptions<CreateAutoResponseMutation, CreateAutoResponseMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<CreateAutoResponseMutation, CreateAutoResponseMutationVariables>(CreateAutoResponseDocument, options);
+      }
+export type CreateAutoResponseMutationHookResult = ReturnType<typeof useCreateAutoResponseMutation>;
+export type CreateAutoResponseMutationResult = Apollo.MutationResult<CreateAutoResponseMutation>;
+export type CreateAutoResponseMutationOptions = Apollo.BaseMutationOptions<CreateAutoResponseMutation, CreateAutoResponseMutationVariables>;
+export const UpdateAutoResponseDocument = gql`
+    mutation UpdateAutoResponse($input: UpdateAutoResponseInput!) {
+  updateAutoResponse(input: $input) {
+    id
+    shopId
+    artistUserId
+    name
+    trigger
+    enabled
+    emailEnabled
+    smsEnabled
+    emailSubjectTemplate
+    emailBodyTemplate
+    smsTemplate
+    active
+  }
+}
+    `;
+export type UpdateAutoResponseMutationFn = Apollo.MutationFunction<UpdateAutoResponseMutation, UpdateAutoResponseMutationVariables>;
+
+/**
+ * __useUpdateAutoResponseMutation__
+ *
+ * To run a mutation, you first call `useUpdateAutoResponseMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateAutoResponseMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateAutoResponseMutation, { data, loading, error }] = useUpdateAutoResponseMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useUpdateAutoResponseMutation(baseOptions?: Apollo.MutationHookOptions<UpdateAutoResponseMutation, UpdateAutoResponseMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<UpdateAutoResponseMutation, UpdateAutoResponseMutationVariables>(UpdateAutoResponseDocument, options);
+      }
+export type UpdateAutoResponseMutationHookResult = ReturnType<typeof useUpdateAutoResponseMutation>;
+export type UpdateAutoResponseMutationResult = Apollo.MutationResult<UpdateAutoResponseMutation>;
+export type UpdateAutoResponseMutationOptions = Apollo.BaseMutationOptions<UpdateAutoResponseMutation, UpdateAutoResponseMutationVariables>;
+export const ArchiveAutoResponseDocument = gql`
+    mutation ArchiveAutoResponse($autoResponseId: ID!) {
+  archiveAutoResponse(autoResponseId: $autoResponseId) {
+    id
+    active
+  }
+}
+    `;
+export type ArchiveAutoResponseMutationFn = Apollo.MutationFunction<ArchiveAutoResponseMutation, ArchiveAutoResponseMutationVariables>;
+
+/**
+ * __useArchiveAutoResponseMutation__
+ *
+ * To run a mutation, you first call `useArchiveAutoResponseMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useArchiveAutoResponseMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [archiveAutoResponseMutation, { data, loading, error }] = useArchiveAutoResponseMutation({
+ *   variables: {
+ *      autoResponseId: // value for 'autoResponseId'
+ *   },
+ * });
+ */
+export function useArchiveAutoResponseMutation(baseOptions?: Apollo.MutationHookOptions<ArchiveAutoResponseMutation, ArchiveAutoResponseMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<ArchiveAutoResponseMutation, ArchiveAutoResponseMutationVariables>(ArchiveAutoResponseDocument, options);
+      }
+export type ArchiveAutoResponseMutationHookResult = ReturnType<typeof useArchiveAutoResponseMutation>;
+export type ArchiveAutoResponseMutationResult = Apollo.MutationResult<ArchiveAutoResponseMutation>;
+export type ArchiveAutoResponseMutationOptions = Apollo.BaseMutationOptions<ArchiveAutoResponseMutation, ArchiveAutoResponseMutationVariables>;
 export const GetBookingRequestsDocument = gql`
     query GetBookingRequests($artistId: ID!, $statuses: [String!], $page: PageInput) {
   getBookingRequests(artistId: $artistId, statuses: $statuses, page: $page) {

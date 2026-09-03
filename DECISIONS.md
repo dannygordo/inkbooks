@@ -2094,6 +2094,61 @@ for actually sharing it.
 `FORM_FIELD_TYPE_LABELS`/`formFieldTypeLabel`) - same "build the map directly, don't port
 `prettyConstantsListValue`" reasoning as `utils/projectStatus.ts` (X20).
 
+### X39. Messages batch 2 - Auto-Responses (message templates fired on a lifecycle event)
+
+Continuing down the Messages sub-slice list started in X38, per the same "yes, keep going"/"keep
+going" instruction. Direct port of `AutoResponsesPanel.jsx`: message templates a shop or artist
+owns, fired automatically on a trigger (after a session, a payment received, a client message) or
+kept around for a manual send elsewhere. New route `settings/auto-responses.tsx`, linked from the
+same "Messages" card on `settings/index.tsx` that X38 added (now two links: Reminders,
+Auto-Responses).
+
+**Server-side, everything already existed** - `getAutoResponses`/`createAutoResponse`/
+`updateAutoResponse`/`archiveAutoResponse` were all already in `server/graphql/typeDefs.js`, so
+this slice is client-operations-only (new `packages/api/src/operations/autoResponses.graphql`).
+`sendAutoResponseNow` (the manual "Send a message" picker, `SendAutoResponseButton.jsx`) is
+deliberately NOT included - already named as its own cut in `SessionDetailForm.tsx`'s own header
+comment, not a new decision made here.
+
+**TWO INDEPENDENT SECTIONS, matching web exactly, not a toggle** - a shop-connected artist who is
+also shop-admin-or-better sees BOTH "Your Auto-Responses" (their own `artistUserId` scope) AND the
+shop's set (`shopId` scope) at the same time, continuously - `server/models/AutoResponse.js`'s own
+design: the artist's own enabled response for a trigger wins, the shop's fires only when the
+artist has none enabled for it. `canManageShopAutoResponses` ported as `isShopAdminOrBetter(user)
+&& Boolean(shopId)` - mobile's existing `isShopAdminOrBetter` (X21/X22) is the same `role <=
+ROLES.SHOP_ADMIN` check web's own inline `user.role <= ROLES.SHOP_ADMIN` is, confirmed by reading
+both side by side rather than assumed from the name.
+
+**NO CROSS-PLATFORM MODAL PRIMITIVE EXISTS IN THIS APP** (checked - grepped `apps/mobile/src/app`
+for RN's `Modal`, found none), so web's create/edit `Dialog` becomes an inline editor card instead
+- opened by a "+ New Auto-Response" button or a row's "Edit", closed by Save/Cancel, one editor
+slot per section. This is the same "actions stay on the list, no popover" shape this project
+already committed to for FormBuilder (X30) and reuses `recurring-expenses.tsx`'s own
+add-a-new-entry-inline-below-the-list layout, extended here to also handle editing an existing
+row (recurring-expenses.tsx itself has no edit flow, only toggle/delete, so this is the first
+screen that reuses one editor card for both create and edit).
+
+**Trigger is locked after creation, matching web's `disabled={Boolean(draft.autoResponseId)}`** -
+the editor shows a plain label instead of the `PillRow` once editing an existing response, so
+there's no way to even attempt changing it (a disabled `PillRow` isn't a pattern this component
+supports, and wasn't worth adding for a field that's really just not editable past creation).
+
+**Shop name for the shop-section title comes from a second query** (`GetShopDetail`, the same
+operation `settings/shop.tsx` already uses) rather than threading it through the auth context -
+skipped whenever `canManageShopAutoResponses` is false, so it costs nothing for the common case of
+an artist with no shop-admin role.
+
+**`AutoResponseSection` is a local, unexported component in this one file** - same placement as
+web's own (only ever used twice, both times from this one screen), not extracted anywhere shared.
+
+**NOT BUILT HERE**: `ResponseTimePanel.jsx` and `SystemMessageTemplatesPanel.jsx` remain the rest
+of the Messages category, named as their own next sub-slices.
+
+Verification: `packages/api` codegen + build (new `useGetAutoResponsesQuery`/
+`useCreateAutoResponseMutation`/`useUpdateAutoResponseMutation`/`useArchiveAutoResponseMutation`
+hooks generated cleanly), `apps/mobile` `tsc --noEmit` clean, full Jest suite 229/229 (unchanged -
+no new pure-logic module needed).
+
 ### X38. Messages batch 1 - Reminders (appointment nudges to clients, by email and/or text)
 
 Fourth of the four follow-up items, continuing down X31's own "roughly in order of likely value"
@@ -2553,7 +2608,8 @@ likely value**:
 - **Messages** (`RemindersPanel.jsx`, `AutoResponsesPanel.jsx`, `ResponseTimePanel.jsx`,
   `SystemMessageTemplatesPanel.jsx`) - the largest remaining chunk (over 1,100 combined web lines),
   real separate scope on its own. ~~`RemindersPanel.jsx`~~ - **done, see X38.**
-  `AutoResponsesPanel.jsx`/`ResponseTimePanel.jsx`/`SystemMessageTemplatesPanel.jsx` remain open.
+  ~~`AutoResponsesPanel.jsx`~~ - **done, see X39.** `ResponseTimePanel.jsx`/
+  `SystemMessageTemplatesPanel.jsx` remain open.
 - **Forms' shop-wide section** (`FormsPanel.jsx`'s "Your link"/URL list, absorbed from the old
   Booking category) - forms/index.tsx and form/[id].tsx (X28/X30) cover form management itself;
   this is the separate "here's your booking link to share" view.
