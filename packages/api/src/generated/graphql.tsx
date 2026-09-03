@@ -2211,6 +2211,11 @@ export type QueryGetMessagesByConversationIdArgs = {
 };
 
 
+export type QueryGetMySquareAuthorizationUrlArgs = {
+  platform?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type QueryGetOneStaffArgs = {
   staffId: Scalars['ID']['input'];
 };
@@ -2317,6 +2322,7 @@ export type QueryGetShopCutRatesArgs = {
 
 
 export type QueryGetSquareAuthorizationUrlArgs = {
+  platform?: InputMaybe<Scalars['String']['input']>;
   shopId: Scalars['ID']['input'];
 };
 
@@ -7991,7 +7997,7 @@ export type UpdateShopIdentityMutationResult = Apollo.MutationResult<UpdateShopI
 export type UpdateShopIdentityMutationOptions = Apollo.BaseMutationOptions<UpdateShopIdentityMutation, UpdateShopIdentityMutationVariables>;
 export const GetSquareAuthorizationUrlDocument = gql`
     query GetSquareAuthorizationUrl($shopId: ID!) {
-  getSquareAuthorizationUrl(shopId: $shopId)
+  getSquareAuthorizationUrl(shopId: $shopId, platform: "mobile")
 }
     `;
 

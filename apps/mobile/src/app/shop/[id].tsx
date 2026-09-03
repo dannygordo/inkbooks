@@ -5,7 +5,7 @@ import {
   useUpdateShopIdentityMutation,
 } from '@inkbooks/api';
 import { useLocalSearchParams } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -35,16 +35,19 @@ import { useTheme } from '@/hooks/use-theme';
  * shops.graphql's own comment on ShopInput requiring every field or it's nulled out).
  *
  * Square Connect: opens Square's hosted OAuth consent page externally via Linking.openURL rather
- * than a WebView or expo-web-browser flow (which isn't even an installed dependency) - honest
- * limitation named plainly in the UI: mobile has no deep link registered for Square's OAuth
- * callback (that redirects to a web route, /shop/:shopId?square=...), so there's no automatic
- * return to the app after the user finishes on Square's site. They come back manually and refresh
- * this screen to see the updated connection status. Disconnect has no such caveat - it's a plain
- * mutation with no redirect involved at all.
+ * than a WebView or expo-web-browser flow (which isn't even an installed dependency). The
+ * authorization URL is requested with platform: "mobile" (packages/api's shops.graphql), which
+ * rides inside the signed state token and tells the callback route (server/routes/squareOAuth.js)
+ * to land the seller's browser on a small "return to the app" page that opens inkbooks://shop/:id
+ * instead of redirecting to the web app. This screen reads the resulting ?square= param below and
+ * shows a banner, plus refetches so squareConnected is current without a manual pull-to-refresh.
+ * See DECISIONS.md X24 (the original gap) and X33 (the deep link that closes it). Disconnect has
+ * no such caveat - it's a plain mutation with no redirect involved at all.
  */
 export default function ShopDetailScreen() {
-  const params = useLocalSearchParams<{ id: string }>();
+  const params = useLocalSearchParams<{ id: string; square?: string }>();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
+  const squareStatus = Array.isArray(params.square) ? params.square[0] : params.square;
   const { user } = useAuth();
   const theme = useTheme();
 
@@ -54,6 +57,16 @@ export default function ShopDetailScreen() {
     fetchPolicy: 'cache-and-network',
   });
   const shop = data?.getShop;
+
+  // Belt-and-suspenders alongside the cache-and-network fetch policy above: this effect covers
+  // the case where expo-router reuses an already-mounted instance of this screen rather than
+  // remounting it when the OS opens the inkbooks://shop/:id?square=... deep link, so the update
+  // still happens without the user having to pull-to-refresh.
+  useEffect(() => {
+    if (squareStatus) {
+      refetch();
+    }
+  }, [squareStatus, refetch]);
 
   if ((loading && !shop) || !id) {
     return (
@@ -91,7 +104,12 @@ export default function ShopDetailScreen() {
 
           <ShopCutCard shop={shop} canEdit={canEdit} />
 
-          <SquareCard shop={shop} canEdit={canEdit} onChanged={() => refetch()} />
+          <SquareCard
+            shop={shop}
+            canEdit={canEdit}
+            onChanged={() => refetch()}
+            returnStatus={squareStatus}
+          />
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -286,10 +304,12 @@ function SquareCard({
   shop,
   canEdit,
   onChanged,
+  returnStatus,
 }: {
   shop: NonNullable<Shop>;
   canEdit: boolean;
   onChanged: () => void;
+  returnStatus?: string;
 }) {
   const [connectError, setConnectError] = useState<string | null>(null);
   const [fetchAuthorizationUrl, { loading: connecting }] = useGetSquareAuthorizationUrlLazyQuery({
@@ -318,9 +338,29 @@ function SquareCard({
       .catch((err) => setConnectError((err as Error).message));
   };
 
+  const returnBanner =
+    returnStatus === 'connected'
+      ? { text: 'Square connected.', testID: 'square-return-connected' as const }
+      : returnStatus === 'denied'
+        ? {
+            text: 'Square connection cancelled - nothing changed.',
+            testID: 'square-return-denied' as const,
+          }
+        : returnStatus
+          ? {
+              text: 'Something went wrong connecting Square. Please try again.',
+              testID: 'square-return-error' as const,
+            }
+          : null;
+
   return (
     <View style={styles.card}>
       <ThemedText type="smallBold">Square</ThemedText>
+      {returnBanner ? (
+        <ThemedText type="small" testID={returnBanner.testID}>
+          {returnBanner.text}
+        </ThemedText>
+      ) : null}
       {connectError ? (
         <ThemedText type="small" style={styles.error}>
           {connectError}
@@ -356,8 +396,8 @@ function SquareCard({
                 testID="square-connect"
               />
               <ThemedText type="small" themeColor="textSecondary">
-                You'll finish this in your browser. Once Square says you're connected, come back
-                and reopen this screen to see the update - it won't happen automatically.
+                You'll finish this in your browser, then it'll bring you back to this screen
+                automatically once Square says you're connected.
               </ThemedText>
             </>
           ) : null}

@@ -1952,10 +1952,15 @@ module.exports = gql`
     ######### Shop-cut ledger ###########
     # See PRODUCTION_ROADMAP.md's "Shop-cut ledger" section.
 
-    getSquareAuthorizationUrl(shopId: ID!): String!
+    # platform is 'web' (the default, when omitted) or 'mobile' - it rides inside the signed
+    # state token (routes/squareOAuth.js's signState/verifyState) so the callback route knows
+    # whether to land the seller's browser back on the web app or on a small "return to the app"
+    # page that opens this app's own inkbooks:// scheme. Nothing else about the handshake changes.
+    getSquareAuthorizationUrl(shopId: ID!, platform: String): String!
     # The same handshake for an independent artist, who has no shop to connect one against.
-    # Takes no argument on purpose: it can only ever act for the caller. See DECISIONS.md M9.
-    getMySquareAuthorizationUrl: String!
+    # Takes no argument on purpose beyond platform above: it can only ever act for the caller.
+    # See DECISIONS.md M9.
+    getMySquareAuthorizationUrl(platform: String): String!
     # WHERE THE CALLER'S SESSIONS ACTUALLY CHARGE - resolved through the same owner rule as their
     # tax rate (M8/M9), not just "does this artist have a row". An artist at a shop charges into
     # the SHOP's account, so the source field is what the settings panel needs in order to say

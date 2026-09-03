@@ -2094,6 +2094,80 @@ for actually sharing it.
 `FORM_FIELD_TYPE_LABELS`/`formFieldTypeLabel`) - same "build the map directly, don't port
 `prettyConstantsListValue`" reasoning as `utils/projectStatus.ts` (X20).
 
+### X33. Mobile's first real deep link - Square OAuth "return to the app", not the password-reset gap
+
+Second of the three follow-up items ("Settings batch 2, Messages follow-ups, Mobile deep-link
+scheme"). `app.json` has carried `"scheme": "inkbooks"` since the app was scaffolded, but nothing
+server-side or client-side had ever actually constructed or consumed an `inkbooks://...` URL -
+every earlier entry in this file describing a "no deep link" gap (X24's Square Connect, the
+password-reset flow) meant it literally. This closes exactly one of those two gaps.
+
+**A custom URL scheme is not a Universal Link, and the difference decided what got fixed here.**
+An `https://` Universal Link is intercepted by the OS before it ever reaches a browser, so tapping
+one in an email client, a text message, anywhere, opens the app directly. A custom scheme like
+`inkbooks://` only fires from script or a deliberate tap on an already-loaded page: a link an email
+client renders as plain, non-tappable text, an HTTP redirect a mobile browser prompts "Open in
+App?" for, or a `window.location.href` assignment on a page the app's own server controls. Square
+OAuth fits the last case - InkBooks's own callback route renders the intermediate page - so it's
+fixable with the scheme alone. The password-reset email link (X29's gap) does not: it needs a real
+Universal Link, which means a registered domain serving `apple-app-site-association` and
+`assetlinks.json`, an App Store listing, and signed builds with the matching entitlements - none of
+which exist or are buildable in this sandbox. Still an open, named gap, not touched by this entry.
+
+**The mechanism: a `platform` claim riding inside the already-signed OAuth `state` JWT.**
+`getSquareAuthorizationUrl`/`getMySquareAuthorizationUrl` (`graphql/typeDefs.js`,
+`resolvers/shops.js`) take a new optional `platform: String` argument, defaulted to `'web'` when
+omitted so every existing web call site (`apps/web/src/services/ShopService.js`, which defines its
+own independent query and never passes this) keeps behaving exactly as before. `routes/
+squareOAuth.js`'s `signState(ownerType, ownerId, platform = 'web')` seals it into the same signed
+token that already carries `ownerType`/`ownerId`/`purpose` (M9) - riding inside the signature
+rather than beside it, for the same reason `ownerType` does: Square hands `state` back to the
+callback unmodified and unchecked, so anything not inside the signature is an attacker's to change.
+`verifyState` reads it back, defaulting anything other than the literal `'mobile'` to `'web'`
+(never trusts an unrecognized value into a different code path).
+
+**The callback route now branches on that claim.** `respondToOAuthResult(res, owner, status)`
+replaces the old unconditional `res.redirect(settingsRedirectUrl(...))`: a `'web'` owner still gets
+that redirect (`webRedirectUrl`, renamed from `settingsRedirectUrl` for symmetry, otherwise
+unchanged), while a `'mobile'` owner gets `mobileReturnPageHtml(...)` - a small, self-contained HTML
+page that scripts `window.location.href = 'inkbooks://...'` immediately AND shows a manual "Open
+InkBooks" button as a fallback, rather than a bare `res.redirect('inkbooks://...')` that would
+degrade badly in a desktop browser or without the app installed. The deep link itself mirrors
+`webRedirectUrl`'s own routing exactly: `inkbooks://shop/:shopId?square=<status>` for a shop,
+`inkbooks://settings?square=<status>` for an independent artist, `status` one of `connected`/
+`denied`/`error`.
+
+**Mobile: `shop/[id].tsx` reads `?square=` and shows a banner.** `packages/api`'s
+`GetSquareAuthorizationUrl` operation now passes `platform: "mobile"` as a literal in the query
+string (not a variable - this operation is mobile-only, unlike the shared schema field) so every
+call already gets the deep-linked flow with no call-site change. The screen reads
+`useLocalSearchParams<{ id: string; square?: string }>()`'s new `square` field, shows a
+connected/cancelled/error banner via `SquareCard`'s `returnStatus` prop, and calls `refetch()` in a
+`useEffect` keyed on that param - belt-and-suspenders alongside the query's existing
+`cache-and-network` fetch policy, for the case where expo-router reuses an already-mounted screen
+instance rather than remounting it when the OS opens the link. `settings/index.tsx` has no
+equivalent read yet: an independent artist's Square connection lives on Settings, not this screen,
+and Settings does not currently read a `square` param or show a banner - named here as a real,
+narrow follow-up rather than silently incomplete, since Settings batch 2 (this same follow-up
+round) is about to touch that screen anyway.
+
+**Not independently verified**: whether `inkbooks://shop/<id>?square=connected` actually resolves
+to the `shop/[id]` route with `id` and `square` populated correctly relies on expo-router's default
+scheme-based linking (no explicit `linking` config exists or was added - `app.json`'s
+`"scheme": "inkbooks"` is the only piece expo-router needs, per its own deep-linking docs) - there
+is no device or simulator in this sandbox to actually tap a generated link and watch it land. Every
+other piece (`tsc --noEmit`, the full mobile Jest suite, `node --check` on every touched server
+file) is confirmed; this one specific claim is asked of whoever runs this on a real device.
+
+**Tests**: new `describe('signState: platform claim')` block in `test/unit/square-oauth-state.
+test.js` - default-to-`'web'`, explicit `'mobile'`, explicit `'web'`, and rejecting an unrecognized
+platform value, mirroring the file's own existing `ownerType` tests exactly. All four are pure
+function calls against `signState`/`jwt.verify` - no `mongod`, no schema, nothing this sandbox's
+`node --check`-only ceiling could get wrong the way the previous entry's (X32) invalid test did.
+Confirmed the three existing Square test files (`square-oauth-state.test.js`, `mySquareConnection.
+test.js`, `square.test.js`) call `signState`/the GraphQL query without a `platform` argument at
+every existing call site, so the new optional parameter changes nothing about what they assert.
+
 ### X32. Push notifications carry a subject, and tapping one now opens the right screen
 
 Last of the four follow-up items ("do 2, 3, 4 and 5"). Closes a real, standing gap: mobile has

@@ -74,12 +74,13 @@ mutation UpdateShopIdentity($shop: ShopInput!) {
 	}
 }
 
-# Square OAuth "Connect": lazy-fetched, then opened externally via Linking.openURL - mobile has no
-# deep link registered for Square's OAuth callback (that redirects to a web route,
-# /shop/:shopId?square=...), so there's no automatic return to the app. Named as an explicit,
-# honest limitation in shop/[id].tsx rather than silently glossed over. See DECISIONS.md X24.
+# Square OAuth "Connect": lazy-fetched, then opened externally via Linking.openURL. platform:
+# "mobile" rides inside the signed state token (server/routes/squareOAuth.js) so the callback
+# route lands the seller's browser on a small "return to the app" page that opens this app's own
+# inkbooks:// scheme, instead of the web app's /shop/:shopId?square=... route. See DECISIONS.md
+# X24 (the original gap) and X33 (the deep link that closes it).
 query GetSquareAuthorizationUrl($shopId: ID!) {
-	getSquareAuthorizationUrl(shopId: $shopId)
+	getSquareAuthorizationUrl(shopId: $shopId, platform: "mobile")
 }
 
 # Plain mutation, no redirect involved - fully portable with none of the Connect flow's caveats.

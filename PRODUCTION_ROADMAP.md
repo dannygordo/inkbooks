@@ -1136,6 +1136,25 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    This closes the requested four-item follow-up round in full (forgot-password recovery,
    FormBuilder, Settings batch 1, push-notification deep-linking).
 
+   **Mobile's first real deep link (2026-09-03, see DECISIONS.md X33) is the second of a new
+   three-item follow-up round** ("Settings batch 2, Messages follow-ups, Mobile deep-link
+   scheme"). `app.json`'s `"scheme": "inkbooks"` had existed since scaffolding but nothing ever
+   used it. This closes Square OAuth's "return to the app" gap (X24) only - NOT the
+   password-reset email-link gap noted just above, which genuinely needs a real Universal Link
+   (registered domain, hosted association files, signed builds), not a custom scheme, since an
+   email client won't treat `inkbooks://...` as tappable the way it treats `https://...`. The
+   mechanism: a `platform` claim (`'web'`/`'mobile'`) rides inside the already-signed Square OAuth
+   `state` JWT (`routes/squareOAuth.js`'s `signState`/`verifyState`), and the callback route sends
+   a `'mobile'` caller to a small server-rendered "return to the app" page that opens
+   `inkbooks://shop/:id?square=<status>` instead of redirecting to the web app. `shop/[id].tsx`
+   reads that `square` param, shows a status banner, and refetches. Confirmed in this sandbox:
+   `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean, full `apps/mobile` Jest
+   suite (still 223/223 - no new mobile tests needed), `node --check` on every touched server file,
+   and four new pure-function tests for the `platform` claim in
+   `test/unit/square-oauth-state.test.js`. **Not confirmed:** that the generated `inkbooks://`
+   link actually resolves to the right mobile route on a real device - no simulator in this
+   sandbox to check it.
+
    Everything else on the ~40-screen list not yet named remains open.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).

@@ -8,6 +8,56 @@ Last updated: 2026-09-03.
 
 ---
 
+### 2026-09-03 (twenty-first entry): Mobile's first real deep link - Square OAuth "return to the app"
+
+Second of three follow-up items ("Settings batch 2, Messages follow-ups, Mobile deep-link scheme").
+Full reasoning: DECISIONS.md X33.
+
+`app.json`'s `"scheme": "inkbooks"` has existed since the app was scaffolded but nothing ever
+constructed or consumed an `inkbooks://` URL until now. Fixes exactly one of the two named
+"no deep link" gaps - Square OAuth's return-to-app (X24) - and NOT the other: a custom scheme can
+only fire from script or a tapped link on a page the app controls, so it cannot make the
+password-reset email link (X29) tappable the way a real Universal Link would. That gap is
+unchanged and still needs a registered domain, hosted association files, and signed builds - none
+buildable here.
+
+**Server:** `getSquareAuthorizationUrl`/`getMySquareAuthorizationUrl` take a new optional
+`platform: String` arg (defaults to `'web'`, so every existing web call site is unaffected).
+`routes/squareOAuth.js`'s `signState`/`verifyState` seal it inside the same signed `state` JWT that
+already carries `ownerType`/`ownerId`/`purpose` (M9). The callback route's new
+`respondToOAuthResult` branches on it: `'web'` keeps the old redirect
+(`webRedirectUrl`, renamed from `settingsRedirectUrl`), `'mobile'` gets a small self-contained HTML
+page (`mobileReturnPageHtml`) that scripts a redirect to `inkbooks://shop/:id?square=<status>` (or
+`inkbooks://settings?square=<status>` for an independent artist) with a manual "Open InkBooks"
+button as fallback. New `describe('signState: platform claim')` block in
+`test/unit/square-oauth-state.test.js` - four pure-function tests (default, explicit mobile,
+explicit web, rejecting a bad value), no schema/mongod involved this time, specifically to avoid
+repeating the twentieth entry's mistake. Confirmed the three existing Square test files don't pass
+a `platform` argument anywhere, so nothing already-passing changes. `node --check` on every touched
+server file.
+
+**Mobile:** `packages/api`'s `GetSquareAuthorizationUrl` operation now sends `platform: "mobile"`
+as a literal (mobile-only operation, so no call-site variable needed) - ran `codegen`+`build` after
+the change. `shop/[id].tsx` reads the new `?square=` param, shows a connected/cancelled/error
+banner (`SquareCard`'s new `returnStatus` prop), and `refetch()`s on that param via `useEffect` as
+a belt-and-suspenders alongside the query's existing `cache-and-network` policy. Corrected the
+screen's own header comment, which used to name this exact gap. `settings/index.tsx` (the
+independent-artist equivalent) does NOT yet read a `square` param or show a banner - named here as
+a narrow, real follow-up, since Settings batch 2 (next in this same round) is about to touch that
+screen anyway.
+
+**Confirmed in this sandbox:** `apps/mobile` `tsc --noEmit` clean, full `apps/mobile` Jest suite -
+223/223 (no new mobile tests added - none of the touched mobile code has branching pure logic worth
+isolating beyond what's already covered). `packages/api` codegen + build clean. `node --check` on
+`typeDefs.js`/`resolvers/shops.js`/`routes/squareOAuth.js`/`square-oauth-state.test.js`. **Not
+confirmed:** whether `inkbooks://shop/<id>?square=connected` actually resolves to the right route
+with the right params on a real device or simulator - relies on expo-router's default scheme-based
+linking with no explicit `linking` config, which nothing in this sandbox can tap and watch land.
+Also not confirmed: the full server integration suite (same standing `fastdl.mongodb.org` block as
+always).
+
+---
+
 ### 2026-09-03 (twentieth entry): Push notifications now carry a subject, and tapping one opens the right screen
 
 Last of four follow-up items ("do 2, 3, 4 and 5") - closes out this round. Full reasoning:
