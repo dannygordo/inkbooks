@@ -1187,6 +1187,16 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    Rent, the Messages settings category, Forms' per-artist "Your link" section, Appearance, and
    Security remain the next items on that same follow-up list.
 
+   **Settings batch 4 (2026-09-03, see DECISIONS.md X37) is the next slice** - `settings/rates.tsx`
+   (gated to artists): billing type, hourly/flat rate, and, for a shop-connected artist, which
+   rate applies to their sessions. `BoothRentPanel.jsx`'s "your booth rent" card checked and found
+   to need real new infrastructure (no `BoothRentService` equivalent, no `boothRentCharge` screen
+   at all) - named as its own future slice rather than folded in. `PillRow` extracted from
+   `form/[id].tsx` into a shared `components/PillRow.tsx` along the way, its second real caller.
+   Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+   full `apps/mobile` Jest suite - still 229/229. Booth Rent, the Messages settings category,
+   Forms' per-artist "Your link" section, Appearance, and Security remain open.
+
    Everything else on the ~40-screen list not yet named remains open.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).

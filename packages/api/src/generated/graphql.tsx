@@ -3337,6 +3337,31 @@ export type UnregisterDeviceTokenMutationVariables = Exact<{
 
 export type UnregisterDeviceTokenMutation = { __typename?: 'Mutation', unregisterDeviceToken: boolean };
 
+export type GetMyRateSettingsQueryVariables = Exact<{
+  artistId: Scalars['ID']['input'];
+}>;
+
+
+export type GetMyRateSettingsQuery = { __typename?: 'Query', getArtist?: { __typename?: 'Artist', id: string, hourlyRate?: number | null, flatRate?: number | null, billingType?: string | null } | null };
+
+export type UpdateArtistRateSettingsMutationVariables = Exact<{
+  hourlyRate?: InputMaybe<Scalars['Int']['input']>;
+  flatRate?: InputMaybe<Scalars['Int']['input']>;
+  billingType: Scalars['String']['input'];
+}>;
+
+
+export type UpdateArtistRateSettingsMutation = { __typename?: 'Mutation', updateArtistRateSettings: { __typename?: 'Artist', id: string, hourlyRate?: number | null, flatRate?: number | null, billingType?: string | null } };
+
+export type SetArtistShopRateSourceMutationVariables = Exact<{
+  artistId: Scalars['ID']['input'];
+  shopId: Scalars['ID']['input'];
+  rateSource: Scalars['String']['input'];
+}>;
+
+
+export type SetArtistShopRateSourceMutation = { __typename?: 'Mutation', setArtistShopRateSource: { __typename?: 'ArtistShopConnection', id: string, rateSource: string } };
+
 export type GetRecurringExpensesListQueryVariables = Exact<{
   shopId?: InputMaybe<Scalars['ID']['input']>;
   artistUserId?: InputMaybe<Scalars['ID']['input']>;
@@ -7447,6 +7472,134 @@ export function useUnregisterDeviceTokenMutation(baseOptions?: Apollo.MutationHo
 export type UnregisterDeviceTokenMutationHookResult = ReturnType<typeof useUnregisterDeviceTokenMutation>;
 export type UnregisterDeviceTokenMutationResult = Apollo.MutationResult<UnregisterDeviceTokenMutation>;
 export type UnregisterDeviceTokenMutationOptions = Apollo.BaseMutationOptions<UnregisterDeviceTokenMutation, UnregisterDeviceTokenMutationVariables>;
+export const GetMyRateSettingsDocument = gql`
+    query GetMyRateSettings($artistId: ID!) {
+  getArtist(artistId: $artistId) {
+    id
+    hourlyRate
+    flatRate
+    billingType
+  }
+}
+    `;
+
+/**
+ * __useGetMyRateSettingsQuery__
+ *
+ * To run a query within a React component, call `useGetMyRateSettingsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetMyRateSettingsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetMyRateSettingsQuery({
+ *   variables: {
+ *      artistId: // value for 'artistId'
+ *   },
+ * });
+ */
+export function useGetMyRateSettingsQuery(baseOptions: Apollo.QueryHookOptions<GetMyRateSettingsQuery, GetMyRateSettingsQueryVariables> & ({ variables: GetMyRateSettingsQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetMyRateSettingsQuery, GetMyRateSettingsQueryVariables>(GetMyRateSettingsDocument, options);
+      }
+export function useGetMyRateSettingsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetMyRateSettingsQuery, GetMyRateSettingsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetMyRateSettingsQuery, GetMyRateSettingsQueryVariables>(GetMyRateSettingsDocument, options);
+        }
+// @ts-ignore
+export function useGetMyRateSettingsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetMyRateSettingsQuery, GetMyRateSettingsQueryVariables>): Apollo.UseSuspenseQueryResult<GetMyRateSettingsQuery, GetMyRateSettingsQueryVariables>;
+export function useGetMyRateSettingsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetMyRateSettingsQuery, GetMyRateSettingsQueryVariables>): Apollo.UseSuspenseQueryResult<GetMyRateSettingsQuery | undefined, GetMyRateSettingsQueryVariables>;
+export function useGetMyRateSettingsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetMyRateSettingsQuery, GetMyRateSettingsQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetMyRateSettingsQuery, GetMyRateSettingsQueryVariables>(GetMyRateSettingsDocument, options);
+        }
+export type GetMyRateSettingsQueryHookResult = ReturnType<typeof useGetMyRateSettingsQuery>;
+export type GetMyRateSettingsLazyQueryHookResult = ReturnType<typeof useGetMyRateSettingsLazyQuery>;
+export type GetMyRateSettingsSuspenseQueryHookResult = ReturnType<typeof useGetMyRateSettingsSuspenseQuery>;
+export type GetMyRateSettingsQueryResult = Apollo.QueryResult<GetMyRateSettingsQuery, GetMyRateSettingsQueryVariables>;
+export const UpdateArtistRateSettingsDocument = gql`
+    mutation UpdateArtistRateSettings($hourlyRate: Int, $flatRate: Int, $billingType: String!) {
+  updateArtistRateSettings(
+    hourlyRate: $hourlyRate
+    flatRate: $flatRate
+    billingType: $billingType
+  ) {
+    id
+    hourlyRate
+    flatRate
+    billingType
+  }
+}
+    `;
+export type UpdateArtistRateSettingsMutationFn = Apollo.MutationFunction<UpdateArtistRateSettingsMutation, UpdateArtistRateSettingsMutationVariables>;
+
+/**
+ * __useUpdateArtistRateSettingsMutation__
+ *
+ * To run a mutation, you first call `useUpdateArtistRateSettingsMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateArtistRateSettingsMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateArtistRateSettingsMutation, { data, loading, error }] = useUpdateArtistRateSettingsMutation({
+ *   variables: {
+ *      hourlyRate: // value for 'hourlyRate'
+ *      flatRate: // value for 'flatRate'
+ *      billingType: // value for 'billingType'
+ *   },
+ * });
+ */
+export function useUpdateArtistRateSettingsMutation(baseOptions?: Apollo.MutationHookOptions<UpdateArtistRateSettingsMutation, UpdateArtistRateSettingsMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<UpdateArtistRateSettingsMutation, UpdateArtistRateSettingsMutationVariables>(UpdateArtistRateSettingsDocument, options);
+      }
+export type UpdateArtistRateSettingsMutationHookResult = ReturnType<typeof useUpdateArtistRateSettingsMutation>;
+export type UpdateArtistRateSettingsMutationResult = Apollo.MutationResult<UpdateArtistRateSettingsMutation>;
+export type UpdateArtistRateSettingsMutationOptions = Apollo.BaseMutationOptions<UpdateArtistRateSettingsMutation, UpdateArtistRateSettingsMutationVariables>;
+export const SetArtistShopRateSourceDocument = gql`
+    mutation SetArtistShopRateSource($artistId: ID!, $shopId: ID!, $rateSource: String!) {
+  setArtistShopRateSource(
+    artistId: $artistId
+    shopId: $shopId
+    rateSource: $rateSource
+  ) {
+    id
+    rateSource
+  }
+}
+    `;
+export type SetArtistShopRateSourceMutationFn = Apollo.MutationFunction<SetArtistShopRateSourceMutation, SetArtistShopRateSourceMutationVariables>;
+
+/**
+ * __useSetArtistShopRateSourceMutation__
+ *
+ * To run a mutation, you first call `useSetArtistShopRateSourceMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useSetArtistShopRateSourceMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [setArtistShopRateSourceMutation, { data, loading, error }] = useSetArtistShopRateSourceMutation({
+ *   variables: {
+ *      artistId: // value for 'artistId'
+ *      shopId: // value for 'shopId'
+ *      rateSource: // value for 'rateSource'
+ *   },
+ * });
+ */
+export function useSetArtistShopRateSourceMutation(baseOptions?: Apollo.MutationHookOptions<SetArtistShopRateSourceMutation, SetArtistShopRateSourceMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<SetArtistShopRateSourceMutation, SetArtistShopRateSourceMutationVariables>(SetArtistShopRateSourceDocument, options);
+      }
+export type SetArtistShopRateSourceMutationHookResult = ReturnType<typeof useSetArtistShopRateSourceMutation>;
+export type SetArtistShopRateSourceMutationResult = Apollo.MutationResult<SetArtistShopRateSourceMutation>;
+export type SetArtistShopRateSourceMutationOptions = Apollo.BaseMutationOptions<SetArtistShopRateSourceMutation, SetArtistShopRateSourceMutationVariables>;
 export const GetRecurringExpensesListDocument = gql`
     query GetRecurringExpensesList($shopId: ID, $artistUserId: ID, $includeInactive: Boolean) {
   getRecurringExpenses(

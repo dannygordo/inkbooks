@@ -8,6 +8,33 @@ Last updated: 2026-09-03.
 
 ---
 
+### 2026-09-03 (twenty-fifth entry): Settings batch 4 - an artist's own Rates
+
+Next slice from the same Settings follow-up list. Full reasoning: DECISIONS.md X37.
+
+New `settings/rates.tsx` (gated `user.userType === 'artist'`, matching web's own category gate),
+port of `RatesPanel.jsx`: billing type + hourly/flat rate (new `GetMyRateSettings`/
+`UpdateArtistRateSettings` operations - a SELF-scoped query, deliberately not the leaner
+Staff-or-better `GetArtistDetail` roster query, which drops these fields on purpose - X22) and,
+for a shop-connected artist, which rate actually applies to their sessions (new
+`SetArtistShopRateSource` mutation against `GetArtistShopConnections`'s existing `rateSource`
+field). Verified the two different id shapes this touches (`getArtist` takes the Artist profile's
+own id; `getArtistShopConnections`/`setArtistShopRateSource` take the artist's USER id) against
+the resolver source and existing mobile call sites, not assumed from field names.
+
+`PillRow` extracted from `form/[id].tsx` into `components/PillRow.tsx` - built there as a local
+component (X30), this screen's billing-type/rate-source pickers are the second real caller. No
+behavior change to the form editor's own picker.
+
+Not built: `BoothRentPanel.jsx`'s "your booth rent" card - real, separate scope, no existing
+mobile infrastructure to build it on.
+
+Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+full `apps/mobile` Jest suite - still 229/229. No server-side changes - everything used here
+already existed.
+
+---
+
 ### 2026-09-03 (twenty-fourth entry): Settings batch 3 - Shop's shop-cut-percent editor + shop-wide form link
 
 Picked as the next slice after the three-item follow-up round closed - "More Settings," highest

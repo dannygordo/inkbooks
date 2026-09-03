@@ -77,9 +77,13 @@ import { getUserShopId } from '@/utils/user';
  * form-link handle and its shop-wide form links list. Kept as its own screen, not a third card
  * here, since it needs its own shop query and a forms query neither existing card needs.
  *
- * Everything else on web's Settings (Rates, Booth Rent, Appearance, Notifications, Security,
- * Messages, Forms' per-artist "Your link" section) remains unported - see DECISIONS.md
- * X31/X34/X36 for the full list and reasoning.
+ * A "Rates" link (X37) routes any artist to `settings/rates.tsx` - what they charge, and, if
+ * shop-connected, whose rate actually applies to their sessions. `BoothRentPanel`'s "your booth
+ * rent" card is a real, separate feature with no existing mobile infrastructure - not folded in.
+ *
+ * Everything else on web's Settings (Appearance, Notifications, Security, Messages, Forms'
+ * per-artist "Your link" section) remains unported - see DECISIONS.md X31/X34/X36/X37 for the
+ * full list and reasoning.
  */
 export default function SettingsScreen() {
   const { user, updateCurrentUser } = useAuth();
@@ -323,6 +327,24 @@ export default function SettingsScreen() {
                   variant="secondary"
                   onPress={() => router.push('/settings/shop')}
                   testID="settings-shop-link"
+                />
+              </View>
+            </View>
+          ) : null}
+
+          {user.userType === 'artist' ? (
+            <View style={styles.card}>
+              <ThemedText type="smallBold">Rates</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                What you charge, and, if you're shop-connected, whose rate applies to your
+                sessions.
+              </ThemedText>
+              <View style={styles.linkList}>
+                <Button
+                  label="Rates"
+                  variant="secondary"
+                  onPress={() => router.push('/settings/rates')}
+                  testID="settings-rates-link"
                 />
               </View>
             </View>

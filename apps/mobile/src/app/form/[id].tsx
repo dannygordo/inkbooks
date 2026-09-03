@@ -5,10 +5,11 @@ import {
 } from '@inkbooks/api';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/Button';
+import { PillRow } from '@/components/PillRow';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -35,6 +36,8 @@ import { FORM_FIELD_TYPE_OPTIONS, formStatusLabel, isChoiceFieldType } from '@/u
  * primitive exists in this app - matches DurationPicker.tsx's own "no cross-platform select
  * primitive, use a pill row instead" precedent for the same underlying gap. The substitute here is
  * a pair of Up/Down buttons per field row, backed by utils/formBuilder.ts's pure `moveField`.
+ * The type picker below uses that same pill-row idea, via the shared `PillRow` component
+ * (extracted from this file into components/PillRow.tsx in X37, once a second screen needed it).
  *
  * PUBLISH/ARCHIVE/GUEST-LINK/RESPONSES ACTIONS: web's FormBuilder shows all four once a form is
  * real (task #145). Mobile's forms/index.tsx list screen already carries every one of them per
@@ -405,43 +408,6 @@ export default function FormBuilderScreen() {
   );
 }
 
-function PillRow({
-  options,
-  selectedId,
-  onSelect,
-  testID,
-}: {
-  options: Array<{ id: string; label: string }>;
-  selectedId: string;
-  onSelect: (id: string) => void;
-  testID?: string;
-}) {
-  const theme = useTheme();
-  return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pillRow} testID={testID}>
-      {options.map((option) => {
-        const selected = option.id === selectedId;
-        return (
-          <Pressable
-            key={option.id}
-            onPress={() => onSelect(option.id)}
-            style={[
-              styles.pill,
-              { borderColor: theme.backgroundSelected },
-              selected && { backgroundColor: theme.text, borderColor: theme.text },
-            ]}
-            testID={testID ? `${testID}-${option.id}` : undefined}
-          >
-            <ThemedText type="small" style={selected ? { color: theme.background } : undefined}>
-              {option.label}
-            </ThemedText>
-          </Pressable>
-        );
-      })}
-    </ScrollView>
-  );
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -503,16 +469,6 @@ const styles = StyleSheet.create({
   moveButtons: {
     flexDirection: 'row',
     gap: Spacing.two,
-  },
-  pillRow: {
-    flexGrow: 0,
-  },
-  pill: {
-    borderWidth: 1,
-    borderRadius: Spacing.four,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.one,
-    marginRight: Spacing.two,
   },
   optionsList: {
     gap: Spacing.two,

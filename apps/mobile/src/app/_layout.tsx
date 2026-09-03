@@ -134,6 +134,9 @@ function RootNavigator() {
         <Stack.Screen name="settings/recurring-expenses" options={{ headerShown: true, title: 'Recurring Expenses' }} />
         {/* Shop-wide money config (X36) - reached from settings/index.tsx's own "Shop" link. */}
         <Stack.Screen name="settings/shop" options={{ headerShown: true, title: 'Shop' }} />
+        {/* An artist's own rates + which-rate-applies (X37) - reached from settings/index.tsx's
+            own "Rates" link. */}
+        <Stack.Screen name="settings/rates" options={{ headerShown: true, title: 'Rates' }} />
         {/* The client roster - see clients/index.tsx's own header comment. Reached from
             index.tsx's header, and the second (real) entry point into client/[id].tsx below -
             that screen's own X15 comment named this as worth building. */}

@@ -2094,6 +2094,59 @@ for actually sharing it.
 `FORM_FIELD_TYPE_LABELS`/`formFieldTypeLabel`) - same "build the map directly, don't port
 `prettyConstantsListValue`" reasoning as `utils/projectStatus.ts` (X20).
 
+### X37. Settings batch 4 - an artist's own Rates (billing type, hourly/flat rate, which-rate-applies)
+
+Next slice from X31/X34/X36's own follow-up list. Direct port of apps/web's RatesPanel.jsx, kept
+as one screen for the same reason it's one category on web: "what I charge" and "whose rate
+applies to me" are one question with two parts, not two separate settings.
+
+**New `settings/rates.tsx`, gated `user.userType === 'artist'`** (matching web's own
+`isVisible: isArtist` on this settings category exactly) - reached from a new "Rates" link on
+`settings/index.tsx`.
+
+**`GetMyRateSettings`, not `GetArtistDetail`** - checked `artists.graphql`'s own header comment
+before adding anything: that query deliberately drops `hourlyRate`/`flatRate`/`billingType`
+because it's the Staff-or-better ROSTER view of an artist (a shop-mate looking up someone else),
+and those fields back a dashboard panel deliberately out of scope for that slice (X22). This is a
+different, SELF-scoped query - the signed-in artist reading their OWN rate settings - so it gets
+its own operation rather than loosening the roster query's deliberate leanness for everyone who
+calls it.
+
+**Two different id shapes, easy to conflate, checked against both the mobile call sites already
+using them and the server resolvers directly rather than assumed**: `getArtist(artistId)` takes
+the Artist PROFILE's own `_id` (`user.userInfo.id` - same id `GetArtistDetail`/`artists/index.tsx`
+already navigate with), while `getArtistShopConnections(artistId)`/`setArtistShopRateSource`
+take the artist's USER id (`user.id` - confirmed against `resolvers/artistShopConnections.js`'s
+own `ArtistShopConnection.find({artistId})` and against `session/[id].tsx`'s existing
+`useGetArtistShopConnectionsQuery({variables: {artistId: project.artistId}})` call, where
+`project.artistId` is a user id, not an Artist document id). Getting this backwards would silently
+return another artist's connections or fail auth - not a value that "looks wrong" that testing
+would catch, so this was verified against the resolver source, not inferred from the field name.
+
+**`PillRow` extracted from `form/[id].tsx` into `components/PillRow.tsx`** - it was built there
+(X30) as a local, unexported component implementing `DurationPicker.tsx`'s "no cross-platform
+`<select>` primitive, use a pill row" precedent for a short string enum. This screen's billing-type
+and rate-source pickers are the second real caller, which is what earned the extraction - a third
+inline copy would have been the wrong call, a second real use is exactly the right time. No visual
+or behavioral change to `form/[id].tsx`'s own field-type picker; same component, same styles,
+different file.
+
+**hourlyRate/flatRate use local-edit-tracking state (uncontrolled-style), billingType/rateSource
+use plain `useState` hydrated at render** - mirrors web's own `IBInput` (defaultValue-based,
+uncontrolled) vs `IBSelect`/radio (value-based, controlled) split exactly, and for the identical
+reason web's own comment gives: hydrating an uncontrolled field's value via an effect after a query
+resolves updates state that the field never actually reads again after mount.
+
+**Not built**: `BoothRentPanel.jsx`'s "Your booth rent" card - real, separate scope, no existing
+mobile infrastructure (`BoothRentService` equivalent, a `boothRentCharge` screen) to build it on
+top of. Left as its own named future slice.
+
+**Verified in this sandbox**: `packages/api` codegen + build clean, `apps/mobile` `tsc --noEmit`
+clean, full `apps/mobile` Jest suite - still 229/229 (no new pure-logic module - `PillRow`'s
+extraction changes its file, not its logic, and every other piece here is Apollo-wired screen
+code, matching this port's own no-screen-level-test convention). No server-side changes - all
+three mutations/queries used here already existed.
+
 ### X36. Settings batch 3 - Shop's shop-cut-percent editor and shop-wide form link
 
 Picked as the next slice from X31/X34's own follow-up list ("More Settings"), highest priority on
@@ -2432,8 +2485,11 @@ likely value**:
   remaining item, not folded into this pass.
 - ~~**Square Config** (`SquarePanel.jsx`, `SquarePricingPanel.jsx`'s tax rate/fee offset
   editor)~~ - **done, see X34.**
-- **Rates** (`RatesPanel.jsx`, `BoothRentPanel.jsx`) - an artist's own session-rate defaults and
-  booth-rent terms.
+- ~~**Rates** (`RatesPanel.jsx`)~~ - **done, see X37.** `BoothRentPanel.jsx` (an artist's own
+  read-only view of shop-set flat-fee booth-rent terms, plus a "mark this month paid" action) is
+  real, separate scope with no existing mobile infrastructure at all (no `BoothRentService`
+  equivalent, no `boothRentCharge` screen - X32's own note on that `subjectType` having nowhere to
+  land is still true) - left as its own future slice, not folded into this one.
 - **Messages** (`RemindersPanel.jsx`, `AutoResponsesPanel.jsx`, `ResponseTimePanel.jsx`,
   `SystemMessageTemplatesPanel.jsx`) - the largest remaining chunk (over 1,100 combined web lines),
   real separate scope on its own.
