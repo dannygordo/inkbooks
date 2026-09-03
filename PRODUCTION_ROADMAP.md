@@ -1221,10 +1221,19 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    and how often the nudge repeats. Client-operations-only, everything already existed
    server-side. Unlike Auto-Responses, only the artist's own card is ever editable - a
    shop-connected artist sees the shop's numbers only as a read-only ceiling on their own row.
-   `SystemMessageTemplatesPanel.jsx` is the last Messages sub-slice. Confirmed in this sandbox:
+   Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+   full `apps/mobile` Jest suite - still 229/229.
+
+   **Messages batch 4 (2026-09-03, see DECISIONS.md X41) completes the Messages category** -
+   `settings/system-message-templates.tsx`: owner-editable overrides for a fixed list of 7
+   hardcoded outbound emails (account-invite/password-reset stay hardcoded on purpose, never in
+   this list). Client-operations-only, everything already existed server-side. Reused the
+   inline-editor-card shape from Auto-Responses, edit-only since there's no create step for a
+   fixed key list. Reminders (X38), Auto-Responses (X39), Response Time (X40), and System
+   Messages (X41) - all four Messages sub-slices - are now built. Confirmed in this sandbox:
    `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean, full `apps/mobile` Jest
-   suite - still 229/229. Booth Rent, System Message Templates, Forms' per-artist "Your link"
-   section, Appearance, and Security remain open.
+   suite - still 229/229. Booth Rent, Forms' per-artist "Your link" section, Appearance,
+   Security, and `ShopConnectionPanel.jsx` remain open.
 
    Everything else on the ~40-screen list not yet named remains open.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until

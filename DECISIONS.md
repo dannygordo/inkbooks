@@ -2094,6 +2094,55 @@ for actually sharing it.
 `FORM_FIELD_TYPE_LABELS`/`formFieldTypeLabel`) - same "build the map directly, don't port
 `prettyConstantsListValue`" reasoning as `utils/projectStatus.ts` (X20).
 
+### X41. Messages batch 4 - System Message Templates (completes the Messages category)
+
+Fourth and last Messages sub-slice, completing X31's biggest remaining named chunk. Direct port of
+`SystemMessageTemplatesPanel.jsx`: an owner-editable override for one of the app's hardcoded
+outbound emails. New route `settings/system-message-templates.tsx`, linked from the same
+"Messages" card (now all four: Reminders, Auto-Responses, Response Time, System Messages).
+
+**Server-side, everything already existed** - `getSystemMessageTemplates`/
+`updateSystemMessageTemplate`/`resetSystemMessageTemplate` were already in `server/graphql/
+typeDefs.js`, so this slice is client-operations-only (new `packages/api/src/operations/
+systemMessageTemplates.graphql`).
+
+**ACCOUNT-INVITE AND PASSWORD-RESET STAY HARDCODED ON PURPOSE** - identity/security emails, not a
+shop or artist's own outreach - confirmed against `SystemMessageTemplateService.js`'s own header
+comment; they never appear in `KEY_META` at all, so there was nothing to deliberately omit here,
+only to not invent.
+
+**A FIXED LIST OF 7 KEYS, not a create/list-of-arbitrary-rows screen like Auto-Responses (X39)** -
+`KEY_META` ported directly (label, merge fields, and the `hasExtraNote`/`shopOnly`/`artistOnly`
+flags), and every key always renders a row regardless of whether an override exists yet -
+"Customized" vs "Default" is what distinguishes them, editing writes the override row, resetting
+deletes it outright (there's no null-override state to reset to, per the type's own comment).
+Reused the same inline-editor-card shape X39 established (no cross-platform modal primitive in
+this app), but edit-only here, never create, since there's nothing to create - a fixed key list
+has no "new" affordance to offer.
+
+**`BOOKING_CONFIRMATION` is the one key with `hasExtraNote` instead of a body field** - ported
+directly, including its own helper text explaining that the schedule/deposit/request details stay
+code-generated and this is only an appendable note, matching web's own comment on why
+(`utils/client-booking-emails.js`).
+
+**Reset uses the `secondary` Button variant, not `danger`** - deliberately different from
+Auto-Responses' "Deactivate" (X39), which IS `danger` with a confirm `Alert`. Resetting here
+deletes a record with no destructive real-world consequence - the wording just reverts to the
+built-in default, and re-customizing is one Edit tap away - unlike deactivating an Auto-Response,
+which stops it firing until manually re-created. Matches web's own choice not to confirm a reset
+either (`handleReset` fires immediately, no `window.confirm`).
+
+**Shop name for the shop-section title reuses the same `GetShopDetail` second-query approach as
+X39/X40**, skipped whenever `canManageShopTemplates` is false.
+
+This completes X31's Messages category - all four sub-slices (X38 Reminders, X39 Auto-Responses,
+X40 Response Time, X41 System Messages) are now built.
+
+Verification: `packages/api` codegen + build (new `useGetSystemMessageTemplatesQuery`/
+`useUpdateSystemMessageTemplateMutation`/`useResetSystemMessageTemplateMutation` hooks generated
+cleanly), `apps/mobile` `tsc --noEmit` clean, full Jest suite 229/229 (unchanged - no new
+pure-logic module needed).
+
 ### X40. Messages batch 3 - Response Time (unanswered-message nudges)
 
 Continuing down the Messages sub-slice list from X38/X39. Direct port of `ResponseTimePanel.jsx`:
@@ -2650,11 +2699,9 @@ likely value**:
   real, separate scope with no existing mobile infrastructure at all (no `BoothRentService`
   equivalent, no `boothRentCharge` screen - X32's own note on that `subjectType` having nowhere to
   land is still true) - left as its own future slice, not folded into this one.
-- **Messages** (`RemindersPanel.jsx`, `AutoResponsesPanel.jsx`, `ResponseTimePanel.jsx`,
-  `SystemMessageTemplatesPanel.jsx`) - the largest remaining chunk (over 1,100 combined web lines),
-  real separate scope on its own. ~~`RemindersPanel.jsx`~~ - **done, see X38.**
-  ~~`AutoResponsesPanel.jsx`~~ - **done, see X39.** ~~`ResponseTimePanel.jsx`~~ - **done, see
-  X40.** `SystemMessageTemplatesPanel.jsx` remains open.
+- ~~**Messages** (`RemindersPanel.jsx`, `AutoResponsesPanel.jsx`, `ResponseTimePanel.jsx`,
+  `SystemMessageTemplatesPanel.jsx`)~~ - **done, see X38/X39/X40/X41.** The largest remaining
+  chunk (over 1,100 combined web lines), taken as four separate sub-slices, all now built.
 - **Forms' shop-wide section** (`FormsPanel.jsx`'s "Your link"/URL list, absorbed from the old
   Booking category) - forms/index.tsx and form/[id].tsx (X28/X30) cover form management itself;
   this is the separate "here's your booking link to share" view.

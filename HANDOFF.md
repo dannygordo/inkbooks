@@ -8,6 +8,31 @@ Last updated: 2026-09-03.
 
 ---
 
+### 2026-09-03 (twenty-ninth entry): Messages batch 4 - System Message Templates (Messages category complete)
+
+Fourth and last Messages sub-slice, completing the category. Full reasoning: DECISIONS.md X41.
+
+New `settings/system-message-templates.tsx`, direct port of `SystemMessageTemplatesPanel.jsx`: an
+owner-editable override for one of the app's hardcoded outbound emails - a fixed list of 7 keys
+(account-invite/password-reset stay hardcoded on purpose, never in this list), each always shown
+as either "Customized" or "Default." New `packages/api/src/operations/
+systemMessageTemplates.graphql` - server-side, everything already existed, so
+client-operations-only.
+
+Reused the inline-editor-card shape from Auto-Responses (X39), edit-only since there's no create
+step for a fixed key list. Reset uses the `secondary` Button variant (not `danger`, unlike
+Auto-Responses' "Deactivate") since it's a low-consequence, instantly-reversible action - matches
+web's own choice not to confirm it either.
+
+This completes X31's Messages category: Reminders (X38), Auto-Responses (X39), Response Time
+(X40), and System Messages (X41) are all built. Remaining named Settings/follow-up work: Booth
+Rent, Forms' per-artist "Your link" section, Appearance, Security, and `ShopConnectionPanel.jsx`.
+
+Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+full `apps/mobile` Jest suite - still 229/229. No server-side changes.
+
+---
+
 ### 2026-09-03 (twenty-eighth entry): Messages batch 3 - Response Time
 
 Continuing down the Messages sub-slice list from the twenty-seventh entry. Full reasoning:

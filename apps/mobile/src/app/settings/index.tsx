@@ -81,14 +81,14 @@ import { getUserShopId } from '@/utils/user';
  * shop-connected, whose rate actually applies to their sessions. `BoothRentPanel`'s "your booth
  * rent" card is a real, separate feature with no existing mobile infrastructure - not folded in.
  *
- * A "Messages" card (X38/X39/X40) links to three of the four web panels so far - `settings/
- * reminders.tsx`, `settings/auto-responses.tsx`, `settings/response-time.tsx` - out of the
- * largest remaining chunk X31 named, taken one screen at a time, same as the Business/Rates links
- * above. SystemMessageTemplates remains open.
+ * A "Messages" card (X38/X39/X40/X41) links to all four web panels - `settings/reminders.tsx`,
+ * `settings/auto-responses.tsx`, `settings/response-time.tsx`, `settings/
+ * system-message-templates.tsx` - completing the largest remaining chunk X31 named, taken one
+ * screen at a time, same as the Business/Rates links above.
  *
  * Everything else on web's Settings (Appearance, Notifications, Security, Forms' per-artist
- * "Your link" section) remains unported - see DECISIONS.md X31/X34/X36/X37/X38/X39/X40 for the
- * full list and reasoning.
+ * "Your link" section) remains unported - see DECISIONS.md X31/X34/X36/X37/X38/X39/X40/X41 for
+ * the full list and reasoning.
  */
 export default function SettingsScreen() {
   const { user, updateCurrentUser } = useAuth();
@@ -360,8 +360,8 @@ export default function SettingsScreen() {
               <ThemedText type="smallBold">Messages</ThemedText>
               <ThemedText type="small" themeColor="textSecondary">
                 Automatic reminders sent to clients ahead of an appointment, message templates
-                fired on things like a completed session, and how long an unanswered client
-                message waits before you're nudged.
+                fired on things like a completed session, how long an unanswered client message
+                waits before you're nudged, and the wording of every other automatic email.
               </ThemedText>
               <View style={styles.linkList}>
                 <Button
@@ -381,6 +381,12 @@ export default function SettingsScreen() {
                   variant="secondary"
                   onPress={() => router.push('/settings/response-time')}
                   testID="settings-response-time-link"
+                />
+                <Button
+                  label="System Messages"
+                  variant="secondary"
+                  onPress={() => router.push('/settings/system-message-templates')}
+                  testID="settings-system-message-templates-link"
                 />
               </View>
             </View>

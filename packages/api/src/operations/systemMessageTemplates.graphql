@@ -1,0 +1,38 @@
+# settings/system-message-templates.tsx (DECISIONS.md X41) - an owner-editable override for one of
+# the app's hardcoded outbound emails. Direct port of apps/web's SystemMessageTemplatesPanel.jsx.
+# Account-invite and password-reset stay hardcoded on purpose (identity/security emails, not a
+# shop or artist's own outreach) and never appear in the key list this operates on.
+#
+# Absence of a row for a given key means "use the built-in default" - there is no lazily-created-
+# row-with-null-fields convention here the way ResponseTimeSettings has, since every field on this
+# type is only ever an override.
+query GetSystemMessageTemplates($shopId: ID, $artistUserId: ID) {
+	getSystemMessageTemplates(shopId: $shopId, artistUserId: $artistUserId) {
+		id
+		shopId
+		artistUserId
+		key
+		emailSubjectTemplate
+		emailBodyTemplate
+		extraNoteTemplate
+	}
+}
+
+mutation UpdateSystemMessageTemplate($input: UpdateSystemMessageTemplateInput!) {
+	updateSystemMessageTemplate(input: $input) {
+		id
+		shopId
+		artistUserId
+		key
+		emailSubjectTemplate
+		emailBodyTemplate
+		extraNoteTemplate
+	}
+}
+
+# Deletes the override row outright, returning to the built-in default - see
+# models/SystemMessageTemplate.js's own comment on why absence, not a null override, is the
+# "use the default" state.
+mutation ResetSystemMessageTemplate($shopId: ID, $key: String!) {
+	resetSystemMessageTemplate(shopId: $shopId, key: $key)
+}

@@ -3615,6 +3615,29 @@ export type UnarchiveStaffMutationVariables = Exact<{
 
 export type UnarchiveStaffMutation = { __typename?: 'Mutation', unarchiveStaff?: { __typename?: 'Staff', id: string, status: number } | null };
 
+export type GetSystemMessageTemplatesQueryVariables = Exact<{
+  shopId?: InputMaybe<Scalars['ID']['input']>;
+  artistUserId?: InputMaybe<Scalars['ID']['input']>;
+}>;
+
+
+export type GetSystemMessageTemplatesQuery = { __typename?: 'Query', getSystemMessageTemplates: Array<{ __typename?: 'SystemMessageTemplate', id: string, shopId?: string | null, artistUserId?: string | null, key: string, emailSubjectTemplate?: string | null, emailBodyTemplate?: string | null, extraNoteTemplate?: string | null }> };
+
+export type UpdateSystemMessageTemplateMutationVariables = Exact<{
+  input: UpdateSystemMessageTemplateInput;
+}>;
+
+
+export type UpdateSystemMessageTemplateMutation = { __typename?: 'Mutation', updateSystemMessageTemplate: { __typename?: 'SystemMessageTemplate', id: string, shopId?: string | null, artistUserId?: string | null, key: string, emailSubjectTemplate?: string | null, emailBodyTemplate?: string | null, extraNoteTemplate?: string | null } };
+
+export type ResetSystemMessageTemplateMutationVariables = Exact<{
+  shopId?: InputMaybe<Scalars['ID']['input']>;
+  key: Scalars['String']['input'];
+}>;
+
+
+export type ResetSystemMessageTemplateMutation = { __typename?: 'Mutation', resetSystemMessageTemplate: boolean };
+
 export type UpdateProjectMutationVariables = Exact<{
   project?: InputMaybe<ProjectInput>;
 }>;
@@ -9275,6 +9298,127 @@ export function useUnarchiveStaffMutation(baseOptions?: Apollo.MutationHookOptio
 export type UnarchiveStaffMutationHookResult = ReturnType<typeof useUnarchiveStaffMutation>;
 export type UnarchiveStaffMutationResult = Apollo.MutationResult<UnarchiveStaffMutation>;
 export type UnarchiveStaffMutationOptions = Apollo.BaseMutationOptions<UnarchiveStaffMutation, UnarchiveStaffMutationVariables>;
+export const GetSystemMessageTemplatesDocument = gql`
+    query GetSystemMessageTemplates($shopId: ID, $artistUserId: ID) {
+  getSystemMessageTemplates(shopId: $shopId, artistUserId: $artistUserId) {
+    id
+    shopId
+    artistUserId
+    key
+    emailSubjectTemplate
+    emailBodyTemplate
+    extraNoteTemplate
+  }
+}
+    `;
+
+/**
+ * __useGetSystemMessageTemplatesQuery__
+ *
+ * To run a query within a React component, call `useGetSystemMessageTemplatesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetSystemMessageTemplatesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetSystemMessageTemplatesQuery({
+ *   variables: {
+ *      shopId: // value for 'shopId'
+ *      artistUserId: // value for 'artistUserId'
+ *   },
+ * });
+ */
+export function useGetSystemMessageTemplatesQuery(baseOptions?: Apollo.QueryHookOptions<GetSystemMessageTemplatesQuery, GetSystemMessageTemplatesQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetSystemMessageTemplatesQuery, GetSystemMessageTemplatesQueryVariables>(GetSystemMessageTemplatesDocument, options);
+      }
+export function useGetSystemMessageTemplatesLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetSystemMessageTemplatesQuery, GetSystemMessageTemplatesQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetSystemMessageTemplatesQuery, GetSystemMessageTemplatesQueryVariables>(GetSystemMessageTemplatesDocument, options);
+        }
+// @ts-ignore
+export function useGetSystemMessageTemplatesSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetSystemMessageTemplatesQuery, GetSystemMessageTemplatesQueryVariables>): Apollo.UseSuspenseQueryResult<GetSystemMessageTemplatesQuery, GetSystemMessageTemplatesQueryVariables>;
+export function useGetSystemMessageTemplatesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetSystemMessageTemplatesQuery, GetSystemMessageTemplatesQueryVariables>): Apollo.UseSuspenseQueryResult<GetSystemMessageTemplatesQuery | undefined, GetSystemMessageTemplatesQueryVariables>;
+export function useGetSystemMessageTemplatesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetSystemMessageTemplatesQuery, GetSystemMessageTemplatesQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetSystemMessageTemplatesQuery, GetSystemMessageTemplatesQueryVariables>(GetSystemMessageTemplatesDocument, options);
+        }
+export type GetSystemMessageTemplatesQueryHookResult = ReturnType<typeof useGetSystemMessageTemplatesQuery>;
+export type GetSystemMessageTemplatesLazyQueryHookResult = ReturnType<typeof useGetSystemMessageTemplatesLazyQuery>;
+export type GetSystemMessageTemplatesSuspenseQueryHookResult = ReturnType<typeof useGetSystemMessageTemplatesSuspenseQuery>;
+export type GetSystemMessageTemplatesQueryResult = Apollo.QueryResult<GetSystemMessageTemplatesQuery, GetSystemMessageTemplatesQueryVariables>;
+export const UpdateSystemMessageTemplateDocument = gql`
+    mutation UpdateSystemMessageTemplate($input: UpdateSystemMessageTemplateInput!) {
+  updateSystemMessageTemplate(input: $input) {
+    id
+    shopId
+    artistUserId
+    key
+    emailSubjectTemplate
+    emailBodyTemplate
+    extraNoteTemplate
+  }
+}
+    `;
+export type UpdateSystemMessageTemplateMutationFn = Apollo.MutationFunction<UpdateSystemMessageTemplateMutation, UpdateSystemMessageTemplateMutationVariables>;
+
+/**
+ * __useUpdateSystemMessageTemplateMutation__
+ *
+ * To run a mutation, you first call `useUpdateSystemMessageTemplateMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateSystemMessageTemplateMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateSystemMessageTemplateMutation, { data, loading, error }] = useUpdateSystemMessageTemplateMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useUpdateSystemMessageTemplateMutation(baseOptions?: Apollo.MutationHookOptions<UpdateSystemMessageTemplateMutation, UpdateSystemMessageTemplateMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<UpdateSystemMessageTemplateMutation, UpdateSystemMessageTemplateMutationVariables>(UpdateSystemMessageTemplateDocument, options);
+      }
+export type UpdateSystemMessageTemplateMutationHookResult = ReturnType<typeof useUpdateSystemMessageTemplateMutation>;
+export type UpdateSystemMessageTemplateMutationResult = Apollo.MutationResult<UpdateSystemMessageTemplateMutation>;
+export type UpdateSystemMessageTemplateMutationOptions = Apollo.BaseMutationOptions<UpdateSystemMessageTemplateMutation, UpdateSystemMessageTemplateMutationVariables>;
+export const ResetSystemMessageTemplateDocument = gql`
+    mutation ResetSystemMessageTemplate($shopId: ID, $key: String!) {
+  resetSystemMessageTemplate(shopId: $shopId, key: $key)
+}
+    `;
+export type ResetSystemMessageTemplateMutationFn = Apollo.MutationFunction<ResetSystemMessageTemplateMutation, ResetSystemMessageTemplateMutationVariables>;
+
+/**
+ * __useResetSystemMessageTemplateMutation__
+ *
+ * To run a mutation, you first call `useResetSystemMessageTemplateMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useResetSystemMessageTemplateMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [resetSystemMessageTemplateMutation, { data, loading, error }] = useResetSystemMessageTemplateMutation({
+ *   variables: {
+ *      shopId: // value for 'shopId'
+ *      key: // value for 'key'
+ *   },
+ * });
+ */
+export function useResetSystemMessageTemplateMutation(baseOptions?: Apollo.MutationHookOptions<ResetSystemMessageTemplateMutation, ResetSystemMessageTemplateMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<ResetSystemMessageTemplateMutation, ResetSystemMessageTemplateMutationVariables>(ResetSystemMessageTemplateDocument, options);
+      }
+export type ResetSystemMessageTemplateMutationHookResult = ReturnType<typeof useResetSystemMessageTemplateMutation>;
+export type ResetSystemMessageTemplateMutationResult = Apollo.MutationResult<ResetSystemMessageTemplateMutation>;
+export type ResetSystemMessageTemplateMutationOptions = Apollo.BaseMutationOptions<ResetSystemMessageTemplateMutation, ResetSystemMessageTemplateMutationVariables>;
 export const UpdateProjectDocument = gql`
     mutation UpdateProject($project: ProjectInput) {
   updateProject(project: $project) {
