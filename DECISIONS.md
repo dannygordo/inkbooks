@@ -2027,6 +2027,73 @@ special-case beyond the chip itself, on web or here, which is exactly why portin
 module was needed this slice (every helper `income/index.tsx` needed already exists and is reused
 verbatim).
 
+### X28. Forms built - list + Responses only; FormBuilder, the booking-fields editor, and analytics are all named, deliberate cuts
+
+Last of the requested batch (Artists/Staff, Shops, Search, Income/Expenses, Forms) and the largest
+by a wide margin on web - four pages (`Forms`, `FormBuilder`, `FormResponses`,
+`BookingRequestFieldsEditor`) plus a public fill-out flow. This slice covers the two that don't
+require building a field editor: the management list and the response viewer.
+
+**New `canManageForms` in `utils/businessScope.ts`** (co-located with `businessScopeFor`/
+`createScopeFor`, which it's built from) - a direct port of web's `/forms` route gate:
+`RoleRoute minRole={ROLES.SHOP_ADMIN} allowIf={(user) => !hasShop(user)}`. Narrower than
+`canManageBusinessLedger` (Income/Expenses' gate, which admits any artist at all): a plain
+shop-connected artist who isn't a shop admin sees none of this, the same way they see none of Shop
+Cut Confirmations. Also added a `businessScope.test.ts` this slice that retroactively covers
+`businessScopeFor`/`createScopeFor` from X26, which shipped without their own dedicated test -
+PR1's "test alongside the feature" rule applies going forward, and this closes that one gap while
+the file was already open for `canManageForms`.
+
+**FormBuilder (creating a form, or editing an existing one's fields) is NOT ported - the single
+biggest cut in this entire mobile port so far.** Web's `FormBuilder.jsx` reorders fields via
+`@dnd-kit/core`/`@dnd-kit/sortable` drag-and-drop, which has no cross-platform equivalent in this
+app (`DurationPicker.tsx`'s own header comment already established there is no select primitive
+either, and reordering is a strictly harder interaction problem than picking one option). Building
+fields from scratch - add/remove/retype/reorder/required-toggle/options-editing, per field type -
+is real, separate, feature-sized scope on its own, not a corner of a "management list" port. This
+is named here explicitly rather than shipped as a half-built editor: **there is currently no way
+to create or edit a form's fields from mobile at all.** A form's title is plain text in the list,
+not a link into an editor that doesn't exist.
+
+**Duplicate IS still ported**, despite the FormBuilder gap - it's a plain `createForm` call with
+the source form's own fields copied client-side (dropping each field's `key` so the copy gets
+fresh ones, matching web's own `handleDuplicate` exactly), no editor involved at all. Publish/
+Archive/the guest-link toggle/Delete are every bit as portable, for the same reason - none of the
+four touch a form's fields.
+
+**`BookingRequestFieldsEditor` (task #162, the `booking_request` system form's own restricted
+reorder/relabel/required/hidden editor) is also NOT ported.** It's a smaller, more constrained
+surface than the generic `FormBuilder` (no add/remove/retype, per that editor's own header
+comment), but it is still a dedicated editing UI this slice deliberately stops short of. The
+`booking_request` row in the list gets no interactive actions at all, matching its narrower action
+set on web exactly (no Responses/guest-link/Duplicate either - see `Forms.jsx`'s own `isBookingRequest`
+branch).
+
+**`getFormAnalytics` (the per-field answered-count/option-percentage breakdown on `FormResponses.jsx`)
+is NOT ported.** It's a real, separate secondary feature layered on top of the response list -
+aggregate stats, not "read what one person submitted," which is this screen's actual job. Only the
+response list itself (expandable per-response answers) is built.
+
+**New `utils/formAnswers.ts`'s `formatFormAnswer`** - direct port of web's own `formatAnswer`,
+carrying the same UTC-vs-local nuance web's comment calls out: `dateValue` is a pure calendar date
+read in UTC (a naive local-timezone read rolls it back a day west of UTC), while a signature's
+`signedAt` is a real instant read in local time. `file_upload` returns a plain count from the pure
+function - the component renders the actual openable rows from the answer's own `fileUrls`
+directly via `Linking.openURL`, since a text-formatting function can't itself open a URL.
+
+**No "Copy link" button** - no clipboard library is installed on mobile (same
+`expo-web-browser`-shaped gap as the Shops slice's Square flow: avoid a new dependency for one
+action). Turning a form's guest link on shows it in a read-only, `selectTextOnFocus` text field
+the user can select and copy with the OS's own native text selection - no library needed. The
+field shows only the relative path (`form/<token>`), not a full URL: mobile has no reliable source
+for the web app's own public origin the way a browser's `window.location.origin` is on web -
+turning the link on and reading the full shareable URL from Settings on web remains the real path
+for actually sharing it.
+
+**New `utils/formConstants.ts`** (`FORM_STATUS_LABELS`/`formStatusLabel`,
+`FORM_FIELD_TYPE_LABELS`/`formFieldTypeLabel`) - same "build the map directly, don't port
+`prettyConstantsListValue`" reasoning as `utils/projectStatus.ts` (X20).
+
 ---
 
 ## Process

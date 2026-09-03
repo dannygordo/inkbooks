@@ -8,6 +8,44 @@ Last updated: 2026-09-03.
 
 ---
 
+### 2026-09-03 (sixteenth entry): Forms built - list + Responses only; FormBuilder is the biggest named cut yet
+
+Last of the requested batch (Artists/Staff, Shops, Search, Income/Expenses, Forms) - all six
+named features are now done. Full reasoning: DECISIONS.md X28.
+
+**Built:** `app/forms/index.tsx` (status-filtered list: Publish/Archive/guest-link toggle/
+Duplicate/Delete), `app/form-responses/[id].tsx` (expandable per-response answer viewer, no
+analytics panel), a new `forms.graphql` operation set, `utils/formAnswers.ts`'s
+`formatFormAnswer` (UTC-safe date formatting, ported from web's own), `utils/formConstants.ts`,
+and `utils/businessScope.ts`'s new `canManageForms` (narrower than Income/Expenses' gate - excludes
+a plain shop-connected artist). Also backfilled a `businessScope.test.ts` covering X26's
+`businessScopeFor`/`createScopeFor`, which shipped without one.
+
+**The headline cut: there is currently no way to create or edit a form's fields from mobile at
+all.** `FormBuilder.jsx`'s drag-and-drop field reordering (`@dnd-kit`) has no cross-platform mobile
+equivalent in this app, and building fields from scratch is real, separate, feature-sized scope.
+Duplicate/Publish/Archive/guest-link/Delete are all still ported - none of them touch a form's
+fields, so none of them needed the missing editor. The `booking_request` system form's own
+restricted editor (`BookingRequestFieldsEditor.jsx`, task #162) and `getFormAnalytics`'s per-field
+stat breakdown are likewise not ported, both named as deliberate, separate-scope cuts.
+
+**No "Copy link" button** - no clipboard library installed; the guest link shows in a
+`selectTextOnFocus` read-only field instead, with only the relative path (mobile has no reliable
+web-origin source).
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean
+on the first pass, and the full `apps/mobile` Jest suite - 193/193, up from 177
+(`businessScope.test.ts` + `formAnswers.test.ts`). **Not yet confirmed:** a real device/simulator
+run.
+
+This closes the six-feature batch (Artists/Staff, Shops, Search, Income/Expenses, Forms) the user
+asked for together with "do all of those, keep going." All six shipped as separate, individually
+verified and documented commits (`f800607` was already in before this batch; `d90ad1b`, `52ed7ed`,
+`7cdecc1`, `8742695`, `80e0553`, `6037bb2`, and this entry's forms commit are the batch itself),
+none pushed - the standing "push once at the end of the day" instruction is still in force.
+
+---
+
 ### 2026-09-03 (fifteenth entry): Expenses built - same shape as Income, minus the recurring-expense CRUD subsystem
 
 Sixth of the requested batch (Artists/Staff, Shops, Search, Income/Expenses, Forms) - the last of

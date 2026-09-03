@@ -1,0 +1,121 @@
+# Forms - consent forms, waivers, custom intake questionnaires. Same shopId-XOR-artistUserId
+# ownership as Income/Expenses, but visible to a narrower slice of users - see
+# utils/businessScope.ts's canManageForms (a plain shop-connected artist who isn't a shop admin
+# sees none of this, unlike Income/Expenses' canManageBusinessLedger).
+#
+# DELIBERATELY NOT PORTED this slice: FormBuilder (creating a form or editing its fields - no
+# cross-platform drag-and-drop reordering primitive exists in this app, and building fields from
+# scratch needs its own interaction design, not a rushed one), BookingRequestFieldsEditor (the
+# booking_request system form's own restricted editor), and getFormAnalytics (a real, separate
+# secondary feature - aggregate per-field stats/percentages layered on top of the response list,
+# not the core "read what someone submitted" job this slice covers). See DECISIONS.md X28.
+#
+# createForm IS still used here, for Duplicate only - it's a plain mutation call with client-side
+# field copying, no editor needed (see resolvers/forms.js's fieldsFromInput: an omitted field key
+# means a fresh key, so a duplicate never shares field identity with its source).
+query GetFormsList($shopId: ID, $artistUserId: ID, $status: String, $page: PageInput) {
+	getForms(shopId: $shopId, artistUserId: $artistUserId, status: $status, page: $page) {
+		items {
+			id
+			title
+			status
+			allowGuestSubmissions
+			publicToken
+			slug
+			systemKey
+			fields {
+				key
+				type
+				label
+				helpText
+				required
+				options
+			}
+			createdAt
+		}
+		pageInfo {
+			totalCount
+			hasMore
+			limit
+			offset
+		}
+	}
+}
+
+mutation PublishForm($formId: ID!) {
+	publishForm(formId: $formId) {
+		id
+		status
+	}
+}
+
+mutation ArchiveForm($formId: ID!) {
+	archiveForm(formId: $formId) {
+		id
+		status
+	}
+}
+
+mutation SetFormGuestAccess($formId: ID!, $allow: Boolean!) {
+	setFormGuestAccess(formId: $formId, allow: $allow) {
+		id
+		allowGuestSubmissions
+		publicToken
+		slug
+	}
+}
+
+mutation DeleteForm($formId: ID!) {
+	deleteForm(formId: $formId)
+}
+
+mutation DuplicateForm($input: CreateFormInput!) {
+	createForm(input: $input) {
+		id
+	}
+}
+
+query GetFormTitle($formId: ID!) {
+	getForm(formId: $formId) {
+		id
+		title
+	}
+}
+
+query GetFormResponsesList($formId: ID!, $page: PageInput) {
+	getFormResponses(formId: $formId, page: $page) {
+		items {
+			id
+			formTitle
+			fieldsSnapshot {
+				key
+				type
+				label
+			}
+			client {
+				id
+				firstName
+				lastName
+			}
+			answers {
+				fieldKey
+				textValue
+				selectedOptions
+				dateValue
+				fileUrls
+				signature {
+					signedName
+					signedAt
+				}
+			}
+			source
+			createdAt
+		}
+		pageInfo {
+			totalCount
+			hasMore
+			limit
+			offset
+		}
+	}
+}

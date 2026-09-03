@@ -127,6 +127,11 @@ function RootNavigator() {
         {/* Expenses - structurally identical to Income, see expenses/index.tsx's own header
             comment. Same `canManageBusinessLedger` gate. */}
         <Stack.Screen name="expenses/index" options={{ headerShown: true, title: 'Expenses' }} />
+        {/* Forms - see forms/index.tsx's own header comment for the full scope (list + Responses
+            only; FormBuilder/BookingRequestFieldsEditor/analytics are all deliberately not
+            ported). Gated `canManageForms`, narrower than Income/Expenses' gate. */}
+        <Stack.Screen name="forms/index" options={{ headerShown: true, title: 'Forms' }} />
+        <Stack.Screen name="form-responses/[id]" options={{ headerShown: true, title: 'Responses' }} />
       </Stack.Protected>
     </Stack>
   );

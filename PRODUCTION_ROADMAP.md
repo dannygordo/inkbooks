@@ -1076,7 +1076,20 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    Search, Income/Expenses, Forms) except Forms itself, the largest and last-remaining name from
    that list.
 
-   Everything else on the ~40-screen list not yet named remains open.
+   **Forms (2026-09-03, see DECISIONS.md X28) is the last slice of the named batch.**
+   `app/forms/index.tsx` (status-filtered management list) and `app/form-responses/[id].tsx`
+   (expandable response viewer, no analytics panel), a new `forms.graphql` operation set. **The
+   headline cut: there is no way to create or edit a form's fields from mobile at all** -
+   `FormBuilder.jsx`'s drag-and-drop reordering has no cross-platform equivalent in this app, and
+   building fields from scratch is real, separate, feature-sized scope, named here rather than
+   half-built. Duplicate/Publish/Archive/guest-link toggle/Delete are all still ported since none
+   of them touch a form's fields. `BookingRequestFieldsEditor` and `getFormAnalytics` are likewise
+   named, deliberate cuts. Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile`
+   `tsc --noEmit` clean, and the full `apps/mobile` Jest suite (193/193, up from 177).
+
+   This closes the six-feature batch (Artists/Staff, Shops, Search, Income/Expenses, Forms) taken
+   one slice at a time, each independently verified and documented. Everything else on the
+   ~40-screen list not yet named remains open.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).
 10. TestFlight beta, then App Store submission - Guideline 3.1.1 already checked in step 5, so this

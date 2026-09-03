@@ -34,3 +34,20 @@ export function createScopeFor(user: CurrentUser): { shopId?: string } {
   const scope = businessScopeFor(user);
   return 'shopId' in scope ? { shopId: scope.shopId } : {};
 }
+
+/**
+ * Direct port of apps/web's App.jsx route gate on /forms and every /forms/* route:
+ * `RoleRoute minRole={ROLES.SHOP_ADMIN} allowIf={(user) => !hasShop(user)}`. NARROWER than
+ * canManageBusinessLedger (permissions.ts) - that one admits any artist at all, this one excludes
+ * a plain shop-connected artist who isn't a shop admin. Forms follows the exact same
+ * shopId-XOR-artistUserId ownership model as Income/Expenses (see models/Form.js's own header
+ * comment on why), it's just visible to a narrower slice of users: a shop's forms are the shop
+ * admin's to manage, and an independent artist manages their own, but a plain shop-connected
+ * artist has neither role and sees none of this - same as they see none of Shop Cut Confirmations.
+ */
+export function canManageForms(user: CurrentUser | null | undefined): boolean {
+  if (!user) {
+    return false;
+  }
+  return isShopAdminOrBetter(user) || !hasShop(user);
+}

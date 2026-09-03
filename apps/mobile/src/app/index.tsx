@@ -28,6 +28,7 @@ import {
 } from '@/utils/appointments';
 import { getThisWeekFilter } from '@/utils/dateRanges';
 import { canManageAppointment, canManageBusinessLedger, isShopAdminOrBetter, isStaffOrBetter } from '@/utils/permissions';
+import { canManageForms } from '@/utils/businessScope';
 import { getUserShopId } from '@/utils/user';
 
 // A month of one shop's appointments in one response, not paged - same choice
@@ -190,6 +191,11 @@ export default function AppointmentsScreen() {
             {canManageBusinessLedger(user) ? (
               <Pressable onPress={() => router.push('/expenses')} testID="expenses-button">
                 <ThemedText type="link">Expenses</ThemedText>
+              </Pressable>
+            ) : null}
+            {canManageForms(user) ? (
+              <Pressable onPress={() => router.push('/forms')} testID="forms-button">
+                <ThemedText type="link">Forms</ThemedText>
               </Pressable>
             ) : null}
             <Pressable

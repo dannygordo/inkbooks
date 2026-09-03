@@ -3031,6 +3031,67 @@ export type DeleteExpenseMutationVariables = Exact<{
 
 export type DeleteExpenseMutation = { __typename?: 'Mutation', deleteExpense: boolean };
 
+export type GetFormsListQueryVariables = Exact<{
+  shopId?: InputMaybe<Scalars['ID']['input']>;
+  artistUserId?: InputMaybe<Scalars['ID']['input']>;
+  status?: InputMaybe<Scalars['String']['input']>;
+  page?: InputMaybe<PageInput>;
+}>;
+
+
+export type GetFormsListQuery = { __typename?: 'Query', getForms: { __typename?: 'FormPage', items: Array<{ __typename?: 'Form', id: string, title: string, status: string, allowGuestSubmissions: boolean, publicToken?: string | null, slug?: string | null, systemKey?: string | null, createdAt: string, fields: Array<{ __typename?: 'FormField', key: string, type: string, label: string, helpText?: string | null, required: boolean, options: Array<string> }> }>, pageInfo: { __typename?: 'PageInfo', totalCount: number, hasMore: boolean, limit: number, offset: number } } };
+
+export type PublishFormMutationVariables = Exact<{
+  formId: Scalars['ID']['input'];
+}>;
+
+
+export type PublishFormMutation = { __typename?: 'Mutation', publishForm: { __typename?: 'Form', id: string, status: string } };
+
+export type ArchiveFormMutationVariables = Exact<{
+  formId: Scalars['ID']['input'];
+}>;
+
+
+export type ArchiveFormMutation = { __typename?: 'Mutation', archiveForm: { __typename?: 'Form', id: string, status: string } };
+
+export type SetFormGuestAccessMutationVariables = Exact<{
+  formId: Scalars['ID']['input'];
+  allow: Scalars['Boolean']['input'];
+}>;
+
+
+export type SetFormGuestAccessMutation = { __typename?: 'Mutation', setFormGuestAccess: { __typename?: 'Form', id: string, allowGuestSubmissions: boolean, publicToken?: string | null, slug?: string | null } };
+
+export type DeleteFormMutationVariables = Exact<{
+  formId: Scalars['ID']['input'];
+}>;
+
+
+export type DeleteFormMutation = { __typename?: 'Mutation', deleteForm: boolean };
+
+export type DuplicateFormMutationVariables = Exact<{
+  input: CreateFormInput;
+}>;
+
+
+export type DuplicateFormMutation = { __typename?: 'Mutation', createForm: { __typename?: 'Form', id: string } };
+
+export type GetFormTitleQueryVariables = Exact<{
+  formId: Scalars['ID']['input'];
+}>;
+
+
+export type GetFormTitleQuery = { __typename?: 'Query', getForm: { __typename?: 'Form', id: string, title: string } };
+
+export type GetFormResponsesListQueryVariables = Exact<{
+  formId: Scalars['ID']['input'];
+  page?: InputMaybe<PageInput>;
+}>;
+
+
+export type GetFormResponsesListQuery = { __typename?: 'Query', getFormResponses: { __typename?: 'FormResponsePage', items: Array<{ __typename?: 'FormResponse', id: string, formTitle: string, source: string, createdAt: string, fieldsSnapshot: Array<{ __typename?: 'FormField', key: string, type: string, label: string }>, client?: { __typename?: 'Client', id: string, firstName: string, lastName: string } | null, answers: Array<{ __typename?: 'FormAnswer', fieldKey: string, textValue?: string | null, selectedOptions: Array<string>, dateValue?: string | null, fileUrls: Array<string>, signature?: { __typename?: 'FormSignature', signedName?: string | null, signedAt?: string | null } | null }> }>, pageInfo: { __typename?: 'PageInfo', totalCount: number, hasMore: boolean, limit: number, offset: number } } };
+
 export type GetProjectQueryVariables = Exact<{
   projectId: Scalars['ID']['input'];
 }>;
@@ -5009,6 +5070,369 @@ export function useDeleteExpenseMutation(baseOptions?: Apollo.MutationHookOption
 export type DeleteExpenseMutationHookResult = ReturnType<typeof useDeleteExpenseMutation>;
 export type DeleteExpenseMutationResult = Apollo.MutationResult<DeleteExpenseMutation>;
 export type DeleteExpenseMutationOptions = Apollo.BaseMutationOptions<DeleteExpenseMutation, DeleteExpenseMutationVariables>;
+export const GetFormsListDocument = gql`
+    query GetFormsList($shopId: ID, $artistUserId: ID, $status: String, $page: PageInput) {
+  getForms(
+    shopId: $shopId
+    artistUserId: $artistUserId
+    status: $status
+    page: $page
+  ) {
+    items {
+      id
+      title
+      status
+      allowGuestSubmissions
+      publicToken
+      slug
+      systemKey
+      fields {
+        key
+        type
+        label
+        helpText
+        required
+        options
+      }
+      createdAt
+    }
+    pageInfo {
+      totalCount
+      hasMore
+      limit
+      offset
+    }
+  }
+}
+    `;
+
+/**
+ * __useGetFormsListQuery__
+ *
+ * To run a query within a React component, call `useGetFormsListQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetFormsListQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetFormsListQuery({
+ *   variables: {
+ *      shopId: // value for 'shopId'
+ *      artistUserId: // value for 'artistUserId'
+ *      status: // value for 'status'
+ *      page: // value for 'page'
+ *   },
+ * });
+ */
+export function useGetFormsListQuery(baseOptions?: Apollo.QueryHookOptions<GetFormsListQuery, GetFormsListQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetFormsListQuery, GetFormsListQueryVariables>(GetFormsListDocument, options);
+      }
+export function useGetFormsListLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetFormsListQuery, GetFormsListQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetFormsListQuery, GetFormsListQueryVariables>(GetFormsListDocument, options);
+        }
+// @ts-ignore
+export function useGetFormsListSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetFormsListQuery, GetFormsListQueryVariables>): Apollo.UseSuspenseQueryResult<GetFormsListQuery, GetFormsListQueryVariables>;
+export function useGetFormsListSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetFormsListQuery, GetFormsListQueryVariables>): Apollo.UseSuspenseQueryResult<GetFormsListQuery | undefined, GetFormsListQueryVariables>;
+export function useGetFormsListSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetFormsListQuery, GetFormsListQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetFormsListQuery, GetFormsListQueryVariables>(GetFormsListDocument, options);
+        }
+export type GetFormsListQueryHookResult = ReturnType<typeof useGetFormsListQuery>;
+export type GetFormsListLazyQueryHookResult = ReturnType<typeof useGetFormsListLazyQuery>;
+export type GetFormsListSuspenseQueryHookResult = ReturnType<typeof useGetFormsListSuspenseQuery>;
+export type GetFormsListQueryResult = Apollo.QueryResult<GetFormsListQuery, GetFormsListQueryVariables>;
+export const PublishFormDocument = gql`
+    mutation PublishForm($formId: ID!) {
+  publishForm(formId: $formId) {
+    id
+    status
+  }
+}
+    `;
+export type PublishFormMutationFn = Apollo.MutationFunction<PublishFormMutation, PublishFormMutationVariables>;
+
+/**
+ * __usePublishFormMutation__
+ *
+ * To run a mutation, you first call `usePublishFormMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `usePublishFormMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [publishFormMutation, { data, loading, error }] = usePublishFormMutation({
+ *   variables: {
+ *      formId: // value for 'formId'
+ *   },
+ * });
+ */
+export function usePublishFormMutation(baseOptions?: Apollo.MutationHookOptions<PublishFormMutation, PublishFormMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<PublishFormMutation, PublishFormMutationVariables>(PublishFormDocument, options);
+      }
+export type PublishFormMutationHookResult = ReturnType<typeof usePublishFormMutation>;
+export type PublishFormMutationResult = Apollo.MutationResult<PublishFormMutation>;
+export type PublishFormMutationOptions = Apollo.BaseMutationOptions<PublishFormMutation, PublishFormMutationVariables>;
+export const ArchiveFormDocument = gql`
+    mutation ArchiveForm($formId: ID!) {
+  archiveForm(formId: $formId) {
+    id
+    status
+  }
+}
+    `;
+export type ArchiveFormMutationFn = Apollo.MutationFunction<ArchiveFormMutation, ArchiveFormMutationVariables>;
+
+/**
+ * __useArchiveFormMutation__
+ *
+ * To run a mutation, you first call `useArchiveFormMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useArchiveFormMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [archiveFormMutation, { data, loading, error }] = useArchiveFormMutation({
+ *   variables: {
+ *      formId: // value for 'formId'
+ *   },
+ * });
+ */
+export function useArchiveFormMutation(baseOptions?: Apollo.MutationHookOptions<ArchiveFormMutation, ArchiveFormMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<ArchiveFormMutation, ArchiveFormMutationVariables>(ArchiveFormDocument, options);
+      }
+export type ArchiveFormMutationHookResult = ReturnType<typeof useArchiveFormMutation>;
+export type ArchiveFormMutationResult = Apollo.MutationResult<ArchiveFormMutation>;
+export type ArchiveFormMutationOptions = Apollo.BaseMutationOptions<ArchiveFormMutation, ArchiveFormMutationVariables>;
+export const SetFormGuestAccessDocument = gql`
+    mutation SetFormGuestAccess($formId: ID!, $allow: Boolean!) {
+  setFormGuestAccess(formId: $formId, allow: $allow) {
+    id
+    allowGuestSubmissions
+    publicToken
+    slug
+  }
+}
+    `;
+export type SetFormGuestAccessMutationFn = Apollo.MutationFunction<SetFormGuestAccessMutation, SetFormGuestAccessMutationVariables>;
+
+/**
+ * __useSetFormGuestAccessMutation__
+ *
+ * To run a mutation, you first call `useSetFormGuestAccessMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useSetFormGuestAccessMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [setFormGuestAccessMutation, { data, loading, error }] = useSetFormGuestAccessMutation({
+ *   variables: {
+ *      formId: // value for 'formId'
+ *      allow: // value for 'allow'
+ *   },
+ * });
+ */
+export function useSetFormGuestAccessMutation(baseOptions?: Apollo.MutationHookOptions<SetFormGuestAccessMutation, SetFormGuestAccessMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<SetFormGuestAccessMutation, SetFormGuestAccessMutationVariables>(SetFormGuestAccessDocument, options);
+      }
+export type SetFormGuestAccessMutationHookResult = ReturnType<typeof useSetFormGuestAccessMutation>;
+export type SetFormGuestAccessMutationResult = Apollo.MutationResult<SetFormGuestAccessMutation>;
+export type SetFormGuestAccessMutationOptions = Apollo.BaseMutationOptions<SetFormGuestAccessMutation, SetFormGuestAccessMutationVariables>;
+export const DeleteFormDocument = gql`
+    mutation DeleteForm($formId: ID!) {
+  deleteForm(formId: $formId)
+}
+    `;
+export type DeleteFormMutationFn = Apollo.MutationFunction<DeleteFormMutation, DeleteFormMutationVariables>;
+
+/**
+ * __useDeleteFormMutation__
+ *
+ * To run a mutation, you first call `useDeleteFormMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useDeleteFormMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [deleteFormMutation, { data, loading, error }] = useDeleteFormMutation({
+ *   variables: {
+ *      formId: // value for 'formId'
+ *   },
+ * });
+ */
+export function useDeleteFormMutation(baseOptions?: Apollo.MutationHookOptions<DeleteFormMutation, DeleteFormMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<DeleteFormMutation, DeleteFormMutationVariables>(DeleteFormDocument, options);
+      }
+export type DeleteFormMutationHookResult = ReturnType<typeof useDeleteFormMutation>;
+export type DeleteFormMutationResult = Apollo.MutationResult<DeleteFormMutation>;
+export type DeleteFormMutationOptions = Apollo.BaseMutationOptions<DeleteFormMutation, DeleteFormMutationVariables>;
+export const DuplicateFormDocument = gql`
+    mutation DuplicateForm($input: CreateFormInput!) {
+  createForm(input: $input) {
+    id
+  }
+}
+    `;
+export type DuplicateFormMutationFn = Apollo.MutationFunction<DuplicateFormMutation, DuplicateFormMutationVariables>;
+
+/**
+ * __useDuplicateFormMutation__
+ *
+ * To run a mutation, you first call `useDuplicateFormMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useDuplicateFormMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [duplicateFormMutation, { data, loading, error }] = useDuplicateFormMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useDuplicateFormMutation(baseOptions?: Apollo.MutationHookOptions<DuplicateFormMutation, DuplicateFormMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<DuplicateFormMutation, DuplicateFormMutationVariables>(DuplicateFormDocument, options);
+      }
+export type DuplicateFormMutationHookResult = ReturnType<typeof useDuplicateFormMutation>;
+export type DuplicateFormMutationResult = Apollo.MutationResult<DuplicateFormMutation>;
+export type DuplicateFormMutationOptions = Apollo.BaseMutationOptions<DuplicateFormMutation, DuplicateFormMutationVariables>;
+export const GetFormTitleDocument = gql`
+    query GetFormTitle($formId: ID!) {
+  getForm(formId: $formId) {
+    id
+    title
+  }
+}
+    `;
+
+/**
+ * __useGetFormTitleQuery__
+ *
+ * To run a query within a React component, call `useGetFormTitleQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetFormTitleQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetFormTitleQuery({
+ *   variables: {
+ *      formId: // value for 'formId'
+ *   },
+ * });
+ */
+export function useGetFormTitleQuery(baseOptions: Apollo.QueryHookOptions<GetFormTitleQuery, GetFormTitleQueryVariables> & ({ variables: GetFormTitleQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetFormTitleQuery, GetFormTitleQueryVariables>(GetFormTitleDocument, options);
+      }
+export function useGetFormTitleLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetFormTitleQuery, GetFormTitleQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetFormTitleQuery, GetFormTitleQueryVariables>(GetFormTitleDocument, options);
+        }
+// @ts-ignore
+export function useGetFormTitleSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetFormTitleQuery, GetFormTitleQueryVariables>): Apollo.UseSuspenseQueryResult<GetFormTitleQuery, GetFormTitleQueryVariables>;
+export function useGetFormTitleSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetFormTitleQuery, GetFormTitleQueryVariables>): Apollo.UseSuspenseQueryResult<GetFormTitleQuery | undefined, GetFormTitleQueryVariables>;
+export function useGetFormTitleSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetFormTitleQuery, GetFormTitleQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetFormTitleQuery, GetFormTitleQueryVariables>(GetFormTitleDocument, options);
+        }
+export type GetFormTitleQueryHookResult = ReturnType<typeof useGetFormTitleQuery>;
+export type GetFormTitleLazyQueryHookResult = ReturnType<typeof useGetFormTitleLazyQuery>;
+export type GetFormTitleSuspenseQueryHookResult = ReturnType<typeof useGetFormTitleSuspenseQuery>;
+export type GetFormTitleQueryResult = Apollo.QueryResult<GetFormTitleQuery, GetFormTitleQueryVariables>;
+export const GetFormResponsesListDocument = gql`
+    query GetFormResponsesList($formId: ID!, $page: PageInput) {
+  getFormResponses(formId: $formId, page: $page) {
+    items {
+      id
+      formTitle
+      fieldsSnapshot {
+        key
+        type
+        label
+      }
+      client {
+        id
+        firstName
+        lastName
+      }
+      answers {
+        fieldKey
+        textValue
+        selectedOptions
+        dateValue
+        fileUrls
+        signature {
+          signedName
+          signedAt
+        }
+      }
+      source
+      createdAt
+    }
+    pageInfo {
+      totalCount
+      hasMore
+      limit
+      offset
+    }
+  }
+}
+    `;
+
+/**
+ * __useGetFormResponsesListQuery__
+ *
+ * To run a query within a React component, call `useGetFormResponsesListQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetFormResponsesListQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetFormResponsesListQuery({
+ *   variables: {
+ *      formId: // value for 'formId'
+ *      page: // value for 'page'
+ *   },
+ * });
+ */
+export function useGetFormResponsesListQuery(baseOptions: Apollo.QueryHookOptions<GetFormResponsesListQuery, GetFormResponsesListQueryVariables> & ({ variables: GetFormResponsesListQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetFormResponsesListQuery, GetFormResponsesListQueryVariables>(GetFormResponsesListDocument, options);
+      }
+export function useGetFormResponsesListLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetFormResponsesListQuery, GetFormResponsesListQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetFormResponsesListQuery, GetFormResponsesListQueryVariables>(GetFormResponsesListDocument, options);
+        }
+// @ts-ignore
+export function useGetFormResponsesListSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetFormResponsesListQuery, GetFormResponsesListQueryVariables>): Apollo.UseSuspenseQueryResult<GetFormResponsesListQuery, GetFormResponsesListQueryVariables>;
+export function useGetFormResponsesListSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetFormResponsesListQuery, GetFormResponsesListQueryVariables>): Apollo.UseSuspenseQueryResult<GetFormResponsesListQuery | undefined, GetFormResponsesListQueryVariables>;
+export function useGetFormResponsesListSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetFormResponsesListQuery, GetFormResponsesListQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetFormResponsesListQuery, GetFormResponsesListQueryVariables>(GetFormResponsesListDocument, options);
+        }
+export type GetFormResponsesListQueryHookResult = ReturnType<typeof useGetFormResponsesListQuery>;
+export type GetFormResponsesListLazyQueryHookResult = ReturnType<typeof useGetFormResponsesListLazyQuery>;
+export type GetFormResponsesListSuspenseQueryHookResult = ReturnType<typeof useGetFormResponsesListSuspenseQuery>;
+export type GetFormResponsesListQueryResult = Apollo.QueryResult<GetFormResponsesListQuery, GetFormResponsesListQueryVariables>;
 export const GetProjectDocument = gql`
     query GetProject($projectId: ID!) {
   getProject(projectId: $projectId) {
