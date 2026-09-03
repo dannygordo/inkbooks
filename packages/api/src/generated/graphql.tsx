@@ -3092,6 +3092,27 @@ export type GetFormResponsesListQueryVariables = Exact<{
 
 export type GetFormResponsesListQuery = { __typename?: 'Query', getFormResponses: { __typename?: 'FormResponsePage', items: Array<{ __typename?: 'FormResponse', id: string, formTitle: string, source: string, createdAt: string, fieldsSnapshot: Array<{ __typename?: 'FormField', key: string, type: string, label: string }>, client?: { __typename?: 'Client', id: string, firstName: string, lastName: string } | null, answers: Array<{ __typename?: 'FormAnswer', fieldKey: string, textValue?: string | null, selectedOptions: Array<string>, dateValue?: string | null, fileUrls: Array<string>, signature?: { __typename?: 'FormSignature', signedName?: string | null, signedAt?: string | null } | null }> }>, pageInfo: { __typename?: 'PageInfo', totalCount: number, hasMore: boolean, limit: number, offset: number } } };
 
+export type GetFormForEditQueryVariables = Exact<{
+  formId: Scalars['ID']['input'];
+}>;
+
+
+export type GetFormForEditQuery = { __typename?: 'Query', getForm: { __typename?: 'Form', id: string, title: string, description?: string | null, slug?: string | null, shopUseOnly: boolean, status: string, allowGuestSubmissions: boolean, publicToken?: string | null, systemKey?: string | null, fields: Array<{ __typename?: 'FormField', key: string, type: string, label: string, helpText?: string | null, required: boolean, options: Array<string> }> } };
+
+export type CreateFormFromBuilderMutationVariables = Exact<{
+  input: CreateFormInput;
+}>;
+
+
+export type CreateFormFromBuilderMutation = { __typename?: 'Mutation', createForm: { __typename?: 'Form', id: string, title: string, description?: string | null, slug?: string | null, shopUseOnly: boolean, status: string, allowGuestSubmissions: boolean, publicToken?: string | null, systemKey?: string | null, fields: Array<{ __typename?: 'FormField', key: string, type: string, label: string, helpText?: string | null, required: boolean, options: Array<string> }> } };
+
+export type UpdateFormMutationVariables = Exact<{
+  input: UpdateFormInput;
+}>;
+
+
+export type UpdateFormMutation = { __typename?: 'Mutation', updateForm: { __typename?: 'Form', id: string, title: string, description?: string | null, slug?: string | null, shopUseOnly: boolean, status: string, allowGuestSubmissions: boolean, publicToken?: string | null, systemKey?: string | null, fields: Array<{ __typename?: 'FormField', key: string, type: string, label: string, helpText?: string | null, required: boolean, options: Array<string> }> } };
+
 export type GetProjectQueryVariables = Exact<{
   projectId: Scalars['ID']['input'];
 }>;
@@ -5440,6 +5461,163 @@ export type GetFormResponsesListQueryHookResult = ReturnType<typeof useGetFormRe
 export type GetFormResponsesListLazyQueryHookResult = ReturnType<typeof useGetFormResponsesListLazyQuery>;
 export type GetFormResponsesListSuspenseQueryHookResult = ReturnType<typeof useGetFormResponsesListSuspenseQuery>;
 export type GetFormResponsesListQueryResult = Apollo.QueryResult<GetFormResponsesListQuery, GetFormResponsesListQueryVariables>;
+export const GetFormForEditDocument = gql`
+    query GetFormForEdit($formId: ID!) {
+  getForm(formId: $formId) {
+    id
+    title
+    description
+    slug
+    shopUseOnly
+    status
+    allowGuestSubmissions
+    publicToken
+    systemKey
+    fields {
+      key
+      type
+      label
+      helpText
+      required
+      options
+    }
+  }
+}
+    `;
+
+/**
+ * __useGetFormForEditQuery__
+ *
+ * To run a query within a React component, call `useGetFormForEditQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetFormForEditQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetFormForEditQuery({
+ *   variables: {
+ *      formId: // value for 'formId'
+ *   },
+ * });
+ */
+export function useGetFormForEditQuery(baseOptions: Apollo.QueryHookOptions<GetFormForEditQuery, GetFormForEditQueryVariables> & ({ variables: GetFormForEditQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetFormForEditQuery, GetFormForEditQueryVariables>(GetFormForEditDocument, options);
+      }
+export function useGetFormForEditLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetFormForEditQuery, GetFormForEditQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetFormForEditQuery, GetFormForEditQueryVariables>(GetFormForEditDocument, options);
+        }
+// @ts-ignore
+export function useGetFormForEditSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetFormForEditQuery, GetFormForEditQueryVariables>): Apollo.UseSuspenseQueryResult<GetFormForEditQuery, GetFormForEditQueryVariables>;
+export function useGetFormForEditSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetFormForEditQuery, GetFormForEditQueryVariables>): Apollo.UseSuspenseQueryResult<GetFormForEditQuery | undefined, GetFormForEditQueryVariables>;
+export function useGetFormForEditSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetFormForEditQuery, GetFormForEditQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetFormForEditQuery, GetFormForEditQueryVariables>(GetFormForEditDocument, options);
+        }
+export type GetFormForEditQueryHookResult = ReturnType<typeof useGetFormForEditQuery>;
+export type GetFormForEditLazyQueryHookResult = ReturnType<typeof useGetFormForEditLazyQuery>;
+export type GetFormForEditSuspenseQueryHookResult = ReturnType<typeof useGetFormForEditSuspenseQuery>;
+export type GetFormForEditQueryResult = Apollo.QueryResult<GetFormForEditQuery, GetFormForEditQueryVariables>;
+export const CreateFormFromBuilderDocument = gql`
+    mutation CreateFormFromBuilder($input: CreateFormInput!) {
+  createForm(input: $input) {
+    id
+    title
+    description
+    slug
+    shopUseOnly
+    status
+    allowGuestSubmissions
+    publicToken
+    systemKey
+    fields {
+      key
+      type
+      label
+      helpText
+      required
+      options
+    }
+  }
+}
+    `;
+export type CreateFormFromBuilderMutationFn = Apollo.MutationFunction<CreateFormFromBuilderMutation, CreateFormFromBuilderMutationVariables>;
+
+/**
+ * __useCreateFormFromBuilderMutation__
+ *
+ * To run a mutation, you first call `useCreateFormFromBuilderMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCreateFormFromBuilderMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [createFormFromBuilderMutation, { data, loading, error }] = useCreateFormFromBuilderMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useCreateFormFromBuilderMutation(baseOptions?: Apollo.MutationHookOptions<CreateFormFromBuilderMutation, CreateFormFromBuilderMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<CreateFormFromBuilderMutation, CreateFormFromBuilderMutationVariables>(CreateFormFromBuilderDocument, options);
+      }
+export type CreateFormFromBuilderMutationHookResult = ReturnType<typeof useCreateFormFromBuilderMutation>;
+export type CreateFormFromBuilderMutationResult = Apollo.MutationResult<CreateFormFromBuilderMutation>;
+export type CreateFormFromBuilderMutationOptions = Apollo.BaseMutationOptions<CreateFormFromBuilderMutation, CreateFormFromBuilderMutationVariables>;
+export const UpdateFormDocument = gql`
+    mutation UpdateForm($input: UpdateFormInput!) {
+  updateForm(input: $input) {
+    id
+    title
+    description
+    slug
+    shopUseOnly
+    status
+    allowGuestSubmissions
+    publicToken
+    systemKey
+    fields {
+      key
+      type
+      label
+      helpText
+      required
+      options
+    }
+  }
+}
+    `;
+export type UpdateFormMutationFn = Apollo.MutationFunction<UpdateFormMutation, UpdateFormMutationVariables>;
+
+/**
+ * __useUpdateFormMutation__
+ *
+ * To run a mutation, you first call `useUpdateFormMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateFormMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateFormMutation, { data, loading, error }] = useUpdateFormMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useUpdateFormMutation(baseOptions?: Apollo.MutationHookOptions<UpdateFormMutation, UpdateFormMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<UpdateFormMutation, UpdateFormMutationVariables>(UpdateFormDocument, options);
+      }
+export type UpdateFormMutationHookResult = ReturnType<typeof useUpdateFormMutation>;
+export type UpdateFormMutationResult = Apollo.MutationResult<UpdateFormMutation>;
+export type UpdateFormMutationOptions = Apollo.BaseMutationOptions<UpdateFormMutation, UpdateFormMutationVariables>;
 export const GetProjectDocument = gql`
     query GetProject($projectId: ID!) {
   getProject(projectId: $projectId) {

@@ -8,6 +8,38 @@ Last updated: 2026-09-03.
 
 ---
 
+### 2026-09-03 (eighteenth entry): FormBuilder built on mobile - Up/Down buttons replace drag-and-drop
+
+Second of four follow-up items ("do 2, 3, 4 and 5"). Full reasoning: DECISIONS.md X30. Closes the
+single biggest cut named in X28 (Forms) - there is now a way to create/edit a form's fields on
+mobile.
+
+**Built:** `app/form/[id].tsx` (new route, singular like `client/[id]`; `id === 'new'` is the
+create sentinel, matching web's `formId === "new"`), `utils/formBuilder.ts` (pure `newLocalField`/
+`localFieldFromServer`/`canSaveForm`/`fieldsForInput`/`moveField`/`fieldNeedsMoreOptions`, direct
+ports of `FormBuilder.jsx`'s own logic), three new `forms.graphql` operations
+(`GetFormForEdit`/`CreateFormFromBuilder`/`UpdateForm`), and `FORM_CHOICE_FIELD_TYPES`/
+`isChoiceFieldType`/`FORM_FIELD_TYPE_OPTIONS` added to `utils/formConstants.ts`. `forms/index.tsx`
+gained a "New Form" button and its form titles are now links into the editor (except the
+`booking_request` system form, which stays plain text and redirects back here if opened directly -
+its own restricted editor still isn't ported). New test file `formBuilder.test.ts` (19 tests).
+
+**Field reorder is Up/Down buttons per row, not drag-and-drop** - `moveField` is a clamped array
+swap (first-field-up and last-field-down are no-ops) standing in for `@dnd-kit`, which has no
+cross-platform equivalent here. Same shape of fix as `DurationPicker.tsx`'s pill-row-instead-of-
+`<select>` precedent, applied to reordering instead of picking.
+
+**Publish/Archive/guest-link toggle/Responses stay on the list screen, not duplicated in the
+builder** - a deliberate mobile-specific choice (X30), not a gap: every one of those actions
+already works from `forms/index.tsx` (X28), so the builder just shows status read-only and leaves
+the actions where they are.
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+and the full `apps/mobile` Jest suite - 217/217, up from 198. **Not yet confirmed:** a real
+device/simulator run of the new screen.
+
+---
+
 ### 2026-09-03 (seventeenth entry): Forgot-password recovery built on mobile - request only, never redemption
 
 Requested directly after the six-feature batch closed, as the first of four follow-up items

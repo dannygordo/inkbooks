@@ -28,3 +28,19 @@ export const FORM_FIELD_TYPE_LABELS: Record<string, string> = {
 export function formFieldTypeLabel(type: string): string {
 	return FORM_FIELD_TYPE_LABELS[type] ?? type;
 }
+
+// Mirrors apps/web's FORM_CHOICE_FIELD_TYPES - the two field types that carry an `options` list
+// and need at least two non-empty ones to be savable. See formBuilder.ts's canSaveForm/
+// fieldsForInput, both direct ports of FormBuilder.jsx's own canSave/fieldsForInput.
+export const FORM_CHOICE_FIELD_TYPES = ['single_choice', 'multi_choice'];
+
+export function isChoiceFieldType(type: string): boolean {
+	return FORM_CHOICE_FIELD_TYPES.includes(type);
+}
+
+// Insertion order here is the order FormBuilder's own type picker renders in - same order as
+// apps/web's FORM_FIELD_TYPES list (constants/app.js), built from FORM_FIELD_TYPE_LABELS above
+// rather than kept as a second hand-copied list.
+export const FORM_FIELD_TYPE_OPTIONS: Array<{ value: string; label: string }> = Object.entries(
+	FORM_FIELD_TYPE_LABELS,
+).map(([value, label]) => ({ value, label }));

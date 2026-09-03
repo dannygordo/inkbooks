@@ -31,24 +31,18 @@ type FormItem = GetFormsListQuery['getForms']['items'][number];
  * from Booking Requests, which keeps its own dedicated intake pipeline (see DECISIONS.md X19).
  * Gated `canManageForms` - narrower than Income/Expenses' `canManageBusinessLedger`, excluding a
  * plain shop-connected artist who isn't a shop admin (see that helper's own comment). See
- * DECISIONS.md X28.
+ * DECISIONS.md X28/X30.
  *
- * **No "New Form" button and no way to edit a form's fields at all.** Web's own comment explains
- * why: `createForm` requires at least one field, so "New Form" hands off to `FormBuilder.jsx` to
- * assemble fields before anything is created, rather than creating an empty draft that can't
- * legally exist. `FormBuilder` needs its own field-reordering interaction design (web uses
- * `@dnd-kit`'s drag-and-drop, which has no cross-platform mobile equivalent in this app) - a real
- * follow-up, not a quick add. A form's title is plain text here, not a link into an editor that
- * doesn't exist.
+ * **"New Form" and tapping a form's title both open `form/[id].tsx`** (X30) - the field editor
+ * this list originally shipped without. A form's title links to `/form/:id` to edit it, EXCEPT
+ * the booking_request system form, which keeps plain text here (its own restricted editor isn't
+ * ported - see form/[id].tsx's own comment on why it redirects back here if reached directly).
  *
- * **Duplicate is still ported** - it's a plain `createForm` call with the source form's own
- * fields client-side-copied (dropping each field's `key` so the copy gets fresh ones), no editor
- * needed. **Publish/Archive/guest-link toggle/Delete are all ported** - none of them touch a
- * form's fields.
- *
- * **The booking_request system form gets no interactive actions at all** (matching its narrower
- * action set on web) - its own restricted editor, `BookingRequestFieldsEditor.jsx` (task #162),
- * isn't ported either.
+ * **Duplicate is still ported here rather than routed through the editor** - it's a plain
+ * `createForm` call with the source form's own fields client-side-copied (dropping each field's
+ * `key` so the copy gets fresh ones), no editor needed. **Publish/Archive/guest-link toggle/
+ * Delete stay here too** - form/[id].tsx deliberately doesn't duplicate them (see its own header
+ * comment), so this list remains the one place all of a form's non-field actions live.
  *
  * **The public guest link has no "Copy" button** - no clipboard library is installed (matching
  * the Shops slice's own `expo-web-browser` gap: avoid a new dependency for one action). Turning
@@ -141,9 +135,17 @@ export default function FormsScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
         <ThemedText type="small" themeColor="textSecondary" style={styles.intro}>
-          Consent forms, waivers, and custom intake questionnaires. Build and edit a form&apos;s
-          fields on the web app - this screen manages status, guest links, and responses.
+          Consent forms, waivers, and custom intake questionnaires.
         </ThemedText>
+
+        <View style={styles.newFormRow}>
+          <Button
+            label="New Form"
+            variant="secondary"
+            onPress={() => router.push({ pathname: '/form/[id]', params: { id: 'new' } })}
+            testID="forms-new"
+          />
+        </View>
 
         {actionError ? (
           <ThemedText type="small" style={styles.error}>
@@ -191,9 +193,20 @@ export default function FormsScreen() {
               return (
                 <View key={form.id} style={[styles.row, { borderColor: theme.backgroundSelected }]} testID={`form-row-${form.id}`}>
                   <View style={styles.rowBody}>
-                    <ThemedText type="default" numberOfLines={2}>
-                      {form.title}
-                    </ThemedText>
+                    {isBookingRequest ? (
+                      <ThemedText type="default" numberOfLines={2}>
+                        {form.title}
+                      </ThemedText>
+                    ) : (
+                      <Pressable
+                        onPress={() => router.push({ pathname: '/form/[id]', params: { id: form.id } })}
+                        testID={`form-edit-${form.id}`}
+                      >
+                        <ThemedText type="default" numberOfLines={2} style={styles.titleLink}>
+                          {form.title}
+                        </ThemedText>
+                      </Pressable>
+                    )}
                     <ThemedText type="small" themeColor="textSecondary">
                       {formStatusLabel(form.status)}
                       {form.systemKey ? ' · Default' : ''}
@@ -265,6 +278,14 @@ const styles = StyleSheet.create({
   intro: {
     paddingHorizontal: Spacing.three,
     paddingTop: Spacing.two,
+  },
+  newFormRow: {
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.two,
+    alignItems: 'flex-start',
+  },
+  titleLink: {
+    textDecorationLine: 'underline',
   },
   filterRow: {
     flexDirection: 'row',

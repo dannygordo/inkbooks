@@ -1098,6 +1098,17 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    phone's browser. Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile`
    `tsc --noEmit` clean, and the full `apps/mobile` Jest suite (198/198, up from 193).
 
+   **FormBuilder (2026-09-03, see DECISIONS.md X30) is the next follow-up item after that** -
+   closes the biggest cut named in X28: `app/form/[id].tsx` now creates/edits a form's title,
+   description, link slug, shop-use-only flag, and fields. Field reorder is a pair of Up/Down
+   buttons per row (`utils/formBuilder.ts`'s `moveField`) standing in for web's `@dnd-kit`
+   drag-and-drop, which has no cross-platform equivalent in this app - the same shape of fix
+   `DurationPicker.tsx` already established for select dropdowns. Publish/Archive/guest-link
+   toggle/Responses are deliberately NOT duplicated in the builder - they already work from
+   `forms/index.tsx`'s list (X28), so the builder shows status read-only and leaves those actions
+   where they are. Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile`
+   `tsc --noEmit` clean, and the full `apps/mobile` Jest suite (217/217, up from 198).
+
    Everything else on the ~40-screen list not yet named remains open.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).

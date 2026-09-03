@@ -3,15 +3,21 @@
 # utils/businessScope.ts's canManageForms (a plain shop-connected artist who isn't a shop admin
 # sees none of this, unlike Income/Expenses' canManageBusinessLedger).
 #
-# DELIBERATELY NOT PORTED this slice: FormBuilder (creating a form or editing its fields - no
-# cross-platform drag-and-drop reordering primitive exists in this app, and building fields from
-# scratch needs its own interaction design, not a rushed one), BookingRequestFieldsEditor (the
-# booking_request system form's own restricted editor), and getFormAnalytics (a real, separate
-# secondary feature - aggregate per-field stats/percentages layered on top of the response list,
-# not the core "read what someone submitted" job this slice covers). See DECISIONS.md X28.
+# DELIBERATELY NOT PORTED this slice: BookingRequestFieldsEditor (the booking_request system
+# form's own restricted editor - form/[id].tsx redirects away from it, same as web's FormBuilder
+# does), and getFormAnalytics (a real, separate secondary feature - aggregate per-field stats/
+# percentages layered on top of the response list, not the core "read what someone submitted" job
+# this slice covers). See DECISIONS.md X28.
 #
-# createForm IS still used here, for Duplicate only - it's a plain mutation call with client-side
-# field copying, no editor needed (see resolvers/forms.js's fieldsFromInput: an omitted field key
+# FormBuilder (create a form / edit its title, description, link slug, shop-use-only flag, and
+# fields) WAS ADDED in X30 - see form/[id].tsx and utils/formBuilder.ts for the field-reorder
+# substitute (no cross-platform drag-and-drop primitive exists in this app; a pair of Up/Down move
+# buttons per field row replaces it). GetFormForEdit/CreateFormFromBuilder/UpdateForm below are
+# that screen's own operations - kept separate from GetFormsList's lighter list-row shape and from
+# DuplicateForm's plain create-with-no-editor call.
+#
+# createForm is ALSO used for Duplicate (forms/index.tsx) - a plain mutation call with client-side
+# field copying, no editor involved (see resolvers/forms.js's fieldsFromInput: an omitted field key
 # means a fresh key, so a duplicate never shares field identity with its source).
 query GetFormsList($shopId: ID, $artistUserId: ID, $status: String, $page: PageInput) {
 	getForms(shopId: $shopId, artistUserId: $artistUserId, status: $status, page: $page) {
@@ -116,6 +122,80 @@ query GetFormResponsesList($formId: ID!, $page: PageInput) {
 			hasMore
 			limit
 			offset
+		}
+	}
+}
+
+
+# form/[id].tsx's own load query - the full field shape (including options, unlike GetFormsList's
+# already-known-flat items) plus status/allowGuestSubmissions/publicToken/systemKey for the
+# read-only status chip and the booking_request redirect check.
+query GetFormForEdit($formId: ID!) {
+	getForm(formId: $formId) {
+		id
+		title
+		description
+		slug
+		shopUseOnly
+		status
+		allowGuestSubmissions
+		publicToken
+		systemKey
+		fields {
+			key
+			type
+			label
+			helpText
+			required
+			options
+		}
+	}
+}
+
+# form/[id].tsx's create path - named distinctly from DuplicateForm above (both call the same
+# createForm mutation field; GraphQL operation names only need to be unique from each other, not
+# match the field) since this one needs the full form shape back to navigate into edit mode on the
+# new id, where Duplicate only ever needed the id itself.
+mutation CreateFormFromBuilder($input: CreateFormInput!) {
+	createForm(input: $input) {
+		id
+		title
+		description
+		slug
+		shopUseOnly
+		status
+		allowGuestSubmissions
+		publicToken
+		systemKey
+		fields {
+			key
+			type
+			label
+			helpText
+			required
+			options
+		}
+	}
+}
+
+mutation UpdateForm($input: UpdateFormInput!) {
+	updateForm(input: $input) {
+		id
+		title
+		description
+		slug
+		shopUseOnly
+		status
+		allowGuestSubmissions
+		publicToken
+		systemKey
+		fields {
+			key
+			type
+			label
+			helpText
+			required
+			options
 		}
 	}
 }

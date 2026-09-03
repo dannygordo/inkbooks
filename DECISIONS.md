@@ -2094,6 +2094,66 @@ for actually sharing it.
 `FORM_FIELD_TYPE_LABELS`/`formFieldTypeLabel`) - same "build the map directly, don't port
 `prettyConstantsListValue`" reasoning as `utils/projectStatus.ts` (X20).
 
+### X30. FormBuilder built on mobile - Up/Down buttons replace drag-and-drop, actions stay on the list
+
+Second of the four follow-up items ("do 2, 3, 4 and 5" against the six-feature batch's own "what's
+next" list). Closes the single biggest named cut from X28: there is now a way to create and edit a
+form's fields from mobile.
+
+**Field reorder: a pair of Up/Down buttons per field row, not drag-and-drop.** X28 named the real
+obstacle - web's `FormBuilder.jsx` reorders fields via `@dnd-kit/core`/`@dnd-kit/sortable`
+(`FormFieldEditorRow.jsx`'s drag handle, pointer AND keyboard sensors), and no cross-platform drag
+primitive exists anywhere in this app. `DurationPicker.tsx`'s own header comment already
+established the sibling precedent for select dropdowns - a pill row instead of a native `<select>`
+- so the same shape of fix applies here: `utils/formBuilder.ts`'s pure `moveField(fields, index,
+direction)` swaps a field with its neighbor, clamped (moving the first field up or the last field
+down is a no-op) rather than wrapping, since there's no drag gesture here to simply refuse the way
+dropping above the list's top would on web.
+
+**New `utils/formBuilder.ts`** - a direct port of `FormBuilder.jsx`'s `newField`/`fieldFromServer`/
+`canSave`/`fieldsForInput`, plus `moveField` and `fieldNeedsMoreOptions` (the per-field version of
+`canSave`'s choice-options check, backing the same inline "needs at least two options" notice
+`FormFieldEditorRow.jsx` shows). `newLocalField` uses an incrementing counter for its local id
+instead of web's `Math.random().toString(36)` - functionally equivalent (a React list key that's
+never sent to the server), but deterministic in tests. Five new tests
+(`formBuilder.test.ts`) cover all of it, including `fieldsForInput`'s omit-key-for-a-new-field and
+strip-options-for-non-choice-type behavior.
+
+**New `FORM_CHOICE_FIELD_TYPES`/`isChoiceFieldType`/`FORM_FIELD_TYPE_OPTIONS` added to
+`utils/formConstants.ts`** (extending X28's `FORM_STATUS_LABELS`/`FORM_FIELD_TYPE_LABELS`) -
+`FORM_FIELD_TYPE_OPTIONS` is built from the existing label map via `Object.entries` rather than
+kept as a second hand-copied list, so the two can't drift out of order with each other.
+
+**New route `app/form/[id].tsx`**, singular like `client/[id]`/`project/[id]`/`shop/[id]` -
+`id === 'new'` is the create-mode sentinel, matching web's own `formId === "new"` convention
+exactly. Reached from `forms/index.tsx`'s new "New Form" button and from tapping a form's title
+(now a link, except the `booking_request` system form, which stays plain text). Redirects back to
+the Forms list if it ever loads a `booking_request` form directly - there's no restricted
+booking-fields editor on mobile to redirect to instead (X28), so back to the list is the only
+sensible landing.
+
+**Publish/Archive/guest-link toggle/Responses are deliberately NOT duplicated in the builder
+screen**, unlike web's `FormBuilder.jsx`, which shows all four once a form is real. X28 already put
+every one of them on `forms/index.tsx`'s list rows; showing them again here would mean two
+screens independently calling the same mutations for no reason. The builder shows the form's
+status as a read-only line instead (`formStatusLabel` + a "· Default form" suffix for a seeded
+form like `consent`) and leaves the actions where they already work. This is a mobile-specific
+information-architecture call, not a missing feature - every action web's `FormBuilder.jsx` offers
+is reachable from mobile, just from the list instead of the editor.
+
+**The "always asks First Name/Last Name/Email/Phone first" notice is carried over verbatim** -
+same reasoning web's own comment gives (this isn't a form field, it's how a guest's response gets
+matched to the right client record). The public-link helper text under the slug field is trimmed
+to not reference a full URL, matching the list's own guest-link gap (X28): mobile has no reliable
+source for the web app's own public origin.
+
+**Boolean toggles (`shopUseOnly`, a field's `required`) use React Native's `Switch`**, matching the
+existing convention (`artists/index.tsx`'s "Show archived" toggle), not a hand-drawn checkbox glyph
+- there's an established primitive for this one, unlike the drag-reorder problem above.
+
+Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean, and
+the full `apps/mobile` Jest suite - 217/217, up from 198.
+
 ### X29. Forgot-password recovery built on mobile - request only, never redemption
 
 Requested directly, outside the six-feature batch: mobile's login screen had no self-service
