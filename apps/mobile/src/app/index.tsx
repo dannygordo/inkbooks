@@ -27,7 +27,7 @@ import {
   getAppointmentTitle,
 } from '@/utils/appointments';
 import { getThisWeekFilter } from '@/utils/dateRanges';
-import { canManageAppointment, isShopAdminOrBetter } from '@/utils/permissions';
+import { canManageAppointment, isShopAdminOrBetter, isStaffOrBetter } from '@/utils/permissions';
 import { getUserShopId } from '@/utils/user';
 
 // A month of one shop's appointments in one response, not paged - same choice
@@ -153,6 +153,11 @@ export default function AppointmentsScreen() {
             Appointments
           </ThemedText>
           <View style={styles.headerActions}>
+            {isStaffOrBetter(user) ? (
+              <Pressable onPress={() => router.push('/artists')} testID="artists-button">
+                <ThemedText type="link">Artists</ThemedText>
+              </Pressable>
+            ) : null}
             <Pressable onPress={() => router.push('/clients')} testID="clients-button">
               <ThemedText type="link">Clients</ThemedText>
             </Pressable>

@@ -103,6 +103,10 @@ function RootNavigator() {
           name="shop-cut-confirmations/index"
           options={{ headerShown: true, title: 'Shop Cut Confirmations' }}
         />
+        {/* Artists - the shop's own team roster, see artists/index.tsx's own header comment.
+            Gated `isStaffOrBetter`, matching web's Sidebar.jsx exactly. */}
+        <Stack.Screen name="artists/index" options={{ headerShown: true, title: 'Artists' }} />
+        <Stack.Screen name="artist/[id]" options={{ headerShown: true, title: 'Artist' }} />
       </Stack.Protected>
     </Stack>
   );

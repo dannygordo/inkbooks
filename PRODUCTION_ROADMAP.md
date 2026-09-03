@@ -1013,6 +1013,17 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    `apps/mobile` `tsc --noEmit` clean, and the full `apps/mobile` Jest suite (164/164, up from
    154 - `tagColor.test.ts` plus new `isShopAdminOrBetter` cases).
 
+   **Artists directory (2026-09-03, see DECISIONS.md X22) is the next slice after that - first of
+   a batch (Artists/Staff, Shops, Search, Income/Expenses, Forms) taken one at a time.**
+   `app/artists/index.tsx` (list, real "Show archived" toggle) and `app/artist/[id].tsx` (identity
+   fields, autosave-on-blur, same pattern as `project/[id].tsx`'s `ProjectDetailsCard`), a new
+   reusable `components/ArchiveControl.tsx`, `isStaffOrBetter` gating the header link, and a new
+   `artists.graphql` operation set. Deliberately not ported: `ArtistPerformancePanel`/
+   `ShopCutRatePanel` (Phase 7's still-evolving dashboard, not a directory-port concern) and "Add
+   Artist" (a real account-creation wizard, unlike Clients'/Projects' missing create actions).
+   Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+   and the full `apps/mobile` Jest suite (167/167, up from 164 - new `isStaffOrBetter` cases).
+
    Everything else on the ~40-screen list not yet named remains open.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).

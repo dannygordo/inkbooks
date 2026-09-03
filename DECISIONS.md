@@ -1771,6 +1771,62 @@ there is no "Load more" to build on either platform.
 `utils/tagColor.ts`'s `resolveTagColor`/`tagColorRowStyle` and `utils/permissions.ts`'s new
 `isShopAdminOrBetter` each get test coverage; the Apollo-wired screen doesn't.
 
+
+### X22. Artists directory built - a shop's own team roster, minus the Phase-7 dashboard panels web bundles onto it
+
+Picked as the next slice after a user request to work through the rest of the remaining feature
+list (Artists/Staff directories, Shops, Search, Income/Expenses, Forms) in sequence. Artists first
+because it's the most directly parallel to already-built Clients/Projects (same list+detail
+shape), and because `Artist.jsx`'s own real complexity - archiving, an autosave identity form - is
+now well-established mobile territory, unlike its two embedded dashboard panels (next paragraph).
+
+**Deliberately NOT ported: `ArtistPerformancePanel` and `ShopCutRatePanel`, the two panels web
+mounts below the identity card.** Both are pieces of a large, still-actively-evolving analytics
+dashboard - PRODUCTION_ROADMAP.md's own Phase 7 section runs to seven numbered follow-up fixes
+covering these two panels alone (caching gaps, timezone bugs, capped result counts, and more,
+still ongoing as of this document). Bundling either into a directory-listing port would mean
+re-deriving a moving target from scratch rather than porting a settled feature - a separate slice,
+when it happens, should port Phase 7 as its own thing with its own scope discussion, not inherit
+whatever shape it happened to be in the day Artists shipped.
+
+**Archive/unarchive is real here, not a scope cut like Clients'/Projects' missing archive
+support.** `archiveArtist`/`unarchiveArtist` are two simple, already-existing mutations
+(`assertCanManageArtist`-gated) - nothing like the "no archiving exists on mobile in any form"
+reasoning X17 gave for `getClients`. Built a reusable `components/ArchiveControl.tsx`, a direct
+port of web's own `ArchiveControl.jsx` (same confirmation prose, stating what archiving does AND
+doesn't, for the same reason web's own comment gives: "remove this person" reads as "lose their
+history," and someone who thinks a year of revenue records is at risk won't press the button) -
+except confirmation is RN's native `Alert.alert` rather than a ported custom backdrop-dialog,
+since a native alert is the idiomatic RN equivalent and needs no bespoke styling. Deliberately
+generic (kind/name/mutation callbacks as props, not the mutations themselves) so Staff and Client
+detail screens can reuse it without duplicating the confirmation copy.
+
+**"Add Artist" is not built, and this IS a scope cut - unlike Clients/Projects, web has a real
+create flow here.** `CreateArtistWizard` (`IBPageActionBar`'s `artists` case) creates a real
+account: email, password, role - effectively a small register flow, not a form with a few fields.
+Separate, real scope from a directory port, same category of cut as every other account-creation
+wizard this session has deferred.
+
+**`isStaffOrBetter` added to `utils/permissions.ts`, alongside X21's `isShopAdminOrBetter`.**
+Direct port of web's Sidebar.jsx gate on this exact nav item - looser than `isShopAdminOrBetter`
+(SHOP_STAFF=15, not SHOP_ADMIN=10), matching `getArtists`/`getArtist`'s own server-side minRole.
+Worth noting the security history here: `getArtist`'s own resolver comment records that this used
+to allow ANY artist to open ANY shop-mate's page - found and fixed specifically because that page
+mounted `ArtistPerformancePanel`, a shop-mate's revenue/shop-cut view. Mobile inherits the
+already-fixed rule (self, or Staff-and-above sharing a shop) directly from the server; the
+`isStaffOrBetter` header-link gate is presentation only, same "the mutation is the real gate"
+caveat X13/X21 already established for other client-side role checks.
+
+**Identity-form autosave is a direct structural port of `project/[id].tsx`'s `ProjectDetailsCard`
+pattern** (per-field `useRef`, a `lastSavedRef` dirty-check, `onBlur`-triggered `save()`) - not a
+new pattern invented for this screen. `shopId` is never sent in the update payload, matching web's
+own `buildIdentityPayload` exactly: `updateArtist` rejects a `shopId` that doesn't match the
+artist's current shop outright (connecting/moving shops is `connectArtistToShop`, which asks
+first), so sending it at all is pure risk for a field this form was never going to change.
+
+**No dedicated screen-level test for either new screen**, matching every prior slice's precedent -
+`utils/permissions.ts`'s new `isStaffOrBetter` gets test coverage; the two Apollo-wired screens
+don't.
 ---
 
 ## Process

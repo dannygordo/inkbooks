@@ -2862,6 +2862,42 @@ export type GetArtistShopConnectionsQueryVariables = Exact<{
 
 export type GetArtistShopConnectionsQuery = { __typename?: 'Query', getArtistShopConnections?: Array<{ __typename?: 'ArtistShopConnection', id: string, artistId: string, shopId: string, status: string, rateSource: string } | null> | null };
 
+export type GetArtistsListQueryVariables = Exact<{
+  includeArchived?: InputMaybe<Scalars['Boolean']['input']>;
+  page?: InputMaybe<PageInput>;
+}>;
+
+
+export type GetArtistsListQuery = { __typename?: 'Query', getArtists: { __typename?: 'ArtistPage', items: Array<{ __typename?: 'Artist', id: string, firstName: string, lastName: string, title?: string | null, email: string, phone?: string | null, instagram?: string | null, facebook?: string | null, avatar?: string | null, status?: number | null, user?: { __typename?: 'User', id: string, avatar?: string | null } | null }>, pageInfo: { __typename?: 'PageInfo', totalCount: number, hasMore: boolean, limit: number, offset: number } } };
+
+export type GetArtistDetailQueryVariables = Exact<{
+  artistId: Scalars['ID']['input'];
+}>;
+
+
+export type GetArtistDetailQuery = { __typename?: 'Query', getArtist?: { __typename?: 'Artist', id: string, userId: string, firstName: string, lastName: string, email: string, title?: string | null, phone?: string | null, address?: string | null, city?: string | null, state?: string | null, zip?: string | null, instagram?: string | null, facebook?: string | null, avatar?: string | null, startDate: string, status?: number | null, user?: { __typename?: 'User', id: string, avatar?: string | null } | null } | null };
+
+export type UpdateArtistIdentityMutationVariables = Exact<{
+  artist: ArtistInput;
+}>;
+
+
+export type UpdateArtistIdentityMutation = { __typename?: 'Mutation', updateArtist?: { __typename?: 'Artist', id: string, firstName: string, lastName: string, email: string, title?: string | null, phone?: string | null, address?: string | null, city?: string | null, state?: string | null, zip?: string | null, instagram?: string | null, facebook?: string | null, startDate: string } | null };
+
+export type ArchiveArtistMutationVariables = Exact<{
+  artistId: Scalars['ID']['input'];
+}>;
+
+
+export type ArchiveArtistMutation = { __typename?: 'Mutation', archiveArtist?: { __typename?: 'Artist', id: string, status?: number | null } | null };
+
+export type UnarchiveArtistMutationVariables = Exact<{
+  artistId: Scalars['ID']['input'];
+}>;
+
+
+export type UnarchiveArtistMutation = { __typename?: 'Mutation', unarchiveArtist?: { __typename?: 'Artist', id: string, status?: number | null } | null };
+
 export type GetBookingRequestsQueryVariables = Exact<{
   artistId: Scalars['ID']['input'];
   statuses?: InputMaybe<Array<Scalars['String']['input']> | Scalars['String']['input']>;
@@ -3748,6 +3784,246 @@ export type GetArtistShopConnectionsQueryHookResult = ReturnType<typeof useGetAr
 export type GetArtistShopConnectionsLazyQueryHookResult = ReturnType<typeof useGetArtistShopConnectionsLazyQuery>;
 export type GetArtistShopConnectionsSuspenseQueryHookResult = ReturnType<typeof useGetArtistShopConnectionsSuspenseQuery>;
 export type GetArtistShopConnectionsQueryResult = Apollo.QueryResult<GetArtistShopConnectionsQuery, GetArtistShopConnectionsQueryVariables>;
+export const GetArtistsListDocument = gql`
+    query GetArtistsList($includeArchived: Boolean, $page: PageInput) {
+  getArtists(includeArchived: $includeArchived, page: $page) {
+    items {
+      id
+      firstName
+      lastName
+      title
+      email
+      phone
+      instagram
+      facebook
+      avatar
+      status
+      user {
+        id
+        avatar
+      }
+    }
+    pageInfo {
+      totalCount
+      hasMore
+      limit
+      offset
+    }
+  }
+}
+    `;
+
+/**
+ * __useGetArtistsListQuery__
+ *
+ * To run a query within a React component, call `useGetArtistsListQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetArtistsListQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetArtistsListQuery({
+ *   variables: {
+ *      includeArchived: // value for 'includeArchived'
+ *      page: // value for 'page'
+ *   },
+ * });
+ */
+export function useGetArtistsListQuery(baseOptions?: Apollo.QueryHookOptions<GetArtistsListQuery, GetArtistsListQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetArtistsListQuery, GetArtistsListQueryVariables>(GetArtistsListDocument, options);
+      }
+export function useGetArtistsListLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetArtistsListQuery, GetArtistsListQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetArtistsListQuery, GetArtistsListQueryVariables>(GetArtistsListDocument, options);
+        }
+// @ts-ignore
+export function useGetArtistsListSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetArtistsListQuery, GetArtistsListQueryVariables>): Apollo.UseSuspenseQueryResult<GetArtistsListQuery, GetArtistsListQueryVariables>;
+export function useGetArtistsListSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetArtistsListQuery, GetArtistsListQueryVariables>): Apollo.UseSuspenseQueryResult<GetArtistsListQuery | undefined, GetArtistsListQueryVariables>;
+export function useGetArtistsListSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetArtistsListQuery, GetArtistsListQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetArtistsListQuery, GetArtistsListQueryVariables>(GetArtistsListDocument, options);
+        }
+export type GetArtistsListQueryHookResult = ReturnType<typeof useGetArtistsListQuery>;
+export type GetArtistsListLazyQueryHookResult = ReturnType<typeof useGetArtistsListLazyQuery>;
+export type GetArtistsListSuspenseQueryHookResult = ReturnType<typeof useGetArtistsListSuspenseQuery>;
+export type GetArtistsListQueryResult = Apollo.QueryResult<GetArtistsListQuery, GetArtistsListQueryVariables>;
+export const GetArtistDetailDocument = gql`
+    query GetArtistDetail($artistId: ID!) {
+  getArtist(artistId: $artistId) {
+    id
+    userId
+    firstName
+    lastName
+    email
+    title
+    phone
+    address
+    city
+    state
+    zip
+    instagram
+    facebook
+    avatar
+    startDate
+    status
+    user {
+      id
+      avatar
+    }
+  }
+}
+    `;
+
+/**
+ * __useGetArtistDetailQuery__
+ *
+ * To run a query within a React component, call `useGetArtistDetailQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetArtistDetailQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetArtistDetailQuery({
+ *   variables: {
+ *      artistId: // value for 'artistId'
+ *   },
+ * });
+ */
+export function useGetArtistDetailQuery(baseOptions: Apollo.QueryHookOptions<GetArtistDetailQuery, GetArtistDetailQueryVariables> & ({ variables: GetArtistDetailQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetArtistDetailQuery, GetArtistDetailQueryVariables>(GetArtistDetailDocument, options);
+      }
+export function useGetArtistDetailLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetArtistDetailQuery, GetArtistDetailQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetArtistDetailQuery, GetArtistDetailQueryVariables>(GetArtistDetailDocument, options);
+        }
+// @ts-ignore
+export function useGetArtistDetailSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetArtistDetailQuery, GetArtistDetailQueryVariables>): Apollo.UseSuspenseQueryResult<GetArtistDetailQuery, GetArtistDetailQueryVariables>;
+export function useGetArtistDetailSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetArtistDetailQuery, GetArtistDetailQueryVariables>): Apollo.UseSuspenseQueryResult<GetArtistDetailQuery | undefined, GetArtistDetailQueryVariables>;
+export function useGetArtistDetailSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetArtistDetailQuery, GetArtistDetailQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetArtistDetailQuery, GetArtistDetailQueryVariables>(GetArtistDetailDocument, options);
+        }
+export type GetArtistDetailQueryHookResult = ReturnType<typeof useGetArtistDetailQuery>;
+export type GetArtistDetailLazyQueryHookResult = ReturnType<typeof useGetArtistDetailLazyQuery>;
+export type GetArtistDetailSuspenseQueryHookResult = ReturnType<typeof useGetArtistDetailSuspenseQuery>;
+export type GetArtistDetailQueryResult = Apollo.QueryResult<GetArtistDetailQuery, GetArtistDetailQueryVariables>;
+export const UpdateArtistIdentityDocument = gql`
+    mutation UpdateArtistIdentity($artist: ArtistInput!) {
+  updateArtist(artist: $artist) {
+    id
+    firstName
+    lastName
+    email
+    title
+    phone
+    address
+    city
+    state
+    zip
+    instagram
+    facebook
+    startDate
+  }
+}
+    `;
+export type UpdateArtistIdentityMutationFn = Apollo.MutationFunction<UpdateArtistIdentityMutation, UpdateArtistIdentityMutationVariables>;
+
+/**
+ * __useUpdateArtistIdentityMutation__
+ *
+ * To run a mutation, you first call `useUpdateArtistIdentityMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateArtistIdentityMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateArtistIdentityMutation, { data, loading, error }] = useUpdateArtistIdentityMutation({
+ *   variables: {
+ *      artist: // value for 'artist'
+ *   },
+ * });
+ */
+export function useUpdateArtistIdentityMutation(baseOptions?: Apollo.MutationHookOptions<UpdateArtistIdentityMutation, UpdateArtistIdentityMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<UpdateArtistIdentityMutation, UpdateArtistIdentityMutationVariables>(UpdateArtistIdentityDocument, options);
+      }
+export type UpdateArtistIdentityMutationHookResult = ReturnType<typeof useUpdateArtistIdentityMutation>;
+export type UpdateArtistIdentityMutationResult = Apollo.MutationResult<UpdateArtistIdentityMutation>;
+export type UpdateArtistIdentityMutationOptions = Apollo.BaseMutationOptions<UpdateArtistIdentityMutation, UpdateArtistIdentityMutationVariables>;
+export const ArchiveArtistDocument = gql`
+    mutation ArchiveArtist($artistId: ID!) {
+  archiveArtist(artistId: $artistId) {
+    id
+    status
+  }
+}
+    `;
+export type ArchiveArtistMutationFn = Apollo.MutationFunction<ArchiveArtistMutation, ArchiveArtistMutationVariables>;
+
+/**
+ * __useArchiveArtistMutation__
+ *
+ * To run a mutation, you first call `useArchiveArtistMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useArchiveArtistMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [archiveArtistMutation, { data, loading, error }] = useArchiveArtistMutation({
+ *   variables: {
+ *      artistId: // value for 'artistId'
+ *   },
+ * });
+ */
+export function useArchiveArtistMutation(baseOptions?: Apollo.MutationHookOptions<ArchiveArtistMutation, ArchiveArtistMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<ArchiveArtistMutation, ArchiveArtistMutationVariables>(ArchiveArtistDocument, options);
+      }
+export type ArchiveArtistMutationHookResult = ReturnType<typeof useArchiveArtistMutation>;
+export type ArchiveArtistMutationResult = Apollo.MutationResult<ArchiveArtistMutation>;
+export type ArchiveArtistMutationOptions = Apollo.BaseMutationOptions<ArchiveArtistMutation, ArchiveArtistMutationVariables>;
+export const UnarchiveArtistDocument = gql`
+    mutation UnarchiveArtist($artistId: ID!) {
+  unarchiveArtist(artistId: $artistId) {
+    id
+    status
+  }
+}
+    `;
+export type UnarchiveArtistMutationFn = Apollo.MutationFunction<UnarchiveArtistMutation, UnarchiveArtistMutationVariables>;
+
+/**
+ * __useUnarchiveArtistMutation__
+ *
+ * To run a mutation, you first call `useUnarchiveArtistMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUnarchiveArtistMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [unarchiveArtistMutation, { data, loading, error }] = useUnarchiveArtistMutation({
+ *   variables: {
+ *      artistId: // value for 'artistId'
+ *   },
+ * });
+ */
+export function useUnarchiveArtistMutation(baseOptions?: Apollo.MutationHookOptions<UnarchiveArtistMutation, UnarchiveArtistMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<UnarchiveArtistMutation, UnarchiveArtistMutationVariables>(UnarchiveArtistDocument, options);
+      }
+export type UnarchiveArtistMutationHookResult = ReturnType<typeof useUnarchiveArtistMutation>;
+export type UnarchiveArtistMutationResult = Apollo.MutationResult<UnarchiveArtistMutation>;
+export type UnarchiveArtistMutationOptions = Apollo.BaseMutationOptions<UnarchiveArtistMutation, UnarchiveArtistMutationVariables>;
 export const GetBookingRequestsDocument = gql`
     query GetBookingRequests($artistId: ID!, $statuses: [String!], $page: PageInput) {
   getBookingRequests(artistId: $artistId, statuses: $statuses, page: $page) {

@@ -27,3 +27,27 @@ export const AUTH_ERROR_MESSAGES = {
   INCORRECT_CREDENTIALS:
     'The email and/or password submitted are not correct.  Please try again.',
 } as const;
+
+// Mirrors server/utils/constants.js's ARTIST_STATUS / STAFF_STATUS / CLIENT_STATUS (same
+// duplication reasoning as ROLES above - a status number written from memory in the wrong file
+// is a silent bug, not a compile error).
+//
+// ARCHIVED is 4 in all three, deliberately - "archived" is one fact, not three. Archiving is how
+// someone is removed from the app; there is no delete. It never touches history: an archived
+// artist's completed sessions still count toward shop revenue. Absent/undefined means active.
+export const ARTIST_STATUS = {
+  ACTIVE: 1,
+  INACTIVE: 2,
+  BOOKS_CLOSED: 3,
+  ARCHIVED: 4,
+} as const;
+
+export const STAFF_STATUS = {
+  ACTIVE: 1,
+  ARCHIVED: 4,
+} as const;
+
+export const CLIENT_STATUS = {
+  ACTIVE: 1,
+  ARCHIVED: 4,
+} as const;

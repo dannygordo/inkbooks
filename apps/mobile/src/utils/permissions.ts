@@ -42,3 +42,14 @@ export function canManageAppointment(user: UserLike, appointment: AppointmentOwn
 export function isShopAdminOrBetter(user: UserLike): boolean {
 	return Boolean(user?.role) && (user!.role as number) <= ROLES.SHOP_ADMIN;
 }
+
+/**
+ * Direct port of apps/web's Sidebar.jsx `isStaffOrBetter` inline check - gates the Artists/Staff
+ * directory header links (see DECISIONS.md X22). Looser than isShopAdminOrBetter above
+ * (SHOP_STAFF=15, not SHOP_ADMIN=10) - matches `getArtists`/`getStaff`'s own server-side minRole,
+ * which is deliberately Staff-and-above rather than Shop-Admin-and-above: front-desk staff need
+ * the roster to do their job, even though they can't archive or edit from it.
+ */
+export function isStaffOrBetter(user: UserLike): boolean {
+	return Boolean(user?.role) && (user!.role as number) <= ROLES.SHOP_STAFF;
+}

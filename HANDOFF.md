@@ -8,6 +8,34 @@ Last updated: 2026-09-03.
 
 ---
 
+### 2026-09-03 (tenth entry): Artists directory built - team roster, minus the Phase-7 dashboard panels
+
+First of a batch requested together (Artists/Staff, Shops, Search, Income/Expenses, Forms), taken
+one at a time in the established slice-by-slice way. Full reasoning: DECISIONS.md X22.
+
+**Built:** `app/artists/index.tsx` (list, real "Show archived" toggle - `getArtists` already takes
+that boolean), `app/artist/[id].tsx` (identity fields, autosave-on-blur, same structural pattern as
+`project/[id].tsx`'s `ProjectDetailsCard`), a new reusable `components/ArchiveControl.tsx` (ported
+from web's own, using RN's native `Alert.alert` for confirmation instead of a custom dialog), a new
+`isStaffOrBetter` in `utils/permissions.ts` gating the header link, `ARTIST_STATUS`/
+`STAFF_STATUS`/`CLIENT_STATUS` added to `constants/auth.ts`, and a new `artists.graphql` operation
+set (`GetArtistsList`, `GetArtistDetail`, `UpdateArtistIdentity`, `ArchiveArtist`,
+`UnarchiveArtist`).
+
+**Deliberately not ported: `ArtistPerformancePanel`/`ShopCutRatePanel`** - both pieces of a large,
+still-evolving Phase 7 dashboard (seven numbered follow-up fixes and counting in
+PRODUCTION_ROADMAP.md), not a natural extension of a directory port. **Also not built: "Add
+Artist"** - unlike Clients/Projects, this one really is a scope cut relative to web, since
+`CreateArtistWizard` creates a real account (email/password/role), not a small form.
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+and the full `apps/mobile` Jest suite - 167/167 (164 before this slice, +3: new `isStaffOrBetter`
+cases in `permissions.test.ts`). **Not yet confirmed:** a real device/simulator run, and - same
+caveat as Shop Cut Confirmations - never exercised against a real multi-artist shop fixture in
+this sandbox.
+
+---
+
 ### 2026-09-03 (ninth entry): Shop Cut Confirmations built - the first role-gated header link
 
 The shop-side inbox for the manual mark-paid/confirm dual-control flow (an artist marks their
