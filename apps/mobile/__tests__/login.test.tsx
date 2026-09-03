@@ -1,5 +1,6 @@
 import { MockedProvider } from '@apollo/client/testing';
 import { LoginDocument } from '@inkbooks/api';
+import { useRouter } from 'expo-router';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import LoginScreen from '@/app/login';
@@ -13,7 +14,14 @@ jest.mock('@/context/auth', () => ({
   useAuth: jest.fn(),
 }));
 
+// Mocked the same way for the same reason - this file only needs to prove the "Forgot password?"
+// link navigates to /reset-password, not exercise expo-router's own navigation stack.
+jest.mock('expo-router', () => ({
+  useRouter: jest.fn(),
+}));
+
 const mockUseAuth = useAuth as jest.Mock;
+const mockUseRouter = useRouter as jest.Mock;
 
 const VARIABLES = { email: 'danny@thecopperwolf.com', password: 'hunter2' };
 
@@ -50,8 +58,16 @@ function renderScreen(mocks: readonly unknown[]) {
 }
 
 describe('LoginScreen', () => {
+  const push = jest.fn();
+
+  beforeEach(() => {
+    mockUseRouter.mockReturnValue({ push });
+  });
+
   afterEach(() => {
     mockUseAuth.mockReset();
+    mockUseRouter.mockReset();
+    push.mockReset();
   });
 
   it('disables submit until both fields are filled', () => {
@@ -109,5 +125,14 @@ describe('LoginScreen', () => {
         AUTH_ERROR_MESSAGES.INCORRECT_CREDENTIALS,
       ),
     );
+  });
+
+  it('navigates to /reset-password when "Forgot password?" is pressed', () => {
+    mockUseAuth.mockReturnValue({ login: jest.fn() });
+    renderScreen([]);
+
+    fireEvent.press(screen.getByTestId('forgot-password-link'));
+
+    expect(push).toHaveBeenCalledWith('/reset-password');
   });
 });

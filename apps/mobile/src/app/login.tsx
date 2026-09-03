@@ -1,4 +1,5 @@
 import { useLoginMutation } from '@inkbooks/api';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,6 +18,7 @@ import { useTheme } from '@/hooks/use-theme';
 // directly" option to port, and controlled state is the idiomatic RN default.
 export default function LoginScreen() {
   const theme = useTheme();
+  const router = useRouter();
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -90,6 +92,12 @@ export default function LoginScreen() {
             </ThemedText>
           )}
         </Pressable>
+
+        <Pressable onPress={() => router.push('/reset-password')} testID="forgot-password-link">
+          <ThemedText type="link" style={styles.forgotPassword}>
+            Forgot password?
+          </ThemedText>
+        </Pressable>
       </SafeAreaView>
     </ThemedView>
   );
@@ -118,6 +126,9 @@ const styles = StyleSheet.create({
   },
   error: {
     color: '#D33',
+  },
+  forgotPassword: {
+    textAlign: 'center',
   },
   button: {
     borderRadius: Spacing.two,

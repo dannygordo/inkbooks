@@ -1088,8 +1088,17 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    `tsc --noEmit` clean, and the full `apps/mobile` Jest suite (193/193, up from 177).
 
    This closes the six-feature batch (Artists/Staff, Shops, Search, Income/Expenses, Forms) taken
-   one slice at a time, each independently verified and documented. Everything else on the
-   ~40-screen list not yet named remains open.
+   one slice at a time, each independently verified and documented.
+
+   **Forgot-password recovery (2026-09-03, see DECISIONS.md X29) is a follow-up requested right
+   after that batch closed** - a new "Forgot password?" link on `login.tsx`, a new
+   `app/reset-password.tsx` (request-only, unconditional confirmation), a new
+   `passwordReset.graphql`. The actual reset redemption is NOT built on mobile - the emailed link
+   is a plain web URL with no mobile deep link registered for it, so it always opens in the
+   phone's browser. Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile`
+   `tsc --noEmit` clean, and the full `apps/mobile` Jest suite (198/198, up from 193).
+
+   Everything else on the ~40-screen list not yet named remains open.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).
 10. TestFlight beta, then App Store submission - Guideline 3.1.1 already checked in step 5, so this

@@ -2094,6 +2094,39 @@ for actually sharing it.
 `FORM_FIELD_TYPE_LABELS`/`formFieldTypeLabel`) - same "build the map directly, don't port
 `prettyConstantsListValue`" reasoning as `utils/projectStatus.ts` (X20).
 
+### X29. Forgot-password recovery built on mobile - request only, never redemption
+
+Requested directly, outside the six-feature batch: mobile's login screen had no self-service
+recovery path at all, and Settings' password form requires already being signed in - an artist who
+forgets their password on their phone was simply stuck. Ports the logged-out half of web's
+`ResetPassword.jsx` (the request form), not its logged-in branch (`IBUpdatePassword` - already
+covered by `settings/index.tsx`'s own password-change form, since a signed-in user wants a
+different operation with a different guarantee, per that file's own comment).
+
+**New top-level route `app/reset-password.tsx`**, registered under the SAME `Stack.Protected
+guard={!user}` block as `login` - a logged-out user needs to reach it too. Reached from a new
+"Forgot password?" link below `login.tsx`'s own submit button.
+
+**The confirmation is deliberately unconditional**, matching web's own comment exactly: it says
+the same thing whether or not the address belongs to an account, because the server
+(`requestPasswordReset`) behaves the same way for the same reason - a form that answers
+differently is a tool for checking who a shop's clients are. Both a genuine send and a network
+failure land on the identical "Check your email" screen; the mutation's own error is swallowed on
+purpose. Tested directly (`reset-password.test.tsx`): the success case and the error case both
+assert the same confirmation renders.
+
+**The token-redemption screen is NOT built - the whole reset always finishes in the phone's
+browser, never in the app.** Web's `SetPassword.jsx` (where the emailed link actually lands) is
+deliberately not ported: the link is a plain web URL, and there is no mobile deep link registered
+for it - the same gap already named for Square's OAuth callback in the Shops slice (DECISIONS.md
+X24). Tapping the emailed link from the Mail app opens the phone's default browser regardless of
+whether a native screen exists for it, so building one on mobile would be unreachable dead code
+until a real deep link scheme exists. This screen's only job is sending the email; finishing the
+reset is web's job, today, by design.
+
+Only `requestPasswordReset` is ported to `packages/api` (`passwordReset.graphql`) - not
+`inspectPasswordToken`/`setPasswordWithToken`, for the same reason.
+
 ---
 
 ## Process

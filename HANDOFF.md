@@ -8,6 +8,30 @@ Last updated: 2026-09-03.
 
 ---
 
+### 2026-09-03 (seventeenth entry): Forgot-password recovery built on mobile - request only, never redemption
+
+Requested directly after the six-feature batch closed, as the first of four follow-up items
+("do 2, 3, 4 and 5" against that batch's own "what's next" list). Full reasoning: DECISIONS.md X29.
+
+**Built:** a new "Forgot password?" link on `login.tsx`, a new `app/reset-password.tsx` (logged-
+out request form, unconditional "check your email" confirmation), a new `passwordReset.graphql`
+(`RequestPasswordReset` only). Two new test files: `login.test.tsx` gained a case for the new
+link, `reset-password.test.tsx` is new (disabled-until-filled, the unconditional confirmation on
+both success AND error, back navigation).
+
+**The actual password-reset redemption (web's `SetPassword.jsx`, where the emailed link lands) is
+NOT built on mobile** - that link is a plain web URL with no mobile deep link registered for it
+(same gap as Square's OAuth callback, X24), so it always opens in the phone's browser regardless.
+This screen only sends the email.
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+and the full `apps/mobile` Jest suite - 198/198, up from 193. **Not yet confirmed:** a real
+device/simulator run, or that the reset email actually arrives against a real mail-sending
+configuration (out of this port's scope - that's server-side, already built per Phase 1 of
+`PRODUCTION_ROADMAP.md`).
+
+---
+
 ### 2026-09-03 (sixteenth entry): Forms built - list + Responses only; FormBuilder is the biggest named cut yet
 
 Last of the requested batch (Artists/Staff, Shops, Search, Income/Expenses, Forms) - all six

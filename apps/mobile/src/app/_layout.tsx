@@ -57,6 +57,10 @@ function RootNavigator() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Protected guard={!user}>
         <Stack.Screen name="login" />
+        {/* Forgot-password request - see reset-password.tsx's own header comment. Logged-out
+            only, same guard as login itself; a signed-in user changes a password they know from
+            settings/index.tsx instead. */}
+        <Stack.Screen name="reset-password" options={{ headerShown: true, title: 'Reset Password' }} />
       </Stack.Protected>
       <Stack.Protected guard={!!user}>
         <Stack.Screen name="index" />
