@@ -1121,6 +1121,21 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    codegen + build, `apps/mobile` `tsc --noEmit` clean, and the full `apps/mobile` Jest suite
    (219/219, up from 217).
 
+   **Push-notification tap deep-linking (2026-09-03, see DECISIONS.md X32) is the last of the
+   four follow-up items** - closes the loop on Phase 5 step 7's push channel. Server:
+   `utils/notifications.js`'s `notify()` now actually passes `data: { type, subjectType,
+   subjectId }` to `sendPushForRecipients` (the function already supported it; nothing called it
+   with data before). Mobile: `lib/push-notifications.ts`'s `resolveNotificationTarget` maps that
+   payload to one of five screens, and `app/_layout.tsx` navigates there on a tap via
+   `Notifications.useLastNotificationResponse()`. `boothRentCharge` notifications have nowhere to
+   land yet (Booth Rent isn't in Settings batch 1) and fall back to opening the app to Home.
+   Confirmed in this sandbox: `apps/mobile` `tsc --noEmit` clean, full `apps/mobile` Jest suite
+   (223/223, up from 219); server changes checked with `node --check` only - this sandbox still
+   has no route to `fastdl.mongodb.org` for the real integration suite.
+
+   This closes the requested four-item follow-up round in full (forgot-password recovery,
+   FormBuilder, Settings batch 1, push-notification deep-linking).
+
    Everything else on the ~40-screen list not yet named remains open.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).

@@ -1,12 +1,37 @@
 import { ApolloProvider } from '@apollo/client';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useRouter, type ImperativeRouter } from 'expo-router';
+import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
 import { useColorScheme } from 'react-native';
 
 import { AuthProvider, useAuth } from '@/context/auth';
 import { apolloClient, initCachePersistence } from '@/lib/apollo-client';
+import { resolveNotificationTarget, type PushNotificationTarget } from '@/lib/push-notifications';
 import { initSentry } from '@/lib/sentry';
+
+// Every pathname here is a literal typed-routes string (app.json's typedRoutes: true) - see
+// push-notifications.ts's own header comment on why resolveNotificationTarget returns a plain
+// screen+id instead of trying to hand back one of these strings itself.
+function navigateForNotificationTarget(router: ImperativeRouter, target: PushNotificationTarget) {
+  switch (target.screen) {
+    case 'appointment':
+      router.push({ pathname: '/appointment/[id]', params: { id: target.id } });
+      return;
+    case 'bookingRequest':
+      router.push({ pathname: '/booking-requests/[id]', params: { id: target.id } });
+      return;
+    case 'conversation':
+      router.push({ pathname: '/messages/[id]', params: { id: target.id } });
+      return;
+    case 'artist':
+      router.push({ pathname: '/artist/[id]', params: { id: target.id } });
+      return;
+    case 'shop':
+      router.push({ pathname: '/shop/[id]', params: { id: target.id } });
+      return;
+  }
+}
 
 SplashScreen.preventAutoHideAsync();
 initSentry();
@@ -19,6 +44,7 @@ initSentry();
 // second real authenticated screen (Phase 2's appointments list) is what actually decides that.
 function RootNavigator() {
   const { user, initializing } = useAuth();
+  const router = useRouter();
   // Mirrors `initializing` above - a second, independent async bootstrap step (restoring the
   // persisted Apollo cache from AsyncStorage - see apollo-client.ts's own comment) that has to
   // finish before the appointments screen's first query runs, or a cold launch offline renders an
@@ -48,6 +74,28 @@ function RootNavigator() {
       SplashScreen.hideAsync();
     }
   }, [initializing, cacheReady]);
+
+  // Notification-tap deep-linking (push-notifications.ts's own header comment has the full
+  // design). useLastNotificationResponse covers both a cold start (the app was launched BY the
+  // tap) and a live tap while already running, in one hook - see that hook's own implementation.
+  // Cleared immediately after handling so remounting this component (a fast-refresh in dev, or
+  // user flipping false->true->false->true across a quick logout/login) never re-navigates to a
+  // tap that was already acted on.
+  const lastNotificationResponse = Notifications.useLastNotificationResponse();
+  useEffect(() => {
+    // Every route resolveNotificationTarget can produce lives behind Stack.Protected's
+    // guard={!!user} below - nothing to navigate to for a signed-out user, so this simply waits;
+    // the response stays available (it's not cleared) until a signed-in RootNavigator can act on
+    // it.
+    if (!user || !lastNotificationResponse) {
+      return;
+    }
+    const target = resolveNotificationTarget(lastNotificationResponse.notification.request.content.data);
+    if (target) {
+      navigateForNotificationTarget(router, target);
+    }
+    Notifications.clearLastNotificationResponse();
+  }, [user, lastNotificationResponse, router]);
 
   if (initializing || !cacheReady) {
     return null;

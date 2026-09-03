@@ -8,6 +8,40 @@ Last updated: 2026-09-03.
 
 ---
 
+### 2026-09-03 (twentieth entry): Push notifications now carry a subject, and tapping one opens the right screen
+
+Last of four follow-up items ("do 2, 3, 4 and 5") - closes out this round. Full reasoning:
+DECISIONS.md X32.
+
+**Server:** `utils/notifications.js`'s `notify()` now passes `data: { type, subjectType,
+subjectId }` into its one `push.sendPushForRecipients` call - `sendPushForRecipients` itself
+(`utils/push.js`) has accepted and forwarded a `data` object since Phase 5 step 7, but nothing was
+ever passed. Checked directly against the current code rather than trusting an earlier note in
+this project's own history that claimed this was already wired up - it wasn't. Two new tests in
+`test/integration/pushNotifications.test.js`. **Not run against a real `mongod` in this sandbox**
+(no route to `fastdl.mongodb.org` - same standing block as every other server integration test
+here); `node --check` passed. Ask to run `npm test` in `server/` on a machine with real network
+access for full confirmation.
+
+**Mobile:** new `resolveNotificationTarget` in `lib/push-notifications.ts` maps a push's
+`subjectType` to one of five mobile screens (appointment/bookingRequest/conversation/artist/shop) -
+every real `subjectType` that has a mobile screen to land on. `boothRentCharge` has none (Booth
+Rent isn't ported - X31) and falls back to opening the app to Home, a named gap not a bug. Actual
+navigation lives in `app/_layout.tsx`'s `RootNavigator`, using
+`Notifications.useLastNotificationResponse()` (covers cold-start AND a live tap in one hook) plus
+a literal `switch` so every `router.push` pathname stays a real typed-routes string. 4 new tests
+in `push-notifications.test.ts`.
+
+**Confirmed in this sandbox:** `apps/mobile` `tsc --noEmit` clean, full `apps/mobile` Jest suite -
+223/223, up from 219. Server: `node --check` only (see above). **Not yet confirmed:** a real
+device/simulator run of an actual notification tap, and the server integration suite anywhere with
+real network access.
+
+This closes the requested four-item follow-up round ("do 2, 3, 4 and 5") in full: forgot-password
+recovery, FormBuilder, Settings batch 1, and this.
+
+---
+
 ### 2026-09-03 (nineteenth entry): Settings batch 1 - Income/Expense categories + Recurring Expenses; rest of Settings named as a follow-up list
 
 Third of four follow-up items ("do 2, 3, 4 and 5"). Full reasoning: DECISIONS.md X31. Web's

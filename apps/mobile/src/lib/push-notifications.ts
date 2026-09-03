@@ -145,3 +145,64 @@ export async function unregisterPushNotifications(
     await TokenStorageService.deleteItemAsync(LAST_REGISTERED_TOKEN_KEY);
   }
 }
+
+// --- Notification-tap deep-linking -------------------------------------------------------------
+//
+// server/utils/notifications.js's notify() now attaches `data: { type, subjectType, subjectId }`
+// to every push it sends (the same subject identity every in-app Notification row already
+// carries) - this is the mobile side that reads it back on a tap and decides where to go. See
+// app/_layout.tsx's RootNavigator for the actual navigation call, which uses
+// Notifications.useLastNotificationResponse() (covers both a cold start - the app launched BY the
+// tap - and a live tap while the app is already running, in one hook - see that hook's own
+// implementation for why a separate addNotificationResponseReceivedListener isn't needed too).
+//
+// resolveNotificationTarget is kept here, not in _layout.tsx, and returns a plain discriminated
+// screen+id rather than an expo-router pathname string - app.json's typedRoutes: true means
+// expo-router's `Href` type only accepts known literal route strings, and this table's whole job
+// is picking one of several literals at runtime. Keeping the actual `router.push({ pathname:
+// '/appointment/[id]', ... })` calls as a literal switch in _layout.tsx keeps every pathname a
+// real typed-routes literal there; this function only ever returns which case to take.
+
+export type PushNotificationTargetScreen = 'appointment' | 'bookingRequest' | 'conversation' | 'artist' | 'shop';
+
+export type PushNotificationTarget = {
+  screen: PushNotificationTargetScreen;
+  id: string;
+};
+
+// Every subjectType utils/notifications.js's call sites actually use (server/graphql/mutations/*,
+// server/utils/attention.js, server/utils/notification-jobs.js) that ALSO has a mobile screen to
+// land on. 'boothRentCharge' is deliberately absent - Booth Rent has no mobile screen at all yet
+// (DECISIONS.md X31 names BoothRentPanel as still-unported Settings work), so a boothRentCharge
+// notification simply opens the app to Home, same as tapping the app icon - not a bug, a real gap
+// named here rather than a dead navigation attempt.
+const SUBJECT_TYPE_SCREENS: Record<string, PushNotificationTargetScreen> = {
+  appointment: 'appointment',
+  bookingRequest: 'bookingRequest',
+  conversation: 'conversation',
+  artist: 'artist',
+  shop: 'shop',
+};
+
+/**
+ * Reads a notification response's own `data` payload (an untrusted, loosely-typed object off the
+ * wire - Expo's own types leave it as `Record<string, unknown>`) and decides which screen, if any,
+ * a tap on it should open. Never throws - a malformed, missing, or unrecognized payload (an older
+ * push sent before this data existed, say) is exactly the same "nothing to navigate to" case as no
+ * payload at all.
+ */
+export function resolveNotificationTarget(data: unknown): PushNotificationTarget | null {
+  if (!data || typeof data !== 'object') {
+    return null;
+  }
+  const subjectType = (data as Record<string, unknown>).subjectType;
+  const subjectId = (data as Record<string, unknown>).subjectId;
+  if (typeof subjectType !== 'string' || typeof subjectId !== 'string' || subjectId.length === 0) {
+    return null;
+  }
+  const screen = SUBJECT_TYPE_SCREENS[subjectType];
+  if (!screen) {
+    return null;
+  }
+  return { screen, id: subjectId };
+}

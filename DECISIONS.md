@@ -2094,6 +2094,64 @@ for actually sharing it.
 `FORM_FIELD_TYPE_LABELS`/`formFieldTypeLabel`) - same "build the map directly, don't port
 `prettyConstantsListValue`" reasoning as `utils/projectStatus.ts` (X20).
 
+### X32. Push notifications carry a subject, and tapping one now opens the right screen
+
+Last of the four follow-up items ("do 2, 3, 4 and 5"). Closes a real, standing gap: mobile has
+sent and received push notifications since Phase 5 step 7 (`lib/push-notifications.ts`,
+`server/utils/push.js`), but a tap on one just opened the app to Home - nothing carried enough
+information to open the right screen. Two changes, one on each side of the wire.
+
+**Server: `utils/notifications.js`'s `notify()` now passes `data: { type, subjectType,
+subjectId }` into `push.sendPushForRecipients`.** This was NOT already happening, despite an
+earlier note in this project's own history claiming otherwise - checked directly against the
+current code before writing anything client-side: `sendPushForRecipients` (`utils/push.js`) has
+always accepted and forwarded a `data` object (it's been sitting there, unused, since Phase 5 step
+7 - `data = {}` in its own signature, spread onto every Expo message), but `notify()`'s one real
+call site never passed one. Every in-app `Notification` row already carries `type`/`subjectType`/
+`subjectId` (`models/Notification.js`) - this is that same identity, reaching the push payload for
+the first time. `subjectId` is coerced with `String(...)` (or sent as a real `null`, never the
+string `"undefined"`) since it's a Mongoose ObjectId server-side and has to survive a JSON round
+trip to the device unchanged. Two new tests in `test/integration/pushNotifications.test.js` cover
+the payload shape and the no-subject case; `node --check` is this sandbox's own ceiling for
+confirming it (no route to `fastdl.mongodb.org` here - see Test status - so the integration suite
+itself couldn't be run in this sandbox; ask to run `npm test` on a machine with real network
+access for full confirmation).
+
+**Mobile: `lib/push-notifications.ts`'s new `resolveNotificationTarget(data)`** reads that payload
+back and maps `subjectType` to one of five known mobile screens - `appointment`, `bookingRequest`,
+`conversation`, `artist`, `shop` - every `subjectType` currently in real use
+(`server/graphql/mutations/*`, `utils/attention.js`, `utils/notification-jobs.js`) that ALSO has a
+mobile screen to land on. `boothRentCharge` is the one real `subjectType` with no mapping - Booth
+Rent has no mobile screen at all yet (X31) - so that notification opens the app to Home, same as
+tapping the icon; named here as a real, current gap rather than a broken navigation attempt.
+Malformed, missing, or pre-this-change payloads (an older notification, or a `boothRentCharge`
+event) all resolve to `null` the same way - never throws, matching every other function in this
+file's own "best-effort, never blocks the caller" convention.
+
+**The actual navigation lives in `app/_layout.tsx`'s `RootNavigator`, not in
+`push-notifications.ts`** - `resolveNotificationTarget` deliberately returns a plain `{screen, id}`
+rather than an expo-router path string, because `app.json`'s `typedRoutes: true` means
+`router.push`'s `Href` type only accepts known literal route strings, and this function's whole
+job is picking one of several such strings at runtime. `navigateForNotificationTarget`'s switch
+statement keeps every actual `router.push({ pathname: '/appointment/[id]', ... })` call a real
+literal, satisfied by typed routes, while the decision logic itself stays pure and unit-tested.
+
+**`Notifications.useLastNotificationResponse()`, not a manually wired
+`addNotificationResponseReceivedListener` plus a separate `getLastNotificationResponseAsync` cold-
+start check** - the hook already does both in one place (see its own implementation: it seeds from
+`getLastNotificationResponse()` on mount, then a live listener updates it from there), which is
+less to keep in sync than reimplementing the same two-path merge by hand. `clearLastNotificationResponse()`
+is called immediately after acting on a response with a signed-in user, so remounting
+`RootNavigator` (a fast refresh in dev, or a quick logout/login) never re-navigates to a tap
+that's already been handled - but ONLY when a user is present: a response arriving before login
+(cold-starting the app via a notification tap while signed out) is deliberately left uncleared, so
+it's still there to act on once `RootNavigator` re-renders signed in, since every mapped screen
+lives behind `Stack.Protected`'s `guard={!!user}`.
+
+Not built: any notification action beyond a plain tap (Expo's push categories/actions), and any
+navigation for a `subjectType` with no mobile screen. Both are real, separate scope, not corners
+cut from this one.
+
 ### X31. Settings batch 1 - Income/Expense category management and Recurring Expenses; everything else in Settings named as a follow-up list
 
 Third of the four follow-up items ("do 2, 3, 4 and 5"). Web's Settings is eighteen panels across
