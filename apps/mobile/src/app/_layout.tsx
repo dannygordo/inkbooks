@@ -145,6 +145,10 @@ function RootNavigator() {
             settings/index.tsx's own "Messages" section. ResponseTimePanel/
             SystemMessageTemplatesPanel remain open, named in DECISIONS.md X31/X38/X39. */}
         <Stack.Screen name="settings/auto-responses" options={{ headerShown: true, title: 'Auto-Responses' }} />
+        {/* Messages category, third sub-slice (X40) - Response Time, reached from
+            settings/index.tsx's own "Messages" section. SystemMessageTemplatesPanel remains
+            open, named in DECISIONS.md X31/X38/X39/X40. */}
+        <Stack.Screen name="settings/response-time" options={{ headerShown: true, title: 'Response Time' }} />
         {/* The client roster - see clients/index.tsx's own header comment. Reached from
             index.tsx's header, and the second (real) entry point into client/[id].tsx below -
             that screen's own X15 comment named this as worth building. */}

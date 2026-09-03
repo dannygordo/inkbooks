@@ -3439,6 +3439,21 @@ export type UpdateReminderSettingsMutationVariables = Exact<{
 
 export type UpdateReminderSettingsMutation = { __typename?: 'Mutation', updateReminderSettings: { __typename?: 'ReminderSettings', emailEnabled: boolean, smsEnabled: boolean, emailSubjectTemplate?: string | null, emailBodyTemplate?: string | null, smsTemplate?: string | null, rules: Array<{ __typename?: 'ReminderRule', id: string, offsetMinutes: number, enabled: boolean }> } };
 
+export type GetResponseTimeSettingsQueryVariables = Exact<{
+  shopId?: InputMaybe<Scalars['ID']['input']>;
+  artistUserId?: InputMaybe<Scalars['ID']['input']>;
+}>;
+
+
+export type GetResponseTimeSettingsQuery = { __typename?: 'Query', getResponseTimeSettings: { __typename?: 'ResponseTimeSettings', id: string, shopId?: string | null, artistUserId?: string | null, initialThresholdMinutes: number, repeatIntervalMinutes: number, shopCeiling?: { __typename?: 'ResponseTimeCeiling', initialThresholdMinutes: number, repeatIntervalMinutes: number } | null } };
+
+export type UpdateResponseTimeSettingsMutationVariables = Exact<{
+  input: UpdateResponseTimeSettingsInput;
+}>;
+
+
+export type UpdateResponseTimeSettingsMutation = { __typename?: 'Mutation', updateResponseTimeSettings: { __typename?: 'ResponseTimeSettings', id: string, shopId?: string | null, artistUserId?: string | null, initialThresholdMinutes: number, repeatIntervalMinutes: number, shopCeiling?: { __typename?: 'ResponseTimeCeiling', initialThresholdMinutes: number, repeatIntervalMinutes: number } | null } };
+
 export type UpdateSessionDetailsMutationVariables = Exact<{
   appointmentInput?: InputMaybe<AppointmentInput>;
 }>;
@@ -8093,6 +8108,99 @@ export function useUpdateReminderSettingsMutation(baseOptions?: Apollo.MutationH
 export type UpdateReminderSettingsMutationHookResult = ReturnType<typeof useUpdateReminderSettingsMutation>;
 export type UpdateReminderSettingsMutationResult = Apollo.MutationResult<UpdateReminderSettingsMutation>;
 export type UpdateReminderSettingsMutationOptions = Apollo.BaseMutationOptions<UpdateReminderSettingsMutation, UpdateReminderSettingsMutationVariables>;
+export const GetResponseTimeSettingsDocument = gql`
+    query GetResponseTimeSettings($shopId: ID, $artistUserId: ID) {
+  getResponseTimeSettings(shopId: $shopId, artistUserId: $artistUserId) {
+    id
+    shopId
+    artistUserId
+    initialThresholdMinutes
+    repeatIntervalMinutes
+    shopCeiling {
+      initialThresholdMinutes
+      repeatIntervalMinutes
+    }
+  }
+}
+    `;
+
+/**
+ * __useGetResponseTimeSettingsQuery__
+ *
+ * To run a query within a React component, call `useGetResponseTimeSettingsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetResponseTimeSettingsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetResponseTimeSettingsQuery({
+ *   variables: {
+ *      shopId: // value for 'shopId'
+ *      artistUserId: // value for 'artistUserId'
+ *   },
+ * });
+ */
+export function useGetResponseTimeSettingsQuery(baseOptions?: Apollo.QueryHookOptions<GetResponseTimeSettingsQuery, GetResponseTimeSettingsQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetResponseTimeSettingsQuery, GetResponseTimeSettingsQueryVariables>(GetResponseTimeSettingsDocument, options);
+      }
+export function useGetResponseTimeSettingsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetResponseTimeSettingsQuery, GetResponseTimeSettingsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetResponseTimeSettingsQuery, GetResponseTimeSettingsQueryVariables>(GetResponseTimeSettingsDocument, options);
+        }
+// @ts-ignore
+export function useGetResponseTimeSettingsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetResponseTimeSettingsQuery, GetResponseTimeSettingsQueryVariables>): Apollo.UseSuspenseQueryResult<GetResponseTimeSettingsQuery, GetResponseTimeSettingsQueryVariables>;
+export function useGetResponseTimeSettingsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetResponseTimeSettingsQuery, GetResponseTimeSettingsQueryVariables>): Apollo.UseSuspenseQueryResult<GetResponseTimeSettingsQuery | undefined, GetResponseTimeSettingsQueryVariables>;
+export function useGetResponseTimeSettingsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetResponseTimeSettingsQuery, GetResponseTimeSettingsQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetResponseTimeSettingsQuery, GetResponseTimeSettingsQueryVariables>(GetResponseTimeSettingsDocument, options);
+        }
+export type GetResponseTimeSettingsQueryHookResult = ReturnType<typeof useGetResponseTimeSettingsQuery>;
+export type GetResponseTimeSettingsLazyQueryHookResult = ReturnType<typeof useGetResponseTimeSettingsLazyQuery>;
+export type GetResponseTimeSettingsSuspenseQueryHookResult = ReturnType<typeof useGetResponseTimeSettingsSuspenseQuery>;
+export type GetResponseTimeSettingsQueryResult = Apollo.QueryResult<GetResponseTimeSettingsQuery, GetResponseTimeSettingsQueryVariables>;
+export const UpdateResponseTimeSettingsDocument = gql`
+    mutation UpdateResponseTimeSettings($input: UpdateResponseTimeSettingsInput!) {
+  updateResponseTimeSettings(input: $input) {
+    id
+    shopId
+    artistUserId
+    initialThresholdMinutes
+    repeatIntervalMinutes
+    shopCeiling {
+      initialThresholdMinutes
+      repeatIntervalMinutes
+    }
+  }
+}
+    `;
+export type UpdateResponseTimeSettingsMutationFn = Apollo.MutationFunction<UpdateResponseTimeSettingsMutation, UpdateResponseTimeSettingsMutationVariables>;
+
+/**
+ * __useUpdateResponseTimeSettingsMutation__
+ *
+ * To run a mutation, you first call `useUpdateResponseTimeSettingsMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateResponseTimeSettingsMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateResponseTimeSettingsMutation, { data, loading, error }] = useUpdateResponseTimeSettingsMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useUpdateResponseTimeSettingsMutation(baseOptions?: Apollo.MutationHookOptions<UpdateResponseTimeSettingsMutation, UpdateResponseTimeSettingsMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<UpdateResponseTimeSettingsMutation, UpdateResponseTimeSettingsMutationVariables>(UpdateResponseTimeSettingsDocument, options);
+      }
+export type UpdateResponseTimeSettingsMutationHookResult = ReturnType<typeof useUpdateResponseTimeSettingsMutation>;
+export type UpdateResponseTimeSettingsMutationResult = Apollo.MutationResult<UpdateResponseTimeSettingsMutation>;
+export type UpdateResponseTimeSettingsMutationOptions = Apollo.BaseMutationOptions<UpdateResponseTimeSettingsMutation, UpdateResponseTimeSettingsMutationVariables>;
 export const UpdateSessionDetailsDocument = gql`
     mutation UpdateSessionDetails($appointmentInput: AppointmentInput) {
   updateAppointment(appointmentInput: $appointmentInput) {

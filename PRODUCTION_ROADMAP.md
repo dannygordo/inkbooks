@@ -1214,8 +1214,17 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    primitive exists in this app, so web's create/edit Dialog became an inline editor card
    instead. `ResponseTimePanel.jsx` and `SystemMessageTemplatesPanel.jsx` remain the rest of
    Messages. Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile`
-   `tsc --noEmit` clean, full `apps/mobile` Jest suite - still 229/229. Booth Rent, the rest of
-   Messages, Forms' per-artist "Your link" section, Appearance, and Security remain open.
+   `tsc --noEmit` clean, full `apps/mobile` Jest suite - still 229/229.
+
+   **Messages batch 3 (2026-09-03, see DECISIONS.md X40) is the next slice** - `settings/
+   response-time.tsx`: how long an unanswered client message waits before the artist is nudged,
+   and how often the nudge repeats. Client-operations-only, everything already existed
+   server-side. Unlike Auto-Responses, only the artist's own card is ever editable - a
+   shop-connected artist sees the shop's numbers only as a read-only ceiling on their own row.
+   `SystemMessageTemplatesPanel.jsx` is the last Messages sub-slice. Confirmed in this sandbox:
+   `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean, full `apps/mobile` Jest
+   suite - still 229/229. Booth Rent, System Message Templates, Forms' per-artist "Your link"
+   section, Appearance, and Security remain open.
 
    Everything else on the ~40-screen list not yet named remains open.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until

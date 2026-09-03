@@ -2094,6 +2094,51 @@ for actually sharing it.
 `FORM_FIELD_TYPE_LABELS`/`formFieldTypeLabel`) - same "build the map directly, don't port
 `prettyConstantsListValue`" reasoning as `utils/projectStatus.ts` (X20).
 
+### X40. Messages batch 3 - Response Time (unanswered-message nudges)
+
+Continuing down the Messages sub-slice list from X38/X39. Direct port of `ResponseTimePanel.jsx`:
+how long a client's message may sit unanswered before the artist is nudged to reply, and how
+often the nudge repeats until they do. New route `settings/response-time.tsx`, linked from the
+same "Messages" card (now three links: Reminders, Auto-Responses, Response Time).
+
+**Server-side, everything already existed** - `getResponseTimeSettings`/
+`updateResponseTimeSettings` were already in `server/graphql/typeDefs.js`, so this slice is
+client-operations-only (new `packages/api/src/operations/responseTimeSettings.graphql`).
+
+**MINUTES ON THE WIRE, HOURS ON SCREEN** - `minutesToHours`/`hoursToMinutes` ported directly from
+web, same "human unit for editing, minutes for the server" shape as `reminders.tsx`'s own
+`minutesToUnit`/`unitToMinutes` (X38), kept screen-local on both platforms since nothing else uses
+them.
+
+**ONLY THE ARTIST'S OWN CARD IS EVER EDITABLE - the one real structural difference from
+Auto-Responses (X39)**, checked directly against `ResponseTimePanel.jsx`'s own header comment
+before assuming the same two-independent-sections shape applied unchanged. An ordinary
+shop-connected artist sees the shop's numbers only as a read-only `shopCeiling` on their own row
+(rendered as plain text, not a second card) - they have no authority to manage the shop's row,
+only to be bound by it (`resolveResponseTimeThresholds`'s ceiling-clamp). A shop-admin who is also
+an artist gets both: their own editable card (noting the shop's ceiling) and a second, genuinely
+separate "Shop Response Time" card that edits the shop's row itself (`scope={shopId}` -
+`ResponseTimeSection` is reused for both, exactly as web reuses its own).
+
+**Client-side ceiling check mirrors the server's rejection**, same reasoning as web's own comment:
+the artist sees why a value won't save before hitting Save, not after a failed round trip -
+`exceedsCeiling` ported as a plain boolean expression rather than deferred to a submit-time error.
+
+**Singleton per owner, not a list** - `getResponseTimeSettings` always returns one row (real or
+lazily-defaulted), matching `ReminderSettings`' own convention, so there's no create/edit-mode
+split like Auto-Responses needed - one hydrate-once form per section, same shape as
+`reminders.tsx`'s own top-level state (not `rates.tsx`'s uncontrolled pattern, for the same reason
+Reminders isn't: every field here is meant to reflect live local state after load).
+
+**Shop name for the shop-section title reuses the same `GetShopDetail` second-query approach as
+Auto-Responses (X39)**, skipped whenever `canManageShopResponseTime` is false.
+
+**NOT BUILT HERE**: `SystemMessageTemplatesPanel.jsx` remains the last Messages sub-slice.
+
+Verification: `packages/api` codegen + build (new `useGetResponseTimeSettingsQuery`/
+`useUpdateResponseTimeSettingsMutation` hooks generated cleanly), `apps/mobile` `tsc --noEmit`
+clean, full Jest suite 229/229 (unchanged - no new pure-logic module needed).
+
 ### X39. Messages batch 2 - Auto-Responses (message templates fired on a lifecycle event)
 
 Continuing down the Messages sub-slice list started in X38, per the same "yes, keep going"/"keep
@@ -2608,8 +2653,8 @@ likely value**:
 - **Messages** (`RemindersPanel.jsx`, `AutoResponsesPanel.jsx`, `ResponseTimePanel.jsx`,
   `SystemMessageTemplatesPanel.jsx`) - the largest remaining chunk (over 1,100 combined web lines),
   real separate scope on its own. ~~`RemindersPanel.jsx`~~ - **done, see X38.**
-  ~~`AutoResponsesPanel.jsx`~~ - **done, see X39.** `ResponseTimePanel.jsx`/
-  `SystemMessageTemplatesPanel.jsx` remain open.
+  ~~`AutoResponsesPanel.jsx`~~ - **done, see X39.** ~~`ResponseTimePanel.jsx`~~ - **done, see
+  X40.** `SystemMessageTemplatesPanel.jsx` remains open.
 - **Forms' shop-wide section** (`FormsPanel.jsx`'s "Your link"/URL list, absorbed from the old
   Booking category) - forms/index.tsx and form/[id].tsx (X28/X30) cover form management itself;
   this is the separate "here's your booking link to share" view.

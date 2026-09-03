@@ -8,6 +8,29 @@ Last updated: 2026-09-03.
 
 ---
 
+### 2026-09-03 (twenty-eighth entry): Messages batch 3 - Response Time
+
+Continuing down the Messages sub-slice list from the twenty-seventh entry. Full reasoning:
+DECISIONS.md X40.
+
+New `settings/response-time.tsx`, direct port of `ResponseTimePanel.jsx`: how long an unanswered
+client message waits before the artist is nudged, and how often the nudge repeats. New
+`packages/api/src/operations/responseTimeSettings.graphql` - server-side, everything already
+existed, so client-operations-only.
+
+The one real structural difference from Auto-Responses (X39): only the artist's OWN card is ever
+editable here. A shop-connected artist sees the shop's numbers only as a read-only ceiling on
+their own row, never as a second editable section - checked directly against web's own header
+comment rather than assumed. A shop-admin-and-artist gets both: their own card plus a genuinely
+separate, editable "Shop Response Time" card.
+
+Not built: `SystemMessageTemplatesPanel.jsx` - the last Messages sub-slice.
+
+Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+full `apps/mobile` Jest suite - still 229/229. No server-side changes.
+
+---
+
 ### 2026-09-03 (twenty-seventh entry): Messages batch 2 - Auto-Responses
 
 Continuing down the Messages sub-slice list from the twenty-sixth entry. Full reasoning:
