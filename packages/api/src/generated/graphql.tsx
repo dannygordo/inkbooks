@@ -3100,6 +3100,20 @@ export type GetSharedImagesForClientQueryVariables = Exact<{
 
 export type GetSharedImagesForClientQuery = { __typename?: 'Query', getSharedImagesForClient: Array<{ __typename?: 'SharedImage', id: string, url: string, tags: Array<string>, assignedProjectId?: string | null, assignedImageType?: string | null, createdAt: string, userInfo?: { __typename?: 'User', id: string, firstName?: string | null, lastName?: string | null, avatar?: string | null } | null, assignedProject?: { __typename?: 'Project', id: string, title: string } | null }> };
 
+export type GetPendingShopCutConfirmationsQueryVariables = Exact<{
+  shopId: Scalars['ID']['input'];
+}>;
+
+
+export type GetPendingShopCutConfirmationsQuery = { __typename?: 'Query', getPendingShopCutConfirmations?: Array<{ __typename?: 'Appointment', id: string, appointmentDate: string, title?: string | null, shopCutCents?: number | null, shopCutMarkedPaidAt?: string | null, user?: { __typename?: 'User', id: string, firstName?: string | null, lastName?: string | null, avatar?: string | null, tagColor?: string | null } | null } | null> | null };
+
+export type ConfirmShopCutPaidMutationVariables = Exact<{
+  appointmentId: Scalars['ID']['input'];
+}>;
+
+
+export type ConfirmShopCutPaidMutation = { __typename?: 'Mutation', confirmShopCutPaid: { __typename?: 'Appointment', id: string, shopCutStatus: string, shopCutConfirmedAt?: string | null } };
+
 export type UpdateProjectMutationVariables = Exact<{
   project?: InputMaybe<ProjectInput>;
 }>;
@@ -5604,6 +5618,95 @@ export type GetSharedImagesForClientQueryHookResult = ReturnType<typeof useGetSh
 export type GetSharedImagesForClientLazyQueryHookResult = ReturnType<typeof useGetSharedImagesForClientLazyQuery>;
 export type GetSharedImagesForClientSuspenseQueryHookResult = ReturnType<typeof useGetSharedImagesForClientSuspenseQuery>;
 export type GetSharedImagesForClientQueryResult = Apollo.QueryResult<GetSharedImagesForClientQuery, GetSharedImagesForClientQueryVariables>;
+export const GetPendingShopCutConfirmationsDocument = gql`
+    query GetPendingShopCutConfirmations($shopId: ID!) {
+  getPendingShopCutConfirmations(shopId: $shopId) {
+    id
+    appointmentDate
+    title
+    shopCutCents
+    shopCutMarkedPaidAt
+    user {
+      id
+      firstName
+      lastName
+      avatar
+      tagColor
+    }
+  }
+}
+    `;
+
+/**
+ * __useGetPendingShopCutConfirmationsQuery__
+ *
+ * To run a query within a React component, call `useGetPendingShopCutConfirmationsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetPendingShopCutConfirmationsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetPendingShopCutConfirmationsQuery({
+ *   variables: {
+ *      shopId: // value for 'shopId'
+ *   },
+ * });
+ */
+export function useGetPendingShopCutConfirmationsQuery(baseOptions: Apollo.QueryHookOptions<GetPendingShopCutConfirmationsQuery, GetPendingShopCutConfirmationsQueryVariables> & ({ variables: GetPendingShopCutConfirmationsQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetPendingShopCutConfirmationsQuery, GetPendingShopCutConfirmationsQueryVariables>(GetPendingShopCutConfirmationsDocument, options);
+      }
+export function useGetPendingShopCutConfirmationsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetPendingShopCutConfirmationsQuery, GetPendingShopCutConfirmationsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetPendingShopCutConfirmationsQuery, GetPendingShopCutConfirmationsQueryVariables>(GetPendingShopCutConfirmationsDocument, options);
+        }
+// @ts-ignore
+export function useGetPendingShopCutConfirmationsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetPendingShopCutConfirmationsQuery, GetPendingShopCutConfirmationsQueryVariables>): Apollo.UseSuspenseQueryResult<GetPendingShopCutConfirmationsQuery, GetPendingShopCutConfirmationsQueryVariables>;
+export function useGetPendingShopCutConfirmationsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetPendingShopCutConfirmationsQuery, GetPendingShopCutConfirmationsQueryVariables>): Apollo.UseSuspenseQueryResult<GetPendingShopCutConfirmationsQuery | undefined, GetPendingShopCutConfirmationsQueryVariables>;
+export function useGetPendingShopCutConfirmationsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetPendingShopCutConfirmationsQuery, GetPendingShopCutConfirmationsQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetPendingShopCutConfirmationsQuery, GetPendingShopCutConfirmationsQueryVariables>(GetPendingShopCutConfirmationsDocument, options);
+        }
+export type GetPendingShopCutConfirmationsQueryHookResult = ReturnType<typeof useGetPendingShopCutConfirmationsQuery>;
+export type GetPendingShopCutConfirmationsLazyQueryHookResult = ReturnType<typeof useGetPendingShopCutConfirmationsLazyQuery>;
+export type GetPendingShopCutConfirmationsSuspenseQueryHookResult = ReturnType<typeof useGetPendingShopCutConfirmationsSuspenseQuery>;
+export type GetPendingShopCutConfirmationsQueryResult = Apollo.QueryResult<GetPendingShopCutConfirmationsQuery, GetPendingShopCutConfirmationsQueryVariables>;
+export const ConfirmShopCutPaidDocument = gql`
+    mutation ConfirmShopCutPaid($appointmentId: ID!) {
+  confirmShopCutPaid(appointmentId: $appointmentId) {
+    id
+    shopCutStatus
+    shopCutConfirmedAt
+  }
+}
+    `;
+export type ConfirmShopCutPaidMutationFn = Apollo.MutationFunction<ConfirmShopCutPaidMutation, ConfirmShopCutPaidMutationVariables>;
+
+/**
+ * __useConfirmShopCutPaidMutation__
+ *
+ * To run a mutation, you first call `useConfirmShopCutPaidMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useConfirmShopCutPaidMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [confirmShopCutPaidMutation, { data, loading, error }] = useConfirmShopCutPaidMutation({
+ *   variables: {
+ *      appointmentId: // value for 'appointmentId'
+ *   },
+ * });
+ */
+export function useConfirmShopCutPaidMutation(baseOptions?: Apollo.MutationHookOptions<ConfirmShopCutPaidMutation, ConfirmShopCutPaidMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<ConfirmShopCutPaidMutation, ConfirmShopCutPaidMutationVariables>(ConfirmShopCutPaidDocument, options);
+      }
+export type ConfirmShopCutPaidMutationHookResult = ReturnType<typeof useConfirmShopCutPaidMutation>;
+export type ConfirmShopCutPaidMutationResult = Apollo.MutationResult<ConfirmShopCutPaidMutation>;
+export type ConfirmShopCutPaidMutationOptions = Apollo.BaseMutationOptions<ConfirmShopCutPaidMutation, ConfirmShopCutPaidMutationVariables>;
 export const UpdateProjectDocument = gql`
     mutation UpdateProject($project: ProjectInput) {
   updateProject(project: $project) {

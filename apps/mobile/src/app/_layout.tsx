@@ -96,6 +96,13 @@ function RootNavigator() {
             header, and now the browsable entry point project/[id].tsx (built in this step's
             original PR) had been missing ever since. */}
         <Stack.Screen name="projects/index" options={{ headerShown: true, title: 'Projects' }} />
+        {/* Shop Cut Confirmations - see shop-cut-confirmations/index.tsx's own header comment.
+            The first screen reached only from a role-gated header link (isShopAdminOrBetter),
+            matching web's own Sidebar.jsx gate on this exact item. */}
+        <Stack.Screen
+          name="shop-cut-confirmations/index"
+          options={{ headerShown: true, title: 'Shop Cut Confirmations' }}
+        />
       </Stack.Protected>
     </Stack>
   );

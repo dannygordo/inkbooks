@@ -31,3 +31,14 @@ export function canManageAppointment(user: UserLike, appointment: AppointmentOwn
 	}
 	return Boolean(user.role) && (user.role as number) <= ROLES.SHOP_ADMIN;
 }
+
+/**
+ * Direct port of apps/web's Sidebar.jsx `isShopAdminOrBetter` inline check - gates which nav
+ * entry points a shop-admin-only screen even shows up as. Shop Cut Confirmations is the first
+ * mobile screen that needs this (see DECISIONS.md X21) - every prior header link (Clients,
+ * Projects, Requests, Messages) is shown to any logged-in artist, matching web's own `!isClient`
+ * gate rather than a role floor, since mobile has no client login at all yet (X15's own note).
+ */
+export function isShopAdminOrBetter(user: UserLike): boolean {
+	return Boolean(user?.role) && (user!.role as number) <= ROLES.SHOP_ADMIN;
+}

@@ -1,0 +1,32 @@
+# Shop-side inbox for the manual mark-paid/confirm dual-control flow (see PRODUCTION_ROADMAP.md's
+# "Shop-cut ledger" section and DECISIONS.md X21). An artist marking a shop cut as paid (cash,
+# say - markShopCutPaidManually, not yet built on mobile - see X21's own scope note) doesn't close
+# the ledger item on its own; a shop admin has to independently confirm it here before it counts
+# as paid. Gated server-side to SHOP_ADMIN-or-better (server/graphql/resolvers/appointments.js).
+#
+# Leaner than web's own AppointmentService.js selection - durationMinutes/appointmentEnd are
+# fetched there but never rendered on ShopCutConfirmations.jsx itself, so this drops both.
+query GetPendingShopCutConfirmations($shopId: ID!) {
+	getPendingShopCutConfirmations(shopId: $shopId) {
+		id
+		appointmentDate
+		title
+		shopCutCents
+		shopCutMarkedPaidAt
+		user {
+			id
+			firstName
+			lastName
+			avatar
+			tagColor
+		}
+	}
+}
+
+mutation ConfirmShopCutPaid($appointmentId: ID!) {
+	confirmShopCutPaid(appointmentId: $appointmentId) {
+		id
+		shopCutStatus
+		shopCutConfirmedAt
+	}
+}

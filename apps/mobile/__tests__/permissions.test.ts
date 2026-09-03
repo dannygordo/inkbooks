@@ -1,5 +1,5 @@
 import { ROLES } from '@/constants/auth';
-import { canManageAppointment } from '@/utils/permissions';
+import { canManageAppointment, isShopAdminOrBetter } from '@/utils/permissions';
 
 describe('canManageAppointment', () => {
 	it('allows the appointment owner regardless of role', () => {
@@ -30,5 +30,26 @@ describe('canManageAppointment', () => {
 	it('denies with no appointment or no user', () => {
 		expect(canManageAppointment({ id: 'user-1', role: ROLES.ADMIN }, null)).toBe(false);
 		expect(canManageAppointment(null, { userId: 'user-1' })).toBe(false);
+	});
+});
+
+describe('isShopAdminOrBetter', () => {
+	it('allows plain Admin and Shop Admin', () => {
+		expect(isShopAdminOrBetter({ id: 'admin-1', role: ROLES.ADMIN })).toBe(true);
+		expect(isShopAdminOrBetter({ id: 'admin-2', role: ROLES.SHOP_ADMIN })).toBe(true);
+	});
+
+	it('denies Shop Staff - the floor is SHOP_ADMIN, matching canManageAppointment above', () => {
+		expect(isShopAdminOrBetter({ id: 'staff-1', role: ROLES.SHOP_STAFF })).toBe(false);
+	});
+
+	it('denies a plain Artist and a Client', () => {
+		expect(isShopAdminOrBetter({ id: 'artist-1', role: ROLES.ARTIST })).toBe(false);
+		expect(isShopAdminOrBetter({ id: 'client-1', role: ROLES.CLIENT })).toBe(false);
+	});
+
+	it('denies a missing user or a user with no role', () => {
+		expect(isShopAdminOrBetter(null)).toBe(false);
+		expect(isShopAdminOrBetter({ id: 'user-1' })).toBe(false);
 	});
 });

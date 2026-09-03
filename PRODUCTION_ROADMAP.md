@@ -1000,6 +1000,19 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    `apps/mobile` `tsc --noEmit` clean, and the full `apps/mobile` Jest suite (154/154, up from
    151 - `projectStatus.test.ts`).
 
+   **Shop Cut Confirmations (2026-09-03, see DECISIONS.md X21) is the next slice after that -
+   the first mobile screen with a role-gated entry point.** `app/shop-cut-confirmations/index.tsx`
+   (the shop-side confirm half of the manual mark-paid dual-control flow), a new
+   `shopCutConfirmations.graphql` operation set, `utils/tagColor.ts` (singular - distinct from the
+   existing swatch-picker `utils/tagColors.ts`), and a new `isShopAdminOrBetter` helper in
+   `utils/permissions.ts` gating the header link itself - every prior link (Clients, Projects,
+   Requests, Messages) shows to any logged-in artist, this one only to a shop admin, matching
+   web's own `Sidebar.jsx` gate. The artist-side `markShopCutPaidManually`/Square-invoice actions
+   are deliberately not built - this screen only confirms a cut some other flow (today, always
+   web) already marked paid. Confirmed in this sandbox: `packages/api` codegen + build,
+   `apps/mobile` `tsc --noEmit` clean, and the full `apps/mobile` Jest suite (164/164, up from
+   154 - `tagColor.test.ts` plus new `isShopAdminOrBetter` cases).
+
    Everything else on the ~40-screen list not yet named remains open.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).

@@ -1720,6 +1720,57 @@ Nothing here removes a real web capability.
 precedent - `utils/projectStatus.ts`'s `projectStatusLabel` gets `__tests__/projectStatus.test.ts`;
 the Apollo-wired screen doesn't.
 
+### X21. Shop Cut Confirmations built - the first mobile screen with a role-gated entry point
+
+The shop-side half of the manual mark-paid/confirm dual-control flow (see
+PRODUCTION_ROADMAP.md's "Shop-cut ledger" section) - an artist marking their shop cut paid doesn't
+close the ledger item on its own, a shop admin has to independently confirm it. Picked next
+because it's small, self-contained, and - unlike the artist-side `markShopCutPaidManually` action
+it depends on - genuinely useful on mobile even before that other half is ported: an artist can
+mark a cut paid from web today, and a shop admin can now confirm it from mobile without opening a
+laptop.
+
+**`isShopAdminOrBetter` added to `utils/permissions.ts` - the first role floor mobile has put on a
+header link, not just on what a screen lets you do once you're there.** Every prior entry point
+(Clients, Projects, Requests, Messages) is shown to any logged-in artist, because mobile has no
+client login yet (X15's own note) and none of those screens needed a floor above "logged in."
+`ShopCutConfirmations` is different: `getPendingShopCutConfirmations` itself is gated
+`SHOP_ADMIN`-or-better server-side (`server/graphql/resolvers/appointments.js`), and web's own
+`Sidebar.jsx` hides the nav item entirely behind the identical `user.role <= ROLES.SHOP_ADMIN`
+check rather than showing it and letting the page's own "not available" message do the work. Mobile
+ports the same call: the header link only renders for a shop admin (or plain platform Admin), and
+the screen itself still carries web's own "This screen is only available to shop accounts"
+fallback underneath, for a shop-admin-role user who somehow has no shop (`getUserShopId` returns
+`undefined`, e.g. a platform Admin with no Artist/Staff `userInfo` at all).
+
+**`utils/tagColor.ts` (singular) added, ported from web's own `utils/tagColor.js` - distinct from
+the existing `utils/tagColors.ts` (plural).** The plural file is the Settings swatch picker
+(`TAG_COLORS` + `showAvailableColorTags`); this one is about correctly *displaying* an
+already-assigned color on a row - `resolveTagColor`'s guard against a literal white value carries
+forward web's own reasoning verbatim (white text on a white tag color doesn't look broken, it
+looks *absent* - an artist once reported a resulting invisible calendar label as "appointments
+missing," not a color bug). `tagColorRowStyle` drops web's `hovered` parameter/second alpha tier
+entirely - mobile has no mouse hover to tint for.
+
+**Leaner query than web's own `AppointmentService.js` selection.** Drops `durationMinutes`/
+`appointmentEnd`, which web fetches but `ShopCutConfirmations.jsx` never actually renders.
+
+**`markShopCutPaidManually`, `createShopCutInvoice`, and `createBatchShopCutInvoice` are
+deliberately not built here.** All three are the artist-side half of this same ledger (marking a
+cut paid, or invoicing it via Square) - real, separate follow-up work, not a natural extension of
+a shop admin's confirmation inbox. Nothing on mobile writes `shopCutStatus` to anything but
+`'unpaid'` at appointment-creation time yet (`appointment/[id].tsx`, `booking-requests/[id].tsx`,
+`BookSessionDatesForm.tsx`, `ProjectSessionsList.tsx`) - this slice only adds the ability to
+*confirm* a cut some other flow (today, always web) already marked paid.
+
+**No pagination, matching web's own `ShopCutConfirmations.jsx` exactly, not a scope cut.** This
+list is inherently small - a shop's currently-pending confirmations, not a growing history - so
+there is no "Load more" to build on either platform.
+
+**No dedicated screen-level test for the screen itself**, matching every prior slice's precedent -
+`utils/tagColor.ts`'s `resolveTagColor`/`tagColorRowStyle` and `utils/permissions.ts`'s new
+`isShopAdminOrBetter` each get test coverage; the Apollo-wired screen doesn't.
+
 ---
 
 ## Process

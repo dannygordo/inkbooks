@@ -4,7 +4,37 @@
 has not been verified. `DECISIONS.md` is *rules* — the settled calls and why. They change at
 different rates, which is why they are separate files.
 
-Last updated: 2026-09-02.
+Last updated: 2026-09-03.
+
+---
+
+### 2026-09-03 (ninth entry): Shop Cut Confirmations built - the first role-gated header link
+
+The shop-side inbox for the manual mark-paid/confirm dual-control flow (an artist marks their
+shop cut paid, a shop admin independently confirms it). Full reasoning: DECISIONS.md X21.
+
+**Built:** `app/shop-cut-confirmations/index.tsx` (no pagination, matching web exactly - this
+list is inherently small), a new `shopCutConfirmations.graphql` operation set
+(`GetPendingShopCutConfirmations`, `ConfirmShopCutPaid`), `utils/tagColor.ts` (singular - distinct
+from the existing swatch-picker `utils/tagColors.ts` - `resolveTagColor`/`tagColorRowStyle`, with
+`__tests__/tagColor.test.ts`), and `isShopAdminOrBetter` added to `utils/permissions.ts` (with new
+test cases in `__tests__/permissions.test.ts`).
+
+**The real new thing, not just another screen: the header link is role-gated.** Every prior entry
+point (Clients, Projects, Requests, Messages) shows to any logged-in artist. This one only shows
+for a shop admin (or platform Admin) - `isShopAdminOrBetter(user)` - matching web's `Sidebar.jsx`
+exactly, since `getPendingShopCutConfirmations` itself is server-gated `SHOP_ADMIN`-or-better.
+
+**Deliberately not built: the artist-side `markShopCutPaidManually`/Square-invoice actions.** This
+screen only *confirms* a cut some other flow (today, always web) already marked paid - still real
+value on its own for a shop admin who wants to confirm from their phone rather than a laptop.
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+and the full `apps/mobile` Jest suite - 164/164 (154 before this slice, +10:
+`tagColor.test.ts` and four new `isShopAdminOrBetter` cases in `permissions.test.ts`).
+**Not yet confirmed:** a real device/simulator run - and this slice in particular has never been
+exercised against a shop account with an actual pending confirmation, since no such fixture exists
+in this sandbox. Same standing caveat as every mobile slice this session, worth naming twice here.
 
 ---
 
