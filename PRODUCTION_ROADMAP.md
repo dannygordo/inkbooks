@@ -1046,6 +1046,14 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean, and the full `apps/mobile`
    Jest suite (167/167, unchanged).
 
+   **Global Search (2026-09-03, see DECISIONS.md X25) is the next slice after that - fourth of
+   the batch, and the first with zero new authorization to reason about.** `app/search/index.tsx`
+   (a debounced text box, four grouped result sections - Clients/Projects/Messages/Shared Images),
+   a new `globalSearch.graphql` operation. Ports web's dedicated `/search` results page rather
+   than the app bar's live dropdown. Every result type reuses an existing screen - no new detail
+   screens needed. Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile`
+   `tsc --noEmit` clean, and the full `apps/mobile` Jest suite (167/167, unchanged).
+
    Everything else on the ~40-screen list not yet named remains open.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).

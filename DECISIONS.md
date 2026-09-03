@@ -1913,6 +1913,47 @@ action for this page; shop creation was dead code there already.
 **No dedicated screen-level test for either new screen**, matching every prior slice's precedent -
 no new pure-logic module was needed this slice (no new permission helper, no new formatting util).
 
+### X25. Global Search built - one screen, grouped by type, no new authorization at all
+
+Fourth of the requested batch. Ports web's dedicated `/search` results page
+(`apps/web/src/pages/search/Search.jsx`), not the app bar's live dropdown
+(`components/search/GlobalSearch.jsx`) - a full-screen results list is the better fit for mobile,
+and the dropdown's "quick jump while typing elsewhere" use case doesn't map onto a phone where
+search is already its own destination, not an overlay on top of another screen.
+
+**No new authorization anywhere.** `search` (`server/utils/search.js`) applies zero role floor and
+scopes Clients/Projects with the exact same filters `getClients`/`getProjects` already use -
+there's nothing to gate here that isn't already gated at the record level, so the header link
+shows unconditionally, same as Clients/Projects.
+
+**Named `GlobalSearch`, not `Search`, in `globalSearch.graphql`** - web's `SearchService.js`
+defines its own hand-written `Search` gql document locally rather than importing a generated one
+from `@inkbooks/api` (unlike `ProjectService.js`, which does), so there's no live collision today,
+but this avoids creating one if that page is ever migrated onto the shared package later.
+
+**No `?q=` URL param.** Web's own comment explains that param exists so a link to search results
+is shareable/bookmarkable/back-button-able from a browser address bar. Expo-router has no address
+bar for that to matter to, so the debounced `TextInput` is simply the only input of record here -
+porting a URL-sync mechanism with nothing to sync it FROM would be complexity with no payoff.
+
+**Messages results link straight into the existing conversation screen** (`messages/[id].tsx`,
+keyed on `conversationId`) rather than a separate messenger deep-link scheme web needs
+(`/messenger?conversation=...`) - mobile's Messages feature already has exactly the screen this
+result should open.
+
+**Image results link to the client's own detail screen**, same as web (a SharedImage match isn't
+its own destination - it surfaces the client it's filed under, same as the dropdown's own
+click-through). `client/[id].tsx`'s current scope (shared-images panel only, per its own header
+comment) means this lands somewhere that can actually show the match, not a dead end.
+
+**Constants match web exactly**: `RESULTS_LIMIT = 25`, `DEBOUNCE_MS = 300`,
+`MIN_QUERY_LENGTH = 2`, and the same "showing the top N matches" hint when a group comes back
+exactly at the cap.
+
+**No dedicated screen-level test**, matching every prior slice's precedent - no new pure-logic
+module was needed (row-building is inline JSX, not an extractable pure function the way
+`projectStatus.ts` was for the Projects slice, and it already has direct coverage there).
+
 ---
 
 ## Process

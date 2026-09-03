@@ -3019,6 +3019,14 @@ export type GetProjectsByArtistQueryVariables = Exact<{
 
 export type GetProjectsByArtistQuery = { __typename?: 'Query', getProjectsByArtist?: Array<{ __typename?: 'Project', id: string, title: string, description: string, client?: { __typename?: 'Client', user?: { __typename?: 'User', id: string, firstName?: string | null, lastName?: string | null, avatar?: string | null } | null } | null, artist?: { __typename?: 'Artist', user?: { __typename?: 'User', id: string, firstName?: string | null, lastName?: string | null, avatar?: string | null } | null } | null } | null> | null };
 
+export type GlobalSearchQueryVariables = Exact<{
+  query: Scalars['String']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+
+export type GlobalSearchQuery = { __typename?: 'Query', search: { __typename?: 'SearchResults', clients: Array<{ __typename?: 'Client', id: string, avatar?: string | null, firstName: string, lastName: string, email: string, phone: string, city?: string | null, state?: string | null }>, projects: Array<{ __typename?: 'Project', id: string, title: string, description: string, status: string, artist?: { __typename?: 'Artist', id: string, firstName: string, lastName: string, avatar?: string | null } | null, client?: { __typename?: 'Client', id: string, firstName: string, lastName: string } | null }>, messages: Array<{ __typename?: 'Message', id: string, conversationId: string, message?: string | null, senderId: string, createdAt?: string | null, user?: { __typename?: 'User', id: string, firstName?: string | null, lastName?: string | null, avatar?: string | null } | null }>, images: Array<{ __typename?: 'SharedImage', id: string, url: string, clientId: string, tags: Array<string>, assignedProjectId?: string | null, createdAt: string }> } };
+
 export type LoginMutationVariables = Exact<{
   email: Scalars['String']['input'];
   password: Scalars['String']['input'];
@@ -5148,6 +5156,97 @@ export type GetProjectsByArtistQueryHookResult = ReturnType<typeof useGetProject
 export type GetProjectsByArtistLazyQueryHookResult = ReturnType<typeof useGetProjectsByArtistLazyQuery>;
 export type GetProjectsByArtistSuspenseQueryHookResult = ReturnType<typeof useGetProjectsByArtistSuspenseQuery>;
 export type GetProjectsByArtistQueryResult = Apollo.QueryResult<GetProjectsByArtistQuery, GetProjectsByArtistQueryVariables>;
+export const GlobalSearchDocument = gql`
+    query GlobalSearch($query: String!, $limit: Int) {
+  search(query: $query, limit: $limit) {
+    clients {
+      id
+      avatar
+      firstName
+      lastName
+      email
+      phone
+      city
+      state
+    }
+    projects {
+      id
+      title
+      description
+      status
+      artist {
+        id
+        firstName
+        lastName
+        avatar
+      }
+      client {
+        id
+        firstName
+        lastName
+      }
+    }
+    messages {
+      id
+      conversationId
+      message
+      senderId
+      user {
+        id
+        firstName
+        lastName
+        avatar
+      }
+      createdAt
+    }
+    images {
+      id
+      url
+      clientId
+      tags
+      assignedProjectId
+      createdAt
+    }
+  }
+}
+    `;
+
+/**
+ * __useGlobalSearchQuery__
+ *
+ * To run a query within a React component, call `useGlobalSearchQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGlobalSearchQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGlobalSearchQuery({
+ *   variables: {
+ *      query: // value for 'query'
+ *      limit: // value for 'limit'
+ *   },
+ * });
+ */
+export function useGlobalSearchQuery(baseOptions: Apollo.QueryHookOptions<GlobalSearchQuery, GlobalSearchQueryVariables> & ({ variables: GlobalSearchQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GlobalSearchQuery, GlobalSearchQueryVariables>(GlobalSearchDocument, options);
+      }
+export function useGlobalSearchLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GlobalSearchQuery, GlobalSearchQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GlobalSearchQuery, GlobalSearchQueryVariables>(GlobalSearchDocument, options);
+        }
+// @ts-ignore
+export function useGlobalSearchSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GlobalSearchQuery, GlobalSearchQueryVariables>): Apollo.UseSuspenseQueryResult<GlobalSearchQuery, GlobalSearchQueryVariables>;
+export function useGlobalSearchSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GlobalSearchQuery, GlobalSearchQueryVariables>): Apollo.UseSuspenseQueryResult<GlobalSearchQuery | undefined, GlobalSearchQueryVariables>;
+export function useGlobalSearchSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GlobalSearchQuery, GlobalSearchQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GlobalSearchQuery, GlobalSearchQueryVariables>(GlobalSearchDocument, options);
+        }
+export type GlobalSearchQueryHookResult = ReturnType<typeof useGlobalSearchQuery>;
+export type GlobalSearchLazyQueryHookResult = ReturnType<typeof useGlobalSearchLazyQuery>;
+export type GlobalSearchSuspenseQueryHookResult = ReturnType<typeof useGlobalSearchSuspenseQuery>;
+export type GlobalSearchQueryResult = Apollo.QueryResult<GlobalSearchQuery, GlobalSearchQueryVariables>;
 export const LoginDocument = gql`
     mutation Login($email: String!, $password: String!) {
   login(email: $email, password: $password) {

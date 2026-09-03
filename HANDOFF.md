@@ -8,6 +8,28 @@ Last updated: 2026-09-03.
 
 ---
 
+### 2026-09-03 (thirteenth entry): Global Search built - one screen, grouped by type, no new authorization
+
+Fourth of the requested batch (Artists/Staff, Shops, Search, Income/Expenses, Forms). Full
+reasoning: DECISIONS.md X25.
+
+**Built:** `app/search/index.tsx` (debounced TextInput, four grouped result sections - Clients,
+Projects, Messages, Shared Images - matching web's own `/search` results page, not the app bar's
+live dropdown), a new `globalSearch.graphql` operation (`GlobalSearch`). Header link shows to any
+logged-in artist with no role gate - `search` applies no authorization beyond what
+`getClients`/`getProjects` already enforce.
+
+**Reuses existing screens for every result type**, no new detail screens needed: client results
+open `client/[id].tsx`, project results open `project/[id].tsx`, message results open
+`messages/[id].tsx` (keyed on `conversationId`), and shared-image results also open
+`client/[id].tsx` (same click-through as web's own dropdown).
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit`
+clean, and the full `apps/mobile` Jest suite - 167/167, unchanged (no new pure-logic module this
+slice). **Not yet confirmed:** a real device/simulator run.
+
+---
+
 ### 2026-09-03 (twelfth entry): Shops directory built - no archiving, hard-floor editing, honest Square gap
 
 Third of the requested batch (Artists/Staff, Shops, Search, Income/Expenses, Forms). Full

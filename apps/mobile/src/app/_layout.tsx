@@ -116,6 +116,10 @@ function RootNavigator() {
             Confirmations). */}
         <Stack.Screen name="shops/index" options={{ headerShown: true, title: 'Shops' }} />
         <Stack.Screen name="shop/[id]" options={{ headerShown: true, title: 'Shop' }} />
+        {/* Global search - see search/index.tsx's own header comment. No role gate on the header
+            link itself, matching Clients/Projects - `search` applies no authorization beyond the
+            same scope filters those list queries already use. */}
+        <Stack.Screen name="search/index" options={{ headerShown: true, title: 'Search' }} />
       </Stack.Protected>
     </Stack>
   );
