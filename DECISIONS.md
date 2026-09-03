@@ -1863,6 +1863,56 @@ creates a real account, separate scope from a directory port.
 no new pure-logic module was added this slice (unlike X22's `isStaffOrBetter`, already built and
 reused here unchanged).
 
+### X24. Shops directory built - no archiving, no self-edit, and an honest gap on Square's OAuth return
+
+Third of the requested batch. `getShops` takes no arguments at all (no `page`/`includeArchived`) -
+there is no shop archiving anywhere in this app (no `archiveShop`/`unarchiveShop` mutations exist
+server-side), so unlike X22/X23 this slice has no `ArchiveControl`, no toggle, and the list screen
+is simpler than either directory that came before it.
+
+**`canEdit` is the same hard `SHOP_ADMIN` floor as Staff's, not Artists'.** `updateShop` is
+`withAuth(fn, SHOP_ADMIN)` server-side with no self-branch, matching web's own
+`Shop.jsx`: `canEdit = user.role <= ROLES.SHOP_ADMIN`. There is no "shop editing itself" case the
+way an artist can edit their own profile - a shop isn't a login.
+
+**`hourlyRate`/`shopMinimum` are rendered as plain dollar numbers, not run through
+`utils/money.ts`'s `formatCents`.** These two fields are a deliberate exception to this app's
+almost-universal integer-cents convention - `Shop.hourlyRate`/`Shop.shopMinimum` are stored and
+displayed as whole dollars everywhere on web (`Shops.jsx`'s own `SHOP_COLUMNS`), and this port
+follows that exactly rather than applying the cents convention uniformly and silently misrendering
+`$150/hr` as `$1.50`.
+
+**`ShopInput` requires six fields this page never edits** (`shopMinimum`, `hourlyRate`, `logo`,
+`billingType`, `status`, `shopCutPercent`) **- all six are echoed back from the fetched `Shop`
+unchanged on every save**, matching web's own `buildShopPayload` exactly.
+
+**`shopCutPercent` is a read-only readout with a note, not a working "Change in Settings" link.**
+Web's own `Shop.jsx` consolidates this into a read-only display plus a link to Settings (that
+page's own comment explains this fixed a real two-editors-one-field bug). Mobile's
+`settings/index.tsx` only ports `AccountPanel` (photo/password/calendar color) so far and has no
+shop-cut-percent editor to link to - named here as a genuine gap, not silently glossed over with a
+link that would 404.
+
+**Square "Connect" opens Square's hosted consent page externally via `Linking.openURL`, with no
+automatic return to the app.** `expo-web-browser` isn't an installed mobile dependency, and
+building a real deep-link-based return would require changing the OAuth callback's redirect target
+server-side (`routes/squareOAuth.js` currently redirects to a web route,
+`/shop/:shopId?square=...`) - out of scope for a mobile-only port. The screen says so plainly: the
+user finishes in their browser, then has to come back and reopen the screen themselves to see the
+updated connection status. `disconnectShopSquare` has none of this complexity - it's a plain
+mutation with no redirect involved, ported with no caveats.
+
+**No redirect-status banner.** Web reads a `?square=connected|denied|error` query param on return
+from the OAuth redirect and shows a dismissible banner. Mobile has no way to receive that param at
+all without the deep link named above, so there is nothing to build here yet - not a cut, just a
+consequence of the same gap.
+
+**No "Add Shop" button**, matching web exactly - `Shops.jsx`'s own `IBPageActionBar` has no create
+action for this page; shop creation was dead code there already.
+
+**No dedicated screen-level test for either new screen**, matching every prior slice's precedent -
+no new pure-logic module was needed this slice (no new permission helper, no new formatting util).
+
 ---
 
 ## Process

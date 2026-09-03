@@ -8,6 +8,39 @@ Last updated: 2026-09-03.
 
 ---
 
+### 2026-09-03 (twelfth entry): Shops directory built - no archiving, hard-floor editing, honest Square gap
+
+Third of the requested batch (Artists/Staff, Shops, Search, Income/Expenses, Forms). Full
+reasoning: DECISIONS.md X24.
+
+**Built:** `app/shops/index.tsx` (list - no toggle, no pagination, no create button; `getShops`
+takes no arguments) and `app/shop/[id].tsx` (identity autosave form, a read-only shop-cut-percent
+readout, and a Square Connected/Not-connected section), a new `shops.graphql` operation set
+(`GetShopsList`, `GetShopDetail`, `UpdateShopIdentity`, `GetSquareAuthorizationUrl`,
+`DisconnectShopSquare`). Same `isShopAdminOrBetter`-gated header link as Shop Cut Confirmations.
+
+**No archiving at all** - there is no `archiveShop`/`unarchiveShop` mutation server-side, so this
+is the first directory slice with no `ArchiveControl`. `canEdit` is a hard `SHOP_ADMIN` floor with
+no self-branch (same shape as Staff's `updateStaff`, not Artists' self-or-shop-admin rule).
+`hourlyRate`/`shopMinimum` are rendered as plain whole-dollar numbers, never through
+`utils/money.ts`'s `formatCents` (that pair is a deliberate exception to this app's usual
+integer-cents convention).
+
+**Two named, honest gaps, not silent cuts:** the shop-cut-percent readout's "Change in Settings"
+link has nowhere to point yet (mobile's Settings screen only ports `AccountPanel` so far), so it's
+a plain note instead of a dead link; and Square's "Connect" flow opens the OAuth consent page via
+`Linking.openURL` with no automatic return to the app (no deep link is registered for the
+callback, and building one would mean changing the web-facing OAuth redirect target - out of scope
+here), so the screen says plainly that the user has to come back and reopen it themselves.
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean
+(one round-trip needed - `GetShopsListQuery['getShops']` is nullable, so indexing it into a list-
+item type needed `NonNullable<...>` first), and the full `apps/mobile` Jest suite - 167/167,
+unchanged (no new pure-logic module this slice). **Not yet confirmed:** a real device/simulator
+run, and neither is Square's actual OAuth round-trip against a real Square sandbox account.
+
+---
+
 ### 2026-09-03 (eleventh entry): Staff directory built - same shape as Artists, simpler throughout
 
 Second of the requested batch (Artists/Staff, Shops, Search, Income/Expenses, Forms). Full

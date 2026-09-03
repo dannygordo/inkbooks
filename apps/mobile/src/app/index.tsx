@@ -174,6 +174,11 @@ export default function AppointmentsScreen() {
                 <ThemedText type="link">Shop Cuts</ThemedText>
               </Pressable>
             ) : null}
+            {isShopAdminOrBetter(user) ? (
+              <Pressable onPress={() => router.push('/shops')} testID="shops-button">
+                <ThemedText type="link">Shops</ThemedText>
+              </Pressable>
+            ) : null}
             <Pressable
               onPress={() => router.push('/booking-requests')}
               testID="booking-requests-button"

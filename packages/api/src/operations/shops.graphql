@@ -1,0 +1,93 @@
+# The Shops directory - shop-admin-or-better's view of the shop(s) they're connected to. No
+# archiving exists for shops at all (no archiveShop/unarchiveShop mutations server-side), so unlike
+# Artists/Staff this slice has no ArchiveControl and no includeArchived toggle. Gated on mobile's
+# own header link with utils/permissions.ts's isShopAdminOrBetter, matching web's Sidebar.jsx.
+# See DECISIONS.md X24.
+#
+# getShops takes no arguments at all (no page/includeArchived) - it's an inherently small list
+# (the shops a caller is affiliated with), same reasoning as Shop Cut Confirmations' unpaginated
+# screen.
+query GetShopsList {
+	getShops {
+		id
+		name
+		email
+		phone
+		website
+		logo
+		address
+		city
+		state
+		hourlyRate
+		shopMinimum
+	}
+}
+
+# Full detail selection, matching web's ShopService.js getShop exactly. hourlyRate/shopMinimum are
+# whole-dollar fields (NOT cents like nearly everything else in this app - see utils/money.ts's
+# formatCents, which must NOT be used here), rendered as plain numbers on both web and this port.
+query GetShopDetail($shopId: ID!) {
+	getShop(shopId: $shopId) {
+		id
+		name
+		email
+		phone
+		address
+		city
+		state
+		zip
+		instagram
+		facebook
+		website
+		shopMinimum
+		hourlyRate
+		shopCutPercent
+		logo
+		billingType
+		status
+		formSlug
+		squareConnected
+		squareLocationId
+		squareConnectedAt
+	}
+}
+
+# updateShop has a hard SHOP_ADMIN floor server-side (withAuth(fn, SHOP_ADMIN)) with no self-branch
+# at all, same shape as updateStaff - see apps/web's Shop.jsx canEdit comment. ShopInput requires
+# every field non-null or it's nulled out, so shopMinimum/hourlyRate/logo/billingType/status/
+# shopCutPercent are echoed back unchanged from the fetched Shop exactly as web's own
+# buildShopPayload does - none of the six are edited on this page (shopCutPercent has its own
+# read-only readout below; the other five aren't edited anywhere in this port's scope).
+mutation UpdateShopIdentity($shop: ShopInput!) {
+	updateShop(shop: $shop) {
+		id
+		name
+		email
+		phone
+		address
+		city
+		state
+		zip
+		instagram
+		facebook
+		website
+	}
+}
+
+# Square OAuth "Connect": lazy-fetched, then opened externally via Linking.openURL - mobile has no
+# deep link registered for Square's OAuth callback (that redirects to a web route,
+# /shop/:shopId?square=...), so there's no automatic return to the app. Named as an explicit,
+# honest limitation in shop/[id].tsx rather than silently glossed over. See DECISIONS.md X24.
+query GetSquareAuthorizationUrl($shopId: ID!) {
+	getSquareAuthorizationUrl(shopId: $shopId)
+}
+
+# Plain mutation, no redirect involved - fully portable with none of the Connect flow's caveats.
+mutation DisconnectShopSquare($shopId: ID!) {
+	disconnectShopSquare(shopId: $shopId) {
+		id
+		squareConnected
+		squareLocationId
+		squareConnectedAt
+	}
+}

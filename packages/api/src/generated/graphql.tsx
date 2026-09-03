@@ -3150,6 +3150,39 @@ export type ConfirmShopCutPaidMutationVariables = Exact<{
 
 export type ConfirmShopCutPaidMutation = { __typename?: 'Mutation', confirmShopCutPaid: { __typename?: 'Appointment', id: string, shopCutStatus: string, shopCutConfirmedAt?: string | null } };
 
+export type GetShopsListQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetShopsListQuery = { __typename?: 'Query', getShops?: Array<{ __typename?: 'Shop', id: string, name: string, email: string, phone?: string | null, website?: string | null, logo?: string | null, address?: string | null, city?: string | null, state?: string | null, hourlyRate?: number | null, shopMinimum?: number | null } | null> | null };
+
+export type GetShopDetailQueryVariables = Exact<{
+  shopId: Scalars['ID']['input'];
+}>;
+
+
+export type GetShopDetailQuery = { __typename?: 'Query', getShop?: { __typename?: 'Shop', id: string, name: string, email: string, phone?: string | null, address?: string | null, city?: string | null, state?: string | null, zip?: string | null, instagram?: string | null, facebook?: string | null, website?: string | null, shopMinimum?: number | null, hourlyRate?: number | null, shopCutPercent?: number | null, logo?: string | null, billingType?: string | null, status?: number | null, formSlug?: string | null, squareConnected?: boolean | null, squareLocationId?: string | null, squareConnectedAt?: string | null } | null };
+
+export type UpdateShopIdentityMutationVariables = Exact<{
+  shop: ShopInput;
+}>;
+
+
+export type UpdateShopIdentityMutation = { __typename?: 'Mutation', updateShop?: { __typename?: 'Shop', id: string, name: string, email: string, phone?: string | null, address?: string | null, city?: string | null, state?: string | null, zip?: string | null, instagram?: string | null, facebook?: string | null, website?: string | null } | null };
+
+export type GetSquareAuthorizationUrlQueryVariables = Exact<{
+  shopId: Scalars['ID']['input'];
+}>;
+
+
+export type GetSquareAuthorizationUrlQuery = { __typename?: 'Query', getSquareAuthorizationUrl: string };
+
+export type DisconnectShopSquareMutationVariables = Exact<{
+  shopId: Scalars['ID']['input'];
+}>;
+
+
+export type DisconnectShopSquareMutation = { __typename?: 'Mutation', disconnectShopSquare: { __typename?: 'Shop', id: string, squareConnected?: boolean | null, squareLocationId?: string | null, squareConnectedAt?: string | null } };
+
 export type GetStaffListQueryVariables = Exact<{
   includeArchived?: InputMaybe<Scalars['Boolean']['input']>;
   page?: InputMaybe<PageInput>;
@@ -6019,6 +6052,241 @@ export function useConfirmShopCutPaidMutation(baseOptions?: Apollo.MutationHookO
 export type ConfirmShopCutPaidMutationHookResult = ReturnType<typeof useConfirmShopCutPaidMutation>;
 export type ConfirmShopCutPaidMutationResult = Apollo.MutationResult<ConfirmShopCutPaidMutation>;
 export type ConfirmShopCutPaidMutationOptions = Apollo.BaseMutationOptions<ConfirmShopCutPaidMutation, ConfirmShopCutPaidMutationVariables>;
+export const GetShopsListDocument = gql`
+    query GetShopsList {
+  getShops {
+    id
+    name
+    email
+    phone
+    website
+    logo
+    address
+    city
+    state
+    hourlyRate
+    shopMinimum
+  }
+}
+    `;
+
+/**
+ * __useGetShopsListQuery__
+ *
+ * To run a query within a React component, call `useGetShopsListQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetShopsListQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetShopsListQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetShopsListQuery(baseOptions?: Apollo.QueryHookOptions<GetShopsListQuery, GetShopsListQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetShopsListQuery, GetShopsListQueryVariables>(GetShopsListDocument, options);
+      }
+export function useGetShopsListLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetShopsListQuery, GetShopsListQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetShopsListQuery, GetShopsListQueryVariables>(GetShopsListDocument, options);
+        }
+// @ts-ignore
+export function useGetShopsListSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetShopsListQuery, GetShopsListQueryVariables>): Apollo.UseSuspenseQueryResult<GetShopsListQuery, GetShopsListQueryVariables>;
+export function useGetShopsListSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetShopsListQuery, GetShopsListQueryVariables>): Apollo.UseSuspenseQueryResult<GetShopsListQuery | undefined, GetShopsListQueryVariables>;
+export function useGetShopsListSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetShopsListQuery, GetShopsListQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetShopsListQuery, GetShopsListQueryVariables>(GetShopsListDocument, options);
+        }
+export type GetShopsListQueryHookResult = ReturnType<typeof useGetShopsListQuery>;
+export type GetShopsListLazyQueryHookResult = ReturnType<typeof useGetShopsListLazyQuery>;
+export type GetShopsListSuspenseQueryHookResult = ReturnType<typeof useGetShopsListSuspenseQuery>;
+export type GetShopsListQueryResult = Apollo.QueryResult<GetShopsListQuery, GetShopsListQueryVariables>;
+export const GetShopDetailDocument = gql`
+    query GetShopDetail($shopId: ID!) {
+  getShop(shopId: $shopId) {
+    id
+    name
+    email
+    phone
+    address
+    city
+    state
+    zip
+    instagram
+    facebook
+    website
+    shopMinimum
+    hourlyRate
+    shopCutPercent
+    logo
+    billingType
+    status
+    formSlug
+    squareConnected
+    squareLocationId
+    squareConnectedAt
+  }
+}
+    `;
+
+/**
+ * __useGetShopDetailQuery__
+ *
+ * To run a query within a React component, call `useGetShopDetailQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetShopDetailQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetShopDetailQuery({
+ *   variables: {
+ *      shopId: // value for 'shopId'
+ *   },
+ * });
+ */
+export function useGetShopDetailQuery(baseOptions: Apollo.QueryHookOptions<GetShopDetailQuery, GetShopDetailQueryVariables> & ({ variables: GetShopDetailQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetShopDetailQuery, GetShopDetailQueryVariables>(GetShopDetailDocument, options);
+      }
+export function useGetShopDetailLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetShopDetailQuery, GetShopDetailQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetShopDetailQuery, GetShopDetailQueryVariables>(GetShopDetailDocument, options);
+        }
+// @ts-ignore
+export function useGetShopDetailSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetShopDetailQuery, GetShopDetailQueryVariables>): Apollo.UseSuspenseQueryResult<GetShopDetailQuery, GetShopDetailQueryVariables>;
+export function useGetShopDetailSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetShopDetailQuery, GetShopDetailQueryVariables>): Apollo.UseSuspenseQueryResult<GetShopDetailQuery | undefined, GetShopDetailQueryVariables>;
+export function useGetShopDetailSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetShopDetailQuery, GetShopDetailQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetShopDetailQuery, GetShopDetailQueryVariables>(GetShopDetailDocument, options);
+        }
+export type GetShopDetailQueryHookResult = ReturnType<typeof useGetShopDetailQuery>;
+export type GetShopDetailLazyQueryHookResult = ReturnType<typeof useGetShopDetailLazyQuery>;
+export type GetShopDetailSuspenseQueryHookResult = ReturnType<typeof useGetShopDetailSuspenseQuery>;
+export type GetShopDetailQueryResult = Apollo.QueryResult<GetShopDetailQuery, GetShopDetailQueryVariables>;
+export const UpdateShopIdentityDocument = gql`
+    mutation UpdateShopIdentity($shop: ShopInput!) {
+  updateShop(shop: $shop) {
+    id
+    name
+    email
+    phone
+    address
+    city
+    state
+    zip
+    instagram
+    facebook
+    website
+  }
+}
+    `;
+export type UpdateShopIdentityMutationFn = Apollo.MutationFunction<UpdateShopIdentityMutation, UpdateShopIdentityMutationVariables>;
+
+/**
+ * __useUpdateShopIdentityMutation__
+ *
+ * To run a mutation, you first call `useUpdateShopIdentityMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateShopIdentityMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateShopIdentityMutation, { data, loading, error }] = useUpdateShopIdentityMutation({
+ *   variables: {
+ *      shop: // value for 'shop'
+ *   },
+ * });
+ */
+export function useUpdateShopIdentityMutation(baseOptions?: Apollo.MutationHookOptions<UpdateShopIdentityMutation, UpdateShopIdentityMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<UpdateShopIdentityMutation, UpdateShopIdentityMutationVariables>(UpdateShopIdentityDocument, options);
+      }
+export type UpdateShopIdentityMutationHookResult = ReturnType<typeof useUpdateShopIdentityMutation>;
+export type UpdateShopIdentityMutationResult = Apollo.MutationResult<UpdateShopIdentityMutation>;
+export type UpdateShopIdentityMutationOptions = Apollo.BaseMutationOptions<UpdateShopIdentityMutation, UpdateShopIdentityMutationVariables>;
+export const GetSquareAuthorizationUrlDocument = gql`
+    query GetSquareAuthorizationUrl($shopId: ID!) {
+  getSquareAuthorizationUrl(shopId: $shopId)
+}
+    `;
+
+/**
+ * __useGetSquareAuthorizationUrlQuery__
+ *
+ * To run a query within a React component, call `useGetSquareAuthorizationUrlQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetSquareAuthorizationUrlQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetSquareAuthorizationUrlQuery({
+ *   variables: {
+ *      shopId: // value for 'shopId'
+ *   },
+ * });
+ */
+export function useGetSquareAuthorizationUrlQuery(baseOptions: Apollo.QueryHookOptions<GetSquareAuthorizationUrlQuery, GetSquareAuthorizationUrlQueryVariables> & ({ variables: GetSquareAuthorizationUrlQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetSquareAuthorizationUrlQuery, GetSquareAuthorizationUrlQueryVariables>(GetSquareAuthorizationUrlDocument, options);
+      }
+export function useGetSquareAuthorizationUrlLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetSquareAuthorizationUrlQuery, GetSquareAuthorizationUrlQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetSquareAuthorizationUrlQuery, GetSquareAuthorizationUrlQueryVariables>(GetSquareAuthorizationUrlDocument, options);
+        }
+// @ts-ignore
+export function useGetSquareAuthorizationUrlSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetSquareAuthorizationUrlQuery, GetSquareAuthorizationUrlQueryVariables>): Apollo.UseSuspenseQueryResult<GetSquareAuthorizationUrlQuery, GetSquareAuthorizationUrlQueryVariables>;
+export function useGetSquareAuthorizationUrlSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetSquareAuthorizationUrlQuery, GetSquareAuthorizationUrlQueryVariables>): Apollo.UseSuspenseQueryResult<GetSquareAuthorizationUrlQuery | undefined, GetSquareAuthorizationUrlQueryVariables>;
+export function useGetSquareAuthorizationUrlSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetSquareAuthorizationUrlQuery, GetSquareAuthorizationUrlQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetSquareAuthorizationUrlQuery, GetSquareAuthorizationUrlQueryVariables>(GetSquareAuthorizationUrlDocument, options);
+        }
+export type GetSquareAuthorizationUrlQueryHookResult = ReturnType<typeof useGetSquareAuthorizationUrlQuery>;
+export type GetSquareAuthorizationUrlLazyQueryHookResult = ReturnType<typeof useGetSquareAuthorizationUrlLazyQuery>;
+export type GetSquareAuthorizationUrlSuspenseQueryHookResult = ReturnType<typeof useGetSquareAuthorizationUrlSuspenseQuery>;
+export type GetSquareAuthorizationUrlQueryResult = Apollo.QueryResult<GetSquareAuthorizationUrlQuery, GetSquareAuthorizationUrlQueryVariables>;
+export const DisconnectShopSquareDocument = gql`
+    mutation DisconnectShopSquare($shopId: ID!) {
+  disconnectShopSquare(shopId: $shopId) {
+    id
+    squareConnected
+    squareLocationId
+    squareConnectedAt
+  }
+}
+    `;
+export type DisconnectShopSquareMutationFn = Apollo.MutationFunction<DisconnectShopSquareMutation, DisconnectShopSquareMutationVariables>;
+
+/**
+ * __useDisconnectShopSquareMutation__
+ *
+ * To run a mutation, you first call `useDisconnectShopSquareMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useDisconnectShopSquareMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [disconnectShopSquareMutation, { data, loading, error }] = useDisconnectShopSquareMutation({
+ *   variables: {
+ *      shopId: // value for 'shopId'
+ *   },
+ * });
+ */
+export function useDisconnectShopSquareMutation(baseOptions?: Apollo.MutationHookOptions<DisconnectShopSquareMutation, DisconnectShopSquareMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<DisconnectShopSquareMutation, DisconnectShopSquareMutationVariables>(DisconnectShopSquareDocument, options);
+      }
+export type DisconnectShopSquareMutationHookResult = ReturnType<typeof useDisconnectShopSquareMutation>;
+export type DisconnectShopSquareMutationResult = Apollo.MutationResult<DisconnectShopSquareMutation>;
+export type DisconnectShopSquareMutationOptions = Apollo.BaseMutationOptions<DisconnectShopSquareMutation, DisconnectShopSquareMutationVariables>;
 export const GetStaffListDocument = gql`
     query GetStaffList($includeArchived: Boolean, $page: PageInput) {
   getStaff(includeArchived: $includeArchived, page: $page) {

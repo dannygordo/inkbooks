@@ -1033,6 +1033,19 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    codegen + build, `apps/mobile` `tsc --noEmit` clean, and the full `apps/mobile` Jest suite
    (167/167, unchanged).
 
+   **Shops directory (2026-09-03, see DECISIONS.md X24) is the next slice after that - third of
+   the batch, and the first with no archiving at all.** `app/shops/index.tsx` (list - no toggle,
+   no pagination, no create button) and `app/shop/[id].tsx` (identity autosave form, a read-only
+   shop-cut-percent readout, a Square Connected/Not-connected section), a new `shops.graphql`
+   operation set. `canEdit` is a hard `SHOP_ADMIN` floor with no self-branch (Staff's shape, not
+   Artists'); `hourlyRate`/`shopMinimum` render as plain whole dollars, never through
+   `formatCents`. Two gaps named plainly rather than glossed over: the shop-cut-percent "Change in
+   Settings" link has nowhere to point yet (mobile's Settings only ports `AccountPanel` so far),
+   and Square's "Connect" flow opens externally via `Linking.openURL` with no automatic return to
+   the app (no deep link registered for the OAuth callback). Confirmed in this sandbox:
+   `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean, and the full `apps/mobile`
+   Jest suite (167/167, unchanged).
+
    Everything else on the ~40-screen list not yet named remains open.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).

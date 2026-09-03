@@ -111,6 +111,11 @@ function RootNavigator() {
             gated `isStaffOrBetter` (web's Sidebar.jsx gates Artists and Staff identically). */}
         <Stack.Screen name="staff/index" options={{ headerShown: true, title: 'Staff' }} />
         <Stack.Screen name="staff/[id]" options={{ headerShown: true, title: 'Staff Member' }} />
+        {/* Shops - the shop-admin's own shop(s), see shops/index.tsx's own header comment. Gated
+            `isShopAdminOrBetter`, matching web's Sidebar.jsx exactly (same gate as Shop Cut
+            Confirmations). */}
+        <Stack.Screen name="shops/index" options={{ headerShown: true, title: 'Shops' }} />
+        <Stack.Screen name="shop/[id]" options={{ headerShown: true, title: 'Shop' }} />
       </Stack.Protected>
     </Stack>
   );
