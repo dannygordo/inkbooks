@@ -53,3 +53,23 @@ export function isShopAdminOrBetter(user: UserLike): boolean {
 export function isStaffOrBetter(user: UserLike): boolean {
 	return Boolean(user?.role) && (user!.role as number) <= ROLES.SHOP_STAFF;
 }
+
+type UserTypeLike = {
+	id: string;
+	role?: number | null;
+	userType?: string | null;
+} | null | undefined;
+
+/**
+ * Direct port of apps/web's App.jsx route gate on /income and /expenses:
+ * `RoleRoute minRole={ROLES.SHOP_ADMIN} allowIf={(user) => user.userType === "artist"}`. RoleRoute
+ * checks allowIf FIRST and skips the role floor entirely when it's true (see that component's own
+ * comment), so the combined rule is "any artist at all, OR a shop-admin-or-better who isn't" -
+ * this is what lets a plain shop-connected artist (role ARTIST=20, well under SHOP_ADMIN=10) reach
+ * their own personal ledger, which is the whole point of that route's own CHANGED comment: the
+ * server always supported a shop-connected artist's own artistUserId scope
+ * (businessScopeFor/resolveBusinessOwner), the route just didn't let anyone reach it before.
+ */
+export function canManageBusinessLedger(user: UserTypeLike): boolean {
+	return user?.userType === 'artist' || isShopAdminOrBetter(user);
+}

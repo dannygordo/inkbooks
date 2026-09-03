@@ -120,6 +120,10 @@ function RootNavigator() {
             link itself, matching Clients/Projects - `search` applies no authorization beyond the
             same scope filters those list queries already use. */}
         <Stack.Screen name="search/index" options={{ headerShown: true, title: 'Search' }} />
+        {/* Income - non-tattoo income only, see income/index.tsx's own header comment. Gated
+            `canManageBusinessLedger` (any artist, or a shop-admin-or-better), matching web's own
+            RoleRoute on /income exactly. */}
+        <Stack.Screen name="income/index" options={{ headerShown: true, title: 'Income' }} />
       </Stack.Protected>
     </Stack>
   );

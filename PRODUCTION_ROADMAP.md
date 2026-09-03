@@ -1054,6 +1054,17 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    screens needed. Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile`
    `tsc --noEmit` clean, and the full `apps/mobile` Jest suite (167/167, unchanged).
 
+   **Income (2026-09-03, see DECISIONS.md X26) is the next slice after that - fifth of the
+   batch, and the first to need its own role-gate helper and scoping convention.** `app/income/
+   index.tsx` (log-entry form, five preset date ranges, inline edit/delete), a new
+   `income.graphql` operation set. Three new reusable pure-logic modules: `utils/businessScope.ts`,
+   `utils/businessRanges.ts`, and `utils/permissions.ts`'s new `canManageBusinessLedger` (any
+   artist, or shop-admin-or-better - web's own `/income`/`/expenses` route gate). A new
+   `components/DateField.tsx` (date-only, no time) will be reused unchanged by Expenses next. No
+   custom date-range picker and no category management (Settings-only) - both named scope cuts.
+   Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+   and the full `apps/mobile` Jest suite (177/177, up from 167).
+
    Everything else on the ~40-screen list not yet named remains open.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).

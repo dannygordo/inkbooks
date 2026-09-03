@@ -3027,6 +3027,46 @@ export type GlobalSearchQueryVariables = Exact<{
 
 export type GlobalSearchQuery = { __typename?: 'Query', search: { __typename?: 'SearchResults', clients: Array<{ __typename?: 'Client', id: string, avatar?: string | null, firstName: string, lastName: string, email: string, phone: string, city?: string | null, state?: string | null }>, projects: Array<{ __typename?: 'Project', id: string, title: string, description: string, status: string, artist?: { __typename?: 'Artist', id: string, firstName: string, lastName: string, avatar?: string | null } | null, client?: { __typename?: 'Client', id: string, firstName: string, lastName: string } | null }>, messages: Array<{ __typename?: 'Message', id: string, conversationId: string, message?: string | null, senderId: string, createdAt?: string | null, user?: { __typename?: 'User', id: string, firstName?: string | null, lastName?: string | null, avatar?: string | null } | null }>, images: Array<{ __typename?: 'SharedImage', id: string, url: string, clientId: string, tags: Array<string>, assignedProjectId?: string | null, createdAt: string }> } };
 
+export type GetIncomeTypesListQueryVariables = Exact<{
+  shopId?: InputMaybe<Scalars['ID']['input']>;
+  artistUserId?: InputMaybe<Scalars['ID']['input']>;
+}>;
+
+
+export type GetIncomeTypesListQuery = { __typename?: 'Query', getIncomeTypes: Array<{ __typename?: 'IncomeType', id: string, name: string }> };
+
+export type GetIncomesListQueryVariables = Exact<{
+  shopId?: InputMaybe<Scalars['ID']['input']>;
+  artistUserId?: InputMaybe<Scalars['ID']['input']>;
+  start?: InputMaybe<Scalars['DateTime']['input']>;
+  end?: InputMaybe<Scalars['DateTime']['input']>;
+  page?: InputMaybe<PageInput>;
+}>;
+
+
+export type GetIncomesListQuery = { __typename?: 'Query', getIncomes: { __typename?: 'IncomePage', items: Array<{ __typename?: 'Income', id: string, incomeTypeId: string, amountCents: number, description?: string | null, date: string, incomeType?: { __typename?: 'IncomeType', id: string, name: string } | null, createdBy?: { __typename?: 'User', id: string, firstName?: string | null, lastName?: string | null } | null }>, pageInfo: { __typename?: 'PageInfo', totalCount: number, hasMore: boolean, limit: number, offset: number } } };
+
+export type RecordIncomeMutationVariables = Exact<{
+  input: RecordIncomeInput;
+}>;
+
+
+export type RecordIncomeMutation = { __typename?: 'Mutation', recordIncome: { __typename?: 'Income', id: string, incomeTypeId: string, amountCents: number, description?: string | null, date: string, incomeType?: { __typename?: 'IncomeType', id: string, name: string } | null, createdBy?: { __typename?: 'User', id: string, firstName?: string | null, lastName?: string | null } | null } };
+
+export type UpdateIncomeMutationVariables = Exact<{
+  input: UpdateIncomeInput;
+}>;
+
+
+export type UpdateIncomeMutation = { __typename?: 'Mutation', updateIncome: { __typename?: 'Income', id: string, incomeTypeId: string, amountCents: number, description?: string | null, date: string, incomeType?: { __typename?: 'IncomeType', id: string, name: string } | null, createdBy?: { __typename?: 'User', id: string, firstName?: string | null, lastName?: string | null } | null } };
+
+export type DeleteIncomeMutationVariables = Exact<{
+  incomeId: Scalars['ID']['input'];
+}>;
+
+
+export type DeleteIncomeMutation = { __typename?: 'Mutation', deleteIncome: boolean };
+
 export type LoginMutationVariables = Exact<{
   email: Scalars['String']['input'];
   password: Scalars['String']['input'];
@@ -5247,6 +5287,248 @@ export type GlobalSearchQueryHookResult = ReturnType<typeof useGlobalSearchQuery
 export type GlobalSearchLazyQueryHookResult = ReturnType<typeof useGlobalSearchLazyQuery>;
 export type GlobalSearchSuspenseQueryHookResult = ReturnType<typeof useGlobalSearchSuspenseQuery>;
 export type GlobalSearchQueryResult = Apollo.QueryResult<GlobalSearchQuery, GlobalSearchQueryVariables>;
+export const GetIncomeTypesListDocument = gql`
+    query GetIncomeTypesList($shopId: ID, $artistUserId: ID) {
+  getIncomeTypes(shopId: $shopId, artistUserId: $artistUserId) {
+    id
+    name
+  }
+}
+    `;
+
+/**
+ * __useGetIncomeTypesListQuery__
+ *
+ * To run a query within a React component, call `useGetIncomeTypesListQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetIncomeTypesListQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetIncomeTypesListQuery({
+ *   variables: {
+ *      shopId: // value for 'shopId'
+ *      artistUserId: // value for 'artistUserId'
+ *   },
+ * });
+ */
+export function useGetIncomeTypesListQuery(baseOptions?: Apollo.QueryHookOptions<GetIncomeTypesListQuery, GetIncomeTypesListQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetIncomeTypesListQuery, GetIncomeTypesListQueryVariables>(GetIncomeTypesListDocument, options);
+      }
+export function useGetIncomeTypesListLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetIncomeTypesListQuery, GetIncomeTypesListQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetIncomeTypesListQuery, GetIncomeTypesListQueryVariables>(GetIncomeTypesListDocument, options);
+        }
+// @ts-ignore
+export function useGetIncomeTypesListSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetIncomeTypesListQuery, GetIncomeTypesListQueryVariables>): Apollo.UseSuspenseQueryResult<GetIncomeTypesListQuery, GetIncomeTypesListQueryVariables>;
+export function useGetIncomeTypesListSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetIncomeTypesListQuery, GetIncomeTypesListQueryVariables>): Apollo.UseSuspenseQueryResult<GetIncomeTypesListQuery | undefined, GetIncomeTypesListQueryVariables>;
+export function useGetIncomeTypesListSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetIncomeTypesListQuery, GetIncomeTypesListQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetIncomeTypesListQuery, GetIncomeTypesListQueryVariables>(GetIncomeTypesListDocument, options);
+        }
+export type GetIncomeTypesListQueryHookResult = ReturnType<typeof useGetIncomeTypesListQuery>;
+export type GetIncomeTypesListLazyQueryHookResult = ReturnType<typeof useGetIncomeTypesListLazyQuery>;
+export type GetIncomeTypesListSuspenseQueryHookResult = ReturnType<typeof useGetIncomeTypesListSuspenseQuery>;
+export type GetIncomeTypesListQueryResult = Apollo.QueryResult<GetIncomeTypesListQuery, GetIncomeTypesListQueryVariables>;
+export const GetIncomesListDocument = gql`
+    query GetIncomesList($shopId: ID, $artistUserId: ID, $start: DateTime, $end: DateTime, $page: PageInput) {
+  getIncomes(
+    shopId: $shopId
+    artistUserId: $artistUserId
+    start: $start
+    end: $end
+    page: $page
+  ) {
+    items {
+      id
+      incomeTypeId
+      incomeType {
+        id
+        name
+      }
+      amountCents
+      description
+      date
+      createdBy {
+        id
+        firstName
+        lastName
+      }
+    }
+    pageInfo {
+      totalCount
+      hasMore
+      limit
+      offset
+    }
+  }
+}
+    `;
+
+/**
+ * __useGetIncomesListQuery__
+ *
+ * To run a query within a React component, call `useGetIncomesListQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetIncomesListQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetIncomesListQuery({
+ *   variables: {
+ *      shopId: // value for 'shopId'
+ *      artistUserId: // value for 'artistUserId'
+ *      start: // value for 'start'
+ *      end: // value for 'end'
+ *      page: // value for 'page'
+ *   },
+ * });
+ */
+export function useGetIncomesListQuery(baseOptions?: Apollo.QueryHookOptions<GetIncomesListQuery, GetIncomesListQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetIncomesListQuery, GetIncomesListQueryVariables>(GetIncomesListDocument, options);
+      }
+export function useGetIncomesListLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetIncomesListQuery, GetIncomesListQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetIncomesListQuery, GetIncomesListQueryVariables>(GetIncomesListDocument, options);
+        }
+// @ts-ignore
+export function useGetIncomesListSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetIncomesListQuery, GetIncomesListQueryVariables>): Apollo.UseSuspenseQueryResult<GetIncomesListQuery, GetIncomesListQueryVariables>;
+export function useGetIncomesListSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetIncomesListQuery, GetIncomesListQueryVariables>): Apollo.UseSuspenseQueryResult<GetIncomesListQuery | undefined, GetIncomesListQueryVariables>;
+export function useGetIncomesListSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetIncomesListQuery, GetIncomesListQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetIncomesListQuery, GetIncomesListQueryVariables>(GetIncomesListDocument, options);
+        }
+export type GetIncomesListQueryHookResult = ReturnType<typeof useGetIncomesListQuery>;
+export type GetIncomesListLazyQueryHookResult = ReturnType<typeof useGetIncomesListLazyQuery>;
+export type GetIncomesListSuspenseQueryHookResult = ReturnType<typeof useGetIncomesListSuspenseQuery>;
+export type GetIncomesListQueryResult = Apollo.QueryResult<GetIncomesListQuery, GetIncomesListQueryVariables>;
+export const RecordIncomeDocument = gql`
+    mutation RecordIncome($input: RecordIncomeInput!) {
+  recordIncome(input: $input) {
+    id
+    incomeTypeId
+    incomeType {
+      id
+      name
+    }
+    amountCents
+    description
+    date
+    createdBy {
+      id
+      firstName
+      lastName
+    }
+  }
+}
+    `;
+export type RecordIncomeMutationFn = Apollo.MutationFunction<RecordIncomeMutation, RecordIncomeMutationVariables>;
+
+/**
+ * __useRecordIncomeMutation__
+ *
+ * To run a mutation, you first call `useRecordIncomeMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useRecordIncomeMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [recordIncomeMutation, { data, loading, error }] = useRecordIncomeMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useRecordIncomeMutation(baseOptions?: Apollo.MutationHookOptions<RecordIncomeMutation, RecordIncomeMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<RecordIncomeMutation, RecordIncomeMutationVariables>(RecordIncomeDocument, options);
+      }
+export type RecordIncomeMutationHookResult = ReturnType<typeof useRecordIncomeMutation>;
+export type RecordIncomeMutationResult = Apollo.MutationResult<RecordIncomeMutation>;
+export type RecordIncomeMutationOptions = Apollo.BaseMutationOptions<RecordIncomeMutation, RecordIncomeMutationVariables>;
+export const UpdateIncomeDocument = gql`
+    mutation UpdateIncome($input: UpdateIncomeInput!) {
+  updateIncome(input: $input) {
+    id
+    incomeTypeId
+    incomeType {
+      id
+      name
+    }
+    amountCents
+    description
+    date
+    createdBy {
+      id
+      firstName
+      lastName
+    }
+  }
+}
+    `;
+export type UpdateIncomeMutationFn = Apollo.MutationFunction<UpdateIncomeMutation, UpdateIncomeMutationVariables>;
+
+/**
+ * __useUpdateIncomeMutation__
+ *
+ * To run a mutation, you first call `useUpdateIncomeMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateIncomeMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateIncomeMutation, { data, loading, error }] = useUpdateIncomeMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useUpdateIncomeMutation(baseOptions?: Apollo.MutationHookOptions<UpdateIncomeMutation, UpdateIncomeMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<UpdateIncomeMutation, UpdateIncomeMutationVariables>(UpdateIncomeDocument, options);
+      }
+export type UpdateIncomeMutationHookResult = ReturnType<typeof useUpdateIncomeMutation>;
+export type UpdateIncomeMutationResult = Apollo.MutationResult<UpdateIncomeMutation>;
+export type UpdateIncomeMutationOptions = Apollo.BaseMutationOptions<UpdateIncomeMutation, UpdateIncomeMutationVariables>;
+export const DeleteIncomeDocument = gql`
+    mutation DeleteIncome($incomeId: ID!) {
+  deleteIncome(incomeId: $incomeId)
+}
+    `;
+export type DeleteIncomeMutationFn = Apollo.MutationFunction<DeleteIncomeMutation, DeleteIncomeMutationVariables>;
+
+/**
+ * __useDeleteIncomeMutation__
+ *
+ * To run a mutation, you first call `useDeleteIncomeMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useDeleteIncomeMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [deleteIncomeMutation, { data, loading, error }] = useDeleteIncomeMutation({
+ *   variables: {
+ *      incomeId: // value for 'incomeId'
+ *   },
+ * });
+ */
+export function useDeleteIncomeMutation(baseOptions?: Apollo.MutationHookOptions<DeleteIncomeMutation, DeleteIncomeMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<DeleteIncomeMutation, DeleteIncomeMutationVariables>(DeleteIncomeDocument, options);
+      }
+export type DeleteIncomeMutationHookResult = ReturnType<typeof useDeleteIncomeMutation>;
+export type DeleteIncomeMutationResult = Apollo.MutationResult<DeleteIncomeMutation>;
+export type DeleteIncomeMutationOptions = Apollo.BaseMutationOptions<DeleteIncomeMutation, DeleteIncomeMutationVariables>;
 export const LoginDocument = gql`
     mutation Login($email: String!, $password: String!) {
   login(email: $email, password: $password) {

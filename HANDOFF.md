@@ -8,6 +8,34 @@ Last updated: 2026-09-03.
 
 ---
 
+### 2026-09-03 (fourteenth entry): Income built - a new role-gate helper, a new scoping convention, a new date-only field
+
+Fifth of the requested batch (Artists/Staff, Shops, Search, Income/Expenses, Forms). Full
+reasoning: DECISIONS.md X26.
+
+**Built:** `app/income/index.tsx` (log-entry form, five preset date ranges, list with inline
+edit/delete), a new `income.graphql` operation set (`GetIncomeTypesList`, `GetIncomesList`,
+`RecordIncome`, `UpdateIncome`, `DeleteIncome`). Three new pure-logic modules this slice reuses
+going forward: `utils/businessScope.ts` (`businessScopeFor`/`createScopeFor`, direct port of web's
+own), `utils/businessRanges.ts` (five backward-looking date presets, native Date not moment), and
+`utils/permissions.ts`'s new `canManageBusinessLedger` (any artist, or shop-admin-or-better -
+web's own `/income`/`/expenses` route gate). A new `components/DateField.tsx` (date-only sibling
+of `DateTimeField.tsx`) will be reused unchanged by Expenses next.
+
+**Two named scope cuts, not oversights:** no custom date-range picker (five presets only - the
+same five web's own backward-looking analytics ranges offer), and category
+management (create/edit/deactivate an IncomeType) stays Settings-only, matching web's own page/
+Settings split exactly.
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean
+(one round-trip needed - the new `UserTypeLike` type alias was written as an intersection with the
+existing nullable `UserLike`, which collapses to `never` on the null/undefined branches; fixed by
+writing it as its own nullable union instead), and the full `apps/mobile` Jest suite - 177/177, up
+from 167 (`businessRanges.test.ts` 6 cases + `canManageBusinessLedger` 4 cases). **Not yet
+confirmed:** a real device/simulator run.
+
+---
+
 ### 2026-09-03 (thirteenth entry): Global Search built - one screen, grouped by type, no new authorization
 
 Fourth of the requested batch (Artists/Staff, Shops, Search, Income/Expenses, Forms). Full

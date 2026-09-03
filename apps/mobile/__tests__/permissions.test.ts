@@ -1,5 +1,5 @@
 import { ROLES } from '@/constants/auth';
-import { canManageAppointment, isShopAdminOrBetter, isStaffOrBetter } from '@/utils/permissions';
+import { canManageAppointment, canManageBusinessLedger, isShopAdminOrBetter, isStaffOrBetter } from '@/utils/permissions';
 
 describe('canManageAppointment', () => {
 	it('allows the appointment owner regardless of role', () => {
@@ -69,5 +69,24 @@ describe('isStaffOrBetter', () => {
 	it('denies a missing user or a user with no role', () => {
 		expect(isStaffOrBetter(null)).toBe(false);
 		expect(isStaffOrBetter({ id: 'user-1' })).toBe(false);
+	});
+});
+
+describe('canManageBusinessLedger', () => {
+	it('allows any artist regardless of role - even one under the SHOP_ADMIN floor', () => {
+		expect(canManageBusinessLedger({ id: 'artist-1', role: ROLES.ARTIST, userType: 'artist' })).toBe(true);
+	});
+
+	it('allows a shop admin whose userType is not artist', () => {
+		expect(canManageBusinessLedger({ id: 'admin-1', role: ROLES.SHOP_ADMIN, userType: 'shop' })).toBe(true);
+	});
+
+	it('denies shop staff and a client - neither an artist nor shop-admin-or-better', () => {
+		expect(canManageBusinessLedger({ id: 'staff-1', role: ROLES.SHOP_STAFF, userType: 'staff' })).toBe(false);
+		expect(canManageBusinessLedger({ id: 'client-1', role: ROLES.CLIENT, userType: 'client' })).toBe(false);
+	});
+
+	it('denies a missing user', () => {
+		expect(canManageBusinessLedger(null)).toBe(false);
 	});
 });

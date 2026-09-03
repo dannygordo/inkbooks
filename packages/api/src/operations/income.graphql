@@ -1,0 +1,86 @@
+# Non-tattoo income - the income-side mirror of expenses.graphql. Tattoo income isn't logged here
+# at all; it's derived automatically from completed appointments and shows on the dashboard (not
+# ported to mobile - see PRODUCTION_ROADMAP.md's dashboard/analytics scope). This is for
+# everything else a shop or artist takes in - merch, a walk-in supply resale, etc. Ownership is
+# shopId XOR artistUserId, gated via resolveBusinessOwner/assertCanManageBusinessRecord - see
+# utils/businessScope.ts's own header comment. No recurring counterpart exists on the income side
+# (only Expenses has RecurringExpense). See DECISIONS.md X26.
+#
+# Category management (createIncomeType/updateIncomeType) is Settings-only on web
+# (IncomeTypesPanel.jsx) - out of scope for this page's port, matching web's own page/Settings
+# split exactly (Income.jsx only READS types, for its category picker).
+query GetIncomeTypesList($shopId: ID, $artistUserId: ID) {
+	getIncomeTypes(shopId: $shopId, artistUserId: $artistUserId) {
+		id
+		name
+	}
+}
+
+query GetIncomesList($shopId: ID, $artistUserId: ID, $start: DateTime, $end: DateTime, $page: PageInput) {
+	getIncomes(shopId: $shopId, artistUserId: $artistUserId, start: $start, end: $end, page: $page) {
+		items {
+			id
+			incomeTypeId
+			incomeType {
+				id
+				name
+			}
+			amountCents
+			description
+			date
+			createdBy {
+				id
+				firstName
+				lastName
+			}
+		}
+		pageInfo {
+			totalCount
+			hasMore
+			limit
+			offset
+		}
+	}
+}
+
+mutation RecordIncome($input: RecordIncomeInput!) {
+	recordIncome(input: $input) {
+		id
+		incomeTypeId
+		incomeType {
+			id
+			name
+		}
+		amountCents
+		description
+		date
+		createdBy {
+			id
+			firstName
+			lastName
+		}
+	}
+}
+
+mutation UpdateIncome($input: UpdateIncomeInput!) {
+	updateIncome(input: $input) {
+		id
+		incomeTypeId
+		incomeType {
+			id
+			name
+		}
+		amountCents
+		description
+		date
+		createdBy {
+			id
+			firstName
+			lastName
+		}
+	}
+}
+
+mutation DeleteIncome($incomeId: ID!) {
+	deleteIncome(incomeId: $incomeId)
+}

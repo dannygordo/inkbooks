@@ -1954,6 +1954,55 @@ exactly at the cap.
 module was needed (row-building is inline JSX, not an extractable pure function the way
 `projectStatus.ts` was for the Projects slice, and it already has direct coverage there).
 
+### X26. Income built - the first slice with its own role-gate helper AND its own scoping convention
+
+Fifth of the requested batch. Ports web's `pages/income/Income.jsx` - non-tattoo income only;
+tattoo revenue is derived automatically from completed appointments and shows on the (unbuilt on
+mobile) dashboard, never logged here.
+
+**New `canManageBusinessLedger` in `utils/permissions.ts`**, a direct port of web's own route gate
+on `/income` and `/expenses`: `RoleRoute minRole={ROLES.SHOP_ADMIN} allowIf={(user) => user.userType
+=== "artist"}`. `RoleRoute` checks `allowIf` first and skips the role floor entirely when it's true
+(see that component's own comment), so the combined rule is "any artist at all, OR a
+shop-admin-or-better who isn't" - narrower gates like `isStaffOrBetter` don't express this (an
+artist who is NOT staff-or-better, i.e. plain `ROLES.ARTIST`, still needs their own ledger). This is
+what lets a plain shop-connected artist reach their own personal ledger even though they're well
+under `SHOP_ADMIN` - web's own comment on that route explains this was a deliberate widening: the
+server always supported a shop-connected artist's own `artistUserId` scope, the route just didn't
+let anyone reach it before.
+
+**New `utils/businessScope.ts`**, a direct port of web's `utils/businessScope.js`
+(`businessScopeFor`/`createScopeFor`) - `{ shopId }` for a shop admin managing their shop's books,
+`{ artistUserId }` for everyone else `canManageBusinessLedger` admits. `createScopeFor` is the
+narrower create-safe version web's own comment explains is necessary: `RecordIncomeInput` has no
+`artistUserId` field at all (the server infers it from the caller when `shopId` is omitted), so
+spreading the full scope into a create mutation would send a field the schema doesn't define.
+
+**New `utils/businessRanges.ts`**, a trimmed native-Date port of web's `utils/dateRanges.js`
+`buildPresetRanges`/`getDefaultRange` (the backward-looking analytics presets - This month/Last
+month/This quarter/Year to date/Last 12 months - NOT that file's separate forward-looking
+scheduling ranges, which `dateRanges.ts` already covers for appointments). No custom range picker
+(two free-form date pickers to define an arbitrary window) - a named scope cut, not an oversight;
+the five presets are the whole of this port.
+
+**New `components/DateField.tsx`**, `DateTimeField.tsx`'s date-only sibling - a single
+`mode="date"` step with no chained time dialog, since an income entry's date is a pure calendar
+date (matching web's own `<input type="date">`, per `Income.jsx`'s "utc-ok: pure calendar date"
+comment), not a timestamped instant. Reusing `DateTimeField` directly would force a meaningless
+"pick a time too" step onto a field with no time component. Built as its own component (not
+inlined into `income/index.tsx`) because the next slice, Expenses, needs the identical thing.
+
+**Category picker is a pill row, not a native `<select>`-style dropdown** - matches
+`DurationPicker.tsx`'s own precedent exactly: there is no cross-platform select primitive in this
+app, and a short, closed list of income categories doesn't need one. Category management itself
+(`createIncomeType`/`updateIncomeType`) stays Settings-only, out of scope here, matching web's own
+page/Settings split - this screen only *reads* types for its picker.
+
+**No in-screen role guard beyond the header link's own gate** - matching every other role-gated
+mobile screen's precedent (Shops/Artists/Staff/Shop Cut Confirmations all rely on the header link
+alone plus the server's real enforcement, not a redirect-style guard mobile has no equivalent of
+`RoleRoute` to build anyway).
+
 ---
 
 ## Process
