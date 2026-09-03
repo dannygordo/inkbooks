@@ -2094,6 +2094,53 @@ for actually sharing it.
 `FORM_FIELD_TYPE_LABELS`/`formFieldTypeLabel`) - same "build the map directly, don't port
 `prettyConstantsListValue`" reasoning as `utils/projectStatus.ts` (X20).
 
+### X34. Settings batch 2 - the artist's own Square connection and tax/processing pricing
+
+Third of three follow-up items ("Settings batch 2, Messages follow-ups, Mobile deep-link scheme"),
+tackled first for the continuity with X33 - same domain, same Square OAuth machinery, done while
+that context was fresh. X31 left the rest of web's Settings (thirteen panels, ~2,700 lines) as a
+named follow-up list rather than one slice; this closes the two highest-continuity items from that
+list - Square Config - and leaves the other five (Shop, Rates/Booth Rent, Messages, Forms'
+shop-wide link section, Appearance, Security) exactly as X31 named them, still open.
+
+**Two new cards on `settings/index.tsx`, not two new routes** - `SquareConnectionCard` and
+`SquarePricingCard`, direct ports of web's `SquarePanel.jsx`/`SquarePricingPanel.jsx`, added as
+sibling cards on the same screen rather than their own screens under `settings/`, since both are
+short (142/163 web lines) and this screen already mixes several unrelated settings (photo,
+password, Business links, calendar color) the same way. Distinct from `shop/[id].tsx`'s own
+`SquareCard`: that one connects the SHOP's own Square account (received cut invoices); this is the
+ARTIST's own account, which every artist has regardless of shop membership (DECISIONS.md M9) -
+same underlying OAuth machinery, two separate connections, two separate screens, matching web's own
+split between `Shop.jsx` and `SquarePanel.jsx`.
+
+**Reuses X33's `platform: "mobile"` deep-link mechanism for free** - `getMySquareAuthorizationUrl`
+already gained the same optional `platform` argument as the shop resolver in X33's own server-side
+change, so `squareSettings.graphql`'s `GetMySquareAuthorizationUrl` just asks for
+`platform: "mobile"` and the callback route already knows to send an ARTIST owner to
+`inkbooks://settings?square=<status>` - no new server code needed. This closes the one follow-up
+X33 itself named as still open ("`settings/index.tsx` has no equivalent read yet"): the screen now
+reads `useLocalSearchParams<{ square?: string }>()`'s `square` field, shows a
+connected/cancelled/error banner, and `refetch()`s in a `useEffect` keyed on that param - identical
+shape to `shop/[id].tsx`'s own handling, for the same belt-and-suspenders reason.
+
+**One deliberate divergence from `shop/[id].tsx`'s own pattern, not a port of it**:
+`SquareConnectionCard`'s disconnect confirms first (`Alert.alert`, matching web's own
+`window.confirm` and this app's own `recurring-expenses.tsx` delete-confirm convention) -
+`shop/[id].tsx`'s `handleDisconnect` has no confirmation step at all, a real, narrow inconsistency
+with web noticed while building this, and named here rather than quietly copied into a second
+screen. Not fixed on the shop screen in this pass - out of scope for this slice, worth a one-line
+fix whenever that screen is next touched.
+
+**New `utils/money.ts` exports: `basisPointsToPercent`/`percentToBasisPoints`** - promoted out of
+`SquarePricingPanel.jsx`'s own local, unexported helpers of the same names, the same "one place
+this unit conversion happens" reasoning `money.ts`'s own header comment already states for
+cents/dollars. `dollarsToCents` (already existed, used by Recurring Expenses - X31) covers the fee
+offset field; the tax rate field needed the new pair. 6 new tests in `money.test.ts`.
+
+**Verified in this sandbox**: `packages/api` codegen + build clean, `apps/mobile` `tsc --noEmit`
+clean, full `apps/mobile` Jest suite - 229/229, up from 223. No server-side changes in this entry
+at all (typeDefs/resolvers were already touched by X33) - nothing new to `node --check`.
+
 ### X33. Mobile's first real deep link - Square OAuth "return to the app", not the password-reset gap
 
 Second of the three follow-up items ("Settings batch 2, Messages follow-ups, Mobile deep-link
@@ -2270,8 +2317,8 @@ likely value**:
 - **Shop** (`ShopPanel.jsx`'s shop-cut-percent editor, `ShopConnectionPanel.jsx`) - the gap named
   directly in `shop/[id].tsx`'s own comment (X24): shopCutPercent is read-only there because this
   editor doesn't exist on mobile yet.
-- **Square Config** (`SquarePanel.jsx`, `SquarePricingPanel.jsx`'s tax rate/fee offset editor) -
-  `shop/[id].tsx` already covers Square Connect/Disconnect (X24); the pricing editor is separate.
+- ~~**Square Config** (`SquarePanel.jsx`, `SquarePricingPanel.jsx`'s tax rate/fee offset
+  editor)~~ - **done, see X34.**
 - **Rates** (`RatesPanel.jsx`, `BoothRentPanel.jsx`) - an artist's own session-rate defaults and
   booth-rent terms.
 - **Messages** (`RemindersPanel.jsx`, `AutoResponsesPanel.jsx`, `ResponseTimePanel.jsx`,

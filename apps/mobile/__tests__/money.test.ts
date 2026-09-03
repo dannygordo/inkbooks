@@ -1,4 +1,10 @@
-import { centsToDollars, dollarsToCents, formatCents } from '@/utils/money';
+import {
+	basisPointsToPercent,
+	centsToDollars,
+	dollarsToCents,
+	formatCents,
+	percentToBasisPoints,
+} from '@/utils/money';
 
 describe('formatCents', () => {
 	it('formats a whole-dollar amount with two decimal places', () => {
@@ -49,5 +55,35 @@ describe('dollarsToCents', () => {
 	it('treats null/undefined as zero', () => {
 		expect(dollarsToCents(null)).toBe(0);
 		expect(dollarsToCents(undefined)).toBe(0);
+	});
+});
+
+describe('basisPointsToPercent', () => {
+	it('converts basis points to a percent string', () => {
+		expect(basisPointsToPercent(940)).toBe('9.4');
+	});
+
+	it('treats null/undefined as zero', () => {
+		expect(basisPointsToPercent(null)).toBe('0');
+		expect(basisPointsToPercent(undefined)).toBe('0');
+	});
+});
+
+describe('percentToBasisPoints', () => {
+	it('converts a percent string to integer basis points', () => {
+		expect(percentToBasisPoints('9.4')).toBe(940);
+	});
+
+	it('rounds to the nearest basis point', () => {
+		expect(percentToBasisPoints('9.999')).toBe(1000);
+	});
+
+	it('treats an emptied input as zero rather than NaN', () => {
+		expect(percentToBasisPoints('')).toBe(0);
+	});
+
+	it('treats null/undefined as zero', () => {
+		expect(percentToBasisPoints(null)).toBe(0);
+		expect(percentToBasisPoints(undefined)).toBe(0);
 	});
 });

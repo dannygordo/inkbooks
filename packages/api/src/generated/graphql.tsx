@@ -3442,6 +3442,34 @@ export type DisconnectShopSquareMutationVariables = Exact<{
 
 export type DisconnectShopSquareMutation = { __typename?: 'Mutation', disconnectShopSquare: { __typename?: 'Shop', id: string, squareConnected?: boolean | null, squareLocationId?: string | null, squareConnectedAt?: string | null } };
 
+export type GetMySquareConnectionQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetMySquareConnectionQuery = { __typename?: 'Query', getMySquareConnection: { __typename?: 'SquareConnection', source: string, connected: boolean, locationId?: string | null, connectedAt?: string | null, ownerName?: string | null } };
+
+export type GetMySquareAuthorizationUrlQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetMySquareAuthorizationUrlQuery = { __typename?: 'Query', getMySquareAuthorizationUrl: string };
+
+export type DisconnectMySquareMutationVariables = Exact<{ [key: string]: never; }>;
+
+
+export type DisconnectMySquareMutation = { __typename?: 'Mutation', disconnectMySquare: { __typename?: 'SquareConnection', source: string, connected: boolean, locationId?: string | null, connectedAt?: string | null, ownerName?: string | null } };
+
+export type GetMySquarePricingSettingsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetMySquarePricingSettingsQuery = { __typename?: 'Query', getMySquarePricingSettings: { __typename?: 'SquarePricingSettings', source: string, ownerName?: string | null, taxRateBasisPoints: number, squareFeeOffsetCents: number, canEdit: boolean } };
+
+export type UpdateSquarePricingSettingsMutationVariables = Exact<{
+  taxRateBasisPoints: Scalars['Int']['input'];
+  squareFeeOffsetCents: Scalars['Int']['input'];
+}>;
+
+
+export type UpdateSquarePricingSettingsMutation = { __typename?: 'Mutation', updateSquarePricingSettings: { __typename?: 'SquarePricingSettings', source: string, ownerName?: string | null, taxRateBasisPoints: number, squareFeeOffsetCents: number, canEdit: boolean } };
+
 export type GetStaffListQueryVariables = Exact<{
   includeArchived?: InputMaybe<Scalars['Boolean']['input']>;
   page?: InputMaybe<PageInput>;
@@ -8072,6 +8100,215 @@ export function useDisconnectShopSquareMutation(baseOptions?: Apollo.MutationHoo
 export type DisconnectShopSquareMutationHookResult = ReturnType<typeof useDisconnectShopSquareMutation>;
 export type DisconnectShopSquareMutationResult = Apollo.MutationResult<DisconnectShopSquareMutation>;
 export type DisconnectShopSquareMutationOptions = Apollo.BaseMutationOptions<DisconnectShopSquareMutation, DisconnectShopSquareMutationVariables>;
+export const GetMySquareConnectionDocument = gql`
+    query GetMySquareConnection {
+  getMySquareConnection {
+    source
+    connected
+    locationId
+    connectedAt
+    ownerName
+  }
+}
+    `;
+
+/**
+ * __useGetMySquareConnectionQuery__
+ *
+ * To run a query within a React component, call `useGetMySquareConnectionQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetMySquareConnectionQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetMySquareConnectionQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetMySquareConnectionQuery(baseOptions?: Apollo.QueryHookOptions<GetMySquareConnectionQuery, GetMySquareConnectionQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetMySquareConnectionQuery, GetMySquareConnectionQueryVariables>(GetMySquareConnectionDocument, options);
+      }
+export function useGetMySquareConnectionLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetMySquareConnectionQuery, GetMySquareConnectionQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetMySquareConnectionQuery, GetMySquareConnectionQueryVariables>(GetMySquareConnectionDocument, options);
+        }
+// @ts-ignore
+export function useGetMySquareConnectionSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetMySquareConnectionQuery, GetMySquareConnectionQueryVariables>): Apollo.UseSuspenseQueryResult<GetMySquareConnectionQuery, GetMySquareConnectionQueryVariables>;
+export function useGetMySquareConnectionSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetMySquareConnectionQuery, GetMySquareConnectionQueryVariables>): Apollo.UseSuspenseQueryResult<GetMySquareConnectionQuery | undefined, GetMySquareConnectionQueryVariables>;
+export function useGetMySquareConnectionSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetMySquareConnectionQuery, GetMySquareConnectionQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetMySquareConnectionQuery, GetMySquareConnectionQueryVariables>(GetMySquareConnectionDocument, options);
+        }
+export type GetMySquareConnectionQueryHookResult = ReturnType<typeof useGetMySquareConnectionQuery>;
+export type GetMySquareConnectionLazyQueryHookResult = ReturnType<typeof useGetMySquareConnectionLazyQuery>;
+export type GetMySquareConnectionSuspenseQueryHookResult = ReturnType<typeof useGetMySquareConnectionSuspenseQuery>;
+export type GetMySquareConnectionQueryResult = Apollo.QueryResult<GetMySquareConnectionQuery, GetMySquareConnectionQueryVariables>;
+export const GetMySquareAuthorizationUrlDocument = gql`
+    query GetMySquareAuthorizationUrl {
+  getMySquareAuthorizationUrl(platform: "mobile")
+}
+    `;
+
+/**
+ * __useGetMySquareAuthorizationUrlQuery__
+ *
+ * To run a query within a React component, call `useGetMySquareAuthorizationUrlQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetMySquareAuthorizationUrlQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetMySquareAuthorizationUrlQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetMySquareAuthorizationUrlQuery(baseOptions?: Apollo.QueryHookOptions<GetMySquareAuthorizationUrlQuery, GetMySquareAuthorizationUrlQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetMySquareAuthorizationUrlQuery, GetMySquareAuthorizationUrlQueryVariables>(GetMySquareAuthorizationUrlDocument, options);
+      }
+export function useGetMySquareAuthorizationUrlLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetMySquareAuthorizationUrlQuery, GetMySquareAuthorizationUrlQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetMySquareAuthorizationUrlQuery, GetMySquareAuthorizationUrlQueryVariables>(GetMySquareAuthorizationUrlDocument, options);
+        }
+// @ts-ignore
+export function useGetMySquareAuthorizationUrlSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetMySquareAuthorizationUrlQuery, GetMySquareAuthorizationUrlQueryVariables>): Apollo.UseSuspenseQueryResult<GetMySquareAuthorizationUrlQuery, GetMySquareAuthorizationUrlQueryVariables>;
+export function useGetMySquareAuthorizationUrlSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetMySquareAuthorizationUrlQuery, GetMySquareAuthorizationUrlQueryVariables>): Apollo.UseSuspenseQueryResult<GetMySquareAuthorizationUrlQuery | undefined, GetMySquareAuthorizationUrlQueryVariables>;
+export function useGetMySquareAuthorizationUrlSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetMySquareAuthorizationUrlQuery, GetMySquareAuthorizationUrlQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetMySquareAuthorizationUrlQuery, GetMySquareAuthorizationUrlQueryVariables>(GetMySquareAuthorizationUrlDocument, options);
+        }
+export type GetMySquareAuthorizationUrlQueryHookResult = ReturnType<typeof useGetMySquareAuthorizationUrlQuery>;
+export type GetMySquareAuthorizationUrlLazyQueryHookResult = ReturnType<typeof useGetMySquareAuthorizationUrlLazyQuery>;
+export type GetMySquareAuthorizationUrlSuspenseQueryHookResult = ReturnType<typeof useGetMySquareAuthorizationUrlSuspenseQuery>;
+export type GetMySquareAuthorizationUrlQueryResult = Apollo.QueryResult<GetMySquareAuthorizationUrlQuery, GetMySquareAuthorizationUrlQueryVariables>;
+export const DisconnectMySquareDocument = gql`
+    mutation DisconnectMySquare {
+  disconnectMySquare {
+    source
+    connected
+    locationId
+    connectedAt
+    ownerName
+  }
+}
+    `;
+export type DisconnectMySquareMutationFn = Apollo.MutationFunction<DisconnectMySquareMutation, DisconnectMySquareMutationVariables>;
+
+/**
+ * __useDisconnectMySquareMutation__
+ *
+ * To run a mutation, you first call `useDisconnectMySquareMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useDisconnectMySquareMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [disconnectMySquareMutation, { data, loading, error }] = useDisconnectMySquareMutation({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useDisconnectMySquareMutation(baseOptions?: Apollo.MutationHookOptions<DisconnectMySquareMutation, DisconnectMySquareMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<DisconnectMySquareMutation, DisconnectMySquareMutationVariables>(DisconnectMySquareDocument, options);
+      }
+export type DisconnectMySquareMutationHookResult = ReturnType<typeof useDisconnectMySquareMutation>;
+export type DisconnectMySquareMutationResult = Apollo.MutationResult<DisconnectMySquareMutation>;
+export type DisconnectMySquareMutationOptions = Apollo.BaseMutationOptions<DisconnectMySquareMutation, DisconnectMySquareMutationVariables>;
+export const GetMySquarePricingSettingsDocument = gql`
+    query GetMySquarePricingSettings {
+  getMySquarePricingSettings {
+    source
+    ownerName
+    taxRateBasisPoints
+    squareFeeOffsetCents
+    canEdit
+  }
+}
+    `;
+
+/**
+ * __useGetMySquarePricingSettingsQuery__
+ *
+ * To run a query within a React component, call `useGetMySquarePricingSettingsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetMySquarePricingSettingsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetMySquarePricingSettingsQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetMySquarePricingSettingsQuery(baseOptions?: Apollo.QueryHookOptions<GetMySquarePricingSettingsQuery, GetMySquarePricingSettingsQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetMySquarePricingSettingsQuery, GetMySquarePricingSettingsQueryVariables>(GetMySquarePricingSettingsDocument, options);
+      }
+export function useGetMySquarePricingSettingsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetMySquarePricingSettingsQuery, GetMySquarePricingSettingsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetMySquarePricingSettingsQuery, GetMySquarePricingSettingsQueryVariables>(GetMySquarePricingSettingsDocument, options);
+        }
+// @ts-ignore
+export function useGetMySquarePricingSettingsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetMySquarePricingSettingsQuery, GetMySquarePricingSettingsQueryVariables>): Apollo.UseSuspenseQueryResult<GetMySquarePricingSettingsQuery, GetMySquarePricingSettingsQueryVariables>;
+export function useGetMySquarePricingSettingsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetMySquarePricingSettingsQuery, GetMySquarePricingSettingsQueryVariables>): Apollo.UseSuspenseQueryResult<GetMySquarePricingSettingsQuery | undefined, GetMySquarePricingSettingsQueryVariables>;
+export function useGetMySquarePricingSettingsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetMySquarePricingSettingsQuery, GetMySquarePricingSettingsQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetMySquarePricingSettingsQuery, GetMySquarePricingSettingsQueryVariables>(GetMySquarePricingSettingsDocument, options);
+        }
+export type GetMySquarePricingSettingsQueryHookResult = ReturnType<typeof useGetMySquarePricingSettingsQuery>;
+export type GetMySquarePricingSettingsLazyQueryHookResult = ReturnType<typeof useGetMySquarePricingSettingsLazyQuery>;
+export type GetMySquarePricingSettingsSuspenseQueryHookResult = ReturnType<typeof useGetMySquarePricingSettingsSuspenseQuery>;
+export type GetMySquarePricingSettingsQueryResult = Apollo.QueryResult<GetMySquarePricingSettingsQuery, GetMySquarePricingSettingsQueryVariables>;
+export const UpdateSquarePricingSettingsDocument = gql`
+    mutation UpdateSquarePricingSettings($taxRateBasisPoints: Int!, $squareFeeOffsetCents: Int!) {
+  updateSquarePricingSettings(
+    taxRateBasisPoints: $taxRateBasisPoints
+    squareFeeOffsetCents: $squareFeeOffsetCents
+  ) {
+    source
+    ownerName
+    taxRateBasisPoints
+    squareFeeOffsetCents
+    canEdit
+  }
+}
+    `;
+export type UpdateSquarePricingSettingsMutationFn = Apollo.MutationFunction<UpdateSquarePricingSettingsMutation, UpdateSquarePricingSettingsMutationVariables>;
+
+/**
+ * __useUpdateSquarePricingSettingsMutation__
+ *
+ * To run a mutation, you first call `useUpdateSquarePricingSettingsMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateSquarePricingSettingsMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateSquarePricingSettingsMutation, { data, loading, error }] = useUpdateSquarePricingSettingsMutation({
+ *   variables: {
+ *      taxRateBasisPoints: // value for 'taxRateBasisPoints'
+ *      squareFeeOffsetCents: // value for 'squareFeeOffsetCents'
+ *   },
+ * });
+ */
+export function useUpdateSquarePricingSettingsMutation(baseOptions?: Apollo.MutationHookOptions<UpdateSquarePricingSettingsMutation, UpdateSquarePricingSettingsMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<UpdateSquarePricingSettingsMutation, UpdateSquarePricingSettingsMutationVariables>(UpdateSquarePricingSettingsDocument, options);
+      }
+export type UpdateSquarePricingSettingsMutationHookResult = ReturnType<typeof useUpdateSquarePricingSettingsMutation>;
+export type UpdateSquarePricingSettingsMutationResult = Apollo.MutationResult<UpdateSquarePricingSettingsMutation>;
+export type UpdateSquarePricingSettingsMutationOptions = Apollo.BaseMutationOptions<UpdateSquarePricingSettingsMutation, UpdateSquarePricingSettingsMutationVariables>;
 export const GetStaffListDocument = gql`
     query GetStaffList($includeArchived: Boolean, $page: PageInput) {
   getStaff(includeArchived: $includeArchived, page: $page) {

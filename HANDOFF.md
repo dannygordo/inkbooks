@@ -8,6 +8,36 @@ Last updated: 2026-09-03.
 
 ---
 
+### 2026-09-03 (twenty-second entry): Settings batch 2 - artist's own Square connection + tax/processing pricing
+
+Third of three follow-up items ("Settings batch 2, Messages follow-ups, Mobile deep-link scheme"),
+done first for continuity with the entry above. Full reasoning: DECISIONS.md X34.
+
+Two new cards on `settings/index.tsx` (not new routes): `SquareConnectionCard` and
+`SquarePricingCard`, ports of web's `SquarePanel.jsx`/`SquarePricingPanel.jsx`. Distinct from
+`shop/[id].tsx`'s `SquareCard` - that connects the SHOP's account, this is the ARTIST's own
+(M9). Reuses X33's `platform: "mobile"` deep-link mechanism for free (the resolver already
+supported it) - `settings/index.tsx` now reads `?square=` and shows a banner, closing the one
+follow-up X33 itself named as open. New `packages/api/src/operations/squareSettings.graphql`
+(`GetMySquareConnection`, `GetMySquareAuthorizationUrl`, `DisconnectMySquare`,
+`GetMySquarePricingSettings`, `UpdateSquarePricingSettings`). New `utils/money.ts` exports
+`basisPointsToPercent`/`percentToBasisPoints`, promoted out of `SquarePricingPanel.jsx`'s own
+local helpers.
+
+One noted, not fixed, inconsistency: this card's disconnect confirms first (`Alert.alert`,
+matching web); `shop/[id].tsx`'s own disconnect has no confirmation at all - a real gap noticed
+while building this, named rather than copied, left for whenever that screen is next touched.
+
+Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+full `apps/mobile` Jest suite - 229/229, up from 223. No server-side changes in this entry (X33
+already touched typeDefs/resolvers).
+
+This closes two of the three new follow-up items ("Settings batch 2, Messages follow-ups, Mobile
+deep-link scheme") - Mobile deep-link scheme (X33) and this. Messages follow-ups (image-attachment
+sending, group/shop-wide conversations, per-row mark-unread - X16) is next.
+
+---
+
 ### 2026-09-03 (twenty-first entry): Mobile's first real deep link - Square OAuth "return to the app"
 
 Second of three follow-up items ("Settings batch 2, Messages follow-ups, Mobile deep-link scheme").

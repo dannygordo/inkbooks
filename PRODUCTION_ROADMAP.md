@@ -1155,6 +1155,16 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    link actually resolves to the right mobile route on a real device - no simulator in this
    sandbox to check it.
 
+   **Settings batch 2 (2026-09-03, see DECISIONS.md X34) is the third of this same three-item
+   round** - two new cards on `settings/index.tsx` (not new routes): the artist's own Square
+   connection and the tax-rate/card-processing-offset editor, ports of web's
+   `SquarePanel.jsx`/`SquarePricingPanel.jsx`. Reuses the `platform: "mobile"` deep-link mechanism
+   from the entry just above for free, closing that entry's own named follow-up (`settings/
+   index.tsx` now reads `?square=` and shows a banner too). Confirmed in this sandbox: `packages/
+   api` codegen + build, `apps/mobile` `tsc --noEmit` clean, full `apps/mobile` Jest suite -
+   229/229, up from 223. The rest of Settings (Shop's shop-cut-percent editor, Rates/Booth Rent,
+   Messages, Forms' shop-wide link section, Appearance, Security) remains open, per X31/X34.
+
    Everything else on the ~40-screen list not yet named remains open.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).

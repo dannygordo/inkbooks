@@ -1,12 +1,25 @@
 import {
   useChangePasswordMutation,
+  useDisconnectMySquareMutation,
+  useGetMySquareAuthorizationUrlLazyQuery,
+  useGetMySquareConnectionQuery,
+  useGetMySquarePricingSettingsQuery,
   useGetUserTagColorsQuery,
+  useUpdateSquarePricingSettingsMutation,
   useUpdateUserMutation,
 } from '@inkbooks/api';
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/Avatar';
@@ -21,6 +34,7 @@ import { deleteFile } from '@/firebase/deleteFile';
 import { uploadFileWithProgress } from '@/firebase/uploadFile';
 import { canManageBusinessLedger } from '@/utils/permissions';
 import { avatarFolder, previousAvatarUrl } from '@/utils/avatar';
+import { formatCents, basisPointsToPercent, dollarsToCents, percentToBasisPoints } from '@/utils/money';
 import { formatImagePathForFirebaseStorage } from '@/utils/imagePath';
 import { showAvailableColorTags } from '@/utils/tagColors';
 import { getUserShopId } from '@/utils/user';
@@ -47,14 +61,27 @@ import { getUserShopId } from '@/utils/user';
  *
  * A "Business" section below links out to three more Settings screens (X31) - Income/Expense
  * category management and Recurring Expenses - gated the same `canManageBusinessLedger` as the
- * Income/Expenses pages themselves. Everything else on web's Settings (Shop, Rates, Square
- * Config, Appearance, Notifications, Security, Messages, Forms' shop-wide section) remains
- * unported - see DECISIONS.md X31 for the full list and reasoning.
+ * Income/Expenses pages themselves.
+ *
+ * "Square" and "Tax & processing" (X34) are the artist's OWN Square connection and the tax
+ * rate/card-processing offset every charge is computed from - direct ports of web's SquarePanel.jsx
+ * and SquarePricingPanel.jsx, kept as two cards on this same screen rather than their own routes
+ * since both are short and this screen already mixes several unrelated settings the same way.
+ * Square Connect reuses the exact `platform: "mobile"` deep-link mechanism X33 built for the shop
+ * screen (`getMySquareAuthorizationUrl(platform: "mobile")`), so a tap on "Connect with Square"
+ * here returns to this same screen via `inkbooks://settings?square=<status>` - the `square` param
+ * this screen reads below closes the one follow-up X33 named as still open.
+ *
+ * Everything else on web's Settings (Shop's shop-cut-percent editor, Rates, Booth Rent, Appearance,
+ * Notifications, Security, Messages, Forms' shop-wide section) remains unported - see
+ * DECISIONS.md X31/X34 for the full list and reasoning.
  */
 export default function SettingsScreen() {
   const { user, updateCurrentUser } = useAuth();
   const theme = useTheme();
   const router = useRouter();
+  const params = useLocalSearchParams<{ square?: string }>();
+  const squareStatus = Array.isArray(params.square) ? params.square[0] : params.square;
   const [updateUser] = useUpdateUserMutation();
   const [pickedUri, setPickedUri] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -309,6 +336,10 @@ export default function SettingsScreen() {
             </View>
           ) : null}
 
+          <SquareConnectionCard squareStatus={squareStatus} />
+
+          <SquarePricingCard />
+
           {showsOnACalendar ? (
             <View style={styles.card}>
               <ThemedText type="smallBold">Calendar color</ThemedText>
@@ -349,6 +380,258 @@ export default function SettingsScreen() {
   );
 }
 
+/**
+ * The artist's own Square connection - direct port of web's SquarePanel.jsx. Distinct from
+ * shop/[id].tsx's SquareCard, which connects the SHOP's own account (see that file's own header
+ * comment and DECISIONS.md M9) - every artist has one of these regardless of shop membership.
+ *
+ * Reuses the exact platform: "mobile" deep-link mechanism X33 built for the shop screen: the
+ * authorization URL already asks for platform: "mobile" (squareSettings.graphql), so a tap on
+ * "Connect with Square" returns here via inkbooks://settings?square=<status> - `squareStatus`
+ * (read by the parent screen from useLocalSearchParams) drives the banner and refetch below the
+ * same way shop/[id].tsx's own SquareCard does.
+ *
+ * UNLIKE shop/[id].tsx's own handleDisconnect, this confirms before disconnecting (Alert.alert,
+ * matching web's window.confirm and this app's own recurring-expenses.tsx delete-confirm
+ * convention) - the shop screen's bare, unconfirmed disconnect is a real, narrow inconsistency
+ * worth fixing there too, not repeated here on purpose.
+ */
+function SquareConnectionCard({ squareStatus }: { squareStatus?: string }) {
+  const { data, loading, refetch } = useGetMySquareConnectionQuery();
+  const [fetchAuthorizationUrl, { loading: connecting }] = useGetMySquareAuthorizationUrlLazyQuery({
+    fetchPolicy: 'network-only',
+  });
+  const [disconnectSquare, { loading: disconnecting }] = useDisconnectMySquareMutation();
+  const [error, setError] = useState<string | null>(null);
+
+  // Belt-and-suspenders alongside Apollo's own cache, matching shop/[id].tsx's identical effect -
+  // covers expo-router reusing an already-mounted Settings screen rather than remounting it when
+  // the OS opens the inkbooks://settings?square=... deep link.
+  useEffect(() => {
+    if (squareStatus) {
+      refetch();
+    }
+  }, [squareStatus, refetch]);
+
+  const handleConnect = () => {
+    setError(null);
+    fetchAuthorizationUrl()
+      .then((result) => {
+        const url = result.data?.getMySquareAuthorizationUrl;
+        if (!url) {
+          setError("Couldn't start Square connection.");
+          return;
+        }
+        return Linking.openURL(url);
+      })
+      .catch((err) => setError((err as Error).message));
+  };
+
+  const handleDisconnect = () => {
+    Alert.alert('Disconnect Square?', 'You can reconnect at any time.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Disconnect',
+        style: 'destructive',
+        onPress: () => {
+          setError(null);
+          disconnectSquare()
+            .then(() => refetch())
+            .catch((err) => setError((err as Error).message));
+        },
+      },
+    ]);
+  };
+
+  if (loading || !data) {
+    return null;
+  }
+
+  const { connected, connectedAt } = data.getMySquareConnection;
+
+  const returnBanner =
+    squareStatus === 'connected'
+      ? { text: 'Square connected.', testID: 'square-return-connected' as const }
+      : squareStatus === 'denied'
+        ? {
+            text: 'Square connection cancelled - nothing changed.',
+            testID: 'square-return-denied' as const,
+          }
+        : squareStatus
+          ? {
+              text: 'Something went wrong connecting Square. Please try again.',
+              testID: 'square-return-error' as const,
+            }
+          : null;
+
+  return (
+    <View style={styles.card}>
+      <ThemedText type="smallBold">Square</ThemedText>
+      <ThemedText type="small" themeColor="textSecondary">
+        Connect Square to take card payments and deposits. Clients pay you directly - if you work
+        at a shop, their cut is settled separately, afterwards.
+      </ThemedText>
+      {returnBanner ? (
+        <ThemedText type="small" testID={returnBanner.testID}>
+          {returnBanner.text}
+        </ThemedText>
+      ) : null}
+      {error ? (
+        <ThemedText type="small" style={styles.error}>
+          {error}
+        </ThemedText>
+      ) : null}
+      {connected ? (
+        <>
+          <ThemedText type="default" testID="square-connected">
+            Connected
+          </ThemedText>
+          {connectedAt ? (
+            <ThemedText type="small" themeColor="textSecondary">
+              Connected on {new Date(connectedAt).toLocaleDateString()}.
+            </ThemedText>
+          ) : null}
+          <View style={styles.actions}>
+            <Button
+              label="Disconnect Square"
+              variant="danger"
+              onPress={handleDisconnect}
+              loading={disconnecting}
+              testID="square-disconnect"
+            />
+          </View>
+        </>
+      ) : (
+        <>
+          <ThemedText type="default" themeColor="textSecondary" testID="square-not-connected">
+            Not connected
+          </ThemedText>
+          <View style={styles.actions}>
+            <Button
+              label="Connect with Square"
+              variant="secondary"
+              onPress={handleConnect}
+              loading={connecting}
+              testID="square-connect"
+            />
+          </View>
+        </>
+      )}
+    </View>
+  );
+}
+
+/**
+ * Sales tax and the card processing offset - direct port of web's SquarePricingPanel.jsx. Units
+ * are converted here and only here (utils/money.ts's basisPointsToPercent/percentToBasisPoints/
+ * dollarsToCents) - the server stores/receives basis points and cents, never a float percent.
+ * Read-only (canEdit: false) for a shop artist who isn't an admin, same as web.
+ */
+function SquarePricingCard() {
+  const { data, loading, refetch } = useGetMySquarePricingSettingsQuery();
+  const [updatePricing, { loading: saving }] = useUpdateSquarePricingSettingsMutation();
+  const [editedPercent, setEditedPercent] = useState<string | undefined>(undefined);
+  const [editedOffset, setEditedOffset] = useState<string | undefined>(undefined);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  if (loading || !data) {
+    return null;
+  }
+
+  const settings = data.getMySquarePricingSettings;
+  const { source, ownerName, taxRateBasisPoints, squareFeeOffsetCents, canEdit } = settings;
+
+  const percentValue = editedPercent ?? basisPointsToPercent(taxRateBasisPoints);
+  const offsetValue = editedOffset ?? String((squareFeeOffsetCents || 0) / 100);
+
+  const handleSave = () => {
+    setError(null);
+    setSaved(false);
+    updatePricing({
+      variables: {
+        taxRateBasisPoints: percentToBasisPoints(percentValue),
+        squareFeeOffsetCents: dollarsToCents(offsetValue),
+      },
+    })
+      .then(() => {
+        refetch();
+        setEditedPercent(undefined);
+        setEditedOffset(undefined);
+        setSaved(true);
+      })
+      .catch((err) => setError((err as Error).message));
+  };
+
+  return (
+    <View style={styles.card}>
+      <ThemedText type="smallBold">Tax &amp; processing</ThemedText>
+      <ThemedText type="small" themeColor="textSecondary">
+        {source === 'shop'
+          ? `Set by ${ownerName || 'your shop'} and applied to every session and deposit charged here. Sales tax is charged where the work happens, so it is the same for everyone at the shop.`
+          : 'Applied to every session and deposit you charge. Sales tax is charged where the work happens - use the rate for your location.'}
+      </ThemedText>
+      {taxRateBasisPoints === 0 ? (
+        <ThemedText type="small" style={styles.warning}>
+          No sales tax is being collected on any charge.
+        </ThemedText>
+      ) : null}
+      <FormField
+        label="Sales tax (%)"
+        value={percentValue}
+        onChangeText={setEditedPercent}
+        editable={canEdit}
+        keyboardType="decimal-pad"
+        testID="settings-square-tax-rate"
+      />
+      <ThemedText type="small" themeColor="textSecondary">
+        For example 9.4 for 9.4%.
+      </ThemedText>
+      <FormField
+        label="Card processing offset ($ per hour)"
+        value={offsetValue}
+        onChangeText={setEditedOffset}
+        editable={canEdit}
+        keyboardType="decimal-pad"
+        testID="settings-square-fee-offset"
+      />
+      <ThemedText type="small" themeColor="textSecondary">
+        Offered as a choice at checkout, never added automatically. Leave at 0 to not pass card
+        fees on.
+      </ThemedText>
+      {squareFeeOffsetCents > 0 ? (
+        <ThemedText type="small" themeColor="textSecondary">
+          A three-hour session would be offered {formatCents(squareFeeOffsetCents * 3)} of offset.
+        </ThemedText>
+      ) : null}
+      {canEdit ? (
+        <View style={styles.actions}>
+          <Button
+            label="Save"
+            onPress={handleSave}
+            loading={saving}
+            testID="settings-square-pricing-save"
+          />
+          {saved ? (
+            <ThemedText type="small" themeColor="textSecondary">
+              Saved
+            </ThemedText>
+          ) : null}
+        </View>
+      ) : (
+        <ThemedText type="small" themeColor="textSecondary">
+          Only a shop admin can change these.
+        </ThemedText>
+      )}
+      {error ? (
+        <ThemedText type="small" style={styles.error}>
+          {error}
+        </ThemedText>
+      ) : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -378,6 +661,9 @@ const styles = StyleSheet.create({
   },
   error: {
     color: '#D33',
+  },
+  warning: {
+    color: '#B36B00',
   },
   swatchGrid: {
     flexDirection: 'row',
