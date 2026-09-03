@@ -137,6 +137,10 @@ function RootNavigator() {
         {/* An artist's own rates + which-rate-applies (X37) - reached from settings/index.tsx's
             own "Rates" link. */}
         <Stack.Screen name="settings/rates" options={{ headerShown: true, title: 'Rates' }} />
+        {/* Messages category, first sub-slice (X38) - Reminders, reached from settings/index.tsx's
+            own "Messages" section. AutoResponsesPanel/ResponseTimePanel/SystemMessageTemplatesPanel
+            remain open, named in DECISIONS.md X31/X38. */}
+        <Stack.Screen name="settings/reminders" options={{ headerShown: true, title: 'Reminders' }} />
         {/* The client roster - see clients/index.tsx's own header comment. Reached from
             index.tsx's header, and the second (real) entry point into client/[id].tsx below -
             that screen's own X15 comment named this as worth building. */}

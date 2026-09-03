@@ -81,9 +81,14 @@ import { getUserShopId } from '@/utils/user';
  * shop-connected, whose rate actually applies to their sessions. `BoothRentPanel`'s "your booth
  * rent" card is a real, separate feature with no existing mobile infrastructure - not folded in.
  *
- * Everything else on web's Settings (Appearance, Notifications, Security, Messages, Forms'
- * per-artist "Your link" section) remains unported - see DECISIONS.md X31/X34/X36/X37 for the
- * full list and reasoning.
+ * A "Messages" link (X38) routes any artist to `settings/reminders.tsx`, the first of the four
+ * web panels (Reminders/AutoResponses/ResponseTime/SystemMessageTemplates) X31 named as the
+ * largest remaining chunk - taken one screen at a time, same as the Business/Rates links above,
+ * rather than one combined screen. The other three remain open.
+ *
+ * Everything else on web's Settings (Appearance, Notifications, Security, Forms' per-artist
+ * "Your link" section) remains unported - see DECISIONS.md X31/X34/X36/X37/X38 for the full list
+ * and reasoning.
  */
 export default function SettingsScreen() {
   const { user, updateCurrentUser } = useAuth();
@@ -345,6 +350,23 @@ export default function SettingsScreen() {
                   variant="secondary"
                   onPress={() => router.push('/settings/rates')}
                   testID="settings-rates-link"
+                />
+              </View>
+            </View>
+          ) : null}
+
+          {user.userType === 'artist' ? (
+            <View style={styles.card}>
+              <ThemedText type="smallBold">Messages</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                Automatic reminders sent to clients ahead of an appointment.
+              </ThemedText>
+              <View style={styles.linkList}>
+                <Button
+                  label="Reminders"
+                  variant="secondary"
+                  onPress={() => router.push('/settings/reminders')}
+                  testID="settings-reminders-link"
                 />
               </View>
             </View>

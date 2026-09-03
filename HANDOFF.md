@@ -8,6 +8,37 @@ Last updated: 2026-09-03.
 
 ---
 
+### 2026-09-03 (twenty-sixth entry): Messages batch 1 - Reminders
+
+Next slice from the same Settings follow-up list. Full reasoning: DECISIONS.md X38.
+
+Messages is web's largest remaining named chunk (four panels, 1,175 combined lines) - taken one
+screen at a time rather than as one slice, same as Settings itself was. This is the first:
+Reminders (appointment nudges to clients, by email and/or text). New `settings/reminders.tsx`
+(gated `user.userType === 'artist'`), new self-scoped `packages/api/src/operations/
+reminderSettings.graphql` (`GetReminderSettings`/`UpdateReminderSettings` - both already existed
+server-side, so this was client-operations-only). Reached from a new "Messages" card on
+`settings/index.tsx`.
+
+Confirmed directly against `server/models/ReminderSettings.js` before writing the helper text:
+one shared InkBooks texting number, not one registered per artist - turning Text reminders on
+just starts using the number InkBooks already has.
+
+Fully controlled, hydrated once (a `hydrated` flag, matching web's own `useEffect` gate) rather
+than rates.tsx's (X37) uncontrolled/edit-tracked pattern - every field here is meant to reflect
+live local state after load, unlike a `TextInput` needing only an initial value.
+
+`PillRow` (X37) used again for the per-rule unit picker - third real call site.
+
+Not built: `AutoResponsesPanel.jsx`, `ResponseTimePanel.jsx`, `SystemMessageTemplatesPanel.jsx` -
+each its own remaining Messages sub-slice.
+
+Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+full `apps/mobile` Jest suite - still 229/229 (no new pure-logic module needed). No server-side
+changes.
+
+---
+
 ### 2026-09-03 (twenty-fifth entry): Settings batch 4 - an artist's own Rates
 
 Next slice from the same Settings follow-up list. Full reasoning: DECISIONS.md X37.

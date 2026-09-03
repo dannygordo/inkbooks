@@ -1,0 +1,47 @@
+# settings/reminders.tsx (DECISIONS.md X38) - appointment reminders sent to CLIENTS ahead of an
+# appointment, by email and/or text. Direct port of apps/web's RemindersPanel.jsx. Self-scoped,
+# same authority shape as rateSettings.graphql/the Square connection - always the signed-in
+# artist's own row, no id argument on the query at all (see server/models/ReminderSettings.js).
+query GetReminderSettings {
+	getReminderSettings {
+		emailEnabled
+		smsEnabled
+		rules {
+			id
+			offsetMinutes
+			enabled
+		}
+		emailSubjectTemplate
+		emailBodyTemplate
+		smsTemplate
+	}
+}
+
+mutation UpdateReminderSettings(
+	$emailEnabled: Boolean
+	$smsEnabled: Boolean
+	$rules: [ReminderRuleInput!]
+	$emailSubjectTemplate: String
+	$emailBodyTemplate: String
+	$smsTemplate: String
+) {
+	updateReminderSettings(
+		emailEnabled: $emailEnabled
+		smsEnabled: $smsEnabled
+		rules: $rules
+		emailSubjectTemplate: $emailSubjectTemplate
+		emailBodyTemplate: $emailBodyTemplate
+		smsTemplate: $smsTemplate
+	) {
+		emailEnabled
+		smsEnabled
+		rules {
+			id
+			offsetMinutes
+			enabled
+		}
+		emailSubjectTemplate
+		emailBodyTemplate
+		smsTemplate
+	}
+}

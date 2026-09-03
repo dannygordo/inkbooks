@@ -2094,6 +2094,66 @@ for actually sharing it.
 `FORM_FIELD_TYPE_LABELS`/`formFieldTypeLabel`) - same "build the map directly, don't port
 `prettyConstantsListValue`" reasoning as `utils/projectStatus.ts` (X20).
 
+### X38. Messages batch 1 - Reminders (appointment nudges to clients, by email and/or text)
+
+Fourth of the four follow-up items, continuing down X31's own "roughly in order of likely value"
+list after Shop (X36) and Rates (X37). Messages is web's largest remaining named chunk - four
+panels, 1,175 combined lines (`RemindersPanel.jsx` 291, `AutoResponsesPanel.jsx` 396,
+`ResponseTimePanel.jsx` 205, `SystemMessageTemplatesPanel.jsx` 283) - too large for one slice with
+this project's usual per-feature rigor, so it's being taken the same way Settings itself was: one
+coherent screen at a time, named and committed separately. This slice is the first: Reminders.
+
+**Direct port of `RemindersPanel.jsx`**, reached from a new "Messages" card on `settings/
+index.tsx` (gated `user.userType === 'artist'`, matching web's `isArtist(user)` - the category-
+level gate in `settingsCategories.jsx` itself, not any deeper per-panel gate; `RemindersPanel`
+itself has no further internal gating once the category is visible). New route `settings/
+reminders.tsx`, registered in `_layout.tsx`.
+
+**Self-scoped, no id argument anywhere** - same authority shape as the Square connection and
+Rates (X37): always the signed-in artist's own `ReminderSettings` row
+(`server/models/ReminderSettings.js`'s own comment on this). New `packages/api/src/operations/
+reminderSettings.graphql` (`GetReminderSettings`/`UpdateReminderSettings`) - both the query and
+mutation already existed server-side (`server/graphql/typeDefs.js`), so this slice is
+client-operations-only, no server changes.
+
+**ONE SHARED INKBOOKS TEXTING NUMBER, not one per artist** - confirmed directly against
+`ReminderSettings.js`'s own design comment before writing the mobile helper text, since getting
+this backwards ("this connects your own number") would misrepresent a real product fact, not just
+a UI detail. Turning Text reminders on just starts using the number InkBooks already has; the
+shared-infrastructure helper text ("shared infrastructure across every artist... keep an eye on
+your reply rate") is carried over from web verbatim rather than softened.
+
+**Offsets edited in a human unit, stored/sent as minutes** - `minutesToUnit`/`unitToMinutes`
+ported directly from web's own module-local functions (not extracted to a shared util, matching
+web's own placement, since nothing else on either platform needs them). A rule's identity is its
+`offsetMinutes` value server-side, not any client id - `nextLocalKey()`'s module-level counter for
+new, unsaved rows is a straight port of web's identical pattern.
+
+**Fully controlled, hydrated once via a `hydrated` flag** - deliberately NOT the uncontrolled/
+edit-tracked pattern rates.tsx (X37) uses for `hourlyRate`/`flatRate`. Every field on this screen
+(two Switches, a `PillRow` per rule, three template `TextInput`s) is meant to reflect and freely
+change local state after the query resolves, which is exactly what web's own `useEffect`-gated
+`hydrated` state does - the uncontrolled pattern exists specifically for `TextInput`'s `value`-
+after-first-edit quirk, which doesn't apply here since nothing needs an *initial* value read
+independent of later edits.
+
+**Shared `PillRow` (extracted in X37) used for the per-rule unit picker** - the third real call
+site (`form/[id].tsx`'s field-type picker, `settings/rates.tsx`'s billing type and rate source,
+now this), continuing to avoid a fourth inline copy. `recurring-expenses.tsx`'s own still-inline
+`PillRow` (X31, predates the X37 extraction) is left as-is - a drive-by refactor of unrelated,
+already-shipped code, not part of this slice's scope.
+
+**NOT BUILT HERE**: `AutoResponsesPanel.jsx` (auto-reply rules, with its own two-tier gating -
+`isArtist` for an artist's own auto-responses, `hasAuditAuthority`-and-has-a-shop for a shop-wide
+section), `ResponseTimePanel.jsx` (expected-response-time setting shown to clients), and
+`SystemMessageTemplatesPanel.jsx` (template text for system-generated messages) - each named as
+its own remaining Messages sub-slice, not folded into this one.
+
+Verification: `packages/api` codegen + build (new `useGetReminderSettingsQuery`/
+`useUpdateReminderSettingsMutation` hooks generated cleanly), `apps/mobile` `tsc --noEmit` clean,
+full Jest suite 229/229 (unchanged - no new pure-logic module needed, matching web's own choice to
+keep `minutesToUnit`/`unitToMinutes` screen-local rather than extract them).
+
 ### X37. Settings batch 4 - an artist's own Rates (billing type, hourly/flat rate, which-rate-applies)
 
 Next slice from X31/X34/X36's own follow-up list. Direct port of apps/web's RatesPanel.jsx, kept
@@ -2492,7 +2552,8 @@ likely value**:
   land is still true) - left as its own future slice, not folded into this one.
 - **Messages** (`RemindersPanel.jsx`, `AutoResponsesPanel.jsx`, `ResponseTimePanel.jsx`,
   `SystemMessageTemplatesPanel.jsx`) - the largest remaining chunk (over 1,100 combined web lines),
-  real separate scope on its own.
+  real separate scope on its own. ~~`RemindersPanel.jsx`~~ - **done, see X38.**
+  `AutoResponsesPanel.jsx`/`ResponseTimePanel.jsx`/`SystemMessageTemplatesPanel.jsx` remain open.
 - **Forms' shop-wide section** (`FormsPanel.jsx`'s "Your link"/URL list, absorbed from the old
   Booking category) - forms/index.tsx and form/[id].tsx (X28/X30) cover form management itself;
   this is the separate "here's your booking link to share" view.

@@ -3392,6 +3392,23 @@ export type DeleteRecurringExpenseMutationVariables = Exact<{
 
 export type DeleteRecurringExpenseMutation = { __typename?: 'Mutation', deleteRecurringExpense: boolean };
 
+export type GetReminderSettingsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetReminderSettingsQuery = { __typename?: 'Query', getReminderSettings: { __typename?: 'ReminderSettings', emailEnabled: boolean, smsEnabled: boolean, emailSubjectTemplate?: string | null, emailBodyTemplate?: string | null, smsTemplate?: string | null, rules: Array<{ __typename?: 'ReminderRule', id: string, offsetMinutes: number, enabled: boolean }> } };
+
+export type UpdateReminderSettingsMutationVariables = Exact<{
+  emailEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  smsEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  rules?: InputMaybe<Array<ReminderRuleInput> | ReminderRuleInput>;
+  emailSubjectTemplate?: InputMaybe<Scalars['String']['input']>;
+  emailBodyTemplate?: InputMaybe<Scalars['String']['input']>;
+  smsTemplate?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type UpdateReminderSettingsMutation = { __typename?: 'Mutation', updateReminderSettings: { __typename?: 'ReminderSettings', emailEnabled: boolean, smsEnabled: boolean, emailSubjectTemplate?: string | null, emailBodyTemplate?: string | null, smsTemplate?: string | null, rules: Array<{ __typename?: 'ReminderRule', id: string, offsetMinutes: number, enabled: boolean }> } };
+
 export type UpdateSessionDetailsMutationVariables = Exact<{
   appointmentInput?: InputMaybe<AppointmentInput>;
 }>;
@@ -7759,6 +7776,111 @@ export function useDeleteRecurringExpenseMutation(baseOptions?: Apollo.MutationH
 export type DeleteRecurringExpenseMutationHookResult = ReturnType<typeof useDeleteRecurringExpenseMutation>;
 export type DeleteRecurringExpenseMutationResult = Apollo.MutationResult<DeleteRecurringExpenseMutation>;
 export type DeleteRecurringExpenseMutationOptions = Apollo.BaseMutationOptions<DeleteRecurringExpenseMutation, DeleteRecurringExpenseMutationVariables>;
+export const GetReminderSettingsDocument = gql`
+    query GetReminderSettings {
+  getReminderSettings {
+    emailEnabled
+    smsEnabled
+    rules {
+      id
+      offsetMinutes
+      enabled
+    }
+    emailSubjectTemplate
+    emailBodyTemplate
+    smsTemplate
+  }
+}
+    `;
+
+/**
+ * __useGetReminderSettingsQuery__
+ *
+ * To run a query within a React component, call `useGetReminderSettingsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetReminderSettingsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetReminderSettingsQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetReminderSettingsQuery(baseOptions?: Apollo.QueryHookOptions<GetReminderSettingsQuery, GetReminderSettingsQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetReminderSettingsQuery, GetReminderSettingsQueryVariables>(GetReminderSettingsDocument, options);
+      }
+export function useGetReminderSettingsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetReminderSettingsQuery, GetReminderSettingsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetReminderSettingsQuery, GetReminderSettingsQueryVariables>(GetReminderSettingsDocument, options);
+        }
+// @ts-ignore
+export function useGetReminderSettingsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetReminderSettingsQuery, GetReminderSettingsQueryVariables>): Apollo.UseSuspenseQueryResult<GetReminderSettingsQuery, GetReminderSettingsQueryVariables>;
+export function useGetReminderSettingsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetReminderSettingsQuery, GetReminderSettingsQueryVariables>): Apollo.UseSuspenseQueryResult<GetReminderSettingsQuery | undefined, GetReminderSettingsQueryVariables>;
+export function useGetReminderSettingsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetReminderSettingsQuery, GetReminderSettingsQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetReminderSettingsQuery, GetReminderSettingsQueryVariables>(GetReminderSettingsDocument, options);
+        }
+export type GetReminderSettingsQueryHookResult = ReturnType<typeof useGetReminderSettingsQuery>;
+export type GetReminderSettingsLazyQueryHookResult = ReturnType<typeof useGetReminderSettingsLazyQuery>;
+export type GetReminderSettingsSuspenseQueryHookResult = ReturnType<typeof useGetReminderSettingsSuspenseQuery>;
+export type GetReminderSettingsQueryResult = Apollo.QueryResult<GetReminderSettingsQuery, GetReminderSettingsQueryVariables>;
+export const UpdateReminderSettingsDocument = gql`
+    mutation UpdateReminderSettings($emailEnabled: Boolean, $smsEnabled: Boolean, $rules: [ReminderRuleInput!], $emailSubjectTemplate: String, $emailBodyTemplate: String, $smsTemplate: String) {
+  updateReminderSettings(
+    emailEnabled: $emailEnabled
+    smsEnabled: $smsEnabled
+    rules: $rules
+    emailSubjectTemplate: $emailSubjectTemplate
+    emailBodyTemplate: $emailBodyTemplate
+    smsTemplate: $smsTemplate
+  ) {
+    emailEnabled
+    smsEnabled
+    rules {
+      id
+      offsetMinutes
+      enabled
+    }
+    emailSubjectTemplate
+    emailBodyTemplate
+    smsTemplate
+  }
+}
+    `;
+export type UpdateReminderSettingsMutationFn = Apollo.MutationFunction<UpdateReminderSettingsMutation, UpdateReminderSettingsMutationVariables>;
+
+/**
+ * __useUpdateReminderSettingsMutation__
+ *
+ * To run a mutation, you first call `useUpdateReminderSettingsMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateReminderSettingsMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateReminderSettingsMutation, { data, loading, error }] = useUpdateReminderSettingsMutation({
+ *   variables: {
+ *      emailEnabled: // value for 'emailEnabled'
+ *      smsEnabled: // value for 'smsEnabled'
+ *      rules: // value for 'rules'
+ *      emailSubjectTemplate: // value for 'emailSubjectTemplate'
+ *      emailBodyTemplate: // value for 'emailBodyTemplate'
+ *      smsTemplate: // value for 'smsTemplate'
+ *   },
+ * });
+ */
+export function useUpdateReminderSettingsMutation(baseOptions?: Apollo.MutationHookOptions<UpdateReminderSettingsMutation, UpdateReminderSettingsMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<UpdateReminderSettingsMutation, UpdateReminderSettingsMutationVariables>(UpdateReminderSettingsDocument, options);
+      }
+export type UpdateReminderSettingsMutationHookResult = ReturnType<typeof useUpdateReminderSettingsMutation>;
+export type UpdateReminderSettingsMutationResult = Apollo.MutationResult<UpdateReminderSettingsMutation>;
+export type UpdateReminderSettingsMutationOptions = Apollo.BaseMutationOptions<UpdateReminderSettingsMutation, UpdateReminderSettingsMutationVariables>;
 export const UpdateSessionDetailsDocument = gql`
     mutation UpdateSessionDetails($appointmentInput: AppointmentInput) {
   updateAppointment(appointmentInput: $appointmentInput) {

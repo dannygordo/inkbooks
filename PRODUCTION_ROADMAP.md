@@ -1197,6 +1197,16 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    full `apps/mobile` Jest suite - still 229/229. Booth Rent, the Messages settings category,
    Forms' per-artist "Your link" section, Appearance, and Security remain open.
 
+   **Messages batch 1 (2026-09-03, see DECISIONS.md X38) is the next slice** - `settings/
+   reminders.tsx`: appointment reminders to clients by email/text, offsets in a human unit
+   (minutes/hours/days) stored as minutes, per-channel toggles, and optional message-template
+   overrides. Self-scoped, client-operations-only (both `getReminderSettings`/
+   `updateReminderSettings` already existed server-side). `AutoResponsesPanel.jsx`,
+   `ResponseTimePanel.jsx`, and `SystemMessageTemplatesPanel.jsx` remain the rest of the Messages
+   category. Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile`
+   `tsc --noEmit` clean, full `apps/mobile` Jest suite - still 229/229. Booth Rent, the rest of
+   Messages, Forms' per-artist "Your link" section, Appearance, and Security remain open.
+
    Everything else on the ~40-screen list not yet named remains open.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).
