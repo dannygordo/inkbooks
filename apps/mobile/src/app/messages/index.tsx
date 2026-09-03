@@ -1,4 +1,4 @@
-import { useGetConversationsByMemberIdQuery } from '@inkbooks/api';
+import { useGetConversationsByMemberIdQuery, useMarkConversationUnreadMutation } from '@inkbooks/api';
 import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
@@ -15,9 +15,12 @@ import { otherMembers, type ConversationListItem } from '@/utils/conversations';
  * Third and last of X13's still-unported items (avatar upload and the client-dashboard
  * shared-images panel are X14/X15) - the inbox half of Messages. Direct scope-down of apps/web's
  * Messenger.jsx: one 1:1-thread list (getConversationsByMemberId, self-only server-side), no
- * search box, no per-row "mark unread" menu, and no shop-wide/group conversations
- * (getConversationsByShopId) - all real web features, all deliberately left for later. Full
- * reasoning: DECISIONS.md X16.
+ * search box, and no shop-wide/group conversations (getConversationsByShopId) - both real web
+ * features, still deliberately left for later. Full reasoning: DECISIONS.md X16.
+ *
+ * Per-row "Mark as unread" (X35, closing that gap) is wired here and rendered by
+ * ConversationRow.tsx itself - see that component's own header comment for why it's a plain
+ * trailing text button rather than web's overflow-menu shape.
  *
  * Polled (network-only fetch + a 30s pollInterval) rather than updated over a socket - mobile has
  * no socket.io-client dependency anywhere, and X12/X13's own "avoid a native rebuild where RN
@@ -37,6 +40,16 @@ export default function MessagesInboxScreen() {
     fetchPolicy: 'network-only',
     pollInterval: 30000,
   });
+
+  const [markConversationUnread] = useMarkConversationUnreadMutation({
+    refetchQueries: ['GetUnreadMessageCount', 'GetConversationsByMemberId'],
+  });
+  const handleMarkUnread = (conversation: ConversationListItem) => {
+    markConversationUnread({ variables: { conversationId: conversation.id } }).catch(() => {
+      // Same reasoning as the thread screen's own swallowed catch on markConversationRead: a
+      // failed toggle is a wrong badge, not lost data.
+    });
+  };
 
   const conversations = data?.getConversationsByMemberId?.filter(
     (conversation): conversation is ConversationListItem => Boolean(conversation),
@@ -73,7 +86,12 @@ export default function MessagesInboxScreen() {
             keyExtractor={(conversation) => conversation.id}
             testID="conversations-list"
             renderItem={({ item }) => (
-              <ConversationRow conversation={item} myId={user?.id} onPress={() => openConversation(item)} />
+              <ConversationRow
+                conversation={item}
+                myId={user?.id}
+                onPress={() => openConversation(item)}
+                onMarkUnread={() => handleMarkUnread(item)}
+              />
             )}
           />
         )}

@@ -9,9 +9,9 @@ import { prettyMessageTime } from '@/utils/messageTime';
 // Port of apps/web's IBMessage.jsx - own/other bubble styling, avatar only on the other person's
 // side (own messages need no avatar of yourself), image attachments rendered inline. Unlike web's
 // "open full size in a new tab" (this component has no lightbox), attachments here are just
-// larger inline thumbnails - a tap-to-enlarge viewer is real follow-up work, not built for this
-// first pass since mobile can't compose an image message yet either (see DECISIONS.md X16) - any
-// image shown here only ever arrived from a web-side sender.
+// larger inline thumbnails - a tap-to-enlarge viewer is real follow-up work, not built here.
+// mobile can now COMPOSE an image message too (messages/[id].tsx's own attach flow - DECISIONS.md
+// X35), so this renders images from either side, not only ones sent from web.
 export function MessageBubble({
   own,
   message,

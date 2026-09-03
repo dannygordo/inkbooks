@@ -3280,6 +3280,13 @@ export type MarkConversationReadMutationVariables = Exact<{
 
 export type MarkConversationReadMutation = { __typename?: 'Mutation', markConversationRead: { __typename?: 'Conversation', id: string, unreadCount: number } };
 
+export type MarkConversationUnreadMutationVariables = Exact<{
+  conversationId: Scalars['ID']['input'];
+}>;
+
+
+export type MarkConversationUnreadMutation = { __typename?: 'Mutation', markConversationUnread: { __typename?: 'Conversation', id: string, unreadCount: number } };
+
 export type GetUnreadMessageCountQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -7030,6 +7037,40 @@ export function useMarkConversationReadMutation(baseOptions?: Apollo.MutationHoo
 export type MarkConversationReadMutationHookResult = ReturnType<typeof useMarkConversationReadMutation>;
 export type MarkConversationReadMutationResult = Apollo.MutationResult<MarkConversationReadMutation>;
 export type MarkConversationReadMutationOptions = Apollo.BaseMutationOptions<MarkConversationReadMutation, MarkConversationReadMutationVariables>;
+export const MarkConversationUnreadDocument = gql`
+    mutation MarkConversationUnread($conversationId: ID!) {
+  markConversationUnread(conversationId: $conversationId) {
+    id
+    unreadCount
+  }
+}
+    `;
+export type MarkConversationUnreadMutationFn = Apollo.MutationFunction<MarkConversationUnreadMutation, MarkConversationUnreadMutationVariables>;
+
+/**
+ * __useMarkConversationUnreadMutation__
+ *
+ * To run a mutation, you first call `useMarkConversationUnreadMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useMarkConversationUnreadMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [markConversationUnreadMutation, { data, loading, error }] = useMarkConversationUnreadMutation({
+ *   variables: {
+ *      conversationId: // value for 'conversationId'
+ *   },
+ * });
+ */
+export function useMarkConversationUnreadMutation(baseOptions?: Apollo.MutationHookOptions<MarkConversationUnreadMutation, MarkConversationUnreadMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<MarkConversationUnreadMutation, MarkConversationUnreadMutationVariables>(MarkConversationUnreadDocument, options);
+      }
+export type MarkConversationUnreadMutationHookResult = ReturnType<typeof useMarkConversationUnreadMutation>;
+export type MarkConversationUnreadMutationResult = Apollo.MutationResult<MarkConversationUnreadMutation>;
+export type MarkConversationUnreadMutationOptions = Apollo.BaseMutationOptions<MarkConversationUnreadMutation, MarkConversationUnreadMutationVariables>;
 export const GetUnreadMessageCountDocument = gql`
     query GetUnreadMessageCount {
   getUnreadMessageCount

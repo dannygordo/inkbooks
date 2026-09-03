@@ -1165,6 +1165,18 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    229/229, up from 223. The rest of Settings (Shop's shop-cut-percent editor, Rates/Booth Rent,
    Messages, Forms' shop-wide link section, Appearance, Security) remains open, per X31/X34.
 
+   **Messages follow-ups (2026-09-03, see DECISIONS.md X35) closes out this three-item round** -
+   image-attachment compose (`messages/[id].tsx`, port of web's `IBChatBox.jsx`, upload-on-select
+   via a hand-built multipart POST to `routes/messageUploads.js`) and per-row "mark unread"
+   (`ConversationRow.tsx`, a new `MarkConversationUnread` operation against a mutation that already
+   existed server-side). Group/shop-wide conversations and search-by-name (X16's third named gap)
+   remain open. Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile`
+   `tsc --noEmit` clean, full `apps/mobile` Jest suite - still 229/229. Not verified: a real
+   multipart upload against a running server or device - no way to exercise that end-to-end here.
+
+   This closes the requested three-item follow-up round in full ("Settings batch 2, Messages
+   follow-ups, Mobile deep-link scheme").
+
    Everything else on the ~40-screen list not yet named remains open.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).

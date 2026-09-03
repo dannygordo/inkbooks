@@ -6,19 +6,25 @@ import { Spacing } from '@/constants/theme';
 import { conversationDisplayName, otherMembers, type ConversationListItem } from '@/utils/conversations';
 import { prettyMessageTime } from '@/utils/messageTime';
 
-// Port of apps/web's IBConversation.jsx, scoped down: no per-row overflow menu ("Mark as
-// unread") and no name search box on the list above it - both real web features, left for a
-// follow-up rather than built here, same as every other slice this session (see DECISIONS.md
-// X16). The unread badge is the one piece of IBConversation's own UI kept, since it's the whole
-// point of a list-of-threads screen.
+// Port of apps/web's IBConversation.jsx. No name search box on the list above it - a real web
+// feature, still left for a follow-up (DECISIONS.md X16). "Mark as unread" WAS built (X35,
+// closing that gap): a plain trailing text button rather than web's overflow-menu-then-menu-item
+// (`IconButton` + MUI `Menu`) - there is no icon library anywhere in this app (see settings/
+// index.tsx's own plain-text convention), and one already-unread-hiding condition is simpler as a
+// direct Pressable than as a single-item menu. Mobile has no equivalent of web's second hiding
+// condition ("not the open conversation") - opening a thread here navigates to its own screen
+// rather than staying on this list the way web's two-pane layout does, so there is no "currently
+// open, don't offer this" case to guard against.
 export function ConversationRow({
   conversation,
   myId,
   onPress,
+  onMarkUnread,
 }: {
   conversation: ConversationListItem;
   myId: string | null | undefined;
   onPress: () => void;
+  onMarkUnread?: () => void;
 }) {
   const others = otherMembers(conversation, myId);
   const name = conversationDisplayName(conversation, myId);
@@ -51,9 +57,27 @@ export function ConversationRow({
           {name}
         </ThemedText>
       </View>
-      <ThemedText type="small" themeColor="textSecondary">
-        {prettyMessageTime(conversation.updatedAt)}
-      </ThemedText>
+      <View style={styles.trailing}>
+        <ThemedText type="small" themeColor="textSecondary">
+          {prettyMessageTime(conversation.updatedAt)}
+        </ThemedText>
+        {/* Hidden once already unread - marking an already-unread thread unread again is a
+            no-op with nothing to show for it, matching web's own identical condition. */}
+        {onMarkUnread && unread === 0 ? (
+          <Pressable
+            onPress={(e) => {
+              e.stopPropagation();
+              onMarkUnread();
+            }}
+            hitSlop={8}
+            testID={`conversation-mark-unread-${conversation.id}`}
+          >
+            <ThemedText type="small" themeColor="textSecondary" style={styles.markUnread}>
+              Mark unread
+            </ThemedText>
+          </Pressable>
+        ) : null}
+      </View>
     </Pressable>
   );
 }
@@ -92,5 +116,12 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
+  },
+  trailing: {
+    alignItems: 'flex-end',
+    gap: Spacing.half,
+  },
+  markUnread: {
+    textDecorationLine: 'underline',
   },
 });

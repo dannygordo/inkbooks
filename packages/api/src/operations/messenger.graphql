@@ -3,7 +3,8 @@
 # MessengerService.js operation-by-operation, with the same "no message bodies on the list query"
 # shape that file's own header comment explains: opening the inbox should not pull every message
 # of every thread just to render a name and a badge. See DECISIONS.md X16 for what's deliberately
-# not ported (live socket delivery, per-row "mark unread", search).
+# not ported (live socket delivery, search-by-name, group/shop-wide conversations) and X35 for the
+# image-attachment compose flow and per-row "mark unread" that WERE later added to this slice.
 
 # Self-only server-side (getConversationsByMemberId throws AuthenticationError if memberId isn't
 # the caller's own id - see resolvers/conversations.js) - always call with the signed-in user's
@@ -44,10 +45,10 @@ query GetMessagesByConversationId($conversationId: ID!) {
 }
 
 # No timestamps sent - the server stamps them (see typeDefs.js's own comment on createMessage:
-# thread order and unread state may not be caller-controlled). imageUrls omitted entirely from
-# this slice's mutation call sites (mobile doesn't build the image-attachment compose flow yet -
-# see DECISIONS.md X16) but kept in the schema call and response selection so the thread query
-# above and this mutation's response shape stay interchangeable if that follow-up lands later.
+# thread order and unread state may not be caller-controlled). imageUrls is sent by
+# messages/[id].tsx's own image-attachment compose flow (DECISIONS.md X35, closing the gap X16
+# named) - already uploaded via routes/messageUploads.js by the time this mutation fires, so this
+# variable is always a list of already-hosted URLs, never raw file data.
 mutation CreateMessage($conversationId: ID!, $senderId: ID!, $message: String, $imageUrls: [String!]) {
 	createMessage(conversationId: $conversationId, senderId: $senderId, message: $message, imageUrls: $imageUrls) {
 		id
@@ -63,6 +64,17 @@ mutation CreateMessage($conversationId: ID!, $senderId: ID!, $message: String, $
 # utils/conversation-reads.js's own header comment via MessengerService.js).
 mutation MarkConversationRead($conversationId: ID!) {
 	markConversationRead(conversationId: $conversationId) {
+		id
+		unreadCount
+	}
+}
+
+# The reverse of the above - see conversation-reads.js's markConversationUnreadForUser. Same
+# shape deliberately: this is the same field, just clearing it instead of setting it. Closes the
+# "no per-row mark unread" gap X16 named (DECISIONS.md X35) - ConversationRow.tsx's own overflow
+# action.
+mutation MarkConversationUnread($conversationId: ID!) {
+	markConversationUnread(conversationId: $conversationId) {
 		id
 		unreadCount
 	}

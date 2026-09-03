@@ -8,6 +8,32 @@ Last updated: 2026-09-03.
 
 ---
 
+### 2026-09-03 (twenty-third entry): Messages follow-ups - image-attachment compose + per-row "mark unread"
+
+Last of three follow-up items ("Settings batch 2, Messages follow-ups, Mobile deep-link scheme") -
+closes the round. Full reasoning: DECISIONS.md X35.
+
+Closes two of X16's three named gaps: **image-attachment compose** (`messages/[id].tsx`, port of
+web's `IBChatBox.jsx` - upload-on-select via a hand-built multipart POST to `routes/
+messageUploads.js`, using `restApi.ts`'s existing `restApiUrl`/`getAccessToken`; up to 5 images,
+image-only sends allowed) and **per-row "mark unread"** (`ConversationRow.tsx` +
+`messages/index.tsx`, new `MarkConversationUnread` operation against the `markConversationUnread`
+mutation that already existed server-side - rendered as a plain trailing text button, no icon
+library in this app). Group/shop-wide conversations and search-by-name (X16's third gap) remain
+open - real, separate scope, named rather than attempted here.
+
+Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+full `apps/mobile` Jest suite - still 229/229 (no new screen-level tests, matching X16's own
+precedent for this slice's components). **Not verified**: a real multipart upload against a
+running server or a real device - built by reading `routes/messageUploads.js`'s multer config and
+web's own working fetch call directly, not assumed, but not exercised end-to-end here.
+
+**This closes the requested three-item follow-up round in full** ("Settings batch 2, Messages
+follow-ups, Mobile deep-link scheme" - X33/X34/X35, done in that order for continuity between the
+first two).
+
+---
+
 ### 2026-09-03 (twenty-second entry): Settings batch 2 - artist's own Square connection + tax/processing pricing
 
 Third of three follow-up items ("Settings batch 2, Messages follow-ups, Mobile deep-link scheme"),

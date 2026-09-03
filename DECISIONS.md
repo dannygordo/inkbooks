@@ -2094,6 +2094,63 @@ for actually sharing it.
 `FORM_FIELD_TYPE_LABELS`/`formFieldTypeLabel`) - same "build the map directly, don't port
 `prettyConstantsListValue`" reasoning as `utils/projectStatus.ts` (X20).
 
+### X35. Messages follow-ups - image-attachment compose and per-row "mark unread"; group/shop-wide conversations still open
+
+Last of three follow-up items ("Settings batch 2, Messages follow-ups, Mobile deep-link scheme"),
+done last since it's the least related to the other two. X16 named three gaps against web's
+Messenger/IBChatBox: no image-attachment compose, no group/shop-wide conversations, no per-row
+"mark unread"/search. This closes the first and the "mark unread" half of the third - the two
+most tractable, self-contained pieces - and leaves group/shop-wide conversations (a real new
+query, `getConversationsByShopId`, plus real new UI for a multi-member thread) and the
+search-by-name box open, matching this project's own "smallest complete piece, name the rest"
+convention every other slice has used.
+
+**Image-attachment compose (`messages/[id].tsx`), direct port of web's `IBChatBox.jsx`.** Upload
+happens on selection, not on send - `expo-image-picker` (`allowsMultipleSelection`,
+`selectionLimit: MAX_IMAGES_PER_MESSAGE - pendingImageUrls.length`) picks up to 5 images total,
+each uploaded immediately via a hand-built multipart `fetch` POST to `routes/messageUploads.js`
+(`restApi.ts`'s `restApiUrl`/`getAccessToken` - already built for Square - are this file's second
+real caller), so the compose row shows real thumbnails and a real per-file failure before the
+message is actually sent, exactly like web. `createMessage`'s `imageUrls` variable already existed
+in `messenger.graphql`'s schema and generated types (declared, just never populated from a mobile
+call site) - no codegen change needed for this half. Sending is allowed with images and no text
+(mirrors `createMessageInputSchema`'s server-side refinement: reject only when BOTH are empty).
+RN's `FormData.append('files', {uri, name, type})` stands in for a real `Blob` (there is no `File`
+object in RN, only a local file URI) - cast with `as unknown as Blob` since this shape doesn't
+satisfy `FormData`'s DOM-`Blob`-typed overload, but is RN's own documented way to attach a local
+file to a multipart request.
+
+**Per-row "mark unread" (`ConversationRow.tsx` + `messages/index.tsx`), using the
+`markConversationUnread` mutation that already existed server-side** (`conversation-reads.js`'s
+`markConversationUnreadForUser` - just clears the same `lastReadAt` field `markConversationRead`
+sets, no new storage). New `MarkConversationUnread` operation in `messenger.graphql`, mirroring
+`MarkConversationRead`'s exact shape. Rendered as a plain trailing text button, not web's
+overflow-`IconButton`-then-MUI-`Menu` shape - there is no icon library anywhere in this mobile app
+(matching `settings/index.tsx`'s own plain-text convention throughout this whole port), and a
+single hide condition reads more simply as a direct `Pressable` than as a one-item menu. Web hides
+the action under two conditions (already unread, OR the currently-open conversation); mobile only
+has the first - opening a thread here navigates to its own screen rather than staying on this list
+the way web's two-pane layout does, so there is no "currently open, don't offer this" case that
+needs a second guard.
+
+**Two stale doc-comments corrected in the same pass, both about claims this entry makes false**:
+`messenger.graphql`'s own header no longer lists "mark unread" among what's NOT ported, and
+`MessageBubble.tsx`'s header no longer says images "only ever arrived from a web-side sender" -
+they can now arrive from either side.
+
+**Verified in this sandbox**: `packages/api` codegen + build clean, `apps/mobile` `tsc --noEmit`
+clean, full `apps/mobile` Jest suite - still 229/229 (no new screen-level tests for
+`messages/[id].tsx`/`messages/index.tsx`/`ConversationRow.tsx`, matching X16's own established
+precedent of not screen-testing this slice's Apollo-wired components). **Not verified**: an actual
+multipart upload against a real running server (this sandbox cannot run the server integration
+suite - standing `fastdl.mongodb.org` block - and there is no device/simulator to manually attach
+a real photo and watch it send). The request shape was built by reading `routes/
+messageUploads.js`'s multer configuration and web's own working `IBChatBox.jsx` fetch call
+directly, not assumed.
+
+This closes the requested three-item follow-up round in full ("Settings batch 2, Messages
+follow-ups, Mobile deep-link scheme").
+
 ### X34. Settings batch 2 - the artist's own Square connection and tax/processing pricing
 
 Third of three follow-up items ("Settings batch 2, Messages follow-ups, Mobile deep-link scheme"),
