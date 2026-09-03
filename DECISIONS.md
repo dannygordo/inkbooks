@@ -2094,6 +2094,52 @@ for actually sharing it.
 `FORM_FIELD_TYPE_LABELS`/`formFieldTypeLabel`) - same "build the map directly, don't port
 `prettyConstantsListValue`" reasoning as `utils/projectStatus.ts` (X20).
 
+### X42. Forms' per-artist "Your link" section
+
+Next slice from X31's own follow-up list, after Messages (X38-X41) completed. Direct port of
+`FormsPanel.jsx`'s "Your link" half: the artist's own handle (`Artist.bookingSlug`), which is the
+`<ownerHandle>` half of EVERY form's public URL (`/<formSlug>/<ownerHandle>` -
+`server/utils/public-form-lookup.js`), booking_request included - not a booking-specific link.
+New route `settings/your-link.tsx`, new "Forms" card on `settings/index.tsx` (gated
+`user.userType === 'artist'`, matching web's `isArtist`).
+
+**"Manage Forms" (web's other half of this same category) is deliberately NOT rebuilt here** -
+mobile's home screen (`index.tsx`) already has its own direct "Forms" button to `forms/index.tsx`
+(X28/X30), so adding a second on-ramp inside Settings would be a redundant path to the exact same
+screen, not new functionality. This is a genuinely different situation from Rates/Shop, where the
+whole feature was previously unreachable on mobile.
+
+**Server-side, everything already existed** - `getArtist.bookingSlug`, `updateMyBookingSlug`, and
+`getMyFormLinks` were all already in `server/graphql/typeDefs.js`, so this slice is
+client-operations-only (new `packages/api/src/operations/myBookingLink.graphql`).
+
+**NO LIVE AVAILABILITY CHECK, UNLIKE WEB'S `BookingSlugField`** - its own header comment calls the
+debounced `checkBookingSlugAvailable` typing-check "a COURTESY... The server re-validates on
+write... is the actual guarantee." Cutting the courtesy doesn't cut the guarantee: saving a taken
+handle still fails with the same server message, just discovered on Save rather than while typing.
+Building a debounced, stale-response-guarded live check (a first for this app - nothing else here
+validates as-you-type) for one field was judged real, separate scope, not something to fold in
+silently without calling it out.
+
+**GraphQL FIELD-SCOPED ERRORS MATTER HERE, caught before it became a real bug** -
+`updateMyBookingSlug` throws `UserInputError('Errors', { errors: { bookingSlug: '...' } })` on a
+collision (`server/graphql/mutations/artists.js`), so the top-level `err.message` this port's
+other save handlers all just show is the literal, useless word "Errors" for this one mutation.
+Read `err.graphQLErrors?.[0]?.extensions?.errors?.bookingSlug` first (typed via `ApolloError`),
+falling back to `err.message` only when that's absent - the same place web's own `handleSave`
+reads it from. Worth flagging: this is the first screen in this port to need field-scoped
+GraphQL-error extraction at all; every earlier slice's mutations either don't throw a
+`UserInputError` shape or the plain top-level message happens to already be useful.
+
+**No origin to build a full URL from** - same "no `window.location.origin` equivalent" reasoning
+already established (X28/X30/X36): the booking-link preview shows `book/<slug>` and the per-form
+links list shows `<formSlug>/<bookingSlug>`, both relative, both read-only `selectTextOnFocus`
+fields for the list (no clipboard library installed, same as every other link list in this port).
+
+Verification: `packages/api` codegen + build (new `useGetMyBookingSlugQuery`/
+`useUpdateMyBookingSlugMutation`/`useGetMyFormLinksQuery` hooks generated cleanly), `apps/mobile`
+`tsc --noEmit` clean, full Jest suite 229/229 (unchanged - no new pure-logic module needed).
+
 ### X41. Messages batch 4 - System Message Templates (completes the Messages category)
 
 Fourth and last Messages sub-slice, completing X31's biggest remaining named chunk. Direct port of
@@ -2702,9 +2748,10 @@ likely value**:
 - ~~**Messages** (`RemindersPanel.jsx`, `AutoResponsesPanel.jsx`, `ResponseTimePanel.jsx`,
   `SystemMessageTemplatesPanel.jsx`)~~ - **done, see X38/X39/X40/X41.** The largest remaining
   chunk (over 1,100 combined web lines), taken as four separate sub-slices, all now built.
-- **Forms' shop-wide section** (`FormsPanel.jsx`'s "Your link"/URL list, absorbed from the old
-  Booking category) - forms/index.tsx and form/[id].tsx (X28/X30) cover form management itself;
-  this is the separate "here's your booking link to share" view.
+- ~~**Forms' per-artist "Your link" section** (`FormsPanel.jsx`'s "Your link"/URL list, absorbed
+  from the old Booking category)~~ - **done, see X42.** forms/index.tsx and form/[id].tsx (X28/
+  X30) already cover form management itself; this was the separate "here's your handle, here's
+  every published form's link built from it" view.
 - **Appearance** (`AppearancePanel.jsx`) - light/dark/system theme preference; mobile's
   `useTheme()` already follows the system setting automatically, so this is a smaller, lower-value
   port than it looks (a manual override control, not new capability).

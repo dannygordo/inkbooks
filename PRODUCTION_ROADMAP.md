@@ -1232,8 +1232,18 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    fixed key list. Reminders (X38), Auto-Responses (X39), Response Time (X40), and System
    Messages (X41) - all four Messages sub-slices - are now built. Confirmed in this sandbox:
    `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean, full `apps/mobile` Jest
-   suite - still 229/229. Booth Rent, Forms' per-artist "Your link" section, Appearance,
-   Security, and `ShopConnectionPanel.jsx` remain open.
+   suite - still 229/229.
+
+   **Forms' per-artist "Your link" section (2026-09-03, see DECISIONS.md X42) is the next
+   slice** - `settings/your-link.tsx`: the artist's own handle, the `<ownerHandle>` part of every
+   form's public URL. Client-operations-only, everything already existed server-side. "Manage
+   Forms" not rebuilt - mobile's home screen already links there directly. No live
+   availability-check-as-you-type (a real, named scope cut - web's own debounced check is its own
+   comment's word for a "courtesy," not the actual guarantee). First screen in this port to read
+   a field-scoped GraphQL error rather than a plain top-level message. Confirmed in this sandbox:
+   `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean, full `apps/mobile` Jest
+   suite - still 229/229. Booth Rent, Appearance, Security, and `ShopConnectionPanel.jsx` remain
+   open.
 
    Everything else on the ~40-screen list not yet named remains open.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until

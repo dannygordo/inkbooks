@@ -3322,6 +3322,25 @@ export type GetUnreadMessageCountQueryVariables = Exact<{ [key: string]: never; 
 
 export type GetUnreadMessageCountQuery = { __typename?: 'Query', getUnreadMessageCount: number };
 
+export type GetMyBookingSlugQueryVariables = Exact<{
+  artistId: Scalars['ID']['input'];
+}>;
+
+
+export type GetMyBookingSlugQuery = { __typename?: 'Query', getArtist?: { __typename?: 'Artist', id: string, bookingSlug?: string | null } | null };
+
+export type UpdateMyBookingSlugMutationVariables = Exact<{
+  slug: Scalars['String']['input'];
+}>;
+
+
+export type UpdateMyBookingSlugMutation = { __typename?: 'Mutation', updateMyBookingSlug: { __typename?: 'Artist', id: string, bookingSlug?: string | null } };
+
+export type GetMyFormLinksQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetMyFormLinksQuery = { __typename?: 'Query', getMyFormLinks: Array<{ __typename?: 'FormLinkSummary', title: string, slug: string }> };
+
 export type RequestPasswordResetMutationVariables = Exact<{
   email: Scalars['String']['input'];
 }>;
@@ -7419,6 +7438,127 @@ export type GetUnreadMessageCountQueryHookResult = ReturnType<typeof useGetUnrea
 export type GetUnreadMessageCountLazyQueryHookResult = ReturnType<typeof useGetUnreadMessageCountLazyQuery>;
 export type GetUnreadMessageCountSuspenseQueryHookResult = ReturnType<typeof useGetUnreadMessageCountSuspenseQuery>;
 export type GetUnreadMessageCountQueryResult = Apollo.QueryResult<GetUnreadMessageCountQuery, GetUnreadMessageCountQueryVariables>;
+export const GetMyBookingSlugDocument = gql`
+    query GetMyBookingSlug($artistId: ID!) {
+  getArtist(artistId: $artistId) {
+    id
+    bookingSlug
+  }
+}
+    `;
+
+/**
+ * __useGetMyBookingSlugQuery__
+ *
+ * To run a query within a React component, call `useGetMyBookingSlugQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetMyBookingSlugQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetMyBookingSlugQuery({
+ *   variables: {
+ *      artistId: // value for 'artistId'
+ *   },
+ * });
+ */
+export function useGetMyBookingSlugQuery(baseOptions: Apollo.QueryHookOptions<GetMyBookingSlugQuery, GetMyBookingSlugQueryVariables> & ({ variables: GetMyBookingSlugQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetMyBookingSlugQuery, GetMyBookingSlugQueryVariables>(GetMyBookingSlugDocument, options);
+      }
+export function useGetMyBookingSlugLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetMyBookingSlugQuery, GetMyBookingSlugQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetMyBookingSlugQuery, GetMyBookingSlugQueryVariables>(GetMyBookingSlugDocument, options);
+        }
+// @ts-ignore
+export function useGetMyBookingSlugSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetMyBookingSlugQuery, GetMyBookingSlugQueryVariables>): Apollo.UseSuspenseQueryResult<GetMyBookingSlugQuery, GetMyBookingSlugQueryVariables>;
+export function useGetMyBookingSlugSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetMyBookingSlugQuery, GetMyBookingSlugQueryVariables>): Apollo.UseSuspenseQueryResult<GetMyBookingSlugQuery | undefined, GetMyBookingSlugQueryVariables>;
+export function useGetMyBookingSlugSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetMyBookingSlugQuery, GetMyBookingSlugQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetMyBookingSlugQuery, GetMyBookingSlugQueryVariables>(GetMyBookingSlugDocument, options);
+        }
+export type GetMyBookingSlugQueryHookResult = ReturnType<typeof useGetMyBookingSlugQuery>;
+export type GetMyBookingSlugLazyQueryHookResult = ReturnType<typeof useGetMyBookingSlugLazyQuery>;
+export type GetMyBookingSlugSuspenseQueryHookResult = ReturnType<typeof useGetMyBookingSlugSuspenseQuery>;
+export type GetMyBookingSlugQueryResult = Apollo.QueryResult<GetMyBookingSlugQuery, GetMyBookingSlugQueryVariables>;
+export const UpdateMyBookingSlugDocument = gql`
+    mutation UpdateMyBookingSlug($slug: String!) {
+  updateMyBookingSlug(slug: $slug) {
+    id
+    bookingSlug
+  }
+}
+    `;
+export type UpdateMyBookingSlugMutationFn = Apollo.MutationFunction<UpdateMyBookingSlugMutation, UpdateMyBookingSlugMutationVariables>;
+
+/**
+ * __useUpdateMyBookingSlugMutation__
+ *
+ * To run a mutation, you first call `useUpdateMyBookingSlugMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateMyBookingSlugMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateMyBookingSlugMutation, { data, loading, error }] = useUpdateMyBookingSlugMutation({
+ *   variables: {
+ *      slug: // value for 'slug'
+ *   },
+ * });
+ */
+export function useUpdateMyBookingSlugMutation(baseOptions?: Apollo.MutationHookOptions<UpdateMyBookingSlugMutation, UpdateMyBookingSlugMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<UpdateMyBookingSlugMutation, UpdateMyBookingSlugMutationVariables>(UpdateMyBookingSlugDocument, options);
+      }
+export type UpdateMyBookingSlugMutationHookResult = ReturnType<typeof useUpdateMyBookingSlugMutation>;
+export type UpdateMyBookingSlugMutationResult = Apollo.MutationResult<UpdateMyBookingSlugMutation>;
+export type UpdateMyBookingSlugMutationOptions = Apollo.BaseMutationOptions<UpdateMyBookingSlugMutation, UpdateMyBookingSlugMutationVariables>;
+export const GetMyFormLinksDocument = gql`
+    query GetMyFormLinks {
+  getMyFormLinks {
+    title
+    slug
+  }
+}
+    `;
+
+/**
+ * __useGetMyFormLinksQuery__
+ *
+ * To run a query within a React component, call `useGetMyFormLinksQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetMyFormLinksQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetMyFormLinksQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetMyFormLinksQuery(baseOptions?: Apollo.QueryHookOptions<GetMyFormLinksQuery, GetMyFormLinksQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetMyFormLinksQuery, GetMyFormLinksQueryVariables>(GetMyFormLinksDocument, options);
+      }
+export function useGetMyFormLinksLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetMyFormLinksQuery, GetMyFormLinksQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetMyFormLinksQuery, GetMyFormLinksQueryVariables>(GetMyFormLinksDocument, options);
+        }
+// @ts-ignore
+export function useGetMyFormLinksSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetMyFormLinksQuery, GetMyFormLinksQueryVariables>): Apollo.UseSuspenseQueryResult<GetMyFormLinksQuery, GetMyFormLinksQueryVariables>;
+export function useGetMyFormLinksSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetMyFormLinksQuery, GetMyFormLinksQueryVariables>): Apollo.UseSuspenseQueryResult<GetMyFormLinksQuery | undefined, GetMyFormLinksQueryVariables>;
+export function useGetMyFormLinksSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetMyFormLinksQuery, GetMyFormLinksQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetMyFormLinksQuery, GetMyFormLinksQueryVariables>(GetMyFormLinksDocument, options);
+        }
+export type GetMyFormLinksQueryHookResult = ReturnType<typeof useGetMyFormLinksQuery>;
+export type GetMyFormLinksLazyQueryHookResult = ReturnType<typeof useGetMyFormLinksLazyQuery>;
+export type GetMyFormLinksSuspenseQueryHookResult = ReturnType<typeof useGetMyFormLinksSuspenseQuery>;
+export type GetMyFormLinksQueryResult = Apollo.QueryResult<GetMyFormLinksQuery, GetMyFormLinksQueryVariables>;
 export const RequestPasswordResetDocument = gql`
     mutation RequestPasswordReset($email: String!) {
   requestPasswordReset(email: $email)

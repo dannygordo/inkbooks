@@ -86,9 +86,12 @@ import { getUserShopId } from '@/utils/user';
  * system-message-templates.tsx` - completing the largest remaining chunk X31 named, taken one
  * screen at a time, same as the Business/Rates links above.
  *
- * Everything else on web's Settings (Appearance, Notifications, Security, Forms' per-artist
- * "Your link" section) remains unported - see DECISIONS.md X31/X34/X36/X37/X38/X39/X40/X41 for
- * the full list and reasoning.
+ * A "Forms" card (X42) links to `settings/your-link.tsx` - the artist's own handle every form
+ * link is built from. "Manage Forms" isn't duplicated here - mobile's home screen already has its
+ * own direct button to forms/index.tsx.
+ *
+ * Everything else on web's Settings (Appearance, Notifications, Security) remains unported - see
+ * DECISIONS.md X31/X34/X36/X37/X38/X39/X40/X41/X42 for the full list and reasoning.
  */
 export default function SettingsScreen() {
   const { user, updateCurrentUser } = useAuth();
@@ -387,6 +390,23 @@ export default function SettingsScreen() {
                   variant="secondary"
                   onPress={() => router.push('/settings/system-message-templates')}
                   testID="settings-system-message-templates-link"
+                />
+              </View>
+            </View>
+          ) : null}
+
+          {user.userType === 'artist' ? (
+            <View style={styles.card}>
+              <ThemedText type="smallBold">Forms</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                Your own handle, used by every form link you hand out.
+              </ThemedText>
+              <View style={styles.linkList}>
+                <Button
+                  label="Your Link"
+                  variant="secondary"
+                  onPress={() => router.push('/settings/your-link')}
+                  testID="settings-your-link-link"
                 />
               </View>
             </View>

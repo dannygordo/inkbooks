@@ -8,6 +8,29 @@ Last updated: 2026-09-03.
 
 ---
 
+### 2026-09-03 (thirtieth entry): Forms' per-artist "Your link" section
+
+Next slice from the Settings follow-up list, after Messages (X38-X41) completed. Full reasoning:
+DECISIONS.md X42.
+
+New `settings/your-link.tsx`, direct port of `FormsPanel.jsx`'s "Your link" half: the artist's own
+handle, the `<ownerHandle>` part of every form's public URL. New `packages/api/src/operations/
+myBookingLink.graphql` - server-side, everything already existed, so client-operations-only.
+"Manage Forms" (web's other half of this category) is NOT rebuilt here - mobile's home screen
+already has its own direct button to forms/index.tsx.
+
+Two things worth flagging: no live availability check as you type (web's own debounced
+`checkBookingSlugAvailable` call, explicitly named a "courtesy" in its own header comment) - a
+real, separate scope cut, not silently dropped. And this is the first screen in the port that
+needed to read a field-scoped GraphQL error (`err.graphQLErrors[0].extensions.errors.bookingSlug`)
+rather than the top-level message, since `updateMyBookingSlug` throws `UserInputError('Errors',
+...)` on a collision and the plain message would just say "Errors."
+
+Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+full `apps/mobile` Jest suite - still 229/229. No server-side changes.
+
+---
+
 ### 2026-09-03 (twenty-ninth entry): Messages batch 4 - System Message Templates (Messages category complete)
 
 Fourth and last Messages sub-slice, completing the category. Full reasoning: DECISIONS.md X41.
