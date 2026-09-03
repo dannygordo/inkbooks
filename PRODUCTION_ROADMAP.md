@@ -1065,6 +1065,17 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
    and the full `apps/mobile` Jest suite (177/177, up from 167).
 
+   **Expenses (2026-09-03, see DECISIONS.md X27) is the next slice after that - sixth and last
+   of the named batch.** `app/expenses/index.tsx`, structurally identical to Income (every
+   helper - `canManageBusinessLedger`, `businessScopeFor`/`createScopeFor`, `businessRanges.ts`,
+   `DateField` - reused unchanged), a new `expenses.graphql` operation set. Recurring Expenses
+   (the template CRUD behind a "Recurring" chip) is NOT ported - a real, separate feature-sized
+   subsystem; only the read-only chip survives on a generated row. Confirmed in this sandbox:
+   `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean, and the full `apps/mobile`
+   Jest suite (177/177, unchanged). This closes the six-feature batch (Artists/Staff, Shops,
+   Search, Income/Expenses, Forms) except Forms itself, the largest and last-remaining name from
+   that list.
+
    Everything else on the ~40-screen list not yet named remains open.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).

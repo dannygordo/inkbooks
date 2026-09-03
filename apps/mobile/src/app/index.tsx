@@ -187,6 +187,11 @@ export default function AppointmentsScreen() {
                 <ThemedText type="link">Income</ThemedText>
               </Pressable>
             ) : null}
+            {canManageBusinessLedger(user) ? (
+              <Pressable onPress={() => router.push('/expenses')} testID="expenses-button">
+                <ThemedText type="link">Expenses</ThemedText>
+              </Pressable>
+            ) : null}
             <Pressable
               onPress={() => router.push('/booking-requests')}
               testID="booking-requests-button"

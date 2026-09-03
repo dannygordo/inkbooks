@@ -2003,6 +2003,30 @@ mobile screen's precedent (Shops/Artists/Staff/Shop Cut Confirmations all rely o
 alone plus the server's real enforcement, not a redirect-style guard mobile has no equivalent of
 `RoleRoute` to build anyway).
 
+### X27. Expenses built - same shape as Income, minus the recurring-expense CRUD subsystem
+
+Sixth of the requested batch. Structurally identical to X26's Income (same
+`canManageBusinessLedger` gate, same `businessScopeFor`/`createScopeFor` scoping, same five
+`businessRanges.ts` presets, same `DateField`/pill-row pickers, same inline edit/delete list),
+reused unchanged rather than reimplemented.
+
+**Recurring Expenses is NOT ported.** `RecurringExpensesPanel.jsx` (Settings > Expenses) is a full
+separate CRUD subsystem - create/edit/deactivate a TEMPLATE (amount, category, frequency, start/
+end date) that a server-side scheduler turns into real `Expense` rows as they come due. That is
+real, separate scope on the order of a small feature of its own, not a corner of this ledger page -
+named here as a deliberate cut, not an oversight, the same way Income named category management as
+Settings-only.
+
+**Only the read-only "Recurring" chip survives**, matching web's own `Expenses.jsx` exactly: a row
+with `recurringExpenseId` set renders a small "Recurring" badge next to its amount. Editing or
+deleting that row only ever affects the one occurrence, never its template - there is nothing to
+special-case beyond the chip itself, on web or here, which is exactly why porting just the chip
+(and not the template CRUD behind it) is a coherent, honest slice rather than a half-built feature.
+
+**No dedicated screen-level test**, matching every prior slice's precedent - no new pure-logic
+module was needed this slice (every helper `income/index.tsx` needed already exists and is reused
+verbatim).
+
 ---
 
 ## Process

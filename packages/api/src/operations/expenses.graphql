@@ -1,0 +1,87 @@
+# The real expense ledger - structurally identical to income.graphql's Income (see that file's own
+# header comment for the shared ownership model). Categories are Settings-only, same split as
+# Income. Recurring Expenses (a full separate CRUD subsystem - create/edit/deactivate a TEMPLATE
+# that generates real Expense rows on a schedule) is deliberately NOT ported here - out of scope
+# for this slice, matching Income's own "categories are Settings-only" cut in spirit, just a larger
+# one. Only the read-only "Recurring" chip on a generated row survives (recurringExpenseId is
+# selected below purely to render that chip - editing/deleting a generated row only affects that
+# one occurrence, never its template, so no special-casing is needed beyond the chip itself). See
+# DECISIONS.md X27.
+query GetExpenseTypesList($shopId: ID, $artistUserId: ID) {
+	getExpenseTypes(shopId: $shopId, artistUserId: $artistUserId) {
+		id
+		name
+	}
+}
+
+query GetExpensesList($shopId: ID, $artistUserId: ID, $start: DateTime, $end: DateTime, $page: PageInput) {
+	getExpenses(shopId: $shopId, artistUserId: $artistUserId, start: $start, end: $end, page: $page) {
+		items {
+			id
+			expenseTypeId
+			expenseType {
+				id
+				name
+			}
+			amountCents
+			description
+			date
+			recurringExpenseId
+			createdBy {
+				id
+				firstName
+				lastName
+			}
+		}
+		pageInfo {
+			totalCount
+			hasMore
+			limit
+			offset
+		}
+	}
+}
+
+mutation RecordExpense($input: RecordExpenseInput!) {
+	recordExpense(input: $input) {
+		id
+		expenseTypeId
+		expenseType {
+			id
+			name
+		}
+		amountCents
+		description
+		date
+		recurringExpenseId
+		createdBy {
+			id
+			firstName
+			lastName
+		}
+	}
+}
+
+mutation UpdateExpense($input: UpdateExpenseInput!) {
+	updateExpense(input: $input) {
+		id
+		expenseTypeId
+		expenseType {
+			id
+			name
+		}
+		amountCents
+		description
+		date
+		recurringExpenseId
+		createdBy {
+			id
+			firstName
+			lastName
+		}
+	}
+}
+
+mutation DeleteExpense($expenseId: ID!) {
+	deleteExpense(expenseId: $expenseId)
+}

@@ -8,6 +8,32 @@ Last updated: 2026-09-03.
 
 ---
 
+### 2026-09-03 (fifteenth entry): Expenses built - same shape as Income, minus the recurring-expense CRUD subsystem
+
+Sixth of the requested batch (Artists/Staff, Shops, Search, Income/Expenses, Forms) - the last of
+the six named together. Full reasoning: DECISIONS.md X27.
+
+**Built:** `app/expenses/index.tsx` (identical structure to `income/index.tsx` - log-entry form,
+five preset date ranges, inline edit/delete), a new `expenses.graphql` operation set
+(`GetExpenseTypesList`, `GetExpensesList`, `RecordExpense`, `UpdateExpense`, `DeleteExpense`).
+Every helper Income built last slice (`canManageBusinessLedger`, `businessScopeFor`/
+`createScopeFor`, `businessRanges.ts`, `DateField`) is reused unchanged - nothing new needed here.
+
+**Recurring Expenses (the template CRUD behind a "Recurring" chip) is NOT ported** - a real,
+separate feature-sized subsystem, named as a deliberate cut. Only the read-only chip itself
+survives on a generated row, matching web's own `Expenses.jsx` exactly.
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean
+on the first pass, and the full `apps/mobile` Jest suite - 177/177, unchanged (no new pure-logic
+module this slice). **Not yet confirmed:** a real device/simulator run.
+
+This closes out the six-feature batch (Artists/Staff, Shops, Search, Income/Expenses, Forms) taken
+one slice at a time - Forms is the one remaining name from that list and the largest by far (see
+PRODUCTION_ROADMAP.md's own note on FormBuilder's drag-and-drop reordering needing its own
+interaction decision before that slice starts).
+
+---
+
 ### 2026-09-03 (fourteenth entry): Income built - a new role-gate helper, a new scoping convention, a new date-only field
 
 Fifth of the requested batch (Artists/Staff, Shops, Search, Income/Expenses, Forms). Full

@@ -124,6 +124,9 @@ function RootNavigator() {
             `canManageBusinessLedger` (any artist, or a shop-admin-or-better), matching web's own
             RoleRoute on /income exactly. */}
         <Stack.Screen name="income/index" options={{ headerShown: true, title: 'Income' }} />
+        {/* Expenses - structurally identical to Income, see expenses/index.tsx's own header
+            comment. Same `canManageBusinessLedger` gate. */}
+        <Stack.Screen name="expenses/index" options={{ headerShown: true, title: 'Expenses' }} />
       </Stack.Protected>
     </Stack>
   );

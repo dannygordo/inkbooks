@@ -2991,6 +2991,46 @@ export type ApplyDepositMutationVariables = Exact<{
 
 export type ApplyDepositMutation = { __typename?: 'Mutation', applyDeposit?: { __typename?: 'Appointment', id: string, depositCreditCents?: number | null, depositCreditFromAppointmentId?: string | null, subtotalCents?: number | null, totalCents?: number | null, shopCutCents?: number | null, shopCutPercentApplied?: number | null, shopCutStatus: string } | null };
 
+export type GetExpenseTypesListQueryVariables = Exact<{
+  shopId?: InputMaybe<Scalars['ID']['input']>;
+  artistUserId?: InputMaybe<Scalars['ID']['input']>;
+}>;
+
+
+export type GetExpenseTypesListQuery = { __typename?: 'Query', getExpenseTypes: Array<{ __typename?: 'ExpenseType', id: string, name: string }> };
+
+export type GetExpensesListQueryVariables = Exact<{
+  shopId?: InputMaybe<Scalars['ID']['input']>;
+  artistUserId?: InputMaybe<Scalars['ID']['input']>;
+  start?: InputMaybe<Scalars['DateTime']['input']>;
+  end?: InputMaybe<Scalars['DateTime']['input']>;
+  page?: InputMaybe<PageInput>;
+}>;
+
+
+export type GetExpensesListQuery = { __typename?: 'Query', getExpenses: { __typename?: 'ExpensePage', items: Array<{ __typename?: 'Expense', id: string, expenseTypeId: string, amountCents: number, description?: string | null, date: string, recurringExpenseId?: string | null, expenseType?: { __typename?: 'ExpenseType', id: string, name: string } | null, createdBy?: { __typename?: 'User', id: string, firstName?: string | null, lastName?: string | null } | null }>, pageInfo: { __typename?: 'PageInfo', totalCount: number, hasMore: boolean, limit: number, offset: number } } };
+
+export type RecordExpenseMutationVariables = Exact<{
+  input: RecordExpenseInput;
+}>;
+
+
+export type RecordExpenseMutation = { __typename?: 'Mutation', recordExpense: { __typename?: 'Expense', id: string, expenseTypeId: string, amountCents: number, description?: string | null, date: string, recurringExpenseId?: string | null, expenseType?: { __typename?: 'ExpenseType', id: string, name: string } | null, createdBy?: { __typename?: 'User', id: string, firstName?: string | null, lastName?: string | null } | null } };
+
+export type UpdateExpenseMutationVariables = Exact<{
+  input: UpdateExpenseInput;
+}>;
+
+
+export type UpdateExpenseMutation = { __typename?: 'Mutation', updateExpense: { __typename?: 'Expense', id: string, expenseTypeId: string, amountCents: number, description?: string | null, date: string, recurringExpenseId?: string | null, expenseType?: { __typename?: 'ExpenseType', id: string, name: string } | null, createdBy?: { __typename?: 'User', id: string, firstName?: string | null, lastName?: string | null } | null } };
+
+export type DeleteExpenseMutationVariables = Exact<{
+  expenseId: Scalars['ID']['input'];
+}>;
+
+
+export type DeleteExpenseMutation = { __typename?: 'Mutation', deleteExpense: boolean };
+
 export type GetProjectQueryVariables = Exact<{
   projectId: Scalars['ID']['input'];
 }>;
@@ -4724,6 +4764,251 @@ export function useApplyDepositMutation(baseOptions?: Apollo.MutationHookOptions
 export type ApplyDepositMutationHookResult = ReturnType<typeof useApplyDepositMutation>;
 export type ApplyDepositMutationResult = Apollo.MutationResult<ApplyDepositMutation>;
 export type ApplyDepositMutationOptions = Apollo.BaseMutationOptions<ApplyDepositMutation, ApplyDepositMutationVariables>;
+export const GetExpenseTypesListDocument = gql`
+    query GetExpenseTypesList($shopId: ID, $artistUserId: ID) {
+  getExpenseTypes(shopId: $shopId, artistUserId: $artistUserId) {
+    id
+    name
+  }
+}
+    `;
+
+/**
+ * __useGetExpenseTypesListQuery__
+ *
+ * To run a query within a React component, call `useGetExpenseTypesListQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetExpenseTypesListQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetExpenseTypesListQuery({
+ *   variables: {
+ *      shopId: // value for 'shopId'
+ *      artistUserId: // value for 'artistUserId'
+ *   },
+ * });
+ */
+export function useGetExpenseTypesListQuery(baseOptions?: Apollo.QueryHookOptions<GetExpenseTypesListQuery, GetExpenseTypesListQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetExpenseTypesListQuery, GetExpenseTypesListQueryVariables>(GetExpenseTypesListDocument, options);
+      }
+export function useGetExpenseTypesListLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetExpenseTypesListQuery, GetExpenseTypesListQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetExpenseTypesListQuery, GetExpenseTypesListQueryVariables>(GetExpenseTypesListDocument, options);
+        }
+// @ts-ignore
+export function useGetExpenseTypesListSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetExpenseTypesListQuery, GetExpenseTypesListQueryVariables>): Apollo.UseSuspenseQueryResult<GetExpenseTypesListQuery, GetExpenseTypesListQueryVariables>;
+export function useGetExpenseTypesListSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetExpenseTypesListQuery, GetExpenseTypesListQueryVariables>): Apollo.UseSuspenseQueryResult<GetExpenseTypesListQuery | undefined, GetExpenseTypesListQueryVariables>;
+export function useGetExpenseTypesListSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetExpenseTypesListQuery, GetExpenseTypesListQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetExpenseTypesListQuery, GetExpenseTypesListQueryVariables>(GetExpenseTypesListDocument, options);
+        }
+export type GetExpenseTypesListQueryHookResult = ReturnType<typeof useGetExpenseTypesListQuery>;
+export type GetExpenseTypesListLazyQueryHookResult = ReturnType<typeof useGetExpenseTypesListLazyQuery>;
+export type GetExpenseTypesListSuspenseQueryHookResult = ReturnType<typeof useGetExpenseTypesListSuspenseQuery>;
+export type GetExpenseTypesListQueryResult = Apollo.QueryResult<GetExpenseTypesListQuery, GetExpenseTypesListQueryVariables>;
+export const GetExpensesListDocument = gql`
+    query GetExpensesList($shopId: ID, $artistUserId: ID, $start: DateTime, $end: DateTime, $page: PageInput) {
+  getExpenses(
+    shopId: $shopId
+    artistUserId: $artistUserId
+    start: $start
+    end: $end
+    page: $page
+  ) {
+    items {
+      id
+      expenseTypeId
+      expenseType {
+        id
+        name
+      }
+      amountCents
+      description
+      date
+      recurringExpenseId
+      createdBy {
+        id
+        firstName
+        lastName
+      }
+    }
+    pageInfo {
+      totalCount
+      hasMore
+      limit
+      offset
+    }
+  }
+}
+    `;
+
+/**
+ * __useGetExpensesListQuery__
+ *
+ * To run a query within a React component, call `useGetExpensesListQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetExpensesListQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetExpensesListQuery({
+ *   variables: {
+ *      shopId: // value for 'shopId'
+ *      artistUserId: // value for 'artistUserId'
+ *      start: // value for 'start'
+ *      end: // value for 'end'
+ *      page: // value for 'page'
+ *   },
+ * });
+ */
+export function useGetExpensesListQuery(baseOptions?: Apollo.QueryHookOptions<GetExpensesListQuery, GetExpensesListQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetExpensesListQuery, GetExpensesListQueryVariables>(GetExpensesListDocument, options);
+      }
+export function useGetExpensesListLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetExpensesListQuery, GetExpensesListQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetExpensesListQuery, GetExpensesListQueryVariables>(GetExpensesListDocument, options);
+        }
+// @ts-ignore
+export function useGetExpensesListSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetExpensesListQuery, GetExpensesListQueryVariables>): Apollo.UseSuspenseQueryResult<GetExpensesListQuery, GetExpensesListQueryVariables>;
+export function useGetExpensesListSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetExpensesListQuery, GetExpensesListQueryVariables>): Apollo.UseSuspenseQueryResult<GetExpensesListQuery | undefined, GetExpensesListQueryVariables>;
+export function useGetExpensesListSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetExpensesListQuery, GetExpensesListQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetExpensesListQuery, GetExpensesListQueryVariables>(GetExpensesListDocument, options);
+        }
+export type GetExpensesListQueryHookResult = ReturnType<typeof useGetExpensesListQuery>;
+export type GetExpensesListLazyQueryHookResult = ReturnType<typeof useGetExpensesListLazyQuery>;
+export type GetExpensesListSuspenseQueryHookResult = ReturnType<typeof useGetExpensesListSuspenseQuery>;
+export type GetExpensesListQueryResult = Apollo.QueryResult<GetExpensesListQuery, GetExpensesListQueryVariables>;
+export const RecordExpenseDocument = gql`
+    mutation RecordExpense($input: RecordExpenseInput!) {
+  recordExpense(input: $input) {
+    id
+    expenseTypeId
+    expenseType {
+      id
+      name
+    }
+    amountCents
+    description
+    date
+    recurringExpenseId
+    createdBy {
+      id
+      firstName
+      lastName
+    }
+  }
+}
+    `;
+export type RecordExpenseMutationFn = Apollo.MutationFunction<RecordExpenseMutation, RecordExpenseMutationVariables>;
+
+/**
+ * __useRecordExpenseMutation__
+ *
+ * To run a mutation, you first call `useRecordExpenseMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useRecordExpenseMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [recordExpenseMutation, { data, loading, error }] = useRecordExpenseMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useRecordExpenseMutation(baseOptions?: Apollo.MutationHookOptions<RecordExpenseMutation, RecordExpenseMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<RecordExpenseMutation, RecordExpenseMutationVariables>(RecordExpenseDocument, options);
+      }
+export type RecordExpenseMutationHookResult = ReturnType<typeof useRecordExpenseMutation>;
+export type RecordExpenseMutationResult = Apollo.MutationResult<RecordExpenseMutation>;
+export type RecordExpenseMutationOptions = Apollo.BaseMutationOptions<RecordExpenseMutation, RecordExpenseMutationVariables>;
+export const UpdateExpenseDocument = gql`
+    mutation UpdateExpense($input: UpdateExpenseInput!) {
+  updateExpense(input: $input) {
+    id
+    expenseTypeId
+    expenseType {
+      id
+      name
+    }
+    amountCents
+    description
+    date
+    recurringExpenseId
+    createdBy {
+      id
+      firstName
+      lastName
+    }
+  }
+}
+    `;
+export type UpdateExpenseMutationFn = Apollo.MutationFunction<UpdateExpenseMutation, UpdateExpenseMutationVariables>;
+
+/**
+ * __useUpdateExpenseMutation__
+ *
+ * To run a mutation, you first call `useUpdateExpenseMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateExpenseMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateExpenseMutation, { data, loading, error }] = useUpdateExpenseMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useUpdateExpenseMutation(baseOptions?: Apollo.MutationHookOptions<UpdateExpenseMutation, UpdateExpenseMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<UpdateExpenseMutation, UpdateExpenseMutationVariables>(UpdateExpenseDocument, options);
+      }
+export type UpdateExpenseMutationHookResult = ReturnType<typeof useUpdateExpenseMutation>;
+export type UpdateExpenseMutationResult = Apollo.MutationResult<UpdateExpenseMutation>;
+export type UpdateExpenseMutationOptions = Apollo.BaseMutationOptions<UpdateExpenseMutation, UpdateExpenseMutationVariables>;
+export const DeleteExpenseDocument = gql`
+    mutation DeleteExpense($expenseId: ID!) {
+  deleteExpense(expenseId: $expenseId)
+}
+    `;
+export type DeleteExpenseMutationFn = Apollo.MutationFunction<DeleteExpenseMutation, DeleteExpenseMutationVariables>;
+
+/**
+ * __useDeleteExpenseMutation__
+ *
+ * To run a mutation, you first call `useDeleteExpenseMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useDeleteExpenseMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [deleteExpenseMutation, { data, loading, error }] = useDeleteExpenseMutation({
+ *   variables: {
+ *      expenseId: // value for 'expenseId'
+ *   },
+ * });
+ */
+export function useDeleteExpenseMutation(baseOptions?: Apollo.MutationHookOptions<DeleteExpenseMutation, DeleteExpenseMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<DeleteExpenseMutation, DeleteExpenseMutationVariables>(DeleteExpenseDocument, options);
+      }
+export type DeleteExpenseMutationHookResult = ReturnType<typeof useDeleteExpenseMutation>;
+export type DeleteExpenseMutationResult = Apollo.MutationResult<DeleteExpenseMutation>;
+export type DeleteExpenseMutationOptions = Apollo.BaseMutationOptions<DeleteExpenseMutation, DeleteExpenseMutationVariables>;
 export const GetProjectDocument = gql`
     query GetProject($projectId: ID!) {
   getProject(projectId: $projectId) {
