@@ -8,6 +8,34 @@ Last updated: 2026-09-03.
 
 ---
 
+### 2026-09-03 (nineteenth entry): Settings batch 1 - Income/Expense categories + Recurring Expenses; rest of Settings named as a follow-up list
+
+Third of four follow-up items ("do 2, 3, 4 and 5"). Full reasoning: DECISIONS.md X31. Web's
+Settings is eighteen panels across twelve categories - too large for one slice at this project's
+usual rigor, so taken as a batch, same shape as the earlier six-feature batch: this closes the two
+gaps X26/X27 already named (category management, recurring expenses), everything else in Settings
+is listed as a named follow-up rather than left implicit.
+
+**Built:** three new routes - `settings/income-types.tsx`, `settings/expense-types.tsx`,
+`settings/recurring-expenses.tsx` - reached from a new "Business" section on `settings/index.tsx`
+(gated `canManageBusinessLedger`). New `packages/api` operations: `incomeTypeSettings.graphql`,
+`expenseTypeSettings.graphql`, `recurringExpenses.graphql`. New `utils/utcDate.ts`
+(`formatUtcCalendarDate`, pulled out of `utils/formAnswers.ts` where it started, now shared by
+both Forms and Recurring Expenses' date fields). Two new tests (`utcDate.test.ts`).
+
+**What's still not in Settings, in rough priority order:** Shop (the shop-cut-percent editor
+named as a gap back in X24), Square Config's pricing/tax-rate editor, Rates/Booth Rent, the whole
+Messages category (Reminders/Auto-Responses/Response Time/System Message Templates - the largest
+remaining chunk), Forms' shop-wide link section, Appearance (lower value than it looks - mobile's
+theme already follows the system setting), Security's audit log. Calendar/Taxes/Analytics are
+`ComingSoonPanel` placeholders on web itself - skipped, nothing real to port yet.
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+and the full `apps/mobile` Jest suite - 219/219, up from 217. **Not yet confirmed:** a real
+device/simulator run of the three new screens.
+
+---
+
 ### 2026-09-03 (eighteenth entry): FormBuilder built on mobile - Up/Down buttons replace drag-and-drop
 
 Second of four follow-up items ("do 2, 3, 4 and 5"). Full reasoning: DECISIONS.md X30. Closes the

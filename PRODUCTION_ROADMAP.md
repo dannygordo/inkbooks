@@ -1109,6 +1109,18 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    where they are. Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile`
    `tsc --noEmit` clean, and the full `apps/mobile` Jest suite (217/217, up from 198).
 
+   **Settings batch 1 (2026-09-03, see DECISIONS.md X31) is the next follow-up item after that** -
+   web's Settings is eighteen panels across twelve categories, too large for one slice, so taken
+   as its own batch. This first piece closes the two gaps X26/X27 already named: Income/Expense
+   category management (`settings/income-types.tsx`/`settings/expense-types.tsx`) and Recurring
+   Expenses (`settings/recurring-expenses.tsx`), reached from a new "Business" section on
+   `settings/index.tsx`. Everything else in Settings - Shop's shop-cut-percent editor, Square
+   Config's pricing/tax-rate editor, Rates/Booth Rent, the whole Messages category, Forms'
+   shop-wide link section, Appearance, Security - is named explicitly as still-open follow-up work
+   in DECISIONS.md X31 rather than left implicit. Confirmed in this sandbox: `packages/api`
+   codegen + build, `apps/mobile` `tsc --noEmit` clean, and the full `apps/mobile` Jest suite
+   (219/219, up from 217).
+
    Everything else on the ~40-screen list not yet named remains open.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).

@@ -1,0 +1,29 @@
+# Income category management - Settings > Income on web (IncomeTypesPanel.jsx). Separate operation
+# file from income.graphql, whose own header comment explicitly named this as out of scope for
+# that screen's port ("Category management... is Settings-only on web... out of scope for this
+# page's port"). This is that follow-up - see DECISIONS.md X31.
+#
+# GetIncomeTypesForSettings passes includeInactive: true (unlike income.graphql's
+# GetIncomeTypesList, which only ever wants the active picker list) - a deactivated category still
+# needs to show here so it can be reactivated.
+query GetIncomeTypesForSettings($shopId: ID, $artistUserId: ID, $includeInactive: Boolean) {
+	getIncomeTypes(shopId: $shopId, artistUserId: $artistUserId, includeInactive: $includeInactive) {
+		id
+		name
+		description
+		active
+	}
+}
+
+mutation CreateIncomeType($input: CreateIncomeTypeInput!) {
+	createIncomeType(input: $input) {
+		id
+	}
+}
+
+mutation UpdateIncomeType($input: UpdateIncomeTypeInput!) {
+	updateIncomeType(input: $input) {
+		id
+		active
+	}
+}

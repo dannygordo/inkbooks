@@ -73,11 +73,17 @@ function RootNavigator() {
         <Stack.Screen name="consult/[id]" options={{ headerShown: true, title: 'Consult' }} />
         <Stack.Screen name="project/[id]" options={{ headerShown: true, title: 'Project' }} />
         <Stack.Screen name="session/[id]" options={{ headerShown: true, title: 'Session' }} />
-        {/* Phase 5 step 8's Settings slice (photo only - see settings/index.tsx's own header
-            comment on what's deliberately not here yet). Reached from index.tsx's header, next
-            to Log out - the same "who am I, how do I sign out" header spot web's own account
-            menu occupies, not a tab. */}
+        {/* Phase 5 step 8's Settings slice (see settings/index.tsx's own header comment on
+            what's deliberately not here yet). Reached from index.tsx's header, next to Log out -
+            the same "who am I, how do I sign out" header spot web's own account menu occupies,
+            not a tab. */}
         <Stack.Screen name="settings/index" options={{ headerShown: true, title: 'Settings' }} />
+        {/* Income/Expense category management + Recurring Expenses (X31) - reached from
+            settings/index.tsx's own "Business" section, gated the same `canManageBusinessLedger`
+            as Income/Expenses themselves. */}
+        <Stack.Screen name="settings/income-types" options={{ headerShown: true, title: 'Income Categories' }} />
+        <Stack.Screen name="settings/expense-types" options={{ headerShown: true, title: 'Expense Categories' }} />
+        <Stack.Screen name="settings/recurring-expenses" options={{ headerShown: true, title: 'Recurring Expenses' }} />
         {/* The client roster - see clients/index.tsx's own header comment. Reached from
             index.tsx's header, and the second (real) entry point into client/[id].tsx below -
             that screen's own X15 comment named this as worth building. */}

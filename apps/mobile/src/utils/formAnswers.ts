@@ -8,6 +8,8 @@
 // renders the actual openable rows from the answer's own fileUrls directly, this just tells it
 // whether there's anything to render.
 
+import { formatUtcCalendarDate } from '@/utils/utcDate';
+
 export type FormAnswerField = { type: string };
 export type FormAnswerValue = {
 	textValue?: string | null;
@@ -16,20 +18,6 @@ export type FormAnswerValue = {
 	fileUrls?: string[] | null;
 	signature?: { signedName?: string | null; signedAt?: string | null } | null;
 } | null | undefined;
-
-// dateValue is a pure calendar date (a native date-only input value, sent to the server as UTC
-// midnight) with no time-of-day meaning at all - formatting it in the viewer's LOCAL timezone
-// instead rolls it back a day for anyone west of UTC. Reading the UTC calendar fields directly
-// (not `new Date(iso).getDate()`, which reads LOCAL fields) is what web's own `moment.utc(...)`
-// achieves - see that file's "utc-ok: pure calendar date" comment for the full reasoning.
-function formatUtcCalendarDate(iso: string): string {
-	return new Date(iso).toLocaleDateString('en-US', {
-		month: 'short',
-		day: 'numeric',
-		year: 'numeric',
-		timeZone: 'UTC',
-	});
-}
 
 // signedAt, unlike dateValue above, IS a real timestamp of when signing happened - local time is
 // correct here, matching web's own (non-UTC) moment(...) call for this one field.

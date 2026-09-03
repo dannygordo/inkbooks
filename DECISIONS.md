@@ -2094,6 +2094,64 @@ for actually sharing it.
 `FORM_FIELD_TYPE_LABELS`/`formFieldTypeLabel`) - same "build the map directly, don't port
 `prettyConstantsListValue`" reasoning as `utils/projectStatus.ts` (X20).
 
+### X31. Settings batch 1 - Income/Expense category management and Recurring Expenses; everything else in Settings named as a follow-up list
+
+Third of the four follow-up items ("do 2, 3, 4 and 5"). Web's Settings is eighteen panels across
+twelve categories (`settingsCategories.jsx`) - too large to port as one slice with this project's
+usual per-feature rigor (tests, docs, independent verification), so it's being taken the same way
+the six-feature batch was: one coherent piece at a time, named and committed separately, with the
+remainder listed explicitly rather than left implicit.
+
+**This slice closes the two gaps named directly in X26/X27's own header comments**: Income/Expense
+category management (`IncomeTypesPanel.jsx`/`ExpenseTypesPanel.jsx` - "Category management...
+is Settings-only on web... out of scope for this page's port") and Recurring Expenses
+(`RecurringExpensesPanel.jsx` - "a real, separate feature-sized subsystem"). Both are now built:
+new routes `settings/income-types.tsx`, `settings/expense-types.tsx`, `settings/
+recurring-expenses.tsx`, each a direct port of its web panel (add/deactivate/reactivate for the
+two category screens; add/pause/resume/delete for Recurring Expenses), reached from a new
+"Business" section on `settings/index.tsx`, gated the same `canManageBusinessLedger` as
+Income/Expenses themselves.
+
+**New `utils/utcDate.ts`'s `formatUtcCalendarDate`** - pulled out of `utils/formAnswers.ts`
+(X28, where it started as forms-only and un-exported) once Recurring Expenses' `nextRunDate`/
+`endDate` needed the exact same UTC-vs-local fix `formAnswers.ts`'s own `dateValue` case already
+had. A second inline copy of the same bug fix would have been the wrong way to reuse it - one
+shared, exported, directly-tested function is used by both now. `formAnswers.ts` imports it rather
+than keeping its own copy; `formAnswers.test.ts` still passes unchanged since it only exercised
+the function indirectly through `formatFormAnswer`.
+
+**Recurring Expenses' date fields use `DateField` (X26) for both start and end**, including when
+no end date is set yet - `DateField` requires a real `Date` value, so the "Ends (optional)" field
+shows `startDate` as a placeholder value until the user actually picks one, with a separate "Clear
+end date" button to go back to no end date at all (`endDate: null` is a real, meaningful state
+here - a template with no end date recurs forever - so this needed its own explicit affordance,
+unlike a plain optional text field that's empty by default).
+
+**Named, deliberate cuts - the rest of Settings, left for later slices, roughly in order of
+likely value**:
+- **Shop** (`ShopPanel.jsx`'s shop-cut-percent editor, `ShopConnectionPanel.jsx`) - the gap named
+  directly in `shop/[id].tsx`'s own comment (X24): shopCutPercent is read-only there because this
+  editor doesn't exist on mobile yet.
+- **Square Config** (`SquarePanel.jsx`, `SquarePricingPanel.jsx`'s tax rate/fee offset editor) -
+  `shop/[id].tsx` already covers Square Connect/Disconnect (X24); the pricing editor is separate.
+- **Rates** (`RatesPanel.jsx`, `BoothRentPanel.jsx`) - an artist's own session-rate defaults and
+  booth-rent terms.
+- **Messages** (`RemindersPanel.jsx`, `AutoResponsesPanel.jsx`, `ResponseTimePanel.jsx`,
+  `SystemMessageTemplatesPanel.jsx`) - the largest remaining chunk (over 1,100 combined web lines),
+  real separate scope on its own.
+- **Forms' shop-wide section** (`FormsPanel.jsx`'s "Your link"/URL list, absorbed from the old
+  Booking category) - forms/index.tsx and form/[id].tsx (X28/X30) cover form management itself;
+  this is the separate "here's your booking link to share" view.
+- **Appearance** (`AppearancePanel.jsx`) - light/dark/system theme preference; mobile's
+  `useTheme()` already follows the system setting automatically, so this is a smaller, lower-value
+  port than it looks (a manual override control, not new capability).
+- **Security** (`EventLogPanel.jsx`) - the audit trail.
+- **Account category's remaining pieces are already done** (photo/password/calendar color -
+  X18, pre-dating this session).
+- **Calendar/Taxes/Analytics categories are `ComingSoonPanel` placeholders on web itself** - no
+  real functionality exists yet to port; skipped entirely rather than porting a "coming soon"
+  message as its own mobile screen.
+
 ### X30. FormBuilder built on mobile - Up/Down buttons replace drag-and-drop, actions stay on the list
 
 Second of the four follow-up items ("do 2, 3, 4 and 5" against the six-feature batch's own "what's

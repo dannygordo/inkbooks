@@ -4,6 +4,7 @@ import {
   useUpdateUserMutation,
 } from '@inkbooks/api';
 import * as ImagePicker from 'expo-image-picker';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,6 +19,7 @@ import { useAuth } from '@/context/auth';
 import { useTheme } from '@/hooks/use-theme';
 import { deleteFile } from '@/firebase/deleteFile';
 import { uploadFileWithProgress } from '@/firebase/uploadFile';
+import { canManageBusinessLedger } from '@/utils/permissions';
 import { avatarFolder, previousAvatarUrl } from '@/utils/avatar';
 import { formatImagePathForFirebaseStorage } from '@/utils/imagePath';
 import { showAvailableColorTags } from '@/utils/tagColors';
@@ -42,10 +44,17 @@ import { getUserShopId } from '@/utils/user';
  * avatar is deleted only AFTER updateUser succeeds, so the worst case if anything fails midway is
  * an orphaned new file in Storage (harmless - nothing points at it), never a user left with no
  * avatar at all.
+ *
+ * A "Business" section below links out to three more Settings screens (X31) - Income/Expense
+ * category management and Recurring Expenses - gated the same `canManageBusinessLedger` as the
+ * Income/Expenses pages themselves. Everything else on web's Settings (Shop, Rates, Square
+ * Config, Appearance, Notifications, Security, Messages, Forms' shop-wide section) remains
+ * unported - see DECISIONS.md X31 for the full list and reasoning.
  */
 export default function SettingsScreen() {
   const { user, updateCurrentUser } = useAuth();
   const theme = useTheme();
+  const router = useRouter();
   const [updateUser] = useUpdateUserMutation();
   const [pickedUri, setPickedUri] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -270,6 +279,36 @@ export default function SettingsScreen() {
             </View>
           </View>
 
+          {canManageBusinessLedger(user) ? (
+            <View style={styles.card}>
+              <ThemedText type="smallBold">Business</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                Manage the categories your income and expenses are logged against, and any
+                recurring expense templates.
+              </ThemedText>
+              <View style={styles.linkList}>
+                <Button
+                  label="Income Categories"
+                  variant="secondary"
+                  onPress={() => router.push('/settings/income-types')}
+                  testID="settings-income-types-link"
+                />
+                <Button
+                  label="Expense Categories"
+                  variant="secondary"
+                  onPress={() => router.push('/settings/expense-types')}
+                  testID="settings-expense-types-link"
+                />
+                <Button
+                  label="Recurring Expenses"
+                  variant="secondary"
+                  onPress={() => router.push('/settings/recurring-expenses')}
+                  testID="settings-recurring-expenses-link"
+                />
+              </View>
+            </View>
+          ) : null}
+
           {showsOnACalendar ? (
             <View style={styles.card}>
               <ThemedText type="smallBold">Calendar color</ThemedText>
@@ -332,6 +371,10 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     gap: Spacing.two,
+  },
+  linkList: {
+    gap: Spacing.two,
+    alignItems: 'flex-start',
   },
   error: {
     color: '#D33',

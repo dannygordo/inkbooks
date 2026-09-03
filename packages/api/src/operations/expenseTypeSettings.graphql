@@ -1,0 +1,24 @@
+# Expense category management - Settings > Expenses on web (ExpenseTypesPanel.jsx). Same split
+# from expenses.graphql that incomeTypeSettings.graphql makes from income.graphql - see that
+# file's own header comment. See DECISIONS.md X31.
+query GetExpenseTypesForSettings($shopId: ID, $artistUserId: ID, $includeInactive: Boolean) {
+	getExpenseTypes(shopId: $shopId, artistUserId: $artistUserId, includeInactive: $includeInactive) {
+		id
+		name
+		description
+		active
+	}
+}
+
+mutation CreateExpenseType($input: CreateExpenseTypeInput!) {
+	createExpenseType(input: $input) {
+		id
+	}
+}
+
+mutation UpdateExpenseType($input: UpdateExpenseTypeInput!) {
+	updateExpenseType(input: $input) {
+		id
+		active
+	}
+}
