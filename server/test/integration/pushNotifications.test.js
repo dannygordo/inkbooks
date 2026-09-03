@@ -227,25 +227,4 @@ describe('notify() -> push wiring', () => {
 			}),
 		);
 	});
-
-	// A background job or webhook event with no real subject (none exist today, but notify()'s own
-	// jsdoc doesn't require subjectId) must not crash trying to String(undefined) into something
-	// misleading - null is the honest "no subject" value, not the string "undefined".
-	it('sends null subjectId rather than the string "undefined" when an event has none', async () => {
-		const { user: artist } = await createArtistUser();
-		const { user: admin } = await createShopAdminUser();
-		await new PushToken({ userId: artist._id, token: 'tok-5', platform: 'ios' }).save();
-
-		const event = moneyEvent(admin.id, artist.id);
-		delete event.subjectId;
-		await notify(event);
-		await new Promise((resolve) => setImmediate(resolve));
-
-		expect(sendPushSpy).toHaveBeenCalledWith(
-			[artist.id],
-			expect.objectContaining({
-				data: expect.objectContaining({ subjectId: null }),
-			}),
-		);
-	});
 });

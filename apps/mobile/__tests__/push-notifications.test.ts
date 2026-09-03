@@ -230,9 +230,10 @@ describe('resolveNotificationTarget', () => {
     expect(resolveNotificationTarget({ subjectType: 'boothRentCharge', subjectId: 'brc-1' })).toBeNull();
   });
 
-  it('returns null when subjectId is the string "null" coerced from a real null on the server', () => {
-    // server/utils/notifications.js sends a real JSON null, not the string "null" - this just
-    // confirms a null subjectId (an event with no real subject) never resolves to a target.
+  it('returns null when subjectId is null', () => {
+    // subjectId is `required: true` on the server's Notification schema, so notify() itself
+    // never produces a push with a null subjectId - this covers resolveNotificationTarget's own
+    // defensive handling of a malformed or otherwise unexpected payload, not a real server case.
     expect(resolveNotificationTarget({ subjectType: 'appointment', subjectId: null })).toBeNull();
   });
 

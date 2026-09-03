@@ -17,11 +17,16 @@ DECISIONS.md X32.
 subjectId }` into its one `push.sendPushForRecipients` call - `sendPushForRecipients` itself
 (`utils/push.js`) has accepted and forwarded a `data` object since Phase 5 step 7, but nothing was
 ever passed. Checked directly against the current code rather than trusting an earlier note in
-this project's own history that claimed this was already wired up - it wasn't. Two new tests in
-`test/integration/pushNotifications.test.js`. **Not run against a real `mongod` in this sandbox**
-(no route to `fastdl.mongodb.org` - same standing block as every other server integration test
-here); `node --check` passed. Ask to run `npm test` in `server/` on a machine with real network
-access for full confirmation.
+this project's own history that claimed this was already wired up - it wasn't. One test in
+`test/integration/pushNotifications.test.js` (a second, invalid one - "sends null subjectId when
+an event has none" - was removed after the user's own `npm test` run caught it: `subjectId` is
+`required: true` on the `Notification` schema, so `delete event.subjectId` before calling
+`notify()` fails at `Notification.insertMany`, before the test ever reaches the code it meant to
+exercise. This sandbox's `node --check`-only confirmation couldn't have caught that - a real gap
+in what this sandbox can verify server-side, not a one-off mistake to shrug off. See DECISIONS.md
+X32's own note on the fix). **Not run against a real `mongod` in this sandbox** (no route to
+`fastdl.mongodb.org` - same standing block as every other server integration test here); `node
+--check` passed.
 
 **Mobile:** new `resolveNotificationTarget` in `lib/push-notifications.ts` maps a push's
 `subjectType` to one of five mobile screens (appointment/bookingRequest/conversation/artist/shop) -

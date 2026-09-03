@@ -2109,13 +2109,19 @@ always accepted and forwarded a `data` object (it's been sitting there, unused, 
 7 - `data = {}` in its own signature, spread onto every Expo message), but `notify()`'s one real
 call site never passed one. Every in-app `Notification` row already carries `type`/`subjectType`/
 `subjectId` (`models/Notification.js`) - this is that same identity, reaching the push payload for
-the first time. `subjectId` is coerced with `String(...)` (or sent as a real `null`, never the
-string `"undefined"`) since it's a Mongoose ObjectId server-side and has to survive a JSON round
-trip to the device unchanged. Two new tests in `test/integration/pushNotifications.test.js` cover
-the payload shape and the no-subject case; `node --check` is this sandbox's own ceiling for
-confirming it (no route to `fastdl.mongodb.org` here - see Test status - so the integration suite
-itself couldn't be run in this sandbox; ask to run `npm test` on a machine with real network
-access for full confirmation).
+the first time. `subjectId` is coerced with `String(...)` - never a null fallback, since
+`subjectId` is `required: true` on the `Notification` schema, so `Notification.insertMany` earlier
+in the same function has already thrown for any event missing one; there is no "no subject" case
+by the time this line runs. (An earlier draft of this change DID add a null fallback plus a test
+for it - `node --check` couldn't catch that the test was invalid, since it never got far enough to
+run a real `mongod`. The user's own `npm test` run on a machine with real network access caught
+it: the test's `delete event.subjectId` hit the schema's own `required: true` validation error
+before ever reaching the push code it meant to exercise. Removed the dead null-fallback branch and
+the invalid test along with it - this is what small-sandbox `node --check`-only confirmation
+actually buys you, and does not buy you, for a change like this.) One new test in
+`test/integration/pushNotifications.test.js` covers the payload shape; `node --check` is this
+sandbox's own ceiling for confirming it (no route to `fastdl.mongodb.org` here - see Test status -
+so the integration suite itself couldn't be run in this sandbox).
 
 **Mobile: `lib/push-notifications.ts`'s new `resolveNotificationTarget(data)`** reads that payload
 back and maps `subjectType` to one of five known mobile screens - `appointment`, `bookingRequest`,

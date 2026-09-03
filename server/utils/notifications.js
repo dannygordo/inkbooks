@@ -151,13 +151,16 @@ async function notify({
   // subjectId), so a tap on the notification can open the right screen instead of just the app -
   // see apps/mobile/src/lib/push-notifications.ts's notification-response handler, the client side
   // of this. subjectId is coerced to a plain string: it's a Mongoose ObjectId here, and Expo's
-  // push payload has to survive a JSON round trip to the device exactly as sent.
+  // push payload has to survive a JSON round trip to the device exactly as sent. No null-subject
+  // fallback is needed - subjectId is `required: true` on the Notification schema
+  // (models/Notification.js), so Notification.insertMany above has already thrown for any event
+  // missing one, long before this line could ever run with an empty subjectId.
   if (pushEligibleIds.length > 0) {
     push
       .sendPushForRecipients(pushEligibleIds, {
         title,
         body,
-        data: { type, subjectType, subjectId: subjectId ? String(subjectId) : null },
+        data: { type, subjectType, subjectId: String(subjectId) },
       })
       .catch((err) => {
         reportError(err, {
