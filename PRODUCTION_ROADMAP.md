@@ -1177,6 +1177,16 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    This closes the requested three-item follow-up round in full ("Settings batch 2, Messages
    follow-ups, Mobile deep-link scheme").
 
+   **Settings batch 3 (2026-09-03, see DECISIONS.md X36) is the next slice picked from X31/X34's
+   own follow-up list** - `settings/shop.tsx`, closing the gap named directly in `shop/[id].tsx`'s
+   own `ShopCutCard` comment since X24: shop cut percent (save-on-blur) and the shop's own
+   form-link handle, plus its shop-wide form links list. `ShopConnectionPanel.jsx` (an artist's
+   own shop connect/disconnect/move flow) checked and found substantial enough to name as its own
+   remaining item rather than fold in. Confirmed in this sandbox: `packages/api` codegen + build,
+   `apps/mobile` `tsc --noEmit` clean, full `apps/mobile` Jest suite - still 229/229. Rates/Booth
+   Rent, the Messages settings category, Forms' per-artist "Your link" section, Appearance, and
+   Security remain the next items on that same follow-up list.
+
    Everything else on the ~40-screen list not yet named remains open.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).

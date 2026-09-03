@@ -92,3 +92,24 @@ mutation DisconnectShopSquare($shopId: ID!) {
 		squareConnectedAt
 	}
 }
+
+# settings/shop.tsx - closes the gap shop/[id].tsx's own ShopCutCard names directly (DECISIONS.md
+# X24/X36): this is the SAME updateShop mutation UpdateShopIdentity above already calls (ShopInput
+# requires every field non-null or it's nulled out - see that mutation's own comment), just a
+# second named operation with its own response selection, since IdentityCard's doesn't return
+# shopCutPercent and this screen needs it back to confirm the save.
+mutation UpdateShopCutPercent($shop: ShopInput!) {
+	updateShop(shop: $shop) {
+		id
+		shopCutPercent
+	}
+}
+
+# formSlug is NOT a ShopInput field at all (see typeDefs.js's own ShopInput definition) - it has
+# its own dedicated, self-service mutation, mirroring apps/web's ShopPanel.jsx exactly.
+mutation UpdateMyShopFormSlug($shopId: ID!, $slug: String!) {
+	updateMyShopFormSlug(shopId: $shopId, slug: $slug) {
+		id
+		formSlug
+	}
+}

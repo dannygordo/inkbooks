@@ -8,6 +8,29 @@ Last updated: 2026-09-03.
 
 ---
 
+### 2026-09-03 (twenty-fourth entry): Settings batch 3 - Shop's shop-cut-percent editor + shop-wide form link
+
+Picked as the next slice after the three-item follow-up round closed - "More Settings," highest
+remaining priority per X31/X34's own list. Full reasoning: DECISIONS.md X36.
+
+New `settings/shop.tsx` (its own screen, not a third card on `settings/index.tsx` - needs its own
+`GetShopDetail`+`GetFormsList` queries). Two fields, matching web's `ShopPanel.jsx` exactly: shop
+cut percent (save-on-blur, new `UpdateShopCutPercent` operation against the existing `updateShop`
+mutation) and the shop's own form-link handle (`formSlug` - not a `ShopInput` field at all, its
+own dedicated `updateMyShopFormSlug` mutation), plus the resulting shop-wide form links list
+(`selectTextOnFocus` relative-path display, same call as `form/[id].tsx`/`forms/index.tsx` - no
+`window.location.origin` equivalent on mobile). `shop/[id].tsx`'s `ShopCutCard` now links to this
+screen instead of admitting no such screen existed.
+
+Named, not folded in: `ShopConnectionPanel.jsx` (an artist's own shop connect/disconnect/move
+flow) - checked directly, found substantial, left as its own future slice.
+
+Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+full `apps/mobile` Jest suite - still 229/229. No server-side changes - both mutations already
+existed.
+
+---
+
 ### 2026-09-03 (twenty-third entry): Messages follow-ups - image-attachment compose + per-row "mark unread"
 
 Last of three follow-up items ("Settings batch 2, Messages follow-ups, Mobile deep-link scheme") -

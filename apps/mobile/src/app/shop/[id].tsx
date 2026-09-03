@@ -4,7 +4,7 @@ import {
   useGetSquareAuthorizationUrlLazyQuery,
   useUpdateShopIdentityMutation,
 } from '@inkbooks/api';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,10 +25,9 @@ import { useTheme } from '@/hooks/use-theme';
  *
  * shopCutPercent is a read-only readout here, matching web's own Shop.jsx exactly - that page's
  * own comment explains this was consolidated from a formerly-duplicated editable copy (two
- * editors writing the same stored field was a real bug). Web links out to Settings to change it;
- * mobile's Settings screen (settings/index.tsx) only ports AccountPanel (photo/password/calendar
- * color) so far and has no shop-cut-percent editor yet - named here as a genuine gap rather than
- * a broken in-app link to a screen that doesn't exist.
+ * editors writing the same stored field was a real bug). A "Change in Settings" button now
+ * actually goes somewhere (settings/shop.tsx, X36) - it used to be plain text admitting mobile had
+ * no such screen yet.
  *
  * hourlyRate/shopMinimum/logo/billingType/status are echoed back unchanged in every save, exactly
  * like web's own buildShopPayload - none of the five are edited on this page (see
@@ -285,6 +284,7 @@ function IdentityCard({ shop, canEdit }: { shop: NonNullable<Shop>; canEdit: boo
 }
 
 function ShopCutCard({ shop, canEdit }: { shop: NonNullable<Shop>; canEdit: boolean }) {
+  const router = useRouter();
   return (
     <View style={styles.card}>
       <ThemedText type="smallBold">Shop Cut</ThemedText>
@@ -292,9 +292,12 @@ function ShopCutCard({ shop, canEdit }: { shop: NonNullable<Shop>; canEdit: bool
         {shop.shopCutPercent ?? 0}%
       </ThemedText>
       {canEdit ? (
-        <ThemedText type="small" themeColor="textSecondary">
-          Change this in Settings on the web app - it's not editable from mobile yet.
-        </ThemedText>
+        <Button
+          label="Change in Settings"
+          variant="secondary"
+          onPress={() => router.push('/settings/shop')}
+          testID="shop-cut-settings-link"
+        />
       ) : null}
     </View>
   );

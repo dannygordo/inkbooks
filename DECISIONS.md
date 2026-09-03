@@ -2094,6 +2094,59 @@ for actually sharing it.
 `FORM_FIELD_TYPE_LABELS`/`formFieldTypeLabel`) - same "build the map directly, don't port
 `prettyConstantsListValue`" reasoning as `utils/projectStatus.ts` (X20).
 
+### X36. Settings batch 3 - Shop's shop-cut-percent editor and shop-wide form link
+
+Picked as the next slice from X31/X34's own follow-up list ("More Settings"), highest priority on
+that list since it's the one gap named directly in another screen's own comment: `shop/[id].tsx`'s
+`ShopCutCard` has said, since X24, "not editable from mobile yet." This closes it.
+
+**New `settings/shop.tsx`, not a third card on `settings/index.tsx`** - direct port of web's
+`ShopPanel.jsx`, kept as its own screen (like Income/Expense/Recurring Expenses - X31) rather than
+folded into the index screen the way Square's two cards were (X34), because this one needs its own
+`GetShopDetail` query (already existed, built for `shop/[id].tsx`) plus a `GetFormsList` query
+neither existing settings card needs - a third unrelated data dependency on an already-busy screen,
+not two lines fewer of navigation.
+
+**Two fields, matching web's own scope exactly, nothing more**: shop cut percent (save-on-blur,
+0-100 integer, same validation as web) and the shop's own form-link handle (`formSlug`, save-on-
+blur, lowercase-normalized) plus the resulting list of shop-wide form links. Tax rate/processing
+offset are deliberately NOT here, same as web - those belong to `SquarePricingCard` (X34), which
+already resolves to the shop for a connected artist; a second editor for the same two fields would
+recreate the exact "two editors, one stored field" bug this project already fixed once for
+shopCutPercent itself (see `ShopPanel.jsx`'s own header comment on that history).
+
+**`formSlug` needed its own mutation, not `updateShop`'s `ShopInput`** - checked `typeDefs.js`'s
+`ShopInput` definition directly rather than assuming: `formSlug` isn't a field on it at all, it has
+a dedicated `updateMyShopFormSlug(shopId, slug)` mutation. Shop cut percent, by contrast, IS a
+`ShopInput` field, so saving it means resending the same full echoed-back-unchanged payload
+`shop/[id].tsx`'s `IdentityCard` already builds (`ShopInput` requires every field non-null or the
+resolver nulls it out) - a new `UpdateShopCutPercent` operation against the same `updateShop`
+mutation, with its own response selection, since `UpdateShopIdentity`'s doesn't return
+`shopCutPercent`.
+
+**Shop-wide links shown via a `selectTextOnFocus` read-only field, not a Copy button** - same
+call `form/[id].tsx`'s guest link and `forms/index.tsx`'s public-form link already made (X28/X30):
+mobile has no equivalent of `window.location.origin`, which is what web's own `formUrl()` helper
+needs to build a full URL, so this shows the relative `<formSlug>/<shop.formSlug>` path and lets
+the OS's own text selection do the copying. `GetFormsList`'s selection gained a `shopUseOnly`
+field for this screen's own filter (`items.filter(f => f.shopUseOnly)`, mirroring web's identical
+filter) - additive, no existing caller of that query is affected.
+
+**`shop/[id].tsx`'s `ShopCutCard` now links here** ("Change in Settings" button →
+`router.push('/settings/shop')`) instead of the plain text admitting no such screen existed - that
+comment and button are both corrected in the same pass.
+
+**Named, deliberately not folded in**: `ShopConnectionPanel.jsx` (an artist's own shop connect/
+disconnect/move flow, including a confirm-before-transfer dialog) - checked directly and found
+substantial enough to be its own future slice, not a small addition to this one.
+
+**Verified in this sandbox**: `packages/api` codegen + build clean, `apps/mobile` `tsc --noEmit`
+clean, full `apps/mobile` Jest suite - still 229/229 (no new pure-logic module this slice - every
+new piece is an Apollo-wired screen, matching every other settings screen's own
+no-screen-level-test precedent). No server-side changes at all - both mutations
+(`updateShop`/`updateMyShopFormSlug`) already existed; this only added client-side operations
+against them.
+
 ### X35. Messages follow-ups - image-attachment compose and per-row "mark unread"; group/shop-wide conversations still open
 
 Last of three follow-up items ("Settings batch 2, Messages follow-ups, Mobile deep-link scheme"),
@@ -2371,9 +2424,12 @@ unlike a plain optional text field that's empty by default).
 
 **Named, deliberate cuts - the rest of Settings, left for later slices, roughly in order of
 likely value**:
-- **Shop** (`ShopPanel.jsx`'s shop-cut-percent editor, `ShopConnectionPanel.jsx`) - the gap named
-  directly in `shop/[id].tsx`'s own comment (X24): shopCutPercent is read-only there because this
-  editor doesn't exist on mobile yet.
+- ~~**Shop** (`ShopPanel.jsx`'s shop-cut-percent editor)~~ - **done, see X36.**
+  `ShopConnectionPanel.jsx` - an artist's own connect/disconnect/move-to-a-different-shop flow
+  (`ArtistShopConnectionService`'s `connectArtistToShop`/`disconnectArtistFromShop`, including a
+  confirm-before-transfer dialog when connecting would move them off their current shop) - is a
+  real, separate feature checked while scoping X36 and found substantial enough to name as its own
+  remaining item, not folded into this pass.
 - ~~**Square Config** (`SquarePanel.jsx`, `SquarePricingPanel.jsx`'s tax rate/fee offset
   editor)~~ - **done, see X34.**
 - **Rates** (`RatesPanel.jsx`, `BoothRentPanel.jsx`) - an artist's own session-rate defaults and

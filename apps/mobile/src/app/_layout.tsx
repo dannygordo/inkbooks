@@ -132,6 +132,8 @@ function RootNavigator() {
         <Stack.Screen name="settings/income-types" options={{ headerShown: true, title: 'Income Categories' }} />
         <Stack.Screen name="settings/expense-types" options={{ headerShown: true, title: 'Expense Categories' }} />
         <Stack.Screen name="settings/recurring-expenses" options={{ headerShown: true, title: 'Recurring Expenses' }} />
+        {/* Shop-wide money config (X36) - reached from settings/index.tsx's own "Shop" link. */}
+        <Stack.Screen name="settings/shop" options={{ headerShown: true, title: 'Shop' }} />
         {/* The client roster - see clients/index.tsx's own header comment. Reached from
             index.tsx's header, and the second (real) entry point into client/[id].tsx below -
             that screen's own X15 comment named this as worth building. */}

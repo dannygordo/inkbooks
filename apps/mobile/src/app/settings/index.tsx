@@ -32,7 +32,7 @@ import { useAuth } from '@/context/auth';
 import { useTheme } from '@/hooks/use-theme';
 import { deleteFile } from '@/firebase/deleteFile';
 import { uploadFileWithProgress } from '@/firebase/uploadFile';
-import { canManageBusinessLedger } from '@/utils/permissions';
+import { canManageBusinessLedger, isShopAdminOrBetter } from '@/utils/permissions';
 import { avatarFolder, previousAvatarUrl } from '@/utils/avatar';
 import { formatCents, basisPointsToPercent, dollarsToCents, percentToBasisPoints } from '@/utils/money';
 import { formatImagePathForFirebaseStorage } from '@/utils/imagePath';
@@ -72,9 +72,14 @@ import { getUserShopId } from '@/utils/user';
  * here returns to this same screen via `inkbooks://settings?square=<status>` - the `square` param
  * this screen reads below closes the one follow-up X33 named as still open.
  *
- * Everything else on web's Settings (Shop's shop-cut-percent editor, Rates, Booth Rent, Appearance,
- * Notifications, Security, Messages, Forms' shop-wide section) remains unported - see
- * DECISIONS.md X31/X34 for the full list and reasoning.
+ * A "Shop" link (X36) below routes shop-admins to `settings/shop.tsx` - the shop-cut-percent
+ * editor named directly in shop/[id].tsx's own ShopCutCard comment (X24), plus the shop's own
+ * form-link handle and its shop-wide form links list. Kept as its own screen, not a third card
+ * here, since it needs its own shop query and a forms query neither existing card needs.
+ *
+ * Everything else on web's Settings (Rates, Booth Rent, Appearance, Notifications, Security,
+ * Messages, Forms' per-artist "Your link" section) remains unported - see DECISIONS.md
+ * X31/X34/X36 for the full list and reasoning.
  */
 export default function SettingsScreen() {
   const { user, updateCurrentUser } = useAuth();
@@ -305,6 +310,23 @@ export default function SettingsScreen() {
               />
             </View>
           </View>
+
+          {isShopAdminOrBetter(user) && shopId ? (
+            <View style={styles.card}>
+              <ThemedText type="smallBold">Shop</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                The shop cut percentage and the shop's own form-link handle.
+              </ThemedText>
+              <View style={styles.linkList}>
+                <Button
+                  label="Shop Settings"
+                  variant="secondary"
+                  onPress={() => router.push('/settings/shop')}
+                  testID="settings-shop-link"
+                />
+              </View>
+            </View>
+          ) : null}
 
           {canManageBusinessLedger(user) ? (
             <View style={styles.card}>

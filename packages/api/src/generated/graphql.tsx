@@ -3068,7 +3068,7 @@ export type GetFormsListQueryVariables = Exact<{
 }>;
 
 
-export type GetFormsListQuery = { __typename?: 'Query', getForms: { __typename?: 'FormPage', items: Array<{ __typename?: 'Form', id: string, title: string, status: string, allowGuestSubmissions: boolean, publicToken?: string | null, slug?: string | null, systemKey?: string | null, createdAt: string, fields: Array<{ __typename?: 'FormField', key: string, type: string, label: string, helpText?: string | null, required: boolean, options: Array<string> }> }>, pageInfo: { __typename?: 'PageInfo', totalCount: number, hasMore: boolean, limit: number, offset: number } } };
+export type GetFormsListQuery = { __typename?: 'Query', getForms: { __typename?: 'FormPage', items: Array<{ __typename?: 'Form', id: string, title: string, status: string, allowGuestSubmissions: boolean, publicToken?: string | null, slug?: string | null, systemKey?: string | null, shopUseOnly: boolean, createdAt: string, fields: Array<{ __typename?: 'FormField', key: string, type: string, label: string, helpText?: string | null, required: boolean, options: Array<string> }> }>, pageInfo: { __typename?: 'PageInfo', totalCount: number, hasMore: boolean, limit: number, offset: number } } };
 
 export type PublishFormMutationVariables = Exact<{
   formId: Scalars['ID']['input'];
@@ -3448,6 +3448,21 @@ export type DisconnectShopSquareMutationVariables = Exact<{
 
 
 export type DisconnectShopSquareMutation = { __typename?: 'Mutation', disconnectShopSquare: { __typename?: 'Shop', id: string, squareConnected?: boolean | null, squareLocationId?: string | null, squareConnectedAt?: string | null } };
+
+export type UpdateShopCutPercentMutationVariables = Exact<{
+  shop: ShopInput;
+}>;
+
+
+export type UpdateShopCutPercentMutation = { __typename?: 'Mutation', updateShop?: { __typename?: 'Shop', id: string, shopCutPercent?: number | null } | null };
+
+export type UpdateMyShopFormSlugMutationVariables = Exact<{
+  shopId: Scalars['ID']['input'];
+  slug: Scalars['String']['input'];
+}>;
+
+
+export type UpdateMyShopFormSlugMutation = { __typename?: 'Mutation', updateMyShopFormSlug: { __typename?: 'Shop', id: string, formSlug?: string | null } };
 
 export type GetMySquareConnectionQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -5350,6 +5365,7 @@ export const GetFormsListDocument = gql`
       publicToken
       slug
       systemKey
+      shopUseOnly
       fields {
         key
         type
@@ -8141,6 +8157,75 @@ export function useDisconnectShopSquareMutation(baseOptions?: Apollo.MutationHoo
 export type DisconnectShopSquareMutationHookResult = ReturnType<typeof useDisconnectShopSquareMutation>;
 export type DisconnectShopSquareMutationResult = Apollo.MutationResult<DisconnectShopSquareMutation>;
 export type DisconnectShopSquareMutationOptions = Apollo.BaseMutationOptions<DisconnectShopSquareMutation, DisconnectShopSquareMutationVariables>;
+export const UpdateShopCutPercentDocument = gql`
+    mutation UpdateShopCutPercent($shop: ShopInput!) {
+  updateShop(shop: $shop) {
+    id
+    shopCutPercent
+  }
+}
+    `;
+export type UpdateShopCutPercentMutationFn = Apollo.MutationFunction<UpdateShopCutPercentMutation, UpdateShopCutPercentMutationVariables>;
+
+/**
+ * __useUpdateShopCutPercentMutation__
+ *
+ * To run a mutation, you first call `useUpdateShopCutPercentMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateShopCutPercentMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateShopCutPercentMutation, { data, loading, error }] = useUpdateShopCutPercentMutation({
+ *   variables: {
+ *      shop: // value for 'shop'
+ *   },
+ * });
+ */
+export function useUpdateShopCutPercentMutation(baseOptions?: Apollo.MutationHookOptions<UpdateShopCutPercentMutation, UpdateShopCutPercentMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<UpdateShopCutPercentMutation, UpdateShopCutPercentMutationVariables>(UpdateShopCutPercentDocument, options);
+      }
+export type UpdateShopCutPercentMutationHookResult = ReturnType<typeof useUpdateShopCutPercentMutation>;
+export type UpdateShopCutPercentMutationResult = Apollo.MutationResult<UpdateShopCutPercentMutation>;
+export type UpdateShopCutPercentMutationOptions = Apollo.BaseMutationOptions<UpdateShopCutPercentMutation, UpdateShopCutPercentMutationVariables>;
+export const UpdateMyShopFormSlugDocument = gql`
+    mutation UpdateMyShopFormSlug($shopId: ID!, $slug: String!) {
+  updateMyShopFormSlug(shopId: $shopId, slug: $slug) {
+    id
+    formSlug
+  }
+}
+    `;
+export type UpdateMyShopFormSlugMutationFn = Apollo.MutationFunction<UpdateMyShopFormSlugMutation, UpdateMyShopFormSlugMutationVariables>;
+
+/**
+ * __useUpdateMyShopFormSlugMutation__
+ *
+ * To run a mutation, you first call `useUpdateMyShopFormSlugMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateMyShopFormSlugMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateMyShopFormSlugMutation, { data, loading, error }] = useUpdateMyShopFormSlugMutation({
+ *   variables: {
+ *      shopId: // value for 'shopId'
+ *      slug: // value for 'slug'
+ *   },
+ * });
+ */
+export function useUpdateMyShopFormSlugMutation(baseOptions?: Apollo.MutationHookOptions<UpdateMyShopFormSlugMutation, UpdateMyShopFormSlugMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<UpdateMyShopFormSlugMutation, UpdateMyShopFormSlugMutationVariables>(UpdateMyShopFormSlugDocument, options);
+      }
+export type UpdateMyShopFormSlugMutationHookResult = ReturnType<typeof useUpdateMyShopFormSlugMutation>;
+export type UpdateMyShopFormSlugMutationResult = Apollo.MutationResult<UpdateMyShopFormSlugMutation>;
+export type UpdateMyShopFormSlugMutationOptions = Apollo.BaseMutationOptions<UpdateMyShopFormSlugMutation, UpdateMyShopFormSlugMutationVariables>;
 export const GetMySquareConnectionDocument = gql`
     query GetMySquareConnection {
   getMySquareConnection {

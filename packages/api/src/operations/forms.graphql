@@ -29,6 +29,9 @@ query GetFormsList($shopId: ID, $artistUserId: ID, $status: String, $page: PageI
 			publicToken
 			slug
 			systemKey
+			# Selected for settings/shop.tsx's own use (DECISIONS.md X36) - filters this same list
+			# down to the shop-wide links a shop admin can hand out, mirroring web's ShopPanel.jsx.
+			shopUseOnly
 			fields {
 				key
 				type
