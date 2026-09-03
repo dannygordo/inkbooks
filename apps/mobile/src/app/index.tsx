@@ -158,6 +158,11 @@ export default function AppointmentsScreen() {
                 <ThemedText type="link">Artists</ThemedText>
               </Pressable>
             ) : null}
+            {isStaffOrBetter(user) ? (
+              <Pressable onPress={() => router.push('/staff')} testID="staff-button">
+                <ThemedText type="link">Staff</ThemedText>
+              </Pressable>
+            ) : null}
             <Pressable onPress={() => router.push('/clients')} testID="clients-button">
               <ThemedText type="link">Clients</ThemedText>
             </Pressable>

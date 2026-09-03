@@ -107,6 +107,10 @@ function RootNavigator() {
             Gated `isStaffOrBetter`, matching web's Sidebar.jsx exactly. */}
         <Stack.Screen name="artists/index" options={{ headerShown: true, title: 'Artists' }} />
         <Stack.Screen name="artist/[id]" options={{ headerShown: true, title: 'Artist' }} />
+        {/* Staff - the shop's front-desk roster, see staff/index.tsx's own header comment. Also
+            gated `isStaffOrBetter` (web's Sidebar.jsx gates Artists and Staff identically). */}
+        <Stack.Screen name="staff/index" options={{ headerShown: true, title: 'Staff' }} />
+        <Stack.Screen name="staff/[id]" options={{ headerShown: true, title: 'Staff Member' }} />
       </Stack.Protected>
     </Stack>
   );

@@ -1,0 +1,98 @@
+# The Staff directory - front-desk/shop-staff roster, structurally identical to artists.graphql's
+# Artists directory (same list+detail+archive shape) but simpler: Staff has no self-service edit
+# path at all (updateStaff has a hard SHOP_ADMIN floor server-side, unlike updateArtist's
+# self-or-shop-admin rule) and no embedded dashboard panels to defer. See DECISIONS.md X23.
+#
+# Leaner than web's own inline Staff.jsx query - drops address/zip, which that query selects but
+# never renders on the list row.
+query GetStaffList($includeArchived: Boolean, $page: PageInput) {
+	getStaff(includeArchived: $includeArchived, page: $page) {
+		items {
+			id
+			firstName
+			lastName
+			title
+			email
+			phone
+			city
+			state
+			instagram
+			facebook
+			avatar
+			status
+			shopId
+			shop {
+				name
+			}
+			user {
+				id
+				avatar
+			}
+		}
+		pageInfo {
+			totalCount
+			hasMore
+			limit
+			offset
+		}
+	}
+}
+
+query GetStaffDetail($staffId: ID!) {
+	getOneStaff(staffId: $staffId) {
+		id
+		firstName
+		lastName
+		email
+		phone
+		title
+		address
+		city
+		state
+		zip
+		instagram
+		facebook
+		avatar
+		userId
+		status
+		shopId
+		user {
+			id
+			avatar
+		}
+	}
+}
+
+# StaffInput requires userId/status/shopId as non-null - echoed back unchanged, matching web's own
+# buildIdentityPayload exactly, since nothing on this screen edits any of the three (status has
+# its own door, ArchiveControl; shopId/userId aren't user-editable at all).
+mutation UpdateStaffIdentity($staff: StaffInput!) {
+	updateStaff(staff: $staff) {
+		id
+		firstName
+		lastName
+		email
+		phone
+		title
+		address
+		city
+		state
+		zip
+		instagram
+		facebook
+	}
+}
+
+mutation ArchiveStaff($staffId: ID!) {
+	archiveStaff(staffId: $staffId) {
+		id
+		status
+	}
+}
+
+mutation UnarchiveStaff($staffId: ID!) {
+	unarchiveStaff(staffId: $staffId) {
+		id
+		status
+	}
+}

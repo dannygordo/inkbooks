@@ -3150,6 +3150,42 @@ export type ConfirmShopCutPaidMutationVariables = Exact<{
 
 export type ConfirmShopCutPaidMutation = { __typename?: 'Mutation', confirmShopCutPaid: { __typename?: 'Appointment', id: string, shopCutStatus: string, shopCutConfirmedAt?: string | null } };
 
+export type GetStaffListQueryVariables = Exact<{
+  includeArchived?: InputMaybe<Scalars['Boolean']['input']>;
+  page?: InputMaybe<PageInput>;
+}>;
+
+
+export type GetStaffListQuery = { __typename?: 'Query', getStaff: { __typename?: 'StaffPage', items: Array<{ __typename?: 'Staff', id: string, firstName: string, lastName: string, title?: string | null, email: string, phone: string, city?: string | null, state?: string | null, instagram?: string | null, facebook?: string | null, avatar?: string | null, status: number, shopId: string, shop?: { __typename?: 'Shop', name: string } | null, user?: { __typename?: 'User', id: string, avatar?: string | null } | null }>, pageInfo: { __typename?: 'PageInfo', totalCount: number, hasMore: boolean, limit: number, offset: number } } };
+
+export type GetStaffDetailQueryVariables = Exact<{
+  staffId: Scalars['ID']['input'];
+}>;
+
+
+export type GetStaffDetailQuery = { __typename?: 'Query', getOneStaff?: { __typename?: 'Staff', id: string, firstName: string, lastName: string, email: string, phone: string, title?: string | null, address?: string | null, city?: string | null, state?: string | null, zip?: string | null, instagram?: string | null, facebook?: string | null, avatar?: string | null, userId: string, status: number, shopId: string, user?: { __typename?: 'User', id: string, avatar?: string | null } | null } | null };
+
+export type UpdateStaffIdentityMutationVariables = Exact<{
+  staff: StaffInput;
+}>;
+
+
+export type UpdateStaffIdentityMutation = { __typename?: 'Mutation', updateStaff?: { __typename?: 'Staff', id: string, firstName: string, lastName: string, email: string, phone: string, title?: string | null, address?: string | null, city?: string | null, state?: string | null, zip?: string | null, instagram?: string | null, facebook?: string | null } | null };
+
+export type ArchiveStaffMutationVariables = Exact<{
+  staffId: Scalars['ID']['input'];
+}>;
+
+
+export type ArchiveStaffMutation = { __typename?: 'Mutation', archiveStaff?: { __typename?: 'Staff', id: string, status: number } | null };
+
+export type UnarchiveStaffMutationVariables = Exact<{
+  staffId: Scalars['ID']['input'];
+}>;
+
+
+export type UnarchiveStaffMutation = { __typename?: 'Mutation', unarchiveStaff?: { __typename?: 'Staff', id: string, status: number } | null };
+
 export type UpdateProjectMutationVariables = Exact<{
   project?: InputMaybe<ProjectInput>;
 }>;
@@ -5983,6 +6019,251 @@ export function useConfirmShopCutPaidMutation(baseOptions?: Apollo.MutationHookO
 export type ConfirmShopCutPaidMutationHookResult = ReturnType<typeof useConfirmShopCutPaidMutation>;
 export type ConfirmShopCutPaidMutationResult = Apollo.MutationResult<ConfirmShopCutPaidMutation>;
 export type ConfirmShopCutPaidMutationOptions = Apollo.BaseMutationOptions<ConfirmShopCutPaidMutation, ConfirmShopCutPaidMutationVariables>;
+export const GetStaffListDocument = gql`
+    query GetStaffList($includeArchived: Boolean, $page: PageInput) {
+  getStaff(includeArchived: $includeArchived, page: $page) {
+    items {
+      id
+      firstName
+      lastName
+      title
+      email
+      phone
+      city
+      state
+      instagram
+      facebook
+      avatar
+      status
+      shopId
+      shop {
+        name
+      }
+      user {
+        id
+        avatar
+      }
+    }
+    pageInfo {
+      totalCount
+      hasMore
+      limit
+      offset
+    }
+  }
+}
+    `;
+
+/**
+ * __useGetStaffListQuery__
+ *
+ * To run a query within a React component, call `useGetStaffListQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetStaffListQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetStaffListQuery({
+ *   variables: {
+ *      includeArchived: // value for 'includeArchived'
+ *      page: // value for 'page'
+ *   },
+ * });
+ */
+export function useGetStaffListQuery(baseOptions?: Apollo.QueryHookOptions<GetStaffListQuery, GetStaffListQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetStaffListQuery, GetStaffListQueryVariables>(GetStaffListDocument, options);
+      }
+export function useGetStaffListLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetStaffListQuery, GetStaffListQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetStaffListQuery, GetStaffListQueryVariables>(GetStaffListDocument, options);
+        }
+// @ts-ignore
+export function useGetStaffListSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetStaffListQuery, GetStaffListQueryVariables>): Apollo.UseSuspenseQueryResult<GetStaffListQuery, GetStaffListQueryVariables>;
+export function useGetStaffListSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetStaffListQuery, GetStaffListQueryVariables>): Apollo.UseSuspenseQueryResult<GetStaffListQuery | undefined, GetStaffListQueryVariables>;
+export function useGetStaffListSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetStaffListQuery, GetStaffListQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetStaffListQuery, GetStaffListQueryVariables>(GetStaffListDocument, options);
+        }
+export type GetStaffListQueryHookResult = ReturnType<typeof useGetStaffListQuery>;
+export type GetStaffListLazyQueryHookResult = ReturnType<typeof useGetStaffListLazyQuery>;
+export type GetStaffListSuspenseQueryHookResult = ReturnType<typeof useGetStaffListSuspenseQuery>;
+export type GetStaffListQueryResult = Apollo.QueryResult<GetStaffListQuery, GetStaffListQueryVariables>;
+export const GetStaffDetailDocument = gql`
+    query GetStaffDetail($staffId: ID!) {
+  getOneStaff(staffId: $staffId) {
+    id
+    firstName
+    lastName
+    email
+    phone
+    title
+    address
+    city
+    state
+    zip
+    instagram
+    facebook
+    avatar
+    userId
+    status
+    shopId
+    user {
+      id
+      avatar
+    }
+  }
+}
+    `;
+
+/**
+ * __useGetStaffDetailQuery__
+ *
+ * To run a query within a React component, call `useGetStaffDetailQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetStaffDetailQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetStaffDetailQuery({
+ *   variables: {
+ *      staffId: // value for 'staffId'
+ *   },
+ * });
+ */
+export function useGetStaffDetailQuery(baseOptions: Apollo.QueryHookOptions<GetStaffDetailQuery, GetStaffDetailQueryVariables> & ({ variables: GetStaffDetailQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetStaffDetailQuery, GetStaffDetailQueryVariables>(GetStaffDetailDocument, options);
+      }
+export function useGetStaffDetailLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetStaffDetailQuery, GetStaffDetailQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetStaffDetailQuery, GetStaffDetailQueryVariables>(GetStaffDetailDocument, options);
+        }
+// @ts-ignore
+export function useGetStaffDetailSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetStaffDetailQuery, GetStaffDetailQueryVariables>): Apollo.UseSuspenseQueryResult<GetStaffDetailQuery, GetStaffDetailQueryVariables>;
+export function useGetStaffDetailSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetStaffDetailQuery, GetStaffDetailQueryVariables>): Apollo.UseSuspenseQueryResult<GetStaffDetailQuery | undefined, GetStaffDetailQueryVariables>;
+export function useGetStaffDetailSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetStaffDetailQuery, GetStaffDetailQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetStaffDetailQuery, GetStaffDetailQueryVariables>(GetStaffDetailDocument, options);
+        }
+export type GetStaffDetailQueryHookResult = ReturnType<typeof useGetStaffDetailQuery>;
+export type GetStaffDetailLazyQueryHookResult = ReturnType<typeof useGetStaffDetailLazyQuery>;
+export type GetStaffDetailSuspenseQueryHookResult = ReturnType<typeof useGetStaffDetailSuspenseQuery>;
+export type GetStaffDetailQueryResult = Apollo.QueryResult<GetStaffDetailQuery, GetStaffDetailQueryVariables>;
+export const UpdateStaffIdentityDocument = gql`
+    mutation UpdateStaffIdentity($staff: StaffInput!) {
+  updateStaff(staff: $staff) {
+    id
+    firstName
+    lastName
+    email
+    phone
+    title
+    address
+    city
+    state
+    zip
+    instagram
+    facebook
+  }
+}
+    `;
+export type UpdateStaffIdentityMutationFn = Apollo.MutationFunction<UpdateStaffIdentityMutation, UpdateStaffIdentityMutationVariables>;
+
+/**
+ * __useUpdateStaffIdentityMutation__
+ *
+ * To run a mutation, you first call `useUpdateStaffIdentityMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateStaffIdentityMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateStaffIdentityMutation, { data, loading, error }] = useUpdateStaffIdentityMutation({
+ *   variables: {
+ *      staff: // value for 'staff'
+ *   },
+ * });
+ */
+export function useUpdateStaffIdentityMutation(baseOptions?: Apollo.MutationHookOptions<UpdateStaffIdentityMutation, UpdateStaffIdentityMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<UpdateStaffIdentityMutation, UpdateStaffIdentityMutationVariables>(UpdateStaffIdentityDocument, options);
+      }
+export type UpdateStaffIdentityMutationHookResult = ReturnType<typeof useUpdateStaffIdentityMutation>;
+export type UpdateStaffIdentityMutationResult = Apollo.MutationResult<UpdateStaffIdentityMutation>;
+export type UpdateStaffIdentityMutationOptions = Apollo.BaseMutationOptions<UpdateStaffIdentityMutation, UpdateStaffIdentityMutationVariables>;
+export const ArchiveStaffDocument = gql`
+    mutation ArchiveStaff($staffId: ID!) {
+  archiveStaff(staffId: $staffId) {
+    id
+    status
+  }
+}
+    `;
+export type ArchiveStaffMutationFn = Apollo.MutationFunction<ArchiveStaffMutation, ArchiveStaffMutationVariables>;
+
+/**
+ * __useArchiveStaffMutation__
+ *
+ * To run a mutation, you first call `useArchiveStaffMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useArchiveStaffMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [archiveStaffMutation, { data, loading, error }] = useArchiveStaffMutation({
+ *   variables: {
+ *      staffId: // value for 'staffId'
+ *   },
+ * });
+ */
+export function useArchiveStaffMutation(baseOptions?: Apollo.MutationHookOptions<ArchiveStaffMutation, ArchiveStaffMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<ArchiveStaffMutation, ArchiveStaffMutationVariables>(ArchiveStaffDocument, options);
+      }
+export type ArchiveStaffMutationHookResult = ReturnType<typeof useArchiveStaffMutation>;
+export type ArchiveStaffMutationResult = Apollo.MutationResult<ArchiveStaffMutation>;
+export type ArchiveStaffMutationOptions = Apollo.BaseMutationOptions<ArchiveStaffMutation, ArchiveStaffMutationVariables>;
+export const UnarchiveStaffDocument = gql`
+    mutation UnarchiveStaff($staffId: ID!) {
+  unarchiveStaff(staffId: $staffId) {
+    id
+    status
+  }
+}
+    `;
+export type UnarchiveStaffMutationFn = Apollo.MutationFunction<UnarchiveStaffMutation, UnarchiveStaffMutationVariables>;
+
+/**
+ * __useUnarchiveStaffMutation__
+ *
+ * To run a mutation, you first call `useUnarchiveStaffMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUnarchiveStaffMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [unarchiveStaffMutation, { data, loading, error }] = useUnarchiveStaffMutation({
+ *   variables: {
+ *      staffId: // value for 'staffId'
+ *   },
+ * });
+ */
+export function useUnarchiveStaffMutation(baseOptions?: Apollo.MutationHookOptions<UnarchiveStaffMutation, UnarchiveStaffMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<UnarchiveStaffMutation, UnarchiveStaffMutationVariables>(UnarchiveStaffDocument, options);
+      }
+export type UnarchiveStaffMutationHookResult = ReturnType<typeof useUnarchiveStaffMutation>;
+export type UnarchiveStaffMutationResult = Apollo.MutationResult<UnarchiveStaffMutation>;
+export type UnarchiveStaffMutationOptions = Apollo.BaseMutationOptions<UnarchiveStaffMutation, UnarchiveStaffMutationVariables>;
 export const UpdateProjectDocument = gql`
     mutation UpdateProject($project: ProjectInput) {
   updateProject(project: $project) {

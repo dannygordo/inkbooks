@@ -1827,6 +1827,42 @@ first), so sending it at all is pure risk for a field this form was never going 
 **No dedicated screen-level test for either new screen**, matching every prior slice's precedent -
 `utils/permissions.ts`'s new `isStaffOrBetter` gets test coverage; the two Apollo-wired screens
 don't.
+
+### X23. Staff directory built - same shape as Artists, simpler in every respect
+
+Second of the requested batch. Structurally identical to X22's Artists directory (list with a
+real "Show archived" toggle, detail with an autosave identity form and Archive/Restore reusing
+`components/ArchiveControl.tsx`), but genuinely simpler on both counts web itself already
+establishes, not a mobile-side scope cut:
+
+**No self-service edit path at all.** `updateStaff` has a hard `SHOP_ADMIN` floor server-side
+(`assertCanAccessShop`, no self-branch), unlike `updateArtist`'s self-or-shop-admin rule - matching
+web's own `canEditIdentity = user.role <= ROLES.SHOP_ADMIN` exactly, with no `isSelf` check to
+port because there is no self-edit case to check for.
+
+**No embedded dashboard panels to defer.** `StaffProfile.jsx` never mounted an
+`ArtistPerformancePanel`/`ShopCutRatePanel`-equivalent - Staff isn't the person a shop-cut ledger
+or performance dashboard is ever computed for, so there's nothing here comparable to X22's
+deliberate Phase-7 deferral.
+
+**`StaffInput` requires `shopId`/`userId`/`status` as non-null and they're echoed back unchanged**,
+same "not user-editable on this screen, but the input type demands them" situation `ArtistInput`
+doesn't have (that one made all three nullable). Ported straight from web's own
+`buildIdentityPayload` comment.
+
+**Route note:** list and detail share one directory (`app/staff/index.tsx` +
+`app/staff/[id].tsx`), same pattern `booking-requests/` already uses - unlike Clients/Artists,
+where "staff"/"staff" has no natural singular/plural split to hang two directory names off of
+(web's own `ROUTE_CONSTANTS.STAFF_PROFILE` was dead code for exactly this reason - see
+`Staff.jsx`'s own comment on the route that was never registered).
+
+**No "Add Staff" action**, same reasoning as X22's missing "Add Artist" - `CreateStaffWizard`
+creates a real account, separate scope from a directory port.
+
+**No dedicated screen-level test for either new screen**, matching every prior slice's precedent -
+no new pure-logic module was added this slice (unlike X22's `isStaffOrBetter`, already built and
+reused here unchanged).
+
 ---
 
 ## Process

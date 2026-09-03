@@ -8,6 +8,30 @@ Last updated: 2026-09-03.
 
 ---
 
+### 2026-09-03 (eleventh entry): Staff directory built - same shape as Artists, simpler throughout
+
+Second of the requested batch (Artists/Staff, Shops, Search, Income/Expenses, Forms). Full
+reasoning: DECISIONS.md X23.
+
+**Built:** `app/staff/index.tsx` (list, "Show archived" toggle) and `app/staff/[id].tsx` (identity
+fields, autosave-on-blur, reusing `ArchiveControl.tsx` from X22 unchanged), a new `staff.graphql`
+operation set (`GetStaffList`, `GetStaffDetail`, `UpdateStaffIdentity`, `ArchiveStaff`,
+`UnarchiveStaff`). Same `isStaffOrBetter`-gated header link as Artists (web gates both nav items
+identically).
+
+**Genuinely simpler than Artists, not a scope cut:** no self-service edit (`updateStaff` has a
+hard `SHOP_ADMIN` floor, no self-branch) and no dashboard panels to defer - Staff never had an
+`ArtistPerformancePanel` equivalent. List and detail share one route directory
+(`app/staff/index.tsx` + `app/staff/[id].tsx`), matching `booking-requests/`'s pattern rather than
+Clients'/Artists' singular-plural directory split, since "staff" has no natural plural to split on.
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean
+(one round-trip needed - `GetStaffDetail` initially omitted `user { avatar }`, caught immediately
+by the typecheck), and the full `apps/mobile` Jest suite - 167/167, unchanged (no new pure-logic
+module this slice). **Not yet confirmed:** a real device/simulator run.
+
+---
+
 ### 2026-09-03 (tenth entry): Artists directory built - team roster, minus the Phase-7 dashboard panels
 
 First of a batch requested together (Artists/Staff, Shops, Search, Income/Expenses, Forms), taken

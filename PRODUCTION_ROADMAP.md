@@ -1024,6 +1024,15 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
    and the full `apps/mobile` Jest suite (167/167, up from 164 - new `isStaffOrBetter` cases).
 
+   **Staff directory (2026-09-03, see DECISIONS.md X23) is the next slice after that - second of
+   the batch, same shape as Artists but simpler throughout.** `app/staff/index.tsx` +
+   `app/staff/[id].tsx` (list+detail sharing one directory, matching `booking-requests/`'s
+   pattern), reusing `ArchiveControl.tsx` from X22 unchanged, and a new `staff.graphql` operation
+   set. No self-service edit path and no dashboard panels to defer - both genuinely simpler than
+   Artists on web's own terms, not mobile-side cuts. Confirmed in this sandbox: `packages/api`
+   codegen + build, `apps/mobile` `tsc --noEmit` clean, and the full `apps/mobile` Jest suite
+   (167/167, unchanged).
+
    Everything else on the ~40-screen list not yet named remains open.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).
