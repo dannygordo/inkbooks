@@ -90,8 +90,12 @@ import { getUserShopId } from '@/utils/user';
  * link is built from. "Manage Forms" isn't duplicated here - mobile's home screen already has its
  * own direct button to forms/index.tsx.
  *
- * Everything else on web's Settings (Appearance, Notifications, Security) remains unported - see
- * DECISIONS.md X31/X34/X36/X37/X38/X39/X40/X41/X42 for the full list and reasoning.
+ * An "Appearance" card (X43) links to `settings/appearance.tsx` - light/dark/match-device, saved
+ * to the account (not gated to any role, matching web's own no-floor visibility exactly, unlike
+ * every other card on this screen).
+ *
+ * Everything else on web's Settings (Notifications, Security) remains unported - see
+ * DECISIONS.md X31/X34/X36/X37/X38/X39/X40/X41/X42/X43 for the full list and reasoning.
  */
 export default function SettingsScreen() {
   const { user, updateCurrentUser } = useAuth();
@@ -319,6 +323,21 @@ export default function SettingsScreen() {
                 onPress={handleChangePassword}
                 loading={changingPassword}
                 testID="settings-update-password"
+              />
+            </View>
+          </View>
+
+          <View style={styles.card}>
+            <ThemedText type="smallBold">Appearance</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              Light, dark, or match your device.
+            </ThemedText>
+            <View style={styles.linkList}>
+              <Button
+                label="Appearance"
+                variant="secondary"
+                onPress={() => router.push('/settings/appearance')}
+                testID="settings-appearance-link"
               />
             </View>
           </View>

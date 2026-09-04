@@ -2094,6 +2094,55 @@ for actually sharing it.
 `FORM_FIELD_TYPE_LABELS`/`formFieldTypeLabel`) - same "build the map directly, don't port
 `prettyConstantsListValue`" reasoning as `utils/projectStatus.ts` (X20).
 
+### X43. Appearance - account-level light/dark/match-device, not just a device setting
+
+Next slice from X31's own follow-up list, after Forms' "Your link" (X42). Direct port of
+`AppearancePanel.jsx`: saved to `User.themePreference` (the account), not this device - so it
+follows the user to whatever device they sign into next, matching web's own
+`ThemeModeProvider.jsx` reasoning exactly.
+
+**This turned out to be more than a new screen** - mobile's `useTheme()` (the hook nearly every
+screen's `StyleSheet` reads colors from) previously only ever called `useColorScheme()`, the raw
+OS setting, with no override mechanism at all (X31's own note that this would be "a smaller,
+lower-value port than it looks" was checking the wrong assumption - there was no existing
+follow-the-account behavior to extend, only the OS read to replace). Fixing that touched three
+files beyond the new screen itself:
+
+- **New `hooks/use-effective-color-scheme.ts`** - the one hook that resolves light/dark from
+  `user.themePreference` when it's `'light'`/`'dark'`, falling through to the OS read otherwise
+  (`'system'`, `null`, or `undefined` all fall through - matching the schema's own "null/absent
+  reads as 'system'" comment). This is now the single source of truth for the app's color scheme.
+- **`hooks/use-theme.ts` now calls it** instead of `useColorScheme()` directly - every screen's
+  color tokens automatically pick up an account override with no per-screen change needed.
+- **`_layout.tsx`'s React Navigation `ThemeProvider` (header/nav chrome) now calls it too**,
+  moved from `RootLayout` (outside `AuthProvider`, where `useAuth()` isn't callable) into
+  `RootNavigator` (already inside `AuthProvider`) for exactly that reason. Left as a raw OS read,
+  the header bar would silently disagree with the body content the moment someone picked an
+  explicit Light or Dark override - a real, visible bug this port would otherwise have shipped
+  quietly, since nothing about the new screen itself would have surfaced it in isolation.
+
+**`packages/api/src/operations/updateUser.graphql` widened to select `themePreference`** on the
+mutation response - that file's own header comment had predicted this exact moment back when it
+was avatar-only. No new query needed for the CURRENT value: `login.graphql` already selects
+`themePreference` on `CurrentUser` (added ahead of any caller needing it), so `user.themePreference`
+was already there to read.
+
+**Reuses the existing `useUpdateUserMutation`/`updateCurrentUser` pattern** `settings/index.tsx`'s
+own calendar-color picker already established (X18) - `updateUser({ id, email, role,
+themePreference })` then merge only the changed field into `CurrentUser`, never replace the whole
+object (that file's own warning about the mutation's placeholder `accessToken`).
+
+**No confirmation toast** - unlike this port's other save-then-alert screens, picking an option
+here visibly repaints the whole app in the same render pass once the mutation resolves; a "Saved"
+message on top of an already-different-colored screen would be redundant here specifically.
+
+**No role gate, matching web's own no-floor visibility** - every other card on `settings/
+index.tsx` is gated to some role or user type; this is the first that genuinely isn't, since
+Appearance is universal in a way none of this port's business-logic settings are.
+
+Verification: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean, full Jest suite
+229/229 (unchanged - no new pure-logic module needed).
+
 ### X42. Forms' per-artist "Your link" section
 
 Next slice from X31's own follow-up list, after Messages (X38-X41) completed. Direct port of
@@ -2752,9 +2801,7 @@ likely value**:
   from the old Booking category)~~ - **done, see X42.** forms/index.tsx and form/[id].tsx (X28/
   X30) already cover form management itself; this was the separate "here's your handle, here's
   every published form's link built from it" view.
-- **Appearance** (`AppearancePanel.jsx`) - light/dark/system theme preference; mobile's
-  `useTheme()` already follows the system setting automatically, so this is a smaller, lower-value
-  port than it looks (a manual override control, not new capability).
+- ~~**Appearance** (`AppearancePanel.jsx`)~~ - **done, see X43.**
 - **Security** (`EventLogPanel.jsx`) - the audit trail.
 - **Account category's remaining pieces are already done** (photo/password/calendar color -
   X18, pre-dating this session).

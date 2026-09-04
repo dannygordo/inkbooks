@@ -4,7 +4,32 @@
 has not been verified. `DECISIONS.md` is *rules* — the settled calls and why. They change at
 different rates, which is why they are separate files.
 
-Last updated: 2026-09-03.
+Last updated: 2026-09-04.
+
+---
+
+### 2026-09-04 (thirty-first entry): Appearance - account-level theme, not a device setting
+
+Next slice from the Settings follow-up list, after Forms' "Your link" (X42). Full reasoning:
+DECISIONS.md X43.
+
+New `settings/appearance.tsx`, direct port of `AppearancePanel.jsx`: light/dark/match-device,
+saved to the account (`User.themePreference`), not the device. Turned out to require more than a
+new screen: mobile's `useTheme()` had no override mechanism at all before this, only a raw OS
+read. Added `hooks/use-effective-color-scheme.ts` as the one hook that now resolves the account
+preference (falling back to the OS setting), wired both `hooks/use-theme.ts` (every screen's
+StyleSheet colors) and `_layout.tsx`'s React Navigation `ThemeProvider` (header/nav chrome)
+through it - the header would otherwise have silently disagreed with the body the moment someone
+picked an explicit override, which nothing about the screen itself would have caught. Moved that
+`ThemeProvider` from `RootLayout` into `RootNavigator` in the process, since resolving the
+preference needs `useAuth()`, only callable inside `AuthProvider`.
+
+Widened `packages/api/src/operations/updateUser.graphql` to select `themePreference` on the
+response - its own header comment had predicted this moment. No new query needed; `login.graphql`
+already selects `themePreference`.
+
+Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+full `apps/mobile` Jest suite - still 229/229. No server-side changes.
 
 ---
 

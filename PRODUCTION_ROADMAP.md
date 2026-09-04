@@ -1242,8 +1242,17 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    comment's word for a "courtesy," not the actual guarantee). First screen in this port to read
    a field-scoped GraphQL error rather than a plain top-level message. Confirmed in this sandbox:
    `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean, full `apps/mobile` Jest
-   suite - still 229/229. Booth Rent, Appearance, Security, and `ShopConnectionPanel.jsx` remain
-   open.
+   suite - still 229/229.
+
+   **Appearance (2026-09-04, see DECISIONS.md X43) is the next slice** - `settings/
+   appearance.tsx`: light/dark/match-device, saved to the account rather than the device. Turned
+   out to require more than a screen - mobile's `useTheme()` had no override mechanism at all, so
+   a new `hooks/use-effective-color-scheme.ts` now resolves the account preference (falling back
+   to the OS setting) and both `useTheme()` and `_layout.tsx`'s nav-chrome `ThemeProvider` were
+   wired through it, so header and body never disagree. No role gate - the first Settings card on
+   mobile with none. Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile`
+   `tsc --noEmit` clean, full `apps/mobile` Jest suite - still 229/229. Booth Rent, Security, and
+   `ShopConnectionPanel.jsx` remain open.
 
    Everything else on the ~40-screen list not yet named remains open.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until

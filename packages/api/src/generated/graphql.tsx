@@ -3685,7 +3685,7 @@ export type UpdateUserMutationVariables = Exact<{
 }>;
 
 
-export type UpdateUserMutation = { __typename?: 'Mutation', updateUser: { __typename?: 'User', id: string, avatar?: string | null, tagColor?: string | null } };
+export type UpdateUserMutation = { __typename?: 'Mutation', updateUser: { __typename?: 'User', id: string, avatar?: string | null, tagColor?: string | null, themePreference?: string | null } };
 
 export const AppointmentListItemFragmentDoc = gql`
     fragment AppointmentListItem on Appointment {
@@ -9740,6 +9740,7 @@ export const UpdateUserDocument = gql`
     id
     avatar
     tagColor
+    themePreference
   }
 }
     `;

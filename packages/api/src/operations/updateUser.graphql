@@ -1,9 +1,9 @@
 # Direct equivalent of apps/web's UserService.UPDATE_USER_MUTATION. Widened from `id avatar` to
-# also select `tagColor` now that the calendar-color picker is built (see accountSettings.graphql
-# for GetUserTagColors, its companion query) - this file's own header comment predicted this exact
-# moment back when it was avatar-only. Still not web's full field list
-# (email/firstName/lastName/role/accessToken/userType/themePreference/userInfo) - nothing else on
-# mobile's Settings screen changes any of those yet.
+# also select `tagColor` once the calendar-color picker was built, and now `themePreference` too
+# (settings/appearance.tsx, DECISIONS.md X43) - this file's own header comment predicted both
+# moments back when it was avatar-only. Still not web's full field list
+# (email/firstName/lastName/role/accessToken/userType/userInfo) - nothing else on mobile's
+# Settings screen changes any of those yet.
 #
 # id/email/role ARE REQUIRED ON EVERY CALL, not just when changing them - UserUpdateInput's own
 # schema requires id/email/role regardless of which field the caller actually means to change
@@ -21,5 +21,6 @@ mutation UpdateUser($user: UserUpdateInput!) {
 		id
 		avatar
 		tagColor
+		themePreference
 	}
 }
