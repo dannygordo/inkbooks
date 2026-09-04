@@ -4,20 +4,36 @@
 // (utils/auto-responses.js's "same reasoning as sendRemindersForArtist", AutoResponseLog's own
 // "ReminderLog's own claim-before-send pattern") - this file closes that gap.
 //
-// sendEmail/sendSms are NOT injectable here (unlike utils/auto-responses.js's sendEmailFn/
-// sendSmsFn pattern) - reminders.js destructures them from ./email and ./sms at require time, so
-// they're mocked at the module boundary instead. vi.mock is hoisted above these requires, so the
-// destructuring inside reminders.js itself picks up the mock regardless of it happening at
-// require-time rather than call-time (see utils/notifications.js's own comment on why a
-// DESTRUCTURED import can't be vi.spyOn'd after the fact - vi.mock sidesteps that by replacing the
-// module before anything requires it).
+// CORRECTION (2026-09-04, confirmed by running the real suite for the first time and by a direct
+// isolated reproduction - see DECISIONS.md): the original version of this file mocked via
+// `vi.mock('../../utils/email', () => ({ sendEmail: vi.fn() }))` + a destructured
+// `const { sendEmail } = require(...)`, on the theory that vi.mock's hoisting makes the
+// destructuring inside reminders.js pick up the mock regardless of require-time vs call-time.
+// That theory is wrong for this project: Vitest's vi.mock() only reliably replaces ESM import
+// bindings - it does not intercept plain CommonJS require() calls, which is what this entire
+// codebase uses. Every test below that called `sendEmail.mockImplementation(...)` or asserted
+// `sendEmail.not.toHaveBeenCalled()` was doing so against the REAL, unmocked utils/email.js
+// export, which has no such methods - it just silently threw "is not a function"/"is not a spy"
+// the moment a real run finally exercised it.
+//
+// The fix: vi.spyOn() the ALREADY-REQUIRED module's own object, and do it BEFORE requiring
+// utils/reminders.js below. reminders.js destructures `const { sendEmail } = require('./email')`
+// once, at its own module-load time (this whole codebase is CJS, not the injectable-function-
+// argument pattern utils/auto-responses.js's sendEmailFn/sendSmsFn use) - whichever function
+// happens to be sitting on `email.sendEmail` at that exact moment is the one reminders.js's
+// internal `sendEmail` binding points to forever after (Node caches the module; the destructuring
+// runs exactly once). Spy first, require reminders.js second, and never call `.mockRestore()` on
+// these two spies (that would only reset the *property* on the email/sms module - the function
+// object reminders.js already captured stays a spy regardless, but restoring is pointless here
+// and invites confusion); `.mockClear()`/`.mockReset()` between tests is fine and is what
+// beforeEach below actually does.
 //
 // describe/it/expect/vi come from Vitest's `globals: true` config.
-vi.mock('../../utils/email', () => ({ sendEmail: vi.fn() }));
-vi.mock('../../utils/sms', () => ({ sendSms: vi.fn() }));
+const emailModule = require('../../utils/email');
+const smsModule = require('../../utils/sms');
+const sendEmail = vi.spyOn(emailModule, 'sendEmail').mockResolvedValue({});
+const sendSms = vi.spyOn(smsModule, 'sendSms').mockResolvedValue({});
 
-const { sendEmail } = require('../../utils/email');
-const { sendSms } = require('../../utils/sms');
 const ReminderSettings = require('../../models/ReminderSettings');
 const ReminderLog = require('../../models/ReminderLog');
 const {

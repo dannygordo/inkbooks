@@ -164,8 +164,15 @@ describe("canSeeMoney = true (Shop Admin or better)", () => {
 
 		expect(screen.getByText("By artist")).toBeInTheDocument();
 		expect(screen.getByText("Jordan Ink")).toBeInTheDocument();
-		expect(screen.getByText("Revenue")).toBeInTheDocument();
-		expect(screen.getByText("Tips")).toBeInTheDocument();
+		// "Revenue" and "Tips" each appear TWICE on this screen when canSeeMoney is true - once as
+		// the shop-wide StatCard label above, once as this table's own column header - so a plain
+		// getByText throws ("multiple elements") the moment a real run exercises it (found running
+		// npm test for real, 2026-09-04). getAllByText + an exact count pins that both are really
+		// there rather than silently only matching one of them.
+		expect(screen.getAllByText("Revenue")).toHaveLength(2);
+		expect(screen.getAllByText("Tips")).toHaveLength(2);
+		// "Cut owed" only exists as this table's column header - the shop-wide stat with related
+		// money is worded differently ("Shop cut collected"), so it stays a plain, unambiguous match.
 		expect(screen.getByText("Cut owed")).toBeInTheDocument();
 		expect(screen.getByText("$1,000.00")).toBeInTheDocument();
 	});

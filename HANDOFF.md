@@ -8,6 +8,56 @@ Last updated: 2026-09-04.
 
 ---
 
+### 2026-09-04 (thirty-sixth entry): Danny ran `npm test` for real - 27 failures across both suites, all fixed; the fixes themselves still unconfirmed against a real run
+
+The thirty-fifth entry below asked Danny to run `npm test` in both `server/` and `apps/web/` since
+neither this sandbox nor its device-bridge VM can (`fastdl.mongodb.org`, the MongoDB memory-server
+binary host, returns 403 from both). He did, and pasted the raw output: `apps/web` came back
+"Tests 2 failed | 2163 passed (2165)" and `server` came back "Tests 26 failed | 1276 passed
+(1302)" across five files. Exactly the outcome PR1/DECISIONS.md predicts every real run has so far
+produced - genuine bugs, not flukes.
+
+**The 26 server failures were one root cause wearing four hats.** `test/integration/loaders.test.js`,
+`test/integration/reminders.test.js`, `test/integration/notificationJobs.test.js`, and
+`test/unit/business-jobs.test.js` all used `vi.mock('../../utils/x', factory)` followed by a
+destructured `const { fn } = require('../../utils/x')` - which is the documented, correct pattern
+under Jest and under Vitest for ES `import`/`export`, but this whole server is CommonJS, and
+Vitest's `vi.mock()` hoisting only rewrites Vite's own ESM module graph. A plain `require()` call
+never consults that graph - it resolves straight to the real, unmocked module - so every one of
+those "mocked" functions had actually been running for real all along. Confirmed with a
+from-scratch, DB-independent Vitest reproduction (couldn't run the real DB-backed suite here for
+the same MongoDB-download reason above). Fixed by `vi.spyOn()`-ing the already-`require()`'d module
+object instead, installed before the consumer module is required wherever that consumer
+destructures at its own module-load time. Full writeup, including the one ordering gotcha and why
+it wasn't caught sooner: DECISIONS.md PR3. Audited the other four files in the suite that mention
+`vi.mock` (`emailSms.test.js`, `messageNotifications.test.js`, `pushNotifications.test.js`,
+`shopCutLedger.test.js`) - all four are false-positive greps already using `vi.spyOn()` or plain
+dependency injection, not exposed to this.
+
+**A fifth server failure was a wrong test premise, not a mocking bug**:
+`test/integration/expenses.test.js`'s duplicate-rerun test called `generateDueRecurringExpenses`
+twice at the same `now`, but the function's own query (`nextRunDate: { $lte: now }`) excludes a
+template from a second same-`now` call after the first call's `updateOne` advances it past `now` -
+so the duplicate-key catch it meant to exercise (a defense against two *concurrent* runs, not a
+same-process rerun) could never fire. Fixed by resetting the template's `nextRunDate` backward
+between the two calls to actually simulate the race.
+
+**The 2 web failures were both the same, single, genuine assertion bug**:
+`ShopAnalyticsPanel.test.jsx`'s "shows the money columns on the per-artist table" test called plain
+`getByText("Revenue")`/`getByText("Tips")`, which throws "multiple elements found" the moment
+`canSeeMoney: true` and a non-empty artist list are both true, because the component renders both
+labels twice (a shop-wide `StatCard` and a per-artist table column header). Fixed with
+`getAllByText(...).toHaveLength(2)`. (Danny's paste showed a "Tests 2 failed" summary for one
+located bug in this file; a full read of all 286 lines found no second ambiguous-match site, so the
+"2" is most likely this one test's two assertions, both counted - flagged here rather than silently
+assumed, in case a re-run still shows a second, distinct failure.)
+
+Confirmed in this sandbox: `node -c` on every changed file. **Not yet confirmed: none of these five
+fixes has been run against a real MongoDB or the real web test runner anywhere** - only reasoned
+through against the actual source and validated generically (the vi.mock/vi.spyOn mechanics, not
+these specific test files) via an isolated repro harness. **Danny needs to run `npm test` in both
+`server/` and `apps/web/` again** to confirm these fixes actually clear the reported failures.
+
 ### 2026-09-04 (thirty-fifth entry): Test-coverage tail closed out - every web component and every `server/utils/*.js` file now audited, two real bugs found
 
 PRODUCTION_ROADMAP.md's "Suggested sequencing" item 10 and this file's own "Known gaps" entry both

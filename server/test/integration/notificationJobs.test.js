@@ -13,31 +13,41 @@
 // assertions below are on actual stored Notification rows, not a spy.
 //
 // describe/it/expect/vi come from Vitest's `globals: true` config.
-vi.mock('../../utils/attention', () => ({
-	findUnansweredMessages: vi.fn(),
-	findOverdueBoothRentCharges: vi.fn(),
-}));
-vi.mock('../../utils/response-time', () => ({
-	resolveThresholdsForArtists: vi.fn(),
-	// notification-jobs.js imports this constant directly (not through the mocked function), so
-	// mocking the module means THIS is the value its own fallback (`|| DEFAULT_REPEAT_INTERVAL_
-	// MINUTES`) actually uses - picked distinct from the real default so a test that forgets to
-	// mock resolveThresholdsForArtists's return shape fails loudly instead of coincidentally
-	// matching production's real number.
-	DEFAULT_REPEAT_INTERVAL_MINUTES: 180,
-}));
-vi.mock('../../utils/booth-rent', async (importOriginal) => {
-	const actual = await importOriginal();
-	return { ...actual, resolveBoothRentPlanAt: vi.fn() };
-});
-vi.mock('../../utils/notification-audience', () => ({
-	shopAdminUserIds: vi.fn(),
-}));
+//
+// CORRECTION (2026-09-04, see DECISIONS.md): this file originally mocked the four dependencies
+// below via vi.mock(module, factory) + destructured requires, on the assumption that vi.mock's
+// hoisting makes a destructured require() pick up the mock. It does not - Vitest's vi.mock() only
+// reliably replaces ESM import bindings, not plain CommonJS require() calls, and this whole
+// codebase is CJS. Every assertion here that touched these mocks (`.mockResolvedValue(...)`,
+// `.not.toHaveBeenCalled()`) was actually running against the REAL, unmocked utils/attention.js /
+// response-time.js / booth-rent.js / notification-audience.js exports, which have no such methods
+// - confirmed the moment `npm test` was finally run for real. Fixed by vi.spyOn()-ing each
+// already-required module's own object BEFORE requiring utils/notification-jobs.js below -
+// notification-jobs.js destructures every one of these at its own module-load time, so whichever
+// function is sitting on the module object at that exact moment is what it calls forever after.
+const attentionModule = require('../../utils/attention');
+const responseTimeModule = require('../../utils/response-time');
+const boothRentModule = require('../../utils/booth-rent');
+const notificationAudienceModule = require('../../utils/notification-audience');
 
-const { findUnansweredMessages, findOverdueBoothRentCharges } = require('../../utils/attention');
-const { resolveThresholdsForArtists } = require('../../utils/response-time');
-const { resolveBoothRentPlanAt } = require('../../utils/booth-rent');
-const { shopAdminUserIds } = require('../../utils/notification-audience');
+const findUnansweredMessages = vi.spyOn(attentionModule, 'findUnansweredMessages').mockResolvedValue([]);
+const findOverdueBoothRentCharges = vi
+	.spyOn(attentionModule, 'findOverdueBoothRentCharges')
+	.mockResolvedValue([]);
+const resolveThresholdsForArtists = vi
+	.spyOn(responseTimeModule, 'resolveThresholdsForArtists')
+	.mockResolvedValue(new Map());
+// notification-jobs.js destructures this CONSTANT (not a function) directly from response-time.js
+// at require time, so overwriting the plain property - not spyOn, which is for functions - before
+// requiring notification-jobs.js below is what makes its own fallback
+// (`|| DEFAULT_REPEAT_INTERVAL_MINUTES`) use this test value instead of the real production
+// default. Picked distinct from the real default so a test that forgets to mock
+// resolveThresholdsForArtists's return shape fails loudly instead of coincidentally matching
+// production's real number.
+responseTimeModule.DEFAULT_REPEAT_INTERVAL_MINUTES = 180;
+const resolveBoothRentPlanAt = vi.spyOn(boothRentModule, 'resolveBoothRentPlanAt').mockResolvedValue(null);
+const shopAdminUserIds = vi.spyOn(notificationAudienceModule, 'shopAdminUserIds').mockResolvedValue([]);
+
 const Notification = require('../../models/Notification');
 const BoothRentCharge = require('../../models/BoothRentCharge');
 const { createArtistUser, createClientUser, createShopAdminUser } = require('../helpers/factories');

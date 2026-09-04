@@ -5,18 +5,35 @@
 // that only ever calls createLoaders() as boilerplate context setup would never notice createLoader
 // batching zero calls, or caching nothing, or failing only one of several pending callers.
 //
-// describe/it/expect/vi/beforeEach come from Vitest's `globals: true` config.
-vi.mock('../../utils/conversation-reads', () => ({ unreadSummaryForUser: vi.fn() }));
-vi.mock('../../utils/conversation-routing', () => ({ bookingInboxConversationIds: vi.fn() }));
-
-const { unreadSummaryForUser } = require('../../utils/conversation-reads');
-const { bookingInboxConversationIds } = require('../../utils/conversation-routing');
+// IMPORTANT: this file mocks via vi.spyOn on the required module object, not vi.mock(module,
+// factory) + a destructured import. Confirmed by direct reproduction (2026-09-04, see DECISIONS.md)
+// that Vitest's vi.mock() does not intercept plain CommonJS require() calls in this project's setup
+// - it only reliably replaces ESM import bindings. createUnreadLoader() below reaches its
+// dependencies via `require('./conversation-reads')` (this whole codebase is CJS), so a
+// vi.mock(...)-based version of this file silently ran against the REAL, unmocked functions and
+// threw "X.mockResolvedValue is not a function" the moment a test tried to program a return value
+// - caught only once `npm test` was finally run for real. vi.spyOn(moduleObject, 'fnName') works
+// instead because it mutates the already-`require()`'d module's own object in place, which is
+// exactly the object createUnreadLoader()'s own `require()` call resolves to (Node caches modules
+// by resolved path), whether that require happens at this file's top or lazily inside the function.
+//
+// describe/it/expect/vi/beforeEach/afterEach come from Vitest's `globals: true` config.
+const conversationReads = require('../../utils/conversation-reads');
+const conversationRouting = require('../../utils/conversation-routing');
 const ArtistShopConnection = require('../../models/ArtistShopConnection');
 const { createLoader, createLoaders } = require('../../utils/loaders');
 const { createArtistUser, createShopAdminUser, connectArtistToShop } = require('../helpers/factories');
 
+let unreadSummaryForUser;
+let bookingInboxConversationIds;
+
 beforeEach(() => {
-	vi.clearAllMocks();
+	unreadSummaryForUser = vi.spyOn(conversationReads, 'unreadSummaryForUser');
+	bookingInboxConversationIds = vi.spyOn(conversationRouting, 'bookingInboxConversationIds');
+});
+
+afterEach(() => {
+	vi.restoreAllMocks();
 });
 
 describe('createLoader', () => {

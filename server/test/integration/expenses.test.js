@@ -410,11 +410,26 @@ describe('generateDueRecurringExpenses: the scheduled job that turns a template 
 		expect(await Expense.countDocuments({ shopId: shopTwo.id, recurringExpenseId: templateTwo._id })).toBe(1);
 	});
 
+	// CORRECTION (2026-09-04): the original version of this test called generateDueRecurringExpenses
+	// twice in a row at the SAME `now` and expected the second call to hit duplicates. It cannot -
+	// the first run's own conditional updateOne (keyed on the ORIGINAL nextRunDate) advances
+	// nextRunDate past `now` before returning, and the function's own query is
+	// `{ active: true, nextRunDate: { $lte: now } }`, so a same-`now` rerun never even selects the
+	// template a second time; `npm test` run for real confirmed this ("expected +0 to be 2"). The
+	// unique-index catch this test means to exercise is a defense against two overlapping runs
+	// reading the SAME (not-yet-advanced) nextRunDate concurrently - not a same-process rerun - so
+	// the only honest way to reach it here is to force that overlap directly: reset the template's
+	// nextRunDate back to its pre-first-run value, exactly as a second concurrent worker would have
+	// read it before the first worker's updateOne landed.
 	it('reports the rerun\'s no-op occurrences as skippedDuplicate, not silently as zero generated', async () => {
 		const { template } = await recurringTemplate();
 		const now = new Date('2026-02-15T00:00:00.000Z');
 
 		await generateDueRecurringExpenses({ now });
+		// Simulate a second worker that read this template's nextRunDate BEFORE the first run's
+		// own updateOne advanced it - the exact race the {recurringExpenseId, date} unique index
+		// (models/Expense.js) exists to make safe rather than a silent double-charge.
+		await RecurringExpense.updateOne({ _id: template._id }, { nextRunDate: new Date('2026-01-01T00:00:00.000Z') });
 		const secondRun = await generateDueRecurringExpenses({ now });
 
 		expect(secondRun.generated).toBe(0);
@@ -422,7 +437,6 @@ describe('generateDueRecurringExpenses: the scheduled job that turns a template 
 		// {recurringExpenseId, date} unique index (see models/Expense.js) - caught and counted,
 		// not thrown.
 		expect(secondRun.skippedDuplicate).toBe(2);
-		void template;
 	});
 });
 

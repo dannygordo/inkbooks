@@ -3781,6 +3781,80 @@ never applies) and verified with `npm ci --dry-run` before committing. Skipping 
 exactly what shipped once already and broke `npm ci` in CI - see the fix commit on
 `feat/push-notifications` (`ea56888`) for what that looked like from the outside.
 
+### PR3. `vi.mock()` does not intercept CommonJS `require()` - server tests that need to fake a
+dependency must `vi.spyOn()` the already-`require()`'d module object instead
+
+Discovered 2026-09-04 the same way PR1 predicted every remaining gap would be found: Danny ran the
+real `npm test` (this sandbox and its device-bridge VM both block the MongoDB memory-server binary
+download, `fastdl.mongodb.org` returning 403 in both, so neither could run the server suite for
+real before this) and it reported 26 failing tests across five files, all with the same shape -
+`X.mockResolvedValue is not a function`, `[AsyncFunction X] is not a spy or a call to a spy!`.
+
+**Root cause.** Every one of those files followed the pattern `vi.mock('../../utils/x', () => ({
+someFn: vi.fn() })); const { someFn } = require('../../utils/x');`. That looks correct - and is the
+standard, documented way to do it under Jest, and under Vitest for ES `import`/`export` - but this
+whole server is CommonJS, and Vitest's `vi.mock()` hoisting only rewrites Vite's own ESM module
+graph. A plain `require()` call, anywhere, including in the very same test file right below the
+`vi.mock()` call, is Node's own module resolution and never consults that graph at all - it
+resolves straight to the real, unmocked module. Confirmed with a from-scratch, DB-independent
+Vitest reproduction (`vi.mock` + destructured `require()` of the same module, same file: fails with
+exactly this error; the identical test rewritten as `.mjs` with real `import` syntax: passes). Ruled
+out `test.server.deps.inline` (tried both a targeted pattern and `[/./]` - inline everything) as a
+fix; it makes no difference, because the problem isn't which module transform pipeline runs the
+file, it's that CJS `require()` never goes through Vite's graph in the first place.
+
+This is exactly the same defect class PR1's entry already named for `utils/email.js` - "existing
+tests mock the whole module... and could never have caught [this]" - just one layer earlier: those
+four files' `vi.mock()` calls were never taking effect at all, so every assertion on the "mocked"
+function's calls, return values, or rejection behavior had silently been exercising whatever the
+real function actually does (which, for things like `generateDueRecurringExpenses` hitting a real
+Mongo collection, still happened to produce a result shaped enough like the intended stub's to not
+throw immediately - masking the break until `mockResolvedValue`/`mockImplementation` was called
+against it).
+
+**Fix, and the pattern for every server test that needs to fake a `require()`'d dependency:**
+`require()` the real dependency module, then `vi.spyOn(thatModuleObject, 'methodName')` - this
+mutates the function sitting on the module's own exports object in place, which is exactly what
+Node's `require()` cache hands back to every caller (this file, and any other file requiring the
+same resolved path), lazy or top-level, forever after. One ordering rule matters: if the *consumer*
+module destructures the dependency at its own top-level module-load time (`const { someFn } =
+require('./x')` at the top of `utils/reminders.js`, `utils/notification-jobs.js`, and
+`utils/business-jobs.js` - as opposed to `utils/loaders.js`'s `createUnreadLoader()`, which
+`require()`s lazily inside the function body on every call), the `vi.spyOn()` call must run, and the
+consumer module must first be `require()`'d, in that order - a destructured reference is captured
+once, permanently, at whatever the property held at that exact moment. A plain constant re-exported
+this way (not a function - `response-time.js`'s `DEFAULT_REPEAT_INTERVAL_MINUTES`) isn't spy-able;
+overwrite the property on the module object directly instead, before requiring the consumer. Do
+**not** call `.mockRestore()` on one of these spies between tests in a file whose consumer captured
+the reference at its own load time - restoring only resets the *property* on the source module, and
+the consumer's already-captured local binding keeps pointing at the (former) spy regardless, so it
+does nothing (`.mockClear()`/`.mockReset()`, i.e. `vi.clearAllMocks()` in `beforeEach`, is fine and
+is what these files use).
+
+Fixed in `test/integration/loaders.test.js`, `test/integration/reminders.test.js`,
+`test/integration/notificationJobs.test.js`, and `test/unit/business-jobs.test.js`. Audited every
+other file matching `grep -rl "vi\.mock(" test/` for the same defect
+(`test/integration/emailSms.test.js`, `test/integration/messageNotifications.test.js`,
+`test/integration/pushNotifications.test.js`, `test/integration/shopCutLedger.test.js`) - all four
+were false-positive greps (comments discussing, and explicitly rejecting, `vi.mock()` for this
+exact reason - `shopCutLedger.test.js`'s own header spells out the ESM-graph-vs-CJS-require
+mismatch this decision documents) already using `vi.spyOn()` or plain dependency injection. No
+other file in the suite is exposed to this.
+
+A second, unrelated bug surfaced by the same test run: `test/integration/expenses.test.js`'s
+"reports the rerun's no-op occurrences as skippedDuplicate" test called
+`generateDueRecurringExpenses` twice at the same `now` and expected the second call to hit the
+`{recurringExpenseId, date}` unique-index catch. It cannot - the first call's own `updateOne`
+advances the template's `nextRunDate` past `now` before returning, and the function's own query
+(`{ active: true, nextRunDate: { \$lte: now } }`) then excludes it from the second call entirely.
+That catch defends against two genuinely *concurrent* runs both reading the same, not-yet-advanced
+`nextRunDate` - not a same-process rerun - so the test now resets the template's `nextRunDate`
+backward between the two calls to actually simulate that race. And `apps/web`'s
+`ShopAnalyticsPanel.test.jsx` had a plain, unrelated assertion bug (real ESM, not this CJS issue):
+`getByText("Revenue")`/`getByText("Tips")` throw "multiple elements found" whenever `canSeeMoney`
+is true and at least one artist row renders, because both labels appear as a shop-wide stat AND a
+per-artist column header; switched to `getAllByText(...).toHaveLength(2)`.
+
 ---
 
 ## Sequencing
