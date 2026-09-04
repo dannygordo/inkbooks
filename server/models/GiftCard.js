@@ -85,6 +85,24 @@ const giftCardSchema = new mongoose.Schema(
     // exist separately rather than reusing one.
     soldByUserId: { type: mongoose.Schema.Types.ObjectId, required: true },
 
+    // --- Sale payment - added alongside the first real UI for this feature. Same two-value set
+    // and same "square with no payment id is an unsupported assertion" shape as
+    // Appointment.depositPaymentMethod/depositSquarePaymentId (mutations/deposits.js), for the
+    // same reason: cash is allowed to be an assertion because cash IS one, a card charge is not
+    // because there is a system of record for it (Square) and this should agree with it. ---
+    paymentMethod: { type: String, enum: ['cash', 'square'] },
+    squarePaymentId: { type: String },
+    // 'pending' is the deposit-shaped middle state: an amount agreed (balanceCents/shopCutCents
+    // below are already written, same as Appointment's subtotalCents/totalCents are written for a
+    // pending deposit - see mutations/deposits.js's own comment on why), no money collected yet.
+    // NOT spendable while pending - see resolvers/giftCards.js's redeemGiftCard, which is the gate
+    // a pending deposit gets for free by simply being excluded from getAvailableDeposits/
+    // applyDeposit's own query. A gift card has no equivalent query to exclude it from, so this
+    // field is what redeemGiftCard checks directly instead. Only reachable via `paymentMethod:
+    // 'square', pending: true` at creation (see resolvers/giftCards.js) - a cash sale is always
+    // 'complete' immediately, the same way a cash deposit never passes pending: true either.
+    saleStatus: { type: String, enum: ['pending', 'complete'], default: 'complete' },
+
     // --- Shop-cut ledger fields - SAME NAMES AND MEANING AS Appointment's, deliberately. ---
     // See the class comment above: this is what lets a gift card's shop-cut settlement flow
     // through mirrors of the existing dual-control invoice machinery (Square invoice, or manual

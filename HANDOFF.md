@@ -3094,17 +3094,38 @@ prior summary. Ranked roughly by how much it blocks ordinary daily use, most-blo
    performance (web's `Artist.jsx`, `isSelf=false`) remains unbuilt and is named there as its own
    future slice, not folded into this one.
 5. **Gift cards have no mobile presence whatsoever** - neither the shop-level nor the
-   artist-level side of the feature. Confirmed by a repo-wide search: nothing in `apps/mobile/src`
-   references gift cards at all. **Re-scoped 2026-09-04, before X51**: the feature has no UI on
-   *either* platform. `server/graphql/resolvers/giftCards.js` is a fully built backend (sell an
-   artist-issued or shop-issued card, redeem it against a session, the dual-control shop-cut
-   settlement - see DECISIONS.md M6), but a repo-wide search of `apps/web/src` turns up nothing
-   but a `giftCardCents` field threaded through `AppointmentService.js`'s charge quote - no page,
-   no component, no service file. Every other item on this list is a mobile-behind-web gap; this
-   one is a whole-app gap wearing that shape. Raised with Danny directly, who picked skipping this
-   for now (moved to gap #7) rather than designing a new UI from scratch with nothing to port.
-   Left open here rather than closed or silently reworded, so the next pass at it starts from this
-   finding instead of re-discovering it.
+   artist-level side of the feature. **Re-scoped 2026-09-04, before X51**: raised with Danny
+   directly once it turned out the feature had no UI on *either* platform (the backend -
+   `server/graphql/resolvers/giftCards.js`, DECISIONS.md M6 - was fully built with nothing to
+   port from). Danny's call, in two parts:
+
+   - **Real payment collection at sale (2026-09-04, same day, after X55).** The sale side of M6
+     had no payment collection wired up at all - no Square charge, no `paymentMethod` field.
+     Danny: "Real Square charge, like deposits." Fixed by mirroring M11's own record-then-charge
+     shape exactly - see DECISIONS.md M6's own follow-up entry for the full design
+     (`paymentMethod`/`pending`/`saleStatus` on both create mutations, the new
+     `POST /square/process-gift-card-payment` route). This is now real, not sandboxed-looking
+     arithmetic, same caveat item 1 below carries for every other Square path in this app.
+   - **Platform order: web first, then mobile** (Danny's call, matching this app's established
+     feature-development order whenever there's nothing to port). **Web is now built**:
+     `pages/giftCards/GiftCards.jsx` (sell an artist-issued or shop-issued card, manage the
+     shop-cut settlement for shop-issued ones, liability reports) plus a redeem-a-card entry added
+     to `SessionDetail.jsx` (this page deliberately doesn't handle redemption itself - spending a
+     card happens at a session, not from a management screen). **Mobile still has no gift-card
+     presence at all** - this is the item still open on this list, now with a real web UI to port
+     from instead of a blank slate. See DECISIONS.md M6's follow-up entry for exactly what to
+     port and the naming/prop conventions already chosen (`IBGiftCardPaymentForm` as a sibling of
+     `IBSquarePaymentForm`, not a generalization of it - same restraint to bring to
+     `packages/api`'s codegen on the mobile side).
+
+   **Not yet run through the server's own automated test suite** - `server/test/integration/
+   giftCards.test.js` and the new `giftCardPaymentRoute.test.js` were written and manually
+   reviewed line by line, but `npx vitest run` in `server/` could not be executed in this pass:
+   `mongodb-memory-server`'s startup download (`fastdl.mongodb.org`) is blocked by network policy
+   in every shell available this session (confirmed via the agent proxy's own status endpoint,
+   not just a timeout). **Run `npm test` in `server/` before deploying this** - it is money-moving
+   code that has only been checked by eye so far, the same caveat every item under 0/1 below
+   already carries for a different reason (no real Square account touched yet).
 6. ~~Client flags have no mobile presence either~~ - **done 2026-09-04, same X49 as gap 3** (flags
    are a `ClientDashboard` section server-side too, so both closed in the same pass): viewing,
    resolving, and hand-raising a flag all now work from `client/[id].tsx`. Automatic no-show flags
@@ -3195,9 +3216,12 @@ why viewing one other specific artist's performance is named as its own separate
 rather than part of this one.
 
 **Gift cards (gap 5) turned out to need Danny's own call, not an autonomous pick - see that gap's
-own re-scoped entry above.** The backend is fully built but the feature has no UI on either
-platform, which breaks this whole list's working assumption (mobile behind web, something real to
-port). Raised directly; Danny picked skipping it for now.
+own re-scoped entry above.** The backend was fully built but the feature had no UI on either
+platform, which broke this whole list's working assumption (mobile behind web, something real to
+port). Raised directly; Danny picked skipping it at the time (moved to gap #7), then came back to
+it after X55 with two decisions: real Square payment collection at sale ("Real Square charge, like
+deposits"), and web first, then mobile. Both are done for web (see gap 5's own entry above) -
+**mobile porting is what's left of this item now, not a from-scratch design question anymore.**
 
 **Email-notification preferences (gap 7) is done instead (2026-09-04, X51)** - a direct port of
 web's `NotificationSettingsPanel.jsx` onto a new `settings/notifications.tsx` screen. See X51's
@@ -3230,9 +3254,10 @@ in a second wizard here. First-time password set (`/set-password/:token`) stays 
 new gap, X29 already covers this exact URL for the same missing-deep-link reason. See X55's own
 DECISIONS.md entry.
 
-**One item remains on the parity accounting above: gift cards (gap 5)**, which needs Danny's own
-product call before it can be picked up as a build task - see that section for the full reasoning.
-Every other named gap in the 2026-09-04 accounting is now closed.
+**One item remains on the parity accounting above: gift cards (gap 5)**, now down to a mobile
+port with a real web UI to port from - Danny's own product calls (real Square payment collection;
+web first, then mobile) are both settled and web is built, see that section's own entry for what's
+left. Every other named gap in the 2026-09-04 accounting is now closed.
 
 **0 and 1 below (the shop-admin migration, and a real Square payment) are explicitly deferred —
 reconfirmed 2026-08-25: Danny's plan is to pick this back up as the last item before starting the

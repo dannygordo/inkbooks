@@ -1,0 +1,108 @@
+/* pages/giftCards/GiftCards.jsx - one stylesheet for the whole page, same reasoning as
+   pages/forms/forms.css's own header comment (one feature, not a mirror-pair). */
+
+.giftCardsPage {
+	flex: 4;
+	padding: 20px;
+	margin-left: 10px;
+	max-width: 900px;
+}
+
+.giftCardsSection {
+	margin: 24px 0 32px;
+	padding-bottom: 24px;
+	border-bottom: 1px solid var(--ib-border);
+}
+.giftCardsSection:last-child {
+	border-bottom: none;
+}
+.giftCardsSection h2 {
+	margin-bottom: 4px;
+}
+
+.giftCardsSellForm {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	max-width: 360px;
+	margin-top: 12px;
+}
+
+.giftCardsOffsetRow {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 13px;
+	color: var(--ib-text-secondary);
+}
+.giftCardsOffsetRow label {
+	cursor: pointer;
+}
+
+.giftCardsMethodRow {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+.giftCardsMethodLabel {
+	font-size: 13px;
+	color: var(--ib-text-secondary);
+}
+
+.giftCardsPendingSale {
+	margin-top: 12px;
+	max-width: 400px;
+}
+.giftCardsPendingSaleNote {
+	font-size: 13px;
+	margin-bottom: 8px;
+}
+
+.giftCardsLiabilityNote {
+	font-size: 13px;
+	color: var(--ib-text-secondary);
+	margin: 8px 0 16px;
+}
+
+.giftCardsList {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+.giftCardRow {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	padding: 14px 18px;
+	border: 1px solid var(--ib-border);
+	border-radius: 6px;
+}
+.giftCardRowMain {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+.giftCardRowCode {
+	font-weight: 700;
+	font-size: 15px;
+	font-family: monospace;
+}
+.giftCardRowMeta {
+	font-size: 12px;
+	color: var(--ib-text-secondary);
+}
+.giftCardRowActions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	flex-shrink: 0;
+	justify-content: flex-end;
+}
+.giftCardRowActionsReadOnly {
+	font-size: 12px;
+	color: var(--ib-text-secondary);
+	font-style: italic;
+}

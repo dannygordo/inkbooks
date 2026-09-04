@@ -171,6 +171,47 @@ because that portion of the bank balance is already spoken for. What differs by 
 shop's cut is recognised as revenue**: at sale for an artist-issued card (deposit-shaped), at
 redemption for a shop-issued one (the formula above).
 
+**Follow-up: real payment collection at sale (2026-09-04).** M6 above shipped the money model
+and the resolvers with no answer for how "sell a gift card" actually collects payment — both
+`createArtistGiftCard`/`createShopGiftCard` took the sale as given, with no Square charge and no
+`paymentMethod` field at all. Fixed by mirroring M11's own "record pending, then charge" shape
+exactly, rather than inventing a second one:
+
+- Both mutations now take a required `paymentMethod: 'cash' | 'square'`. `'square'` **requires**
+  `pending: true` — it can only ever be an agreement to charge, never an assertion that a charge
+  already happened (there is a real system of record for a card payment; cash has none — the
+  identical reasoning `recordDeposit`'s own inline check already gives). Passing `'square'` without
+  `pending: true` is a validation error, not a silent downgrade to cash.
+- A `'square'` sale is written with `saleStatus: 'pending'` — agreed, not collected. `balanceCents`
+  and (for a shop-issued card) `shopCutCents` are written up front regardless, same as a pending
+  deposit's `subtotalCents`/`totalCents` (M11): the figures are already known, only the money isn't
+  in yet. `saleStatus` is what actually gates spendability — `redeemGiftCard`,
+  `createGiftCardShopCutInvoice`, and the liability reports (`giftCardLiabilityReport`'s own
+  `$match`) all exclude a pending card, the same exclusion a pending deposit gets for free from
+  `getAvailableDeposits`' own query (a gift card has no equivalent query to leave itself out of, so
+  each of those checks it directly).
+- A new route, `POST /square/process-gift-card-payment` (`routes/squarePayments.js`, alongside the
+  existing session/deposit charge route), is the only path that can ever set `saleStatus: 'complete'`
+  with a real `squarePaymentId` attached. It never trusts an amount from the request — it reads
+  `faceValueCents + feeOffsetCents` straight off the stored pending document, resolves the charge
+  account via the existing `resolveArtistChargeAccount` (issuing artist, or the selling admin for a
+  shop-issued card — M9's account rule, unchanged), and charges through the existing
+  `square.createPaymentForAccount`. Authorization: an artist-issued card's own issuer, or a shop
+  admin at the card's own shop for a shop-issued one.
+- Web UI (`pages/giftCards/GiftCards.jsx`, `services/GiftCardService.js`,
+  `components/IBSquarePayments/IBGiftCardPaymentForm.jsx`): every artist can sell their own card;
+  a shop admin can additionally sell the shop's product and settle a shop-issued card's cut
+  (invoice / mark paid cash / confirm received — the exact same three actions
+  `ShopCutPayoutList.jsx` already offers for an Appointment, since the field shape is identical by
+  design). `IBGiftCardPaymentForm` is a deliberate sibling of `IBSquarePaymentForm`, not a
+  generalization of it — two real, tested, money-moving call sites already exist for the latter
+  (`BookSessionDatesForm.jsx`, `SessionDetail.jsx`); worth consolidating if a third caller ever
+  needs the same mechanic, not before. Redeeming a card was also, until now, unreachable from any
+  screen — added to `SessionDetail.jsx` as a plain code + amount entry (a gift card is looked up by
+  its code, a bearer credential, not picked from a list the way an available deposit is).
+- Notifications remain deliberately unwired for gift cards, per M6's own standing note — this
+  follow-up didn't add any, for the same reason the original didn't.
+
 ### M7. A rate change applies forward only, never backward
 
 Changing an artist's percentage never alters work already performed. The rate that applied is the

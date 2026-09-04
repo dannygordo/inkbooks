@@ -42,6 +42,7 @@ import Search from "./pages/search/Search";
 import Expenses from "./pages/expenses/Expenses";
 import Income from "./pages/income/Income";
 import Forms from "./pages/forms/Forms";
+import GiftCards from "./pages/giftCards/GiftCards";
 import FormBuilder from "./pages/forms/FormBuilder";
 import FormResponses from "./pages/forms/FormResponses";
 import BookingRequestFieldsEditor from "./pages/forms/BookingRequestFieldsEditor";
@@ -323,6 +324,20 @@ function App() {
 							element={
 								<RoleRoute minRole={ROLES.SHOP_ADMIN} allowIf={(user) => !hasShop(user)}>
 									<Forms />
+								</RoleRoute>
+							}
+						/>
+						{/* ROLES.ARTIST, no allowIf - the least restrictive of the two gift-card
+						    floors (createArtistGiftCard's own ROLES.ARTIST vs createShopGiftCard's
+						    SHOP_ADMIN - see resolvers/giftCards.js). Every artist qualifies for at
+						    least the artist-issued-card half of the page; GiftCards.jsx itself gates
+						    the shop-issued half to isShopAdminOrBetter internally, same shape as
+						    this route deferring userType checks to Expenses/Income's own pages. */}
+						<Route
+							path="/gift-cards"
+							element={
+								<RoleRoute minRole={ROLES.ARTIST}>
+									<GiftCards />
 								</RoleRoute>
 							}
 						/>

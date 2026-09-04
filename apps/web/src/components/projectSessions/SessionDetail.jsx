@@ -14,6 +14,7 @@ import { useAuth } from "../../context/auth";
 import { ALERT_CONSTANTS } from "../../constants";
 import { formatCents, centsToDollars, dollarsToCents } from "../../utils/money";
 import DepositService from "../../services/DepositService";
+import GiftCardService from "../../services/GiftCardService";
 import {
 	getEffectiveRate,
 	computeSessionSubtotalCents,
@@ -106,6 +107,16 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 	const [adjustmentDollars, setAdjustmentDollars] = useState("");
 	const [adjustmentReason, setAdjustmentReason] = useState("");
 	const [applyDeposit, { loading: applyingDeposit }] = useMutation(DepositService.APPLY_DEPOSIT);
+	// Gift card redemption - the spend half of DECISIONS.md M6, previously reachable nowhere in
+	// the UI (GiftCards.jsx only manages selling/settling, deliberately - see that page's own
+	// header comment on why redeeming lives here instead). Local, uncontrolled-style state that
+	// clears on a successful redemption, same shape as the Adjustments log below: a code/amount
+	// pair typed in for one redemption, not a persistent field of the session.
+	const [giftCardCode, setGiftCardCode] = useState("");
+	const [giftCardAmountDollars, setGiftCardAmountDollars] = useState("");
+	const [redeemGiftCard, { loading: redeemingGiftCard }] = useMutation(
+		GiftCardService.REDEEM_GIFT_CARD
+	);
 	// Used ONLY for the final, deliberate quote right before a card is actually reached for
 	// (handleChargeViaSquare) - one call, on a click, with nothing else in flight against it.
 	const [fetchChargeQuote, { loading: quoting }] = AppointmentService.useChargeQuote();
@@ -220,6 +231,53 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 			// The realistic failure is "already applied" - two tabs, or a double click that beat
 			// the button's disabled state. The server settles it atomically; this just reports
 			// what it said rather than pretending the click worked.
+			setAlert({
+				isAlert: true,
+				severity: ALERT_CONSTANTS.SEVERITY.ERROR,
+				message: err.graphQLErrors?.[0]?.message || err.message,
+				timeout: ALERT_CONSTANTS.TIMEOUT,
+				location: ALERT_CONSTANTS.DISPLAY_MODAL,
+			});
+		}
+	};
+
+	// Same "record first" instinct doesn't apply here - redeemGiftCard both checks the balance
+	// and spends it atomically server-side (resolvers/giftCards.js), so there is no pending state
+	// to manage the way a Square deposit/charge has. What IS true of both: the local `appointment`
+	// state and the live `quote` are both stale the instant this succeeds (balanceCents dropped on
+	// the card, giftCardCreditCents/shopCutCents changed on the appointment), so both are
+	// refreshed explicitly rather than left to the next unrelated re-render to notice.
+	const handleRedeemGiftCard = async (e) => {
+		e.preventDefault();
+		const amountCents = dollarsToCents(giftCardAmountDollars);
+		if (!giftCardCode.trim() || amountCents <= 0) {
+			return;
+		}
+		try {
+			const { data } = await redeemGiftCard({
+				variables: {
+					appointmentId: appointment.id,
+					code: giftCardCode.trim(),
+					amountCents,
+				},
+			});
+			setAppointment((prev) => ({ ...prev, ...data.redeemGiftCard.appointment }));
+			setGiftCardCode("");
+			setGiftCardAmountDollars("");
+			// Mirrors handleSaveDetails' own "fetched synchronously right before" reasoning - the
+			// debounced `quote` state has no dependency on the appointment's money fields (only
+			// on appointment.id), so it would otherwise keep showing the pre-redemption total
+			// until the artist happened to touch the subtotal/tip fields again.
+			const freshQuote = await getFreshQuote();
+			setQuote(freshQuote);
+			setAlert({
+				isAlert: true,
+				severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
+				message: `${formatCents(amountCents)} of the gift card applied.`,
+				timeout: ALERT_CONSTANTS.TIMEOUT,
+				location: ALERT_CONSTANTS.DISPLAY_MODAL,
+			});
+		} catch (err) {
 			setAlert({
 				isAlert: true,
 				severity: ALERT_CONSTANTS.SEVERITY.ERROR,
@@ -696,6 +754,51 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 							</span>
 						</div>
 					)
+				)}
+
+				{/* Gift cards. No "available to apply" list the way deposits get - a gift card
+				    is identified by its code (a bearer credential, M6), not looked up by whose
+				    it is, so this is a plain code+amount entry rather than a picker. Available on
+				    an open session only, same as the deposit-apply controls above; a closed
+				    session has nothing left to charge against. */}
+				{!isClosed && (
+					<form className="sessionDetailGiftCard" onSubmit={handleRedeemGiftCard}>
+						<span className="sessionDetailGiftCardLabel">Apply a gift card</span>
+						<div className="sessionDetailGiftCardRow">
+							<IBInput
+								id="sessionGiftCardCode"
+								type="text"
+								placeholder="Card code"
+								value={giftCardCode}
+								onChange={(e) => setGiftCardCode(e.target.value)}
+							/>
+							<IBInput
+								id="sessionGiftCardAmount"
+								type="number"
+								placeholder="Amount $"
+								value={giftCardAmountDollars}
+								onChange={(e) => setGiftCardAmountDollars(e.target.value)}
+							/>
+							<Button
+								type="submit"
+								size="small"
+								variant="outlined"
+								disabled={
+									redeemingGiftCard ||
+									!giftCardCode.trim() ||
+									dollarsToCents(giftCardAmountDollars) <= 0
+								}
+							>
+								Apply
+							</Button>
+						</div>
+						{appointment.giftCardCreditCents > 0 && (
+							<span className="sessionDetailGiftCardApplied">
+								{formatCents(appointment.giftCardCreditCents)} in gift card credit applied
+								to this session so far.
+							</span>
+						)}
+					</form>
 				)}
 
 				{appointment.shopCutCents > 0 && (

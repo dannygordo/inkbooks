@@ -257,3 +257,33 @@
     color: var(--ib-text-secondary);
     margin: 10px 0 0;
 }
+
+/* Gift card redemption - see SessionDetail.jsx's own comment on why this is a plain code+amount
+   entry (a card is looked up by its code, a bearer credential, not picked from a list the way an
+   available deposit is). Styled as a plain bordered block, deliberately not tinted green like
+   .sessionDetailDeposits above - applying a deposit is "spend the thing already sitting here",
+   applying a gift card is "look up and spend a code that could be wrong", a meaningfully
+   different action that shouldn't look like the same kind of offer. */
+.sessionDetailGiftCard {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 12px 14px;
+	border: 1px solid var(--ib-border);
+	border-radius: 6px;
+	margin-top: 12px;
+}
+.sessionDetailGiftCardLabel {
+	font-size: 13px;
+	font-weight: 600;
+}
+.sessionDetailGiftCardRow {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+.sessionDetailGiftCardApplied {
+	font-size: 12px;
+	color: var(--ib-text-secondary);
+}

@@ -1072,6 +1072,11 @@ module.exports = gql`
     shopCutMarkedPaidAt: DateTime
     shopCutConfirmedBy: ID
     shopCutConfirmedAt: DateTime
+    # --- Sale payment - see models/GiftCard.js's own comment. 'pending' means agreed but not yet
+    # charged (only reachable via paymentMethod 'square'); redeemGiftCard refuses a pending card.
+    paymentMethod: String
+    squarePaymentId: String
+    saleStatus: String!
     createdAt: DateTime
     updatedAt: DateTime
   }
@@ -1127,6 +1132,12 @@ module.exports = gql`
     # never applied silently. Never loads onto the card's balance either way - see
     # models/GiftCard.js's feeOffsetCents comment.
     applyFeeOffset: Boolean
+    # 'cash' or 'square' - same two-value set as recordDeposit's paymentMethod, same reason (see
+    # models/GiftCard.js). 'square' REQUIRES pending: true here - a card charge only ever comes
+    # from routes/squarePayments.js's own process-gift-card-payment route filling squarePaymentId
+    # in afterwards, never asserted directly on this mutation.
+    paymentMethod: String!
+    pending: Boolean
   }
 
   # Sold as a shop product - see models/GiftCard.js. shopId IS required here, unlike the artist
@@ -1136,6 +1147,8 @@ module.exports = gql`
     shopId: ID!
     faceValueCents: Int!
     applyFeeOffset: Boolean
+    paymentMethod: String!
+    pending: Boolean
   }
 
   # --- Dashboard analytics -------------------------------------------------------------------
