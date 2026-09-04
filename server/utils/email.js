@@ -363,6 +363,17 @@ async function sendShopCutConfirmedNotificationToArtist({ to, artistFirstName, s
 }
 
 module.exports = {
+  // sendEmail ITSELF, the raw primitive every send*() function below calls - was missing from
+  // this list entirely. utils/reminders.js needs it directly (it builds its own subject/body from
+  // ReminderSettings templates rather than going through any of the named send*() wrappers below -
+  // see that file's own header comment on why it isn't injectable the way utils/auto-responses.js's
+  // sendEmailFn is), and `const { sendEmail } = require('./email')` there was silently destructuring
+  // undefined. Every email reminder send was throwing "sendEmail is not a function", caught by
+  // sendRemindersForArtist's own per-channel try/catch and logged to ReminderLog as 'failed' -
+  // never crashing the sweep, never surfacing anywhere a person would see it. Found writing
+  // test/integration/reminders.test.js's coverage (X68) and confirmed by grepping this file's own
+  // module.exports for the name and finding it absent.
+  sendEmail,
   // Exported for its own tests. It is a header-safety boundary as much as a formatting helper,
   // and that is not something to verify only indirectly through whatever a send happens to produce.
   snippetForSubject,
