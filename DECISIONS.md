@@ -2094,6 +2094,53 @@ for actually sharing it.
 `FORM_FIELD_TYPE_LABELS`/`formFieldTypeLabel`) - same "build the map directly, don't port
 `prettyConstantsListValue`" reasoning as `utils/projectStatus.ts` (X20).
 
+### X44. Security - the audit trail
+
+Last slice in X31's own "roughly in order of likely value" list. Direct port of
+`EventLogPanel.jsx`: who changed what, and when, across money/appointment/client-record mutations
+- read-only, nothing on this screen writes anything. New route `settings/security.tsx`, new
+"Security" card on `settings/index.tsx`.
+
+**Server-side, everything already existed** - `getEventLogs` was already in `server/graphql/
+typeDefs.js`, so this slice is client-operations-only (new `packages/api/src/operations/
+eventLogs.graphql`). Only `entityType`/`page` are exposed as filters, matching
+`EventLogService.js`'s own restraint comment (`EventLogFilter` also takes `shopId`/`actorUserId`/
+`from`/`to`, but nothing needs them yet - added when a real caller does, not preemptively).
+
+**New `hasAuditAuthority` export in `utils/businessScope.ts`**, gating this screen - the exact
+same predicate (`isShopAdminOrBetter(user) || !hasShop(user)`) already lived on mobile under the
+name `canManageForms` (X28, predating web's own generalization of this check across Forms/
+Expenses/Income/Security/Taxes/Analytics into one shared `hasAuditAuthority` helper). Rather than
+write the identical boolean expression a second time under a Security-specific name, `canManageForms`
+now delegates to the new `hasAuditAuthority`, keeping every existing Forms call site (and its own
+test file) untouched - confirmed by re-running `businessScope.test.ts` after the change, still
+green with no edits needed there.
+
+**No moment dependency, matching `utils/messageTime.ts`'s own established convention** - a small,
+screen-local `formatEntryTime` hand-rolls web's `moment(...).format("MMM D, YYYY [at] h:mm A")`
+with `toLocaleDateString`/`toLocaleTimeString` rather than adding a date library for one label.
+Genuinely a new format (always includes the year, no relative/weekday shorthand), so it's its own
+function rather than reusing `messageTime.ts`'s `prettyMessageTime`/`fullMessageTime`, both of
+which are tuned for a different display context (a message thread, not an audit log someone scans
+top to bottom).
+
+**Page-size picker ported too, not cut** - unlike some of this port's judgment calls to drop a
+secondary affordance (X42's live slug-availability check), 10/25/50 is a trivial third `PillRow`
+with no new dependency or architecture, so there was no real reason to leave it out.
+
+**`formatChangeValue`'s `Cents$` field-name convention ported directly** - same "money fields are
+named, not looked up in a table" reasoning as `server/utils/money.js`'s own comment, reusing
+mobile's existing `formatCents` (`utils/money.ts`).
+
+Verification: `packages/api` codegen + build (new `useGetEventLogsQuery` hook generated cleanly),
+`apps/mobile` `tsc --noEmit` clean, full Jest suite 229/229 (unchanged, `businessScope.test.ts`
+included).
+
+This completes every item on X31's originally-named follow-up list except the two items called
+out separately as their own future slices: Booth Rent (`BoothRentPanel.jsx`, named under X37) and
+`ShopConnectionPanel.jsx` (named under X36) - neither had existing mobile infrastructure to build
+on and both were scoped out explicitly at the time, not overlooked.
+
 ### X43. Appearance - account-level light/dark/match-device, not just a device setting
 
 Next slice from X31's own follow-up list, after Forms' "Your link" (X42). Direct port of
@@ -2802,7 +2849,7 @@ likely value**:
   X30) already cover form management itself; this was the separate "here's your handle, here's
   every published form's link built from it" view.
 - ~~**Appearance** (`AppearancePanel.jsx`)~~ - **done, see X43.**
-- **Security** (`EventLogPanel.jsx`) - the audit trail.
+- ~~**Security** (`EventLogPanel.jsx`)~~ - **done, see X44.**
 - **Account category's remaining pieces are already done** (photo/password/calendar color -
   X18, pre-dating this session).
 - **Calendar/Taxes/Analytics categories are `ComingSoonPanel` placeholders on web itself** - no

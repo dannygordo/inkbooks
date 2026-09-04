@@ -167,6 +167,9 @@ function RootNavigator() {
               "Appearance" link. Every signed-in user sees this, matching web's own
               no-role-floor gate. */}
           <Stack.Screen name="settings/appearance" options={{ headerShown: true, title: 'Appearance' }} />
+          {/* The audit trail (X44) - reached from settings/index.tsx's own "Security" link,
+              gated `hasAuditAuthority`. Read-only; nothing here writes anything. */}
+          <Stack.Screen name="settings/security" options={{ headerShown: true, title: 'Security' }} />
           {/* The client roster - see clients/index.tsx's own header comment. Reached from
               index.tsx's header, and the second (real) entry point into client/[id].tsx below -
               that screen's own X15 comment named this as worth building. */}

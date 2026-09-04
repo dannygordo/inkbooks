@@ -1251,8 +1251,18 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    to the OS setting) and both `useTheme()` and `_layout.tsx`'s nav-chrome `ThemeProvider` were
    wired through it, so header and body never disagree. No role gate - the first Settings card on
    mobile with none. Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile`
-   `tsc --noEmit` clean, full `apps/mobile` Jest suite - still 229/229. Booth Rent, Security, and
-   `ShopConnectionPanel.jsx` remain open.
+   `tsc --noEmit` clean, full `apps/mobile` Jest suite - still 229/229.
+
+   **Security (2026-09-04, see DECISIONS.md X44) completes the Settings/Messages follow-up list**
+   - `settings/security.tsx`: a read-only, filterable, paged audit trail of who changed what.
+   Client-operations-only, everything already existed server-side. Gated on a new, more general
+   `hasAuditAuthority` export in `utils/businessScope.ts` rather than a one-off check - it turned
+   out to be identical to the existing `canManageForms` logic, so that now delegates to it instead
+   of duplicating the expression (verified via the unmodified `businessScope.test.ts`). Confirmed
+   in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean, full
+   `apps/mobile` Jest suite - still 229/229. Booth Rent (`BoothRentPanel.jsx`) and
+   `ShopConnectionPanel.jsx` remain open - both named separately as their own future slices from
+   the start, not overlooked.
 
    Everything else on the ~40-screen list not yet named remains open.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until

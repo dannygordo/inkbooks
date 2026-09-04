@@ -8,6 +8,39 @@ Last updated: 2026-09-04.
 
 ---
 
+### 2026-09-04 (thirty-second entry): Security - the audit trail (Settings/Messages follow-up list complete)
+
+Next slice from the Settings follow-up list, after Appearance (X43). Full reasoning: DECISIONS.md
+X44.
+
+New `settings/security.tsx`, direct port of `EventLogPanel.jsx`: a read-only audit trail of who
+changed what, filterable by entity type and paged. New `packages/api/src/operations/
+eventLogs.graphql` (`GetEventLogs`) - server-side, everything already existed, so
+client-operations-only.
+
+Gated on a new, more general `hasAuditAuthority` export in `utils/businessScope.ts`
+(`isShopAdminOrBetter(user) || !hasShop(user)`) rather than a new one-off check - it turned out to
+be byte-for-byte what mobile's existing `canManageForms` already computed under a
+feature-specific name, so `canManageForms` now delegates to it instead of duplicating the
+expression. Verified no behavior change: `businessScope.test.ts` passes unmodified. Page-size
+picker (unlike X42's cut of the live-availability check) was ported as-is via the shared
+`PillRow` component, same as the entity-type filter. Date/time formatting is a new screen-local
+`formatEntryTime` (hand-rolled `toLocaleDateString`/`toLocaleTimeString`, no `moment`/`date-fns`
+dependency on mobile) rather than reusing `utils/messageTime.ts`, which formats a different kind
+of timestamp for a different purpose. `formatChangeValue` reuses the existing `Cents$`
+field-name-suffix convention (via `utils/money`'s `formatCents`) to render dollar amounts instead
+of raw cent integers in the changes list.
+
+This completes every item on X31's originally-named Settings/Messages follow-up list except the
+two named separately as their own future slices from the start: Booth Rent (`BoothRentPanel.jsx`,
+named under X37) and `ShopConnectionPanel.jsx` (named under X36) - neither had existing mobile
+infrastructure to build on.
+
+Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+full `apps/mobile` Jest suite - still 229/229. No server-side changes.
+
+---
+
 ### 2026-09-04 (thirty-first entry): Appearance - account-level theme, not a device setting
 
 Next slice from the Settings follow-up list, after Forms' "Your link" (X42). Full reasoning:

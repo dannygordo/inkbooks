@@ -3027,6 +3027,14 @@ export type ApplyDepositMutationVariables = Exact<{
 
 export type ApplyDepositMutation = { __typename?: 'Mutation', applyDeposit?: { __typename?: 'Appointment', id: string, depositCreditCents?: number | null, depositCreditFromAppointmentId?: string | null, subtotalCents?: number | null, totalCents?: number | null, shopCutCents?: number | null, shopCutPercentApplied?: number | null, shopCutStatus: string } | null };
 
+export type GetEventLogsQueryVariables = Exact<{
+  filter?: InputMaybe<EventLogFilter>;
+  page?: InputMaybe<PageInput>;
+}>;
+
+
+export type GetEventLogsQuery = { __typename?: 'Query', getEventLogs: { __typename?: 'EventLogPage', items: Array<{ __typename?: 'EventLogEntry', id: string, entityType: string, entityId: string, action: string, actorName: string, summary: string, createdAt: string, changes: Array<{ __typename?: 'EventLogChange', field: string, from?: string | null, to?: string | null }> }>, pageInfo: { __typename?: 'PageInfo', totalCount: number, hasMore: boolean, limit: number, offset: number } } };
+
 export type GetExpenseTypesForSettingsQueryVariables = Exact<{
   shopId?: InputMaybe<Scalars['ID']['input']>;
   artistUserId?: InputMaybe<Scalars['ID']['input']>;
@@ -5296,6 +5304,69 @@ export function useApplyDepositMutation(baseOptions?: Apollo.MutationHookOptions
 export type ApplyDepositMutationHookResult = ReturnType<typeof useApplyDepositMutation>;
 export type ApplyDepositMutationResult = Apollo.MutationResult<ApplyDepositMutation>;
 export type ApplyDepositMutationOptions = Apollo.BaseMutationOptions<ApplyDepositMutation, ApplyDepositMutationVariables>;
+export const GetEventLogsDocument = gql`
+    query GetEventLogs($filter: EventLogFilter, $page: PageInput) {
+  getEventLogs(filter: $filter, page: $page) {
+    items {
+      id
+      entityType
+      entityId
+      action
+      actorName
+      summary
+      changes {
+        field
+        from
+        to
+      }
+      createdAt
+    }
+    pageInfo {
+      totalCount
+      hasMore
+      limit
+      offset
+    }
+  }
+}
+    `;
+
+/**
+ * __useGetEventLogsQuery__
+ *
+ * To run a query within a React component, call `useGetEventLogsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetEventLogsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetEventLogsQuery({
+ *   variables: {
+ *      filter: // value for 'filter'
+ *      page: // value for 'page'
+ *   },
+ * });
+ */
+export function useGetEventLogsQuery(baseOptions?: Apollo.QueryHookOptions<GetEventLogsQuery, GetEventLogsQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetEventLogsQuery, GetEventLogsQueryVariables>(GetEventLogsDocument, options);
+      }
+export function useGetEventLogsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetEventLogsQuery, GetEventLogsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetEventLogsQuery, GetEventLogsQueryVariables>(GetEventLogsDocument, options);
+        }
+// @ts-ignore
+export function useGetEventLogsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetEventLogsQuery, GetEventLogsQueryVariables>): Apollo.UseSuspenseQueryResult<GetEventLogsQuery, GetEventLogsQueryVariables>;
+export function useGetEventLogsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetEventLogsQuery, GetEventLogsQueryVariables>): Apollo.UseSuspenseQueryResult<GetEventLogsQuery | undefined, GetEventLogsQueryVariables>;
+export function useGetEventLogsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetEventLogsQuery, GetEventLogsQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetEventLogsQuery, GetEventLogsQueryVariables>(GetEventLogsDocument, options);
+        }
+export type GetEventLogsQueryHookResult = ReturnType<typeof useGetEventLogsQuery>;
+export type GetEventLogsLazyQueryHookResult = ReturnType<typeof useGetEventLogsLazyQuery>;
+export type GetEventLogsSuspenseQueryHookResult = ReturnType<typeof useGetEventLogsSuspenseQuery>;
+export type GetEventLogsQueryResult = Apollo.QueryResult<GetEventLogsQuery, GetEventLogsQueryVariables>;
 export const GetExpenseTypesForSettingsDocument = gql`
     query GetExpenseTypesForSettings($shopId: ID, $artistUserId: ID, $includeInactive: Boolean) {
   getExpenseTypes(

@@ -36,18 +36,29 @@ export function createScopeFor(user: CurrentUser): { shopId?: string } {
 }
 
 /**
- * Direct port of apps/web's App.jsx route gate on /forms and every /forms/* route:
- * `RoleRoute minRole={ROLES.SHOP_ADMIN} allowIf={(user) => !hasShop(user)}`. NARROWER than
- * canManageBusinessLedger (permissions.ts) - that one admits any artist at all, this one excludes
- * a plain shop-connected artist who isn't a shop admin. Forms follows the exact same
- * shopId-XOR-artistUserId ownership model as Income/Expenses (see models/Form.js's own header
- * comment on why), it's just visible to a narrower slice of users: a shop's forms are the shop
- * admin's to manage, and an independent artist manages their own, but a plain shop-connected
- * artist has neither role and sees none of this - same as they see none of Shop Cut Confirmations.
+ * Direct port of apps/web's pages/settings/settingsCategories.jsx `hasAuditAuthority` - the same
+ * shop-admin-or-independent-artist floor gating Security (settings/security.tsx, X44) there, and,
+ * under a Forms-specific name below, Forms here since before this generalized. Excludes a plain
+ * shop-connected artist who isn't a shop admin - they have neither an independent ledger of their
+ * own nor the authority to see their shop's.
  */
-export function canManageForms(user: CurrentUser | null | undefined): boolean {
+export function hasAuditAuthority(user: CurrentUser | null | undefined): boolean {
   if (!user) {
     return false;
   }
   return isShopAdminOrBetter(user) || !hasShop(user);
+}
+
+/**
+ * Direct port of apps/web's App.jsx route gate on /forms and every /forms/* route:
+ * `RoleRoute minRole={ROLES.SHOP_ADMIN} allowIf={(user) => !hasShop(user)}`. Same predicate as
+ * `hasAuditAuthority` above - web calls this exact check `hasAuditAuthority` at the Forms category
+ * too (settingsCategories.jsx), but this name predates that generalization on mobile (X28) and
+ * every existing Forms call site already reads `canManageForms`, so it stays as its own name
+ * rather than being renamed out from under them. NARROWER than canManageBusinessLedger
+ * (permissions.ts) - that one admits any artist at all, this one excludes a plain shop-connected
+ * artist who isn't a shop admin.
+ */
+export function canManageForms(user: CurrentUser | null | undefined): boolean {
+  return hasAuditAuthority(user);
 }

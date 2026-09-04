@@ -32,6 +32,7 @@ import { useAuth } from '@/context/auth';
 import { useTheme } from '@/hooks/use-theme';
 import { deleteFile } from '@/firebase/deleteFile';
 import { uploadFileWithProgress } from '@/firebase/uploadFile';
+import { hasAuditAuthority } from '@/utils/businessScope';
 import { canManageBusinessLedger, isShopAdminOrBetter } from '@/utils/permissions';
 import { avatarFolder, previousAvatarUrl } from '@/utils/avatar';
 import { formatCents, basisPointsToPercent, dollarsToCents, percentToBasisPoints } from '@/utils/money';
@@ -94,8 +95,12 @@ import { getUserShopId } from '@/utils/user';
  * to the account (not gated to any role, matching web's own no-floor visibility exactly, unlike
  * every other card on this screen).
  *
- * Everything else on web's Settings (Notifications, Security) remains unported - see
- * DECISIONS.md X31/X34/X36/X37/X38/X39/X40/X41/X42/X43 for the full list and reasoning.
+ * A "Security" card (X44) links to `settings/security.tsx` - the audit trail, gated
+ * `hasAuditAuthority` (utils/businessScope.ts), matching web's own `settingsCategories.jsx` gate
+ * on this category exactly.
+ *
+ * Everything else on web's Settings (Notifications) remains unported - see DECISIONS.md
+ * X31/X34/X36/X37/X38/X39/X40/X41/X42/X43/X44 for the full list and reasoning.
  */
 export default function SettingsScreen() {
   const { user, updateCurrentUser } = useAuth();
@@ -341,6 +346,23 @@ export default function SettingsScreen() {
               />
             </View>
           </View>
+
+          {hasAuditAuthority(user) ? (
+            <View style={styles.card}>
+              <ThemedText type="smallBold">Security</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                The audit trail - who changed money, appointment, or client records, and when.
+              </ThemedText>
+              <View style={styles.linkList}>
+                <Button
+                  label="Security"
+                  variant="secondary"
+                  onPress={() => router.push('/settings/security')}
+                  testID="settings-security-link"
+                />
+              </View>
+            </View>
+          ) : null}
 
           {isShopAdminOrBetter(user) && shopId ? (
             <View style={styles.card}>
