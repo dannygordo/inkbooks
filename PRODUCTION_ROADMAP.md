@@ -1358,7 +1358,16 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    it) - web's own rows carry the same fields but never navigate anywhere. Confirmed in this
    sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean, full `apps/mobile`
    Jest suite - still 247/247.
-   Four items remain on the parity accounting, unprioritized among the last three - see
+   **Gap 9 (group/shop-wide conversations and message search) split in two (2026-09-04, see
+   DECISIONS.md X53).** Message search is done - `matchesConversationSearch`
+   (`utils/conversations.ts`, five new tests) plus a search `TextInput` on `app/messages/index.tsx`,
+   a direct port of web's `Messenger.jsx` name filter, matching `clients/index.tsx`'s own
+   search-row shape. Group/shop-wide conversations stay unbuilt: `getConversationsByShopId` has a
+   unit test in `MessengerService.test.js` but no UI anywhere on web either - the same shape of
+   finding as gift cards (X51), left open rather than built blind. No `packages/api` changes this
+   slice. Confirmed in this sandbox: `apps/mobile` `tsc --noEmit` clean, full Jest suite - 252/252,
+   up from 247.
+   Three items remain on the parity accounting, unprioritized between the last two - see
    HANDOFF.md's "Next" section.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).

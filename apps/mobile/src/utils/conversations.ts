@@ -34,3 +34,26 @@ export function conversationDisplayName(
     .map((member) => `${member.firstName ?? ''} ${member.lastName ?? ''}`.trim() || 'Unknown')
     .join(', ');
 }
+
+
+/**
+ * Direct port of apps/web's Messenger.jsx search filter - "name match on either part, so 'sam'
+ * finds Sam Rivera and 'rivera' does too." Filters what's RENDERED, over the conversations
+ * already loaded, not a server-side search - same "search only filters what's already been paged
+ * in" limitation utils/clients.ts's own matchesClientSearch carries for the same reason (see that
+ * file's header comment and DECISIONS.md X17): neither getConversationsByMemberId nor getClients
+ * takes a search argument server-side.
+ */
+export function matchesConversationSearch(
+  conversation: Pick<ConversationListItem, 'membersInfo'>,
+  myId: string | null | undefined,
+  term: string,
+): boolean {
+  const normalized = term.trim().toLowerCase();
+  if (!normalized) {
+    return true;
+  }
+  return otherMembers(conversation, myId).some((member) =>
+    `${member.firstName ?? ''} ${member.lastName ?? ''}`.toLowerCase().includes(normalized),
+  );
+}

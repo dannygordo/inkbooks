@@ -3125,9 +3125,14 @@ prior summary. Ranked roughly by how much it blocks ordinary daily use, most-blo
    addition beyond the port: rows are tappable, reusing the same `subjectType`/`subjectId` ->
    screen mapping mobile's push-notification handling already relies on for a tap - web's own
    rows are inert despite carrying the same fields. See X52's own DECISIONS.md entry.
-9. **Group/shop-wide conversations and message search remain open**, named since X16 and never
-   picked back up - the one piece of Messages parity still missing (image-attachment compose and
-   per-row mark-unread were both closed since, in X35).
+9. **Group/shop-wide conversations and message search** - split in two by X53
+   (2026-09-04). ~~Message search~~ **done**: `app/messages/index.tsx` now has a name-filter
+   search box over the loaded conversation list, direct port of `Messenger.jsx`'s own filter.
+   **Group/shop-wide conversations stay unbuilt**, and X53 found why: `getConversationsByShopId`
+   (`MessengerService.js`'s `fetchShopConversations`) has a unit test but no UI anywhere on web
+   either - no page calls it, and there is no way on web to even start a group conversation. Same
+   class of finding as gift cards (gap 5) - left open here with this recorded, not built blind (image-attachment compose and per-row
+   mark-unread were both closed earlier, in X35).
 10. **The custom booking-request field editor (`BookingRequestFieldsEditor.jsx`,
     `/forms/:id/booking-fields` on web) is explicitly not ported** - `form/[id].tsx`'s own header
     comment redirects away from it, same as web does for its own restricted case, but with nowhere
@@ -3194,11 +3199,16 @@ cards were set aside first.
 are tappable, reusing the push-notification tap-routing mobile already had. See X52's own
 DECISIONS.md entry.
 
-**Four items remain on the parity accounting above.** Gift cards (gap 5, needs Danny's own
-product call before it can be picked up as a build task), group/shop-wide conversations + search
-(gap 9), the booking-request field editor (gap 10), and registration/first-time password set (gap
-11). See that section for the full reasoning behind each one - nothing here assumes an order among
-the last three.
+**Gap 9 split in two (2026-09-04, X53).** Message search is done - a direct port of
+`Messenger.jsx`'s own name filter, added to `app/messages/index.tsx`. Group/shop-wide
+conversations turned out to be the same shape of finding as gift cards: `getConversationsByShopId`
+has a unit test but no UI anywhere, on either platform - left unbuilt, same call as gift cards, not
+re-raised as a fresh question since X51 already settled how to handle this shape of finding.
+
+**Three items remain on the parity accounting above.** Gift cards (gap 5, needs Danny's own
+product call before it can be picked up as a build task), the booking-request field editor (gap
+10), and registration/first-time password set (gap 11). See that section for the full reasoning
+behind each one - nothing here assumes an order between the last two.
 
 **0 and 1 below (the shop-admin migration, and a real Square payment) are explicitly deferred —
 reconfirmed 2026-08-25: Danny's plan is to pick this back up as the last item before starting the

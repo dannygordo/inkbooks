@@ -2094,6 +2094,42 @@ for actually sharing it.
 `FORM_FIELD_TYPE_LABELS`/`formFieldTypeLabel`) - same "build the map directly, don't port
 `prettyConstantsListValue`" reasoning as `utils/projectStatus.ts` (X20).
 
+### X53. Messages search - and why group/shop-wide conversations stay unbuilt
+
+Seventh slice off the mobile/web parity accounting (HANDOFF.md, 2026-09-04) - gap #9, "Group/
+shop-wide conversations and message search remain open." Reading web's `Messenger.jsx` and
+`MessengerService.js` closely to scope this found the gap is really two unrelated things bundled
+under one line, and only one of them is buildable.
+
+**Message search is a real, portable gap - built here.** Web's `Messenger.jsx` filters its loaded
+conversation list by the other member's name (`otherMembers(...).some(name => name.includes(term))`)
+- a client-side filter over what's already fetched, not a server-side search
+(`getConversationsByMemberId` takes no search argument, same limitation X17's own client-roster
+search already carries and documents). Ported as `matchesConversationSearch` in
+`utils/conversations.ts` (five new tests in `__tests__/conversations.test.ts` - Jest suite now
+252/252, up from 247), and a search `TextInput` added to `app/messages/index.tsx` above the
+conversation list, matching `clients/index.tsx`'s own search-row shape exactly (same styles, same
+`placeholder`/`testID` convention). Shown only once there is at least one conversation to search.
+
+**Group/shop-wide conversations turned out to be the SAME finding as gift cards (X51), at smaller
+scale.** `MessengerService.js` exports `fetchShopConversations`/`FETCH_SHOP_CONVERSATIONS_QUERY`
+(`getConversationsByShopId`) and it has its own unit test in `MessengerService.test.js` - but a
+repo-wide search of `apps/web/src` for both names outside that one file turns up nothing. No page
+or component ever calls it, and there is no `createGroupConversation` mutation or "New Group"
+control anywhere on web - there is currently no way to even START a group conversation, on either
+platform. This is not a mobile-behind-web gap; it is a feature with a tested query and no product
+built on top of it, on the only platform that has ever had a messenger at all. Left unbuilt here
+for the same reason X51 left gift cards unbuilt - nothing to port, and designing a new
+group-conversation UI from scratch (who can start one, who can be added, how it reads on a roster
+built entirely around 1:1 threads) is a product decision, not a scoping call to make alone inside
+an unattended slice. Not re-raised as a fresh question to Danny here, since X51 already established
+the answer for this exact shape of finding (skip it, note it, move on) and this is the same
+situation recurring, not a new one.
+
+**Verification.** No `packages/api` changes (reuses `GetConversationsByMemberId`'s existing
+selection - `membersInfo` was already fetched, `matchesConversationSearch` just reads it
+differently). `apps/mobile`: `npx tsc --noEmit` clean; full Jest suite 252/252.
+
 ### X52. In-app notification feed
 
 Sixth slice off the mobile/web parity accounting (HANDOFF.md, 2026-09-04) - gap #8, "No in-app
