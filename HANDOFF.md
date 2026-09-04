@@ -3119,14 +3119,17 @@ prior summary. Ranked roughly by how much it blocks ordinary daily use, most-blo
      `SessionDetailForm.tsx`. See DECISIONS.md M6's own follow-up entry for the full design on
      both platforms.
 
-   **Not yet run through the server's own automated test suite** - `server/test/integration/
-   giftCards.test.js` and the new `giftCardPaymentRoute.test.js` were written and manually
-   reviewed line by line, but `npx vitest run` in `server/` could not be executed in this pass:
-   `mongodb-memory-server`'s startup download (`fastdl.mongodb.org`) is blocked by network policy
-   in every shell available this session (confirmed via the agent proxy's own status endpoint,
-   not just a timeout). **Run `npm test` in `server/` before deploying this** - it is money-moving
-   code that has only been checked by eye so far, the same caveat every item under 0/1 below
-   already carries for a different reason (no real Square account touched yet).
+   **Run for real by Danny, outside this sandbox (2026-09-04, X59) - two real bugs found and
+   fixed.** `server/test`'s own Vitest suite still cannot run inside this sandbox itself
+   (`mongodb-memory-server`'s download of `fastdl.mongodb.org` is blocked at the proxy level,
+   confirmed directly rather than assumed), but Danny ran it for real and it caught what a manual
+   read alone had missed: `getMyGiftCardLiabilityReport`/`getGiftCardLiabilityReport` matched
+   ids as plain strings inside an aggregation `$match`, which Mongoose never casts the way
+   `find()` does, so the report silently read zero; and the "missing paymentMethod" test's own
+   premise didn't hold given that field is deliberately non-null. Both fixed, see DECISIONS.md
+   M6's own follow-up entry for the full RCA. This is now a real, once-verified data point in
+   this money-moving code's favor, not just a by-eye review - but one run finding two bugs is a
+   reason to run it again after any further change here, not a reason to call this path settled.
 6. ~~Client flags have no mobile presence either~~ - **done 2026-09-04, same X49 as gap 3** (flags
    are a `ClientDashboard` section server-side too, so both closed in the same pass): viewing,
    resolving, and hand-raising a flag all now work from `client/[id].tsx`. Automatic no-show flags

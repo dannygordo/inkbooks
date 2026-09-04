@@ -231,6 +231,27 @@ narrower existing helper. Confirmed in this sandbox: `packages/api` codegen and 
 screens, no new pure-logic module, the same reasoning X48/X54 give for not adding new unit tests
 here).
 
+**Two real bugs found once the server suite actually ran (2026-09-04, X59).** Danny ran
+`server/test`'s own Vitest suite outside this sandbox for the first time on this feature (this
+sandbox still cannot: `mongodb-memory-server`'s download of `fastdl.mongodb.org` is blocked at
+the proxy level here, confirmed directly - not a stale assumption). Two failures came back, both
+fixed:
+
+- `getMyGiftCardLiabilityReport`/`getGiftCardLiabilityReport` matched `issuerArtistId`/`shopId`
+  as plain strings inside `Model.aggregate()`'s `$match` stage. Mongoose only casts a typed path
+  to a real ObjectId for `find`/`findOne`/`countDocuments`, never inside an aggregation pipeline
+  (see `utils/object-id.js`'s own comment on this exact failure shape, first found the same way
+  in the messaging unread-count code) - the query ran, matched nothing, and silently reported a
+  liability of zero. Fixed by wrapping both ids in `toObjectId` before they reach the pipeline.
+- The `rejects a missing paymentMethod` test omitted the field entirely, expecting the
+  resolver's own friendly "cash or Square" validation message. `paymentMethod` is `String!` on
+  `CreateArtistGiftCardInput`, deliberately non-null to match `recordDeposit`'s own field, so an
+  actually-omitted key never reaches the resolver at all - GraphQL's own variable coercion
+  rejects it first, with a generic message and no `data` key at all. Fixed the test to send a
+  syntactically valid but wrong value (`paymentMethod: "venmo"`) instead, the one path that
+  genuinely exercises that validation message. No schema change - the non-null field is the
+  correct, deliberate design, matching deposits.
+
 ### M7. A rate change applies forward only, never backward
 
 Changing an artist's percentage never alters work already performed. The rate that applied is the

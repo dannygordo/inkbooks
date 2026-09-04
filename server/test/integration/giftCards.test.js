@@ -445,13 +445,23 @@ describe('redeemGiftCard - partial redemption', () => {
 // process-gift-card-payment) exists to finish. See models/GiftCard.js's own comment on saleStatus
 // for why this state exists at all - it's the gift-card-shaped counterpart to a pending deposit.
 describe('gift card sale - paymentMethod and the pending/square state', () => {
-  it('rejects a missing paymentMethod', async () => {
+  // paymentMethod is `String!` on CreateArtistGiftCardInput (typeDefs.js), matching
+  // recordDeposit's own non-null field - so an actually OMITTED key never reaches this resolver
+  // at all: GraphQL's own variable coercion rejects the request first, with a generic "field ...
+  // was not provided" message and no `data` key on the response whatsoever (not even `null`).
+  // What IS reachable, and is the thing worth testing here, is a syntactically valid string that
+  // isn't one of the two real values - that's the one path that actually exercises this
+  // resolver's own friendly validate() call and its "cash or Square" errorMap message.
+  it('rejects a paymentMethod that is not cash or square', async () => {
     const { artist } = await shopWithArtist(40);
     const token = signTestToken(artist);
     const server = createTestServer();
 
     const response = await server.executeOperation(
-      { query: CREATE_ARTIST_GIFT_CARD, variables: { input: { faceValueCents: 10000 } } },
+      {
+        query: CREATE_ARTIST_GIFT_CARD,
+        variables: { input: { faceValueCents: 10000, paymentMethod: 'venmo' } },
+      },
       { contextValue: contextWithToken(token) },
     );
 

@@ -19,6 +19,7 @@ const {
 } = require('../../utils/gift-card');
 const { formatCents } = require('../../utils/money');
 const { recordEvent } = require('../../utils/event-log');
+const { toObjectId } = require('../../utils/object-id');
 const square = require('../../utils/square');
 const {
   createArtistGiftCardInputSchema,
@@ -89,6 +90,12 @@ async function giftCardLiabilityReport(matchExtra) {
     // A pending square sale hasn't actually been paid for yet - it isn't money the business owes
     // anyone until the client's card is actually charged, so it isn't counted as a liability
     // until then (see models/GiftCard.js's own comment on saleStatus).
+    //
+    // matchExtra's id fields must already be real ObjectIds, not strings - Model.aggregate()
+    // does not cast a typed path the way find()/findOne() do (see utils/object-id.js's own
+    // comment on this exact failure mode: no error, just a $match that silently matches
+    // nothing). Enforced at both call sites below via toObjectId rather than trusted here, so
+    // this function's own signature doesn't hide the requirement from a future caller.
     { $match: { balanceCents: { $gt: 0 }, saleStatus: 'complete', ...matchExtra } },
     {
       $group: {
@@ -146,11 +153,11 @@ module.exports = {
 
     getGiftCardLiabilityReport: withAuth(async (_, { shopId }, context, info, user) => {
       await assertCanAccessShop(user, shopId);
-      return giftCardLiabilityReport({ shopId });
+      return giftCardLiabilityReport({ shopId: toObjectId(shopId) });
     }),
 
     getMyGiftCardLiabilityReport: withAuth(async (_, __, context, info, user) => {
-      return giftCardLiabilityReport({ issuerArtistId: user.id });
+      return giftCardLiabilityReport({ issuerArtistId: toObjectId(user.id) });
     }),
   },
 
