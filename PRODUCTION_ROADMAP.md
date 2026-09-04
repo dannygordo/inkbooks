@@ -1264,7 +1264,27 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    `ShopConnectionPanel.jsx` remain open - both named separately as their own future slices from
    the start, not overlooked.
 
-   Everything else on the ~40-screen list not yet named remains open.
+   **Booth rent (2026-09-04, see DECISIONS.md X45) closes the first of those two.** Folded into
+   `settings/rates.tsx` in the same place web renders it - an artist's read-only view of shop-set
+   flat-fee terms, plus marking a month paid. Client-operations-only (new `boothRent.graphql`).
+   Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+   full `apps/mobile` Jest suite - 233/233, up from 229 (new `utcDate.ts` formatter tests).
+
+   **`ShopConnectionPanel.jsx` (2026-09-04, see DECISIONS.md X46) closes the Settings/Messages
+   follow-up list in full.** Folded into `settings/shop.tsx` alongside the existing shop-admin
+   money panel, each gated separately (any artist for connect/disconnect/move, admin-with-shop for
+   the money editor) - required widening `settings/index.tsx`'s "Shop" nav gate from admin-with-
+   shop to any artist, since neither an independent artist nor a non-admin shop-connected artist
+   could reach this screen under the old gate. Both of web's confirmation dialogs became native
+   `Alert.alert` calls (matching `ArchiveControl.tsx`'s own precedent) rather than ported dialog
+   markup. Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit`
+   clean, full `apps/mobile` Jest suite - 233/233.
+
+   **With both closed, nothing from the Settings/Messages follow-up list (X31 through X46) remains
+   open.** No specific next screen is named from here - everything else on the original ~40-screen
+   list remains open but unenumerated, to be picked slice by slice as before, e.g. against known
+   named gaps such as group/shop-wide conversations and message search (X16), or against
+   whatever Danny prioritizes next.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).
 10. TestFlight beta, then App Store submission - Guideline 3.1.1 already checked in step 5, so this
