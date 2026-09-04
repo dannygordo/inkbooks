@@ -178,6 +178,9 @@ function RootNavigator() {
               comment). Reached from project/[id].tsx's client name link, and now clients/index.tsx's
               rows too. */}
           <Stack.Screen name="client/[id]" options={{ headerShown: true, title: 'Client' }} />
+          {/* Add Client - closes gap #2 of HANDOFF.md's 2026-09-04 parity accounting. Reached from
+              a new "Add Client" button on clients/index.tsx, gated isStaffOrBetter. */}
+          <Stack.Screen name="client/new" options={{ headerShown: true, title: 'Add Client' }} />
           {/* Messages - inbox + thread, see messages/index.tsx and messages/[id].tsx. Reached from
               index.tsx's header, next to the Settings avatar and Log out. */}
           <Stack.Screen name="messages/index" options={{ headerShown: true, title: 'Messages' }} />
@@ -203,10 +206,16 @@ function RootNavigator() {
               Gated `isStaffOrBetter`, matching web's Sidebar.jsx exactly. */}
           <Stack.Screen name="artists/index" options={{ headerShown: true, title: 'Artists' }} />
           <Stack.Screen name="artist/[id]" options={{ headerShown: true, title: 'Artist' }} />
+          {/* Add Artist - closes gap #2 of HANDOFF.md's 2026-09-04 parity accounting. Reached from
+              a new "Add Artist" button on artists/index.tsx, gated isShopAdminOrBetter. */}
+          <Stack.Screen name="artist/new" options={{ headerShown: true, title: 'Add Artist' }} />
           {/* Staff - the shop's front-desk roster, see staff/index.tsx's own header comment. Also
               gated `isStaffOrBetter` (web's Sidebar.jsx gates Artists and Staff identically). */}
           <Stack.Screen name="staff/index" options={{ headerShown: true, title: 'Staff' }} />
           <Stack.Screen name="staff/[id]" options={{ headerShown: true, title: 'Staff Member' }} />
+          {/* Add Staff - closes gap #2 of HANDOFF.md's 2026-09-04 parity accounting. Reached from
+              a new "Add Staff" button on staff/index.tsx, gated isShopAdminOrBetter. */}
+          <Stack.Screen name="staff/new" options={{ headerShown: true, title: 'Add Staff' }} />
           {/* Shops - the shop-admin's own shop(s), see shops/index.tsx's own header comment. Gated
               `isShopAdminOrBetter`, matching web's Sidebar.jsx exactly (same gate as Shop Cut
               Confirmations). */}

@@ -2799,6 +2799,27 @@ export type GetUserTagColorsQueryVariables = Exact<{
 
 export type GetUserTagColorsQuery = { __typename?: 'Query', getUserTagColors?: Array<{ __typename?: 'User', tagColor?: string | null } | null> | null };
 
+export type CreateClientAccountMutationVariables = Exact<{
+  input: CreateClientAccountInput;
+}>;
+
+
+export type CreateClientAccountMutation = { __typename?: 'Mutation', createClientAccount: { __typename?: 'ClientAccountResult', isNewAccount: boolean, client: { __typename?: 'Client', id: string, firstName: string, lastName: string, email: string, phone: string } } };
+
+export type CreateArtistAccountMutationVariables = Exact<{
+  input: CreateArtistAccountInput;
+}>;
+
+
+export type CreateArtistAccountMutation = { __typename?: 'Mutation', createArtistAccount: { __typename?: 'ArtistAccountResult', inviteLink: string, artist: { __typename?: 'Artist', id: string, firstName: string, lastName: string, email: string, title?: string | null, userId: string } } };
+
+export type CreateStaffAccountMutationVariables = Exact<{
+  input: CreateStaffAccountInput;
+}>;
+
+
+export type CreateStaffAccountMutation = { __typename?: 'Mutation', createStaffAccount: { __typename?: 'StaffAccountResult', inviteLink: string, staff: { __typename?: 'Staff', id: string, firstName: string, lastName: string, email: string, title?: string | null, userId: string } } };
+
 export type RecordAdjustmentMutationVariables = Exact<{
   input: RecordAdjustmentInput;
 }>;
@@ -3892,6 +3913,128 @@ export type GetUserTagColorsQueryHookResult = ReturnType<typeof useGetUserTagCol
 export type GetUserTagColorsLazyQueryHookResult = ReturnType<typeof useGetUserTagColorsLazyQuery>;
 export type GetUserTagColorsSuspenseQueryHookResult = ReturnType<typeof useGetUserTagColorsSuspenseQuery>;
 export type GetUserTagColorsQueryResult = Apollo.QueryResult<GetUserTagColorsQuery, GetUserTagColorsQueryVariables>;
+export const CreateClientAccountDocument = gql`
+    mutation CreateClientAccount($input: CreateClientAccountInput!) {
+  createClientAccount(input: $input) {
+    isNewAccount
+    client {
+      id
+      firstName
+      lastName
+      email
+      phone
+    }
+  }
+}
+    `;
+export type CreateClientAccountMutationFn = Apollo.MutationFunction<CreateClientAccountMutation, CreateClientAccountMutationVariables>;
+
+/**
+ * __useCreateClientAccountMutation__
+ *
+ * To run a mutation, you first call `useCreateClientAccountMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCreateClientAccountMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [createClientAccountMutation, { data, loading, error }] = useCreateClientAccountMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useCreateClientAccountMutation(baseOptions?: Apollo.MutationHookOptions<CreateClientAccountMutation, CreateClientAccountMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<CreateClientAccountMutation, CreateClientAccountMutationVariables>(CreateClientAccountDocument, options);
+      }
+export type CreateClientAccountMutationHookResult = ReturnType<typeof useCreateClientAccountMutation>;
+export type CreateClientAccountMutationResult = Apollo.MutationResult<CreateClientAccountMutation>;
+export type CreateClientAccountMutationOptions = Apollo.BaseMutationOptions<CreateClientAccountMutation, CreateClientAccountMutationVariables>;
+export const CreateArtistAccountDocument = gql`
+    mutation CreateArtistAccount($input: CreateArtistAccountInput!) {
+  createArtistAccount(input: $input) {
+    inviteLink
+    artist {
+      id
+      firstName
+      lastName
+      email
+      title
+      userId
+    }
+  }
+}
+    `;
+export type CreateArtistAccountMutationFn = Apollo.MutationFunction<CreateArtistAccountMutation, CreateArtistAccountMutationVariables>;
+
+/**
+ * __useCreateArtistAccountMutation__
+ *
+ * To run a mutation, you first call `useCreateArtistAccountMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCreateArtistAccountMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [createArtistAccountMutation, { data, loading, error }] = useCreateArtistAccountMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useCreateArtistAccountMutation(baseOptions?: Apollo.MutationHookOptions<CreateArtistAccountMutation, CreateArtistAccountMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<CreateArtistAccountMutation, CreateArtistAccountMutationVariables>(CreateArtistAccountDocument, options);
+      }
+export type CreateArtistAccountMutationHookResult = ReturnType<typeof useCreateArtistAccountMutation>;
+export type CreateArtistAccountMutationResult = Apollo.MutationResult<CreateArtistAccountMutation>;
+export type CreateArtistAccountMutationOptions = Apollo.BaseMutationOptions<CreateArtistAccountMutation, CreateArtistAccountMutationVariables>;
+export const CreateStaffAccountDocument = gql`
+    mutation CreateStaffAccount($input: CreateStaffAccountInput!) {
+  createStaffAccount(input: $input) {
+    inviteLink
+    staff {
+      id
+      firstName
+      lastName
+      email
+      title
+      userId
+    }
+  }
+}
+    `;
+export type CreateStaffAccountMutationFn = Apollo.MutationFunction<CreateStaffAccountMutation, CreateStaffAccountMutationVariables>;
+
+/**
+ * __useCreateStaffAccountMutation__
+ *
+ * To run a mutation, you first call `useCreateStaffAccountMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCreateStaffAccountMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [createStaffAccountMutation, { data, loading, error }] = useCreateStaffAccountMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useCreateStaffAccountMutation(baseOptions?: Apollo.MutationHookOptions<CreateStaffAccountMutation, CreateStaffAccountMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<CreateStaffAccountMutation, CreateStaffAccountMutationVariables>(CreateStaffAccountDocument, options);
+      }
+export type CreateStaffAccountMutationHookResult = ReturnType<typeof useCreateStaffAccountMutation>;
+export type CreateStaffAccountMutationResult = Apollo.MutationResult<CreateStaffAccountMutation>;
+export type CreateStaffAccountMutationOptions = Apollo.BaseMutationOptions<CreateStaffAccountMutation, CreateStaffAccountMutationVariables>;
 export const RecordAdjustmentDocument = gql`
     mutation RecordAdjustment($input: RecordAdjustmentInput!) {
   recordAdjustment(input: $input) {

@@ -6,12 +6,15 @@ import { ActivityIndicator, Pressable, StyleSheet, Switch, View } from 'react-na
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/Avatar';
+import { Button } from '@/components/Button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { ARTIST_STATUS } from '@/constants/auth';
 import { Spacing } from '@/constants/theme';
+import { useAuth } from '@/context/auth';
 import { useTheme } from '@/hooks/use-theme';
 import { formatPhone } from '@/utils/phone';
+import { isShopAdminOrBetter } from '@/utils/permissions';
 
 type ArtistListItem = GetArtistsListQuery['getArtists']['items'][number];
 
@@ -26,14 +29,18 @@ const PAGE_SIZE = 200;
  * once it was noticed that Artist.jsx mounted a shop-mate's revenue panel).
  *
  * "Show archived" toggle is real, not a scope cut - matches web's `Artists.jsx` exactly, since
- * `getArtists(includeArchived)` is a plain boolean the resolver already accepts. No "Add Artist"
- * action, unlike web - that opens a real account-creation wizard (email/password/role, effectively
- * a mini-register flow), separate scope from a directory port.
+ * `getArtists(includeArchived)` is a plain boolean the resolver already accepts. **"Add Artist"
+ * now exists** (see the parity-accounting entry after X46) - gated `isShopAdminOrBetter`, opening
+ * `artist/new.tsx`.
  */
 export default function ArtistsScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const { user } = useAuth();
   const [showArchived, setShowArchived] = useState(false);
+  // "Add Artist" is a shop-admin action on web too - canManageAccounts = role <= ROLES.SHOP_ADMIN
+  // (IBPageActionBar.jsx). Closes gap #2 of HANDOFF.md's 2026-09-04 parity accounting.
+  const canManageAccounts = isShopAdminOrBetter(user);
 
   const { data, loading, error, fetchMore, refetch } = useGetArtistsListQuery({
     variables: { includeArchived: showArchived, page: { limit: PAGE_SIZE, offset: 0 } },
@@ -67,6 +74,16 @@ export default function ArtistsScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+        {canManageAccounts ? (
+          <View style={styles.addRow}>
+            <Button
+              label="Add Artist"
+              variant="secondary"
+              onPress={() => router.push('/artist/new')}
+              testID="artists-add"
+            />
+          </View>
+        ) : null}
         <View style={styles.toggleRow}>
           <ThemedText type="default">Show archived</ThemedText>
           <Switch value={showArchived} onValueChange={toggleArchived} testID="artists-show-archived" />
@@ -133,6 +150,11 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
+  },
+  addRow: {
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.two,
+    alignItems: 'flex-start',
   },
   toggleRow: {
     flexDirection: 'row',

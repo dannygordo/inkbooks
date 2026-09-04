@@ -2094,6 +2094,86 @@ for actually sharing it.
 `FORM_FIELD_TYPE_LABELS`/`formFieldTypeLabel`) - same "build the map directly, don't port
 `prettyConstantsListValue`" reasoning as `utils/projectStatus.ts` (X20).
 
+### X47. Add Client / Add Artist / Add Staff - account creation from mobile
+
+First slice off the mobile/web parity accounting written into HANDOFF.md on 2026-09-04 (gap #2:
+"No client, project, staff, or artist account can be created from mobile at all"). Direct port of
+apps/web's three account-creation wizards - `CreateClientWizard`/`CreateArtistWizard`/
+`CreateStaffWizard` (`AccountWizards.jsx`) plus `AccountService.js`'s three mutations - split
+across three new full-screen routes (`client/new.tsx`, `artist/new.tsx`, `staff/new.tsx`), reached
+from a new "Add Client"/"Add Artist"/"Add Staff" button on the matching directory screen.
+
+**Appointment/consult creation (gap #1, the much larger `AppointmentWizard.jsx`) is NOT this
+entry.** That flow unifies client-creation and appointment-creation into one pipeline for Consult
+and brand-new-Session types (`createBookingRequest` + `convertBookingRequest`, leaning on the
+server's `findOrCreateGuestClient`) and is a materially bigger port - branching on personal-vs-shop
+calendar, consult-vs-session type, and existing-vs-new-project for a session, on top of its own
+date/time picker. Sequenced as its own future slice rather than folded in here, same "one clean
+vertical slice at a time" reasoning as splitting Messages across X38-X41.
+
+**Gating matches web's `IBPageActionBar.jsx` exactly**: Add Client is `isStaffOrBetter` (front-desk
+work, matching the server's own `ROLES.SHOP_STAFF` floor on `createClientAccount`); Add Artist and
+Add Staff are both `isShopAdminOrBetter` (matching the server's `ROLES.SHOP_ADMIN` floor on
+`createArtistAccount`/`createStaffAccount`).
+
+**ONE SCREEN PER WIZARD, NOT A PORTED STEP-WIZARD SHELL.** Web's `EntityWizard.jsx` is a generic,
+reusable step-array shell - steps are a UX-pacing device (identity now, optional details later),
+not an enforced sequence: its own `validateStep` only checks the CURRENT step, so nothing on web
+actually depends on the steps being separate screens. Three call sites don't justify building
+mobile's own version of that shell (this would be the first multi-field form on this app to need
+one), so each wizard's steps survive as labeled sections on one scrollable screen instead, and
+validating every field at submit rather than per-step is a strict superset of web's own behavior,
+never less correct. Each screen is a real expo-router route, not an inline card or modal, matching
+the "opens a real record-creation flow" precedent every other web-modal port on this app has
+followed since there's no cross-platform modal primitive.
+
+**No `shopId` sent by any of the three** - the server derives it from the creating admin
+(`resolveShopIdForNewAccount` in `mutations/accounts.js`), same as X46's `ConnectArtistToShop`
+never sending one either. `AccountWizards.jsx`'s own comment names exactly what a cached client-side
+shop id risks: empty (silent no-connection) or stale (a shop the admin no longer belongs to).
+
+**Booking-slug field on Add Artist has no live availability check.** Same call X42's
+`settings/your-link.tsx` already made for this identical field on an *existing* artist:
+`checkBookingSlugAvailable`'s debounced-and-racy courtesy check is real, separate scope for one
+field, and cutting it doesn't cut the actual guarantee (the unique index on `Artist.bookingSlug`).
+A taken handle, or one that doesn't meet the server's own format rules, surfaces on submit via the
+same `err.graphQLErrors[0].extensions.errors` shape `assertSlugAvailable` and `assertEmailAvailable`
+both throw. New `utils/bookingSlug.ts` ports `suggestSlug`/`suggestSlugOrBlank` byte-for-byte
+(including the accent-stripping and 40-character truncation, both directly ported test-by-test from
+`utils/bookingSlug.test.js`) so the field prefills from the typed name exactly like web's
+`BookingSlugField` render prop does, and never assigns a value the admin didn't see on screen.
+
+**New `utils/graphqlFieldError.ts`** (`fieldError`/`fieldErrors`) - the third call site for the
+`graphQLErrors[0]?.extensions?.errors[field]` read (`your-link.tsx`'s inline copy was the first
+two, both on `bookingSlug`), pulled into a shared helper once a third caller needed the identical
+few lines - same "extract once a second/third caller shows up" reasoning as `PillRow`'s own X37
+extraction.
+
+**Invite link shown directly, not "an email was sent"** - `utils/email.js` no-ops without a
+configured mail provider, so the link is the only thing this app can actually verify, same
+reasoning as `AccountWizards.jsx`'s own `InviteResult`. Shown in a read-only, `selectTextOnFocus`
+text field for OS-native copy - no clipboard library is installed on mobile (same
+avoid-a-new-dependency call as the Shops slice's Square flow and the Forms guest-link field).
+
+**List refresh via `refetchQueries: ['GetClients' | 'GetArtistsList' | 'GetStaffList']` on the
+create mutation itself, not a focus-refetch hook.** `useFocusEffect` lives in
+`@react-navigation/native`, which expo-router depends on internally but which is not itself a
+resolvable import from application code in this repo (confirmed: `require.resolve` fails, and nothing
+in `apps/mobile/package.json` lists it) - reaching for it would mean adding a new dependency for
+one behavior. Naming the one query each screen needs refreshed is simpler and needs nothing new.
+
+**Client duplicate-email handling matches web exactly** - `createClientAccount` reuses
+`findOrCreateGuestClient` server-side and returns `isNewAccount: false` instead of erroring when
+the email already has a client record; the success screen branches on that flag the same way
+`CreateClientWizard`'s own `onSubmit` does ("was already on file" rather than implying a new
+record).
+
+Verification: `packages/api` codegen + build clean (new `useCreateClientAccountMutation`/
+`useCreateArtistAccountMutation`/`useCreateStaffAccountMutation` hooks), `apps/mobile`
+`tsc --noEmit` clean, full Jest suite 247/247 (233 plus 14 new `bookingSlug.test.ts` cases ported
+from `utils/bookingSlug.test.js` - `suggestSlug`/`suggestSlugOrBlank` only, not `bookingUrl`/
+`formUrl`, which are `window.location`-dependent and not part of this port).
+
 ### X46. ShopConnectionPanel - an artist's own shop connect/disconnect/move flow
 
 Last item from the Settings/Messages follow-up list (X44's own closing note named this as the one

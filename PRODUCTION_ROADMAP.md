@@ -1281,10 +1281,26 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    clean, full `apps/mobile` Jest suite - 233/233.
 
    **With both closed, nothing from the Settings/Messages follow-up list (X31 through X46) remains
-   open.** No specific next screen is named from here - everything else on the original ~40-screen
-   list remains open but unenumerated, to be picked slice by slice as before, e.g. against known
-   named gaps such as group/shop-wide conversations and message search (X16), or against
-   whatever Danny prioritizes next.
+   open.** That list was never the whole gap, though - a direct mobile-vs-web functionality audit
+   on 2026-09-04 (HANDOFF.md's "Mobile/web feature parity" section) found 11 further items, ranked
+   by how much each blocks ordinary daily use. Danny picked "Create new appointment/client/project"
+   first.
+
+   **Add Client / Add Artist / Add Staff (2026-09-04, see DECISIONS.md X47) closes the
+   client/artist/staff half of that pick.** Three new "Add" buttons (directory screens, role-gated
+   the same way web's `IBPageActionBar.jsx` gates them) open new full-screen routes ported directly
+   from web's `CreateClientWizard`/`CreateArtistWizard`/`CreateStaffWizard` - one screen per wizard
+   rather than a ported step-shell, since web's own steps are a pacing device, not an enforced
+   sequence. Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile`
+   `tsc --noEmit` clean, full `apps/mobile` Jest suite - 247/247, up from 233 (new
+   `bookingSlug.test.ts`, ported test-by-test from web's own).
+
+   **The appointment/consult half of that same pick (the calendar's tap-an-empty-slot-and-book
+   flow) is still open and is the named next slice** - a materially bigger port (web's
+   `AppointmentWizard.jsx` is 767 lines with several branching paths) that X47's own DECISIONS.md
+   entry deliberately left separate. See HANDOFF.md's "Next" section for the specific plan (a
+   read-first pass over the rest of that file plus its supporting components, then a decision on
+   whether it ships as one slice or splits further).
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).
 10. TestFlight beta, then App Store submission - Guideline 3.1.1 already checked in step 5, so this

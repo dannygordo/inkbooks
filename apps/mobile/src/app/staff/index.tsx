@@ -6,12 +6,15 @@ import { ActivityIndicator, Pressable, StyleSheet, Switch, View } from 'react-na
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/Avatar';
+import { Button } from '@/components/Button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { STAFF_STATUS } from '@/constants/auth';
 import { Spacing } from '@/constants/theme';
+import { useAuth } from '@/context/auth';
 import { useTheme } from '@/hooks/use-theme';
 import { formatPhone } from '@/utils/phone';
+import { isShopAdminOrBetter } from '@/utils/permissions';
 
 type StaffListItem = GetStaffListQuery['getStaff']['items'][number];
 
@@ -23,13 +26,17 @@ const PAGE_SIZE = 200;
  * reached from the same `isStaffOrBetter`-gated header link (web's own Sidebar.jsx gates Artists
  * and Staff identically). See DECISIONS.md X23.
  *
- * No "Add Staff" action, same reasoning as Artists' missing "Add Artist" - `CreateStaffWizard`
- * creates a real account, separate scope from a directory port.
+ * **"Add Staff" now exists** (see the parity-accounting entry after X46) - gated
+ * `isShopAdminOrBetter`, opening `staff/new.tsx`, same as Artists' own "Add Artist".
  */
 export default function StaffScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const { user } = useAuth();
   const [showArchived, setShowArchived] = useState(false);
+  // "Add Staff" is a shop-admin action on web too - canManageAccounts = role <= ROLES.SHOP_ADMIN
+  // (IBPageActionBar.jsx). Closes gap #2 of HANDOFF.md's 2026-09-04 parity accounting.
+  const canManageAccounts = isShopAdminOrBetter(user);
 
   const { data, loading, error, fetchMore, refetch } = useGetStaffListQuery({
     variables: { includeArchived: showArchived, page: { limit: PAGE_SIZE, offset: 0 } },
@@ -63,6 +70,16 @@ export default function StaffScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+        {canManageAccounts ? (
+          <View style={styles.addRow}>
+            <Button
+              label="Add Staff"
+              variant="secondary"
+              onPress={() => router.push('/staff/new')}
+              testID="staff-add"
+            />
+          </View>
+        ) : null}
         <View style={styles.toggleRow}>
           <ThemedText type="default">Show archived</ThemedText>
           <Switch value={showArchived} onValueChange={toggleArchived} testID="staff-show-archived" />
@@ -133,6 +150,11 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
+  },
+  addRow: {
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.two,
+    alignItems: 'flex-start',
   },
   toggleRow: {
     flexDirection: 'row',

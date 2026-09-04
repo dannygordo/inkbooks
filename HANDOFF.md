@@ -3066,11 +3066,17 @@ prior summary. Ranked roughly by how much it blocks ordinary daily use, most-blo
    (`components/ProjectSessionsList.tsx`). There is no tap-an-empty-slot-and-book flow the way
    web's `CreateEventDialog` gives `Appointments.jsx`. An artist taking a walk-in or a phone call
    has no way to get it onto the calendar from their phone.
-2. **No client, project, staff, or artist account can be created from mobile at all.** Every one of
-   those four record types can be viewed and edited (clients: view/edit only, no archive either -
-   see X17's own note; staff/artists: view/edit/archive all work) but never brought into existence.
-   `createClient`/`createProject`/`createStaffAccount`/`createArtist` (or their equivalents) are
-   not called anywhere in `apps/mobile/src`.
+2. ~~No client, project, staff, or artist account can be created from mobile at all~~ - **client/
+   artist/staff done 2026-09-04 (X47)**: "Add Client"/"Add Artist"/"Add Staff" buttons on the three
+   directory screens open new `client/new.tsx`/`artist/new.tsx`/`staff/new.tsx` routes, direct
+   ports of web's `CreateClientWizard`/`CreateArtistWizard`/`CreateStaffWizard`. **Project creation
+   remains open, but isn't actually a gap** - re-reading `IBPageActionBar.jsx`'s own comment while
+   scoping X47 found that web has no standalone "Add Project" button either: a project is only ever
+   spawned by the booking workflow (`convertBookingRequest`, inside `AppointmentWizard.jsx`), not
+   created directly on either platform. This line originally listed "project" alongside the other
+   three from a `createProject` mutation existing in `packages/api` - it exists only for
+   `AppointmentWizard`'s own new-session-with-a-new-project path, which is part of gap #1 below,
+   not a fourth independent thing. Corrected here rather than silently dropped.
 3. **The client detail page is a shell of web's.** `app/client/[id].tsx` (X15) is scoped to exactly
    one thing - the shared-images gallery. Stats, project history, appointment history, notes, and
    the client's own flags, which are all real sections on web's `ClientDashboard.jsx`, don't exist
@@ -3127,6 +3133,22 @@ the whole gap; it just happened to be the one with names already attached. Prior
 items there is Danny's call, not assumed here - see that section for the full reasoning behind each
 one. The deferred items below (0 and 1) are what's left before the app could take real money, and
 Danny's plan is to hold those until mobile is otherwise complete rather than start them early.
+
+**Danny picked "Create new appointment/client/project" first. The client/artist/staff half of that
+is done (X47, 2026-09-04)** - three new "Add" buttons and full-screen creation routes, direct ports
+of web's `AccountWizards.jsx`. **The appointment/consult half (gap #1, the calendar's own
+tap-an-empty-slot-and-book flow) is still open and is the natural next slice** - it's a materially
+bigger port than X47 (web's `AppointmentWizard.jsx` is 767 lines: personal-vs-shop calendar choice,
+consult-vs-session type choice, an email-lookup client step for consult/new-session, an
+intake-details step, a date/time picker, and an existing-vs-new-project branch for a session,
+sitting on top of `createBookingRequest`+`convertBookingRequest` for the consult/new-session paths
+and a more direct `createAppointment` for the rest). X47's own DECISIONS.md entry names this split
+explicitly. Worth scoping as its own read-first pass over `AppointmentWizard.jsx`'s remaining
+~650 lines (only the first ~120 were read while planning X47) plus `AppointmentSlotPicker.jsx`/
+`DurationPicker.jsx`/`IBProjectsByArtistSelect.jsx`/`BookingRequestService.js` before deciding
+whether it ships as one slice or splits further (e.g. Personal/Session-on-existing-project first,
+since those skip the client-lookup and booking-request machinery entirely, then Consult/new-Session
+after).
 
 **0 and 1 below (the shop-admin migration, and a real Square payment) are explicitly deferred —
 reconfirmed 2026-08-25: Danny's plan is to pick this back up as the last item before starting the

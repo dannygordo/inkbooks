@@ -6,12 +6,15 @@ import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/Avatar';
+import { Button } from '@/components/Button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
+import { useAuth } from '@/context/auth';
 import { useTheme } from '@/hooks/use-theme';
 import { matchesClientSearch, type ClientListItem } from '@/utils/clients';
 import { formatPhone } from '@/utils/phone';
+import { isStaffOrBetter } from '@/utils/permissions';
 
 // The server's own max page size (utils/pagination.js's MAX_LIMIT) - the same "a bounded window
 // comfortably covers the common case" call index.tsx's own PAGE constant makes for a week of
@@ -20,11 +23,12 @@ import { formatPhone } from '@/utils/phone';
 const PAGE_SIZE = 200;
 
 /**
- * The client roster - reachable from the header next to Messages/Settings/Log out. Scoped well
- * below apps/web's Clients.jsx on purpose: no create-client action (`IBPageActionBar`), no
- * archive/"Show archived" toggle, and no server-side name search - `getClients` itself takes no
- * search argument (see server/graphql/typeDefs.js), so this only filters whatever's already been
- * paged in, not the shop's whole roster at once. Full reasoning: DECISIONS.md X17.
+ * The client roster - reachable from the header next to Messages/Settings/Log out. Scoped below
+ * apps/web's Clients.jsx: no archive/"Show archived" toggle, and no server-side name search -
+ * `getClients` itself takes no search argument (see server/graphql/typeDefs.js), so this only
+ * filters whatever's already been paged in, not the shop's whole roster at once. Full reasoning:
+ * DECISIONS.md X17. **"Add Client" now exists** (see the parity-accounting entry after X46) -
+ * gated `isStaffOrBetter`, opening `client/new.tsx`.
  *
  * Tapping a row reaches the SAME `client/[id].tsx` screen X15 built (shared-images panel) - the
  * second real entry point that screen's own header comment said was worth revisiting for. Name is
@@ -35,7 +39,11 @@ const PAGE_SIZE = 200;
 export default function ClientsScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const { user } = useAuth();
   const [search, setSearch] = useState('');
+  // "Add Client" is front-desk work on web too - canAddClients = role <= ROLES.SHOP_STAFF
+  // (IBPageActionBar.jsx). Closes gap #2 of HANDOFF.md's 2026-09-04 parity accounting.
+  const canAddClients = isStaffOrBetter(user);
 
   const { data, loading, error, fetchMore } = useGetClientsQuery({
     variables: { page: { limit: PAGE_SIZE, offset: 0 } },
@@ -72,6 +80,16 @@ export default function ClientsScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+        {canAddClients ? (
+          <View style={styles.addRow}>
+            <Button
+              label="Add Client"
+              variant="secondary"
+              onPress={() => router.push('/client/new')}
+              testID="clients-add"
+            />
+          </View>
+        ) : null}
         <View style={styles.searchRow}>
           <TextInput
             value={search}
@@ -134,6 +152,11 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
+  },
+  addRow: {
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.two,
+    alignItems: 'flex-start',
   },
   searchRow: {
     paddingHorizontal: Spacing.three,
