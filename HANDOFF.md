@@ -3274,12 +3274,11 @@ DECISIONS.md entry.
 Danny's own product calls (real Square payment collection; web first, then mobile) are both
 settled, and both platforms are built, see that section's own entry for the full file list.
 
-**0 and 1 below (the shop-admin migration, and a real Square payment) are explicitly deferred —
-reconfirmed 2026-08-25: Danny's plan is to pick this back up as the last item before starting the
-mobile applications, not before.** Left written out below rather than deleted, since the "Run it
-once, for real" suite item is now reported done for both suites (see the 2026-08-25 entry above,
-which supersedes the 2026-08-18/19 reports below) and the rest of each item's own detail is still
-accurate and will still be needed whenever this is picked up again.
+**0 and 1 below (the shop-admin migration, and a real Square payment) were explicitly deferred
+until mobile was otherwise complete - reconfirmed 2026-08-25.** Mobile parity closed in full on
+2026-09-04 (gift cards, gap 5, was the last item), so this is now the active item, not a deferred
+one. Item 1 is already partway done for real, see its own entry below for the current split
+between what Danny has now confirmed and what is still open.
 
 0. ~~Run both suites on a real machine~~ — **done, reported green 2026-08-18** (see above). **Then
    the shop-admin migration** — deferred, not urgent: `node scripts/migrate-shop-admins-to-artists.js
@@ -3288,13 +3287,18 @@ accurate and will still be needed whenever this is picked up again.
    script work right now per Danny (this is dev data he can reseed at will) — this item is about
    *production/pre-existing* data specifically, which is why it's still deferred rather than dropped.
 
-1. **DEFERRED — take one real payment end to end**, when told to pick it back up. Nothing in the
-   charge path has ever touched Square. It was
-   built against their published REST docs, and `utils/square.js` has said so at the top since it
-   was written. The sequence: run `scripts/migrate-square-accounts.js`, connect a Square **sandbox**
-   seller through the OAuth flow, set a tax rate and offset in Settings, then charge a session and a
-   deposit and confirm the figures in Square's dashboard match what InkBooks recorded. Everything
-   below is built on arithmetic that has only ever been checked against itself.
+1. **The charge itself is confirmed for real (2026-09-04) - the downstream half still is not.**
+   Danny has connected to the Square sandbox and taken payments through the running app many
+   times since this was last written up, not just the single 2026-08-11 handshake test below - so
+   `POST /v2/payments` succeeding, and matching Square's own dashboard, is no longer a deferred
+   item, it is a confirmed fact. What is still genuinely unchecked is everything downstream of a
+   successful charge: does `createShopCutInvoice` fire and does the invoice actually publish, and
+   does the webhook flip the appointment to `paid`. That is the narrower, real remaining gap in
+   this item now, not "nothing has ever touched Square." The original sequence for a from-scratch
+   run is still accurate if it is ever needed again: run `scripts/migrate-square-accounts.js`,
+   connect a Square **sandbox** seller through the OAuth flow, set a tax rate and offset in
+   Settings, then charge a session and a deposit and confirm the figures in Square's dashboard
+   match what InkBooks recorded.
 
    **Launch the sandbox seller first.** Square's authorize page refuses with *"To start the OAuth
    flow for a sandbox account, first launch the seller test account from the Developer Console"* —
@@ -3308,23 +3312,27 @@ accurate and will still be needed whenever this is picked up again.
    and a refresh returns the original set, so there is no way to gain one without reconnecting. A
    charge on such a token fails with a message saying exactly that.
 
-   **Verified against a real sandbox seller on 2026-08-11, as far as the Payments call.**
+   **First verified against a real sandbox seller on 2026-08-11, as far as the Payments call.**
    Authorization URL → consent → token exchange → encrypted storage → decrypt → `POST /v2/payments`
-   all ran against Square rather than against its documentation. The charge was refused for the
-   missing scope — which is granted at authorization, so the refusal itself proves the handshake
-   completed and the stored token was genuinely usable.
+   all ran against Square rather than against its documentation that day. The charge was refused
+   for the missing scope at the time - which is granted at authorization, so the refusal itself
+   proved the handshake completed and the stored token was genuinely usable. Superseded by the
+   repeated real charges above, which go all the way through.
 
-   **Still unverified:** a payment that succeeds, and everything downstream — `createShopCutInvoice`,
-   publishing it, and the webhook flipping an appointment to `paid`.
+   **Still unverified: everything downstream of a successful charge** - `createShopCutInvoice`,
+   publishing it, and the webhook flipping an appointment to `paid`. Danny has not specifically
+   traced these on any of his real test charges. This is the one piece of item 1 left to close.
 2. **Drop the old `Shop` Square fields.** Once the migration has run and a charge has worked, delete
    the seven now-unread `square*` fields from stored shop documents. Deliberately left in place for
    one deploy — see M9.
 
 Gift cards, adjustment records, and the client-flags GraphQL surface (previously items 3/4 here)
-are all done — see Done above. What's actually left before this app could take real money is items
-1 (a real Square payment) and 0 (the two suites — done — then the migration) — both deferred, see
-above, not because there's other feature work queued ahead of them. A resolve-by-id mutation for a
-manually-raised client flag is a real, stated gap (see Known gaps) but nobody has asked for it yet.
+are all done - see Done above. What's actually left before this app could take real money is item
+1's downstream half (shop cut invoice creation/publishing, and the webhook flip to `paid` - the
+charge itself is now confirmed) and item 0 (the two suites - done - then the migration), both
+active now that mobile parity is closed, not because there's other feature work queued ahead of
+them. A resolve-by-id mutation for a manually-raised client flag is a real, stated gap (see Known
+gaps) but nobody has asked for it yet.
 
 ~~**New candidate item, found 2026-08-18: wire `ClientFlagType.ensureSeeded()` into application
 boot.**~~ — **done, confirmed 2026-08-21/22**: `server/index.js` calls
