@@ -92,6 +92,9 @@ function RootNavigator() {
               only, same guard as login itself; a signed-in user changes a password they know from
               settings/index.tsx instead. */}
           <Stack.Screen name="reset-password" options={{ headerShown: true, title: 'Reset Password' }} />
+          {/* Cold self-signup (gap #11, X55) - see register.tsx's own header comment for why it's
+              scoped to account creation only, deferring notifications/rates/shop-cut to Settings. */}
+          <Stack.Screen name="register" options={{ headerShown: true, title: 'Create Account' }} />
         </Stack.Protected>
         <Stack.Protected guard={!!user}>
           <Stack.Screen name="index" />

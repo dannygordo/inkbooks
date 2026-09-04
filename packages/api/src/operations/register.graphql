@@ -1,0 +1,59 @@
+# Gap #11 of HANDOFF.md's 2026-09-04 parity accounting - "/register" on web, cold self-service
+# signup for a brand-new InkBooks account (shop or independent artist), unrelated to logging an
+# EXISTING account in. Not to be confused with an invited artist/staff member's first-time
+# password set (/set-password/:token) - that redemption screen stays deliberately unbuilt on
+# mobile, same reasoning as passwordReset.graphql's own header comment and DECISIONS.md X29: the
+# emailed link is a plain web URL with no registered mobile deep link, so it always opens the
+# phone's browser regardless of whether a native screen exists.
+#
+# Selection set mirrors login.graphql's Login mutation FIELD-FOR-FIELD (not apps/web's own
+# Register.jsx, which only spreads CurrentUserFields for the same reason) - register.tsx passes
+# the result straight to useAuth()'s login(), which is typed to LoginMutation['login']. Structural
+# codegen types make this exact duplication load-bearing, not incidental: change one selection
+# set without the other and register.tsx stops type-checking against login().
+mutation RegisterAccount($input: RegisterAccountInput!) {
+	registerAccount(input: $input) {
+		id
+		email
+		firstName
+		lastName
+		avatar
+		role
+		userType
+		tagColor
+		themePreference
+		accessToken
+		firebaseToken
+		userInfo {
+			... on Artist {
+				id
+				firstName
+				lastName
+				avatar
+				hourlyRate
+				shop {
+					id
+					name
+					website
+				}
+			}
+			... on Client {
+				id
+				firstName
+				lastName
+				avatar
+			}
+			... on Staff {
+				id
+				firstName
+				lastName
+				avatar
+				title
+				shop {
+					id
+					name
+				}
+			}
+		}
+	}
+}

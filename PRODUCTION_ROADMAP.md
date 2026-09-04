@@ -1380,8 +1380,25 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    already links directly to it. Confirmed in this sandbox: `packages/api` codegen + build,
    `apps/mobile` `tsc --noEmit` clean, full `apps/mobile` Jest suite - still 252/252 (Apollo-wired
    screen, no new pure-logic module).
-   Two items remain on the parity accounting, unprioritized between them - see HANDOFF.md's
-   "Next" section.
+   **Registration (gap 11) is done too (2026-09-04, see DECISIONS.md X55), scoped to account
+   creation only** - a new `register.tsx` screen, reached from a new "Create a new account" link
+   on `login.tsx`, ports web's `Register.jsx` account-type-and-account-fields steps (accountType
+   via `PillRow`, shopName when shop, firstName, lastName, email, password, confirmPassword,
+   optional bookingSlug), then calls `login(data.registerAccount)` and goes straight to Home.
+   Web's three skippable follow-up steps (notifications, rates, shop cut) are deliberately not
+   re-offered - `settings/notifications.tsx` (X51), `settings/rates.tsx` (X37), and
+   `shop/[id].tsx` already cover all three once the account exists, so a second wizard here would
+   just duplicate them (same restraint as X30's Forms actions). New
+   `packages/api/src/operations/register.graphql` mutation `RegisterAccount`, its selection set
+   mirroring `login.graphql`'s `Login` mutation field-for-field so the result type-checks against
+   `useAuth()`'s `login()`. **First-time password set (`/set-password/:token`) stays unbuilt** -
+   not a new gap, X29 already covers this exact URL (both the invite and reset purposes redeem
+   through it) for the same missing-mobile-deep-link reason. Confirmed in this sandbox:
+   `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean, full `apps/mobile` Jest
+   suite - still 252/252 (Apollo-wired screen, no new pure-logic module).
+   One item remains on the parity accounting: gift cards (gap 5), which needs Danny's own product
+   call - see HANDOFF.md's "Next" section. Every other named gap in the 2026-09-04 accounting is
+   now closed.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).
 10. TestFlight beta, then App Store submission - Guideline 3.1.1 already checked in step 5, so this

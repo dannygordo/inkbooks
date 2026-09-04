@@ -2094,6 +2094,73 @@ for actually sharing it.
 `FORM_FIELD_TYPE_LABELS`/`formFieldTypeLabel`) - same "build the map directly, don't port
 `prettyConstantsListValue`" reasoning as `utils/projectStatus.ts` (X20).
 
+### X55. Registration built on mobile, scoped to account creation - and why set-password stays unbuilt
+
+Ninth slice off the mobile/web parity accounting (HANDOFF.md, 2026-09-04) - gap #11, "Registration/
+onboarding (`/register`) and first-time password set (`/set-password/:token`) are web-only." The
+two halves of this gap turned out to need opposite answers, for reasons settled well before this
+slice started.
+
+**`/set-password/:token` is NOT ported, and this isn't a new call - X29 already made it.** Both an
+invited artist/staff member's first password AND a forgot-password reset are redeemed through this
+exact same web URL (`inspectPasswordToken`/`setPasswordWithToken`, `apps/web/src/pages/setPassword/
+SetPassword.jsx`). X29's own reasoning for why the reset half of this URL isn't built on mobile
+applies word for word to the invite half too: the emailed link is a plain web URL with no
+registered mobile deep link (no Universal Link/App Link domain, no `apple-app-site-association`/
+`assetlinks.json`, no signed entitlements - same infrastructure gap named for Square OAuth in X24),
+so tapping it from Mail always opens the phone's default browser, never the app, regardless of
+whether a native screen exists. Building it now would be unreachable dead code. Nothing new to
+decide here - X29 already covers this token-redemption screen regardless of which mutation issued
+the token, and `packages/api` still has neither `inspectPasswordToken` nor `setPasswordWithToken`,
+per that entry's own restraint.
+
+**`/register` IS ported, because it needs no deep link at all** - it's a normal in-app screen
+reached from `login.tsx`'s own new "Create a new account" link, exactly like web's `Login.jsx`
+links to `/register` (the only entry point into that flow on web too - no marketing site exists in
+this repo). New `packages/api/src/operations/register.graphql` (`RegisterAccount` - nothing existed
+here before; web calls its own local, non-`packages/api` `gql` tag). Its selection set mirrors
+`login.graphql`'s `Login` mutation FIELD-FOR-FIELD rather than web's own `CurrentUserFields`
+fragment, because `register.tsx` hands the result straight to `useAuth()`'s `login()`, which is
+typed to `LoginMutation['login']` - matching structural shape is what makes that call legal, not
+incidental duplication.
+
+**SCOPED TO ACCOUNT CREATION ONLY - the biggest cut this slice makes.** Web's `Register.jsx` is a
+5-6 step wizard: account type, account fields, then three SKIPPABLE steps (notifications, rates,
+shop cut) that save via Settings' own already-authenticated mutations, specifically so closing the
+tab after step 2 leaves a fully working account. `register.tsx` ports only the first two steps -
+accountType (`PillRow`, shop vs independent artist, same "no cross-platform `<select>`" precedent
+as every other enum picker on mobile) and the account-creation fields (shopName when shop,
+firstName, lastName, email, password, confirmPassword, optional bookingSlug) - then calls
+`login(data.registerAccount)` and goes straight to Home. The three skippable steps aren't missing
+functionality: `settings/notifications.tsx` (X51), `settings/rates.tsx` (X37), and `shop/[id].tsx`'s
+own shop-cut editing already exist and are reachable the moment the account is real. Building a
+second wizard here to re-offer them would be the exact "two screens independently calling the same
+mutations for no reason" call X30's own header comment already made for Forms' Publish/Archive/
+link actions - this is that same mobile-specific information-architecture restraint, not a scope
+gap. `registerAccount` itself is unaffected either way: a real password, `hasSetPassword: true`
+immediately, no email verification step server-side (see the resolver's own comment) - the cut only
+changes how many optional preferences get set on day one.
+
+**No live booking-slug availability check**, same restraint and same reasoning as
+`settings/your-link.tsx` (X42): the unique index is the real guarantee, a debounced live check is a
+courtesy mobile has consistently skipped paying for - a taken slug surfaces as a save-time field
+error here instead, same message either way.
+
+**Field-level errors reuse `utils/graphqlFieldError.ts`'s `fieldErrors`** rather than assuming which
+field failed - `registerAccount` can name `email` (uniqueness), `shopName` (required when
+accountType is shop), or `bookingSlug` (taken), and `err.message` in that `UserInputError('Errors',
+{errors})` shape is the literal, useless word "Errors" (same gotcha `artist/new.tsx`/`staff/new.tsx`/
+`your-link.tsx` already worked around). Checked in that order, falling back to `err.message` only
+for a genuinely different failure (network error) that shape doesn't cover.
+
+No dedicated screen-level test, matching the established convention for Apollo-wired screens in
+this slice (X47 onward).
+
+Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean
+(including that `RegisterAccountMutation['registerAccount']` and `LoginMutation['login']` really
+are structurally interchangeable, per the selection-set duplication above), and the full
+`apps/mobile` Jest suite - 252/252 (unchanged from X54; no new test file, per the convention above).
+
 ### X54. Booking request field editor built on mobile - its own restricted screen, not FormBuilder
 
 Eighth slice off the mobile/web parity accounting (HANDOFF.md, 2026-09-04) - gap #10, "The custom

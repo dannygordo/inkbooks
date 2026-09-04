@@ -3632,6 +3632,13 @@ export type DeleteRecurringExpenseMutationVariables = Exact<{
 
 export type DeleteRecurringExpenseMutation = { __typename?: 'Mutation', deleteRecurringExpense: boolean };
 
+export type RegisterAccountMutationVariables = Exact<{
+  input: RegisterAccountInput;
+}>;
+
+
+export type RegisterAccountMutation = { __typename?: 'Mutation', registerAccount: { __typename?: 'User', id: string, email: string, firstName?: string | null, lastName?: string | null, avatar?: string | null, role: number, userType: string, tagColor?: string | null, themePreference?: string | null, accessToken: string, firebaseToken?: string | null, userInfo?: { __typename?: 'Artist', id: string, firstName: string, lastName: string, avatar?: string | null, hourlyRate?: number | null, shop?: { __typename?: 'Shop', id: string, name: string, website?: string | null } | null } | { __typename?: 'Client', id: string, firstName: string, lastName: string, avatar?: string | null } | { __typename?: 'Staff', id: string, firstName: string, lastName: string, avatar?: string | null, title?: string | null, shop?: { __typename?: 'Shop', id: string, name: string } | null } | null } };
+
 export type GetReminderSettingsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -9614,6 +9621,80 @@ export function useDeleteRecurringExpenseMutation(baseOptions?: Apollo.MutationH
 export type DeleteRecurringExpenseMutationHookResult = ReturnType<typeof useDeleteRecurringExpenseMutation>;
 export type DeleteRecurringExpenseMutationResult = Apollo.MutationResult<DeleteRecurringExpenseMutation>;
 export type DeleteRecurringExpenseMutationOptions = Apollo.BaseMutationOptions<DeleteRecurringExpenseMutation, DeleteRecurringExpenseMutationVariables>;
+export const RegisterAccountDocument = gql`
+    mutation RegisterAccount($input: RegisterAccountInput!) {
+  registerAccount(input: $input) {
+    id
+    email
+    firstName
+    lastName
+    avatar
+    role
+    userType
+    tagColor
+    themePreference
+    accessToken
+    firebaseToken
+    userInfo {
+      ... on Artist {
+        id
+        firstName
+        lastName
+        avatar
+        hourlyRate
+        shop {
+          id
+          name
+          website
+        }
+      }
+      ... on Client {
+        id
+        firstName
+        lastName
+        avatar
+      }
+      ... on Staff {
+        id
+        firstName
+        lastName
+        avatar
+        title
+        shop {
+          id
+          name
+        }
+      }
+    }
+  }
+}
+    `;
+export type RegisterAccountMutationFn = Apollo.MutationFunction<RegisterAccountMutation, RegisterAccountMutationVariables>;
+
+/**
+ * __useRegisterAccountMutation__
+ *
+ * To run a mutation, you first call `useRegisterAccountMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useRegisterAccountMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [registerAccountMutation, { data, loading, error }] = useRegisterAccountMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useRegisterAccountMutation(baseOptions?: Apollo.MutationHookOptions<RegisterAccountMutation, RegisterAccountMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<RegisterAccountMutation, RegisterAccountMutationVariables>(RegisterAccountDocument, options);
+      }
+export type RegisterAccountMutationHookResult = ReturnType<typeof useRegisterAccountMutation>;
+export type RegisterAccountMutationResult = Apollo.MutationResult<RegisterAccountMutation>;
+export type RegisterAccountMutationOptions = Apollo.BaseMutationOptions<RegisterAccountMutation, RegisterAccountMutationVariables>;
 export const GetReminderSettingsDocument = gql`
     query GetReminderSettings {
   getReminderSettings {

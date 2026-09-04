@@ -3140,10 +3140,18 @@ prior summary. Ranked roughly by how much it blocks ordinary daily use, most-blo
     now-generalized `utils/formBuilder.ts` `moveField`. `form/[id].tsx` still redirects a
     booking_request form back to the Forms list rather than to this new screen - see X54's own
     DECISIONS.md entry for why.
-11. **Registration/onboarding (`/register`) and first-time password set (`/set-password/:token`)
-    are web-only.** Lower practical priority than everything above - both are one-time flows
-    usually completed off a link before someone has the app installed at all - but worth naming
-    for completeness rather than silently assumed covered.
+11. ~~Registration/onboarding~~ - **done 2026-09-04 (X55), scoped to account creation only**: a
+    new `register.tsx` screen, reached from a new "Create a new account" link on `login.tsx`, ports
+    web's `Register.jsx` account-type-and-account-fields steps (accountType, shopName when shop,
+    firstName, lastName, email, password, confirmPassword, optional bookingSlug), then logs the new
+    account in and goes straight to Home. Web's three SKIPPABLE follow-up steps (notifications,
+    rates, shop cut) are deliberately not re-offered here - `settings/notifications.tsx` (X51),
+    `settings/rates.tsx` (X37), and `shop/[id].tsx` already cover all three once the account is
+    real, so a second wizard would just duplicate them. **First-time password set
+    (`/set-password/:token`) stays unbuilt** - not a new gap, X29 already covers this exact URL
+    (both the invite and reset purposes redeem through it): no mobile deep link is registered for
+    it, so the emailed link always opens the phone's browser regardless of whether a native screen
+    exists. See X55's own DECISIONS.md entry for the full reasoning on both halves.
 
 **Not gaps, by design, not by omission:** the client-facing portal (`ClientSettings.jsx`,
 `ClientDashboard.jsx`'s isSelf=true mode, the public guest-booking/guest-conversation/public-form
@@ -3214,9 +3222,17 @@ reached from a new "Edit Fields" action on the booking_request row in `forms/ind
 Up/Down-button reorder substitute as X30's generic FormBuilder, via a newly generalized
 `moveField<T>`. See X54's own DECISIONS.md entry.
 
-**Two items remain on the parity accounting above.** Gift cards (gap 5, needs Danny's own product
-call before it can be picked up as a build task) and registration/first-time password set (gap
-11). See that section for the full reasoning behind each one.
+**Registration (gap 11) is done too (2026-09-04, X55), scoped to account creation only** - a new
+`register.tsx` screen ports web's `Register.jsx` account-type-and-account-fields steps, then logs
+the new account in and goes to Home; the three skippable follow-up steps (notifications, rates,
+shop cut) are already reachable from Settings once the account exists, so they aren't re-offered
+in a second wizard here. First-time password set (`/set-password/:token`) stays unbuilt - not a
+new gap, X29 already covers this exact URL for the same missing-deep-link reason. See X55's own
+DECISIONS.md entry.
+
+**One item remains on the parity accounting above: gift cards (gap 5)**, which needs Danny's own
+product call before it can be picked up as a build task - see that section for the full reasoning.
+Every other named gap in the 2026-09-04 accounting is now closed.
 
 **0 and 1 below (the shop-admin migration, and a real Square payment) are explicitly deferred —
 reconfirmed 2026-08-25: Danny's plan is to pick this back up as the last item before starting the

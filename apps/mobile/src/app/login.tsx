@@ -98,6 +98,14 @@ export default function LoginScreen() {
             Forgot password?
           </ThemedText>
         </Pressable>
+
+        {/* Cold self-signup (gap #11, X55) - see register.tsx's own header comment. Mirrors web's
+            Login.jsx "Create a New Account" button, the only entry point into that flow there too. */}
+        <Pressable onPress={() => router.push('/register')} testID="create-account-link">
+          <ThemedText type="link" style={styles.forgotPassword}>
+            Create a new account
+          </ThemedText>
+        </Pressable>
       </SafeAreaView>
     </ThemedView>
   );
