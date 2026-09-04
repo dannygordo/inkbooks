@@ -8,6 +8,38 @@ Last updated: 2026-09-04.
 
 ---
 
+### 2026-09-04 (thirty-third entry): Booth rent - the artist's read-only "Your booth rent" card
+
+Next slice after the Settings/Messages follow-up list closed (thirty-second entry) - one of the
+two items left over from that list, picked over the other (`ShopConnectionPanel.jsx`) for having
+no confirm-dialog/native-alert design work and one screen it can fold straight into. Full
+reasoning: DECISIONS.md X45.
+
+Folded into `settings/rates.tsx`, not a new screen - same placement as web (Rates category, right
+after the rate fields). Renders nothing at all when `getBoothRentPlans` comes back empty, same as
+web's `BoothRentPanel.jsx`. New `packages/api/src/operations/boothRent.graphql`
+(`GetBoothRentPlans`/`GetBoothRentCharges`/`MarkBoothRentPaidManually` only - the shop-admin
+mutations aren't called from any mobile screen yet) - server-side, everything already existed, so
+client-operations-only.
+
+New `formatUtcMonthYear`/`formatUtcMonthDay` in `utils/utcDate.ts`, extending the module
+`formatUtcCalendarDate` already established rather than inlining two more UTC-safe date
+formatters - each gets its own test cases in `utcDate.test.ts`. Status label kept as fixed hex
+text color (matching `styles.error`'s `'#D33'` precedent) rather than adding a success/warning/
+info slot to `constants/theme.ts` or building a `Chip`-equivalent component for three short
+labels. Ordinal due-day suffix ("1st"/"2nd"/"3rd"/"...th") ported byte-for-byte from web, existing
+"21th" edge case included - a direct port, not a fix for a bug nobody has raised.
+
+This closes the last item named as its own future slice from the Settings/Messages follow-up work
+except `ShopConnectionPanel.jsx` itself, which remains open - see Next below.
+
+Confirmed in this sandbox: `packages/api` codegen + build clean (new `useGetBoothRentPlansQuery`/
+`useGetBoothRentChargesQuery`/`useMarkBoothRentPaidManuallyMutation` hooks), `apps/mobile`
+`tsc --noEmit` clean, full `apps/mobile` Jest suite - 233/233 (229 plus 4 new `utcDate.test.ts`
+cases). No server-side changes - all three operations already existed.
+
+---
+
 ### 2026-09-04 (thirty-second entry): Security - the audit trail (Settings/Messages follow-up list complete)
 
 Next slice from the Settings follow-up list, after Appearance (X43). Full reasoning: DECISIONS.md
@@ -2993,6 +3025,12 @@ executable bit, git skips it with a hint on stderr rather than an error — whic
   on whether that's worth fixing.
 
 ## Next
+
+**The mobile port's own active queue: `ShopConnectionPanel.jsx`** - an artist's own shop connect/
+disconnect/move flow, including a confirm-before-transfer dialog (web's `window.confirm` for
+disconnect, a custom modal for the transfer case - mobile has neither yet). The last item left
+from the Settings/Messages follow-up list (see the thirty-third entry above); everything else on
+that list, including Booth Rent, is done.
 
 **0 and 1 below (the shop-admin migration, and a real Square payment) are explicitly deferred —
 reconfirmed 2026-08-25: Danny's plan is to pick this back up as the last item before starting the

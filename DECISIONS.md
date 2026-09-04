@@ -2094,6 +2094,60 @@ for actually sharing it.
 `FORM_FIELD_TYPE_LABELS`/`formFieldTypeLabel`) - same "build the map directly, don't port
 `prettyConstantsListValue`" reasoning as `utils/projectStatus.ts` (X20).
 
+### X45. Booth rent - the artist's read-only "Your booth rent" card
+
+Next slice from X44's own follow-up list - the last of the two items named there as their own
+future slices (Booth Rent under X37, `ShopConnectionPanel.jsx` under X36). Picked first between
+the two: no confirm-before-transfer dialog or native-alert equivalent to design, a single
+read/mark-paid mutation, and it slots into a screen (`settings/rates.tsx`) that already exists,
+rather than needing one of its own. `ShopConnectionPanel.jsx` remains the one item left on that
+list.
+
+Direct port of apps/web's `BoothRentPanel.jsx` scope only - the artist's own read-only view of the
+flat-fee terms a shop admin set, plus marking a month paid. Setting the plan
+(`setBoothRentPlan`) and confirming payment (`confirmBoothRentPaid`) are shop-admin actions with no
+mobile screen to call them from yet, same as the web component itself never calling them.
+
+**Server-side, everything already existed** - `getBoothRentPlans`/`getBoothRentCharges`/
+`markBoothRentPaidManually` were already in `server/graphql/typeDefs.js`, so this is client-
+operations-only: new `packages/api/src/operations/boothRent.graphql`, field selections copied from
+`BoothRentService.js`'s own `PLAN_FIELDS`/`CHARGE_FIELDS` verbatim.
+
+**Folded into `settings/rates.tsx`, not a new screen or nav entry** - matches web exactly:
+`BoothRentPanel` renders inside the "Rates" settings category, directly after `RatesPanel`, not as
+its own category. Same RENDERS NOTHING behavior when `getBoothRentPlans` comes back empty - no
+hidden section, no "you're not on booth rent" message, checked with the same `boothRentPlans.length
+> 0` gate web's own component uses as its earliest return.
+
+**Two new small exported functions in `utils/utcDate.ts`, not a moment dependency** -
+`formatUtcMonthYear`/`formatUtcMonthDay`, same UTC-fields-not-local-fields technique
+`formatUtcCalendarDate` already established (X-prior work), different display shapes for
+`periodMonth` ("July 2026", matching web's `moment(periodMonth).utc().format("MMMM YYYY")`) and
+`dueDate` ("Jul 1", matching `moment(dueDate).utc().format("MMM D")`). Extending the existing
+module rather than inlining the calls, same "the technique is what's shared" reasoning that put
+`formatUtcCalendarDate` there in the first place - both new functions get their own test cases in
+`utcDate.test.ts`.
+
+**Ordinal due-day suffix ported byte-for-byte, bug included** - web's `BoothRentPanel.jsx` only
+special-cases 1st/2nd/3rd and falls through to "th" for everything else, so day 21 renders "21th"
+on both platforms. A direct port reproduces existing behavior; fixing an ordinal-suffix edge case
+nobody has raised is scope this slice was never asked for.
+
+**Status label/color kept as fixed hex text colors, not a new theme token or a `Chip`-equivalent
+component** - same call `styles.error`'s `'#D33'` already makes: `constants/theme.ts`'s `Colors`
+has no success/warning/info slot, and a status word reading the same color in light and dark mode
+is the correct behavior here, not a gap to fill in the shared theme system for one screen's three
+labels. No pill/badge background either - text color alone was enough to distinguish three short
+words in a row that already carries the full English label.
+
+**No screen-level test for `rates.tsx` itself** - matches every other Apollo-wired settings screen
+this port has shipped (X36/X37/X44 among others), same no-screen-level-test convention.
+
+Verification: `packages/api` codegen + build (new `useGetBoothRentPlansQuery`/
+`useGetBoothRentChargesQuery`/`useMarkBoothRentPaidManuallyMutation` hooks generated cleanly),
+`apps/mobile` `tsc --noEmit` clean, full Jest suite 233/233 (229 plus 4 new `utcDate.test.ts`
+cases, everything else unchanged).
+
 ### X44. Security - the audit trail
 
 Last slice in X31's own "roughly in order of likely value" list. Direct port of

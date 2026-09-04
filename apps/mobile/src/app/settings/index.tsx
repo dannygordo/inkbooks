@@ -79,8 +79,9 @@ import { getUserShopId } from '@/utils/user';
  * here, since it needs its own shop query and a forms query neither existing card needs.
  *
  * A "Rates" link (X37) routes any artist to `settings/rates.tsx` - what they charge, and, if
- * shop-connected, whose rate actually applies to their sessions. `BoothRentPanel`'s "your booth
- * rent" card is a real, separate feature with no existing mobile infrastructure - not folded in.
+ * shop-connected, whose rate actually applies to their sessions. That screen also carries
+ * `BoothRentPanel`'s "your booth rent" card as of X45 - a shop-set flat-fee readout, same
+ * placement as web's own Rates category.
  *
  * A "Messages" card (X38/X39/X40/X41) links to all four web panels - `settings/reminders.tsx`,
  * `settings/auto-responses.tsx`, `settings/response-time.tsx`, `settings/

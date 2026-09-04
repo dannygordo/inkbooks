@@ -2955,6 +2955,31 @@ export type GetPendingBookingRequestCountQueryVariables = Exact<{ [key: string]:
 
 export type GetPendingBookingRequestCountQuery = { __typename?: 'Query', getPendingBookingRequestCount: number };
 
+export type GetBoothRentPlansQueryVariables = Exact<{
+  artistId: Scalars['ID']['input'];
+  shopId: Scalars['ID']['input'];
+}>;
+
+
+export type GetBoothRentPlansQuery = { __typename?: 'Query', getBoothRentPlans: Array<{ __typename?: 'BoothRentPlan', id: string, artistId: string, shopId: string, amountCents: number, dueDayOfMonth: number, effectiveFrom: string, setByUserId: string, active: boolean, createdAt: string }> };
+
+export type GetBoothRentChargesQueryVariables = Exact<{
+  artistId?: InputMaybe<Scalars['ID']['input']>;
+  shopId?: InputMaybe<Scalars['ID']['input']>;
+  status?: InputMaybe<Scalars['String']['input']>;
+  page?: InputMaybe<PageInput>;
+}>;
+
+
+export type GetBoothRentChargesQuery = { __typename?: 'Query', getBoothRentCharges: { __typename?: 'BoothRentChargePage', items: Array<{ __typename?: 'BoothRentCharge', id: string, artistId: string, shopId: string, amountCents: number, periodMonth: string, dueDate: string, status: string, markedPaidAt?: string | null, markedPaidByUserId?: string | null, confirmedAt?: string | null, confirmedByUserId?: string | null, expenseId?: string | null, incomeId?: string | null, createdAt: string }>, pageInfo: { __typename?: 'PageInfo', totalCount: number, hasMore: boolean, limit: number, offset: number } } };
+
+export type MarkBoothRentPaidManuallyMutationVariables = Exact<{
+  boothRentChargeId: Scalars['ID']['input'];
+}>;
+
+
+export type MarkBoothRentPaidManuallyMutation = { __typename?: 'Mutation', markBoothRentPaidManually: { __typename?: 'BoothRentCharge', id: string, artistId: string, shopId: string, amountCents: number, periodMonth: string, dueDate: string, status: string, markedPaidAt?: string | null, markedPaidByUserId?: string | null, confirmedAt?: string | null, confirmedByUserId?: string | null, expenseId?: string | null, incomeId?: string | null, createdAt: string } };
+
 export type GetChargeQuoteQueryVariables = Exact<{
   appointmentId: Scalars['ID']['input'];
   applyFeeOffset?: InputMaybe<Scalars['Boolean']['input']>;
@@ -4889,6 +4914,176 @@ export type GetPendingBookingRequestCountQueryHookResult = ReturnType<typeof use
 export type GetPendingBookingRequestCountLazyQueryHookResult = ReturnType<typeof useGetPendingBookingRequestCountLazyQuery>;
 export type GetPendingBookingRequestCountSuspenseQueryHookResult = ReturnType<typeof useGetPendingBookingRequestCountSuspenseQuery>;
 export type GetPendingBookingRequestCountQueryResult = Apollo.QueryResult<GetPendingBookingRequestCountQuery, GetPendingBookingRequestCountQueryVariables>;
+export const GetBoothRentPlansDocument = gql`
+    query GetBoothRentPlans($artistId: ID!, $shopId: ID!) {
+  getBoothRentPlans(artistId: $artistId, shopId: $shopId) {
+    id
+    artistId
+    shopId
+    amountCents
+    dueDayOfMonth
+    effectiveFrom
+    setByUserId
+    active
+    createdAt
+  }
+}
+    `;
+
+/**
+ * __useGetBoothRentPlansQuery__
+ *
+ * To run a query within a React component, call `useGetBoothRentPlansQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetBoothRentPlansQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetBoothRentPlansQuery({
+ *   variables: {
+ *      artistId: // value for 'artistId'
+ *      shopId: // value for 'shopId'
+ *   },
+ * });
+ */
+export function useGetBoothRentPlansQuery(baseOptions: Apollo.QueryHookOptions<GetBoothRentPlansQuery, GetBoothRentPlansQueryVariables> & ({ variables: GetBoothRentPlansQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetBoothRentPlansQuery, GetBoothRentPlansQueryVariables>(GetBoothRentPlansDocument, options);
+      }
+export function useGetBoothRentPlansLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetBoothRentPlansQuery, GetBoothRentPlansQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetBoothRentPlansQuery, GetBoothRentPlansQueryVariables>(GetBoothRentPlansDocument, options);
+        }
+// @ts-ignore
+export function useGetBoothRentPlansSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetBoothRentPlansQuery, GetBoothRentPlansQueryVariables>): Apollo.UseSuspenseQueryResult<GetBoothRentPlansQuery, GetBoothRentPlansQueryVariables>;
+export function useGetBoothRentPlansSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetBoothRentPlansQuery, GetBoothRentPlansQueryVariables>): Apollo.UseSuspenseQueryResult<GetBoothRentPlansQuery | undefined, GetBoothRentPlansQueryVariables>;
+export function useGetBoothRentPlansSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetBoothRentPlansQuery, GetBoothRentPlansQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetBoothRentPlansQuery, GetBoothRentPlansQueryVariables>(GetBoothRentPlansDocument, options);
+        }
+export type GetBoothRentPlansQueryHookResult = ReturnType<typeof useGetBoothRentPlansQuery>;
+export type GetBoothRentPlansLazyQueryHookResult = ReturnType<typeof useGetBoothRentPlansLazyQuery>;
+export type GetBoothRentPlansSuspenseQueryHookResult = ReturnType<typeof useGetBoothRentPlansSuspenseQuery>;
+export type GetBoothRentPlansQueryResult = Apollo.QueryResult<GetBoothRentPlansQuery, GetBoothRentPlansQueryVariables>;
+export const GetBoothRentChargesDocument = gql`
+    query GetBoothRentCharges($artistId: ID, $shopId: ID, $status: String, $page: PageInput) {
+  getBoothRentCharges(
+    artistId: $artistId
+    shopId: $shopId
+    status: $status
+    page: $page
+  ) {
+    items {
+      id
+      artistId
+      shopId
+      amountCents
+      periodMonth
+      dueDate
+      status
+      markedPaidAt
+      markedPaidByUserId
+      confirmedAt
+      confirmedByUserId
+      expenseId
+      incomeId
+      createdAt
+    }
+    pageInfo {
+      totalCount
+      hasMore
+      limit
+      offset
+    }
+  }
+}
+    `;
+
+/**
+ * __useGetBoothRentChargesQuery__
+ *
+ * To run a query within a React component, call `useGetBoothRentChargesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetBoothRentChargesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetBoothRentChargesQuery({
+ *   variables: {
+ *      artistId: // value for 'artistId'
+ *      shopId: // value for 'shopId'
+ *      status: // value for 'status'
+ *      page: // value for 'page'
+ *   },
+ * });
+ */
+export function useGetBoothRentChargesQuery(baseOptions?: Apollo.QueryHookOptions<GetBoothRentChargesQuery, GetBoothRentChargesQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetBoothRentChargesQuery, GetBoothRentChargesQueryVariables>(GetBoothRentChargesDocument, options);
+      }
+export function useGetBoothRentChargesLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetBoothRentChargesQuery, GetBoothRentChargesQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetBoothRentChargesQuery, GetBoothRentChargesQueryVariables>(GetBoothRentChargesDocument, options);
+        }
+// @ts-ignore
+export function useGetBoothRentChargesSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetBoothRentChargesQuery, GetBoothRentChargesQueryVariables>): Apollo.UseSuspenseQueryResult<GetBoothRentChargesQuery, GetBoothRentChargesQueryVariables>;
+export function useGetBoothRentChargesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetBoothRentChargesQuery, GetBoothRentChargesQueryVariables>): Apollo.UseSuspenseQueryResult<GetBoothRentChargesQuery | undefined, GetBoothRentChargesQueryVariables>;
+export function useGetBoothRentChargesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetBoothRentChargesQuery, GetBoothRentChargesQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetBoothRentChargesQuery, GetBoothRentChargesQueryVariables>(GetBoothRentChargesDocument, options);
+        }
+export type GetBoothRentChargesQueryHookResult = ReturnType<typeof useGetBoothRentChargesQuery>;
+export type GetBoothRentChargesLazyQueryHookResult = ReturnType<typeof useGetBoothRentChargesLazyQuery>;
+export type GetBoothRentChargesSuspenseQueryHookResult = ReturnType<typeof useGetBoothRentChargesSuspenseQuery>;
+export type GetBoothRentChargesQueryResult = Apollo.QueryResult<GetBoothRentChargesQuery, GetBoothRentChargesQueryVariables>;
+export const MarkBoothRentPaidManuallyDocument = gql`
+    mutation MarkBoothRentPaidManually($boothRentChargeId: ID!) {
+  markBoothRentPaidManually(boothRentChargeId: $boothRentChargeId) {
+    id
+    artistId
+    shopId
+    amountCents
+    periodMonth
+    dueDate
+    status
+    markedPaidAt
+    markedPaidByUserId
+    confirmedAt
+    confirmedByUserId
+    expenseId
+    incomeId
+    createdAt
+  }
+}
+    `;
+export type MarkBoothRentPaidManuallyMutationFn = Apollo.MutationFunction<MarkBoothRentPaidManuallyMutation, MarkBoothRentPaidManuallyMutationVariables>;
+
+/**
+ * __useMarkBoothRentPaidManuallyMutation__
+ *
+ * To run a mutation, you first call `useMarkBoothRentPaidManuallyMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useMarkBoothRentPaidManuallyMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [markBoothRentPaidManuallyMutation, { data, loading, error }] = useMarkBoothRentPaidManuallyMutation({
+ *   variables: {
+ *      boothRentChargeId: // value for 'boothRentChargeId'
+ *   },
+ * });
+ */
+export function useMarkBoothRentPaidManuallyMutation(baseOptions?: Apollo.MutationHookOptions<MarkBoothRentPaidManuallyMutation, MarkBoothRentPaidManuallyMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<MarkBoothRentPaidManuallyMutation, MarkBoothRentPaidManuallyMutationVariables>(MarkBoothRentPaidManuallyDocument, options);
+      }
+export type MarkBoothRentPaidManuallyMutationHookResult = ReturnType<typeof useMarkBoothRentPaidManuallyMutation>;
+export type MarkBoothRentPaidManuallyMutationResult = Apollo.MutationResult<MarkBoothRentPaidManuallyMutation>;
+export type MarkBoothRentPaidManuallyMutationOptions = Apollo.BaseMutationOptions<MarkBoothRentPaidManuallyMutation, MarkBoothRentPaidManuallyMutationVariables>;
 export const GetChargeQuoteDocument = gql`
     query GetChargeQuote($appointmentId: ID!, $applyFeeOffset: Boolean, $tipCents: Int, $subtotalCentsOverride: Int) {
   getChargeQuote(

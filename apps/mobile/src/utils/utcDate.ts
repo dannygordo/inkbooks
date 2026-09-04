@@ -16,3 +16,27 @@ export function formatUtcCalendarDate(iso: string): string {
 		timeZone: 'UTC',
 	});
 }
+
+// Same UTC-fields-not-local-fields technique as formatUtcCalendarDate, different display shape -
+// BoothRentPanel's periodMonth is a whole-month value (always the 1st) where showing a day number
+// at all would be misleading, matching web's own `moment(periodMonth).utc().format("MMMM YYYY")`.
+// See settings/rates.tsx's booth rent section (DECISIONS.md X45).
+export function formatUtcMonthYear(iso: string): string {
+	return new Date(iso).toLocaleDateString('en-US', {
+		month: 'long',
+		year: 'numeric',
+		timeZone: 'UTC',
+	});
+}
+
+// Same technique again, no year - BoothRentPanel's due-date column ("due Jul 1"), matching web's
+// own `moment(dueDate).utc().format("MMM D")`. Not formatUtcCalendarDate: that always includes a
+// year, which web's own due-date column deliberately omits (the period column right next to it
+// already carries the year).
+export function formatUtcMonthDay(iso: string): string {
+	return new Date(iso).toLocaleDateString('en-US', {
+		month: 'short',
+		day: 'numeric',
+		timeZone: 'UTC',
+	});
+}
