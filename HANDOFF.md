@@ -8,6 +8,31 @@ Last updated: 2026-09-04.
 
 ---
 
+### 2026-09-04 (thirty-fourth entry): ShopConnectionPanel - an artist's own shop connect/disconnect/move flow
+
+Last item from the Settings/Messages follow-up list (thirty-third entry above named this as the
+one remaining item after Booth Rent). Full reasoning: DECISIONS.md X46.
+
+Folded into `settings/shop.tsx` alongside the existing shop-admin money panel, each gated
+separately now (admin-with-shop for the money section, any artist at all for the connection
+section). Widened `settings/index.tsx`'s "Shop" nav link from admin-with-shop to any artist, since
+an independent artist or a non-admin shop-connected artist could never reach this screen under the
+old gate. New `ConnectArtistToShop`/`DisconnectArtistFromShop`/`GetShopForConnection` operations in
+`artistShopConnections.graphql`; `login.graphql`'s `Artist.shop` selection gained `website`.
+
+Both of web's confirmation dialogs (a `window.confirm` for disconnect, a custom backdrop-and-modal
+for the shop-transfer case) became native `Alert.alert` calls, matching `ArchiveControl.tsx`'s own
+established precedent for this - no ported dialog markup, no `pendingTransfer` render state.
+
+This closes the Settings/Messages follow-up list in full - every item from X31's original list,
+including both of X44's own named leftovers, is done.
+
+Confirmed in this sandbox: `packages/api` codegen + build clean (new mutation/lazy-query hooks,
+widened `Login` response type), `apps/mobile` `tsc --noEmit` clean, full `apps/mobile` Jest suite -
+still 233/233. No server-side changes - all three operations already existed.
+
+---
+
 ### 2026-09-04 (thirty-third entry): Booth rent - the artist's read-only "Your booth rent" card
 
 Next slice after the Settings/Messages follow-up list closed (thirty-second entry) - one of the
@@ -3026,11 +3051,13 @@ executable bit, git skips it with a hint on stderr rather than an error — whic
 
 ## Next
 
-**The mobile port's own active queue: `ShopConnectionPanel.jsx`** - an artist's own shop connect/
-disconnect/move flow, including a confirm-before-transfer dialog (web's `window.confirm` for
-disconnect, a custom modal for the transfer case - mobile has neither yet). The last item left
-from the Settings/Messages follow-up list (see the thirty-third entry above); everything else on
-that list, including Booth Rent, is done.
+**The Settings/Messages follow-up list (X31, and everything it spawned through X46) is done in
+full** - Booth Rent and `ShopConnectionPanel.jsx`, the two items left after the thirty-second
+entry, both shipped (thirty-third and thirty-fourth entries above). No named mobile-port slice is
+currently queued; the deferred items below (0 and 1) are what's left before the app could take
+real money, and Danny's plan is to hold those until mobile is otherwise complete rather than start
+them early. The next mobile-port slice, when one is picked, should be chosen fresh against
+`PRODUCTION_ROADMAP.md` and web's own feature set rather than assumed from this list.
 
 **0 and 1 below (the shop-admin migration, and a real Square payment) are explicitly deferred —
 reconfirmed 2026-08-25: Danny's plan is to pick this back up as the last item before starting the

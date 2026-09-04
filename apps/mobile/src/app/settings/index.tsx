@@ -33,7 +33,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { deleteFile } from '@/firebase/deleteFile';
 import { uploadFileWithProgress } from '@/firebase/uploadFile';
 import { hasAuditAuthority } from '@/utils/businessScope';
-import { canManageBusinessLedger, isShopAdminOrBetter } from '@/utils/permissions';
+import { canManageBusinessLedger } from '@/utils/permissions';
 import { avatarFolder, previousAvatarUrl } from '@/utils/avatar';
 import { formatCents, basisPointsToPercent, dollarsToCents, percentToBasisPoints } from '@/utils/money';
 import { formatImagePathForFirebaseStorage } from '@/utils/imagePath';
@@ -73,10 +73,12 @@ import { getUserShopId } from '@/utils/user';
  * here returns to this same screen via `inkbooks://settings?square=<status>` - the `square` param
  * this screen reads below closes the one follow-up X33 named as still open.
  *
- * A "Shop" link (X36) below routes shop-admins to `settings/shop.tsx` - the shop-cut-percent
- * editor named directly in shop/[id].tsx's own ShopCutCard comment (X24), plus the shop's own
- * form-link handle and its shop-wide form links list. Kept as its own screen, not a third card
- * here, since it needs its own shop query and a forms query neither existing card needs.
+ * A "Shop" link routes any artist to `settings/shop.tsx` - the shop-cut-percent editor named
+ * directly in shop/[id].tsx's own ShopCutCard comment (X24, built X36), plus, for any artist
+ * regardless of admin status (X46), their own shop connect/disconnect/move flow. Widened from
+ * `isShopAdminOrBetter(user) && shopId` to `user.userType === 'artist'` under X46 - an
+ * independent artist with no shop, and a plain shop-connected artist who isn't an admin, both
+ * need to reach this screen now, and neither would clear the old admin-only gate.
  *
  * A "Rates" link (X37) routes any artist to `settings/rates.tsx` - what they charge, and, if
  * shop-connected, whose rate actually applies to their sessions. That screen also carries
@@ -365,11 +367,12 @@ export default function SettingsScreen() {
             </View>
           ) : null}
 
-          {isShopAdminOrBetter(user) && shopId ? (
+          {user.userType === 'artist' ? (
             <View style={styles.card}>
               <ThemedText type="smallBold">Shop</ThemedText>
               <ThemedText type="small" themeColor="textSecondary">
-                The shop cut percentage and the shop's own form-link handle.
+                Your shop connection, and, if you admin a shop, its cut percentage and form-link
+                handle.
               </ThemedText>
               <View style={styles.linkList}>
                 <Button

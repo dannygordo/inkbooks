@@ -2094,6 +2094,66 @@ for actually sharing it.
 `FORM_FIELD_TYPE_LABELS`/`formFieldTypeLabel`) - same "build the map directly, don't port
 `prettyConstantsListValue`" reasoning as `utils/projectStatus.ts` (X20).
 
+### X46. ShopConnectionPanel - an artist's own shop connect/disconnect/move flow
+
+Last item from the Settings/Messages follow-up list (X44's own closing note named this as the one
+remaining item after Booth Rent, X45). Direct port of apps/web's `ShopConnectionPanel.jsx`: any
+artist connects to a shop by ID, disconnects, or moves to a different shop - independent of
+whether they admin one.
+
+**Folded into `settings/shop.tsx`, not a new screen** - same reasoning as Booth Rent going into
+`rates.tsx`: web renders `ShopConnectionPanel` inside the same "Shop" settings category as
+`ShopPanel` (`settingsCategories.jsx`), just gated differently (`ShopPanel` to a shop admin with a
+shop, `ShopConnectionPanel` to any artist at all). One screen, two independently-gated sections.
+
+**Widened `settings/index.tsx`'s "Shop" nav gate from `isShopAdminOrBetter(user) && shopId` to
+`user.userType === 'artist'`.** This is the one change here that reaches outside the new feature's
+own files: the old gate meant an independent artist, or a plain shop-connected artist who isn't an
+admin, could never open `settings/shop.tsx` at all - neither has a shopId an admin-only check
+would accept, and the independent case has no shopId whatsoever. `shop.tsx` itself gates its two
+sections separately now (`showShopMoneyPanel = isShopAdminOrBetter(user) && Boolean(shopId)` for
+the admin block, `isArtist` alone for the connection block), matching web's own per-component
+gating rather than one screen-wide check.
+
+**`ArtistShopConnectionService.js`'s two mutations got real operation names for this port**
+(`ConnectArtistToShop`/`DisconnectArtistFromShop`) - web's own `gql` tags are anonymous, which
+`useMutation(TAG)` doesn't care about but generated named hooks need. New
+`GetShopForConnection($shopId: ID!)` matches `ShopService.js`'s own `useLazyShop` exactly (id/
+name/website only) - fired once, right after a successful connect, to get display fields
+`connectArtistToShop`'s own response doesn't carry.
+
+**`login.graphql`'s `Artist.shop` selection gained `website`.** Mobile's cached `CurrentUser` type
+had never carried it (nothing read it before this screen), so there was nowhere to put the value
+`GetShopForConnection` fetches after a connect, or to read back for an already-connected artist
+without a second round trip on every settings visit. Staff's own `shop` selection was left alone -
+no Staff-facing screen reads it.
+
+**Both confirmations use RN's native `Alert.alert`, not a ported custom dialog** - same call
+`components/ArchiveControl.tsx` already made (its own header comment: "a native alert is the
+idiomatic RN equivalent of a modal confirm and needs no bespoke styling"). Web's disconnect
+confirm (`window.confirm`, one line) and its transfer confirm (a custom backdrop-and-dialog
+component with both shop names and a reassurance paragraph) both collapse into one `Alert.alert`
+call each - the transfer case fits its entire message (both shop names, the "will end that
+connection" warning, the "past appointments... stay exactly as they are" line) into
+`Alert.alert`'s single message string, so this port carries **no `pendingTransfer` render
+state at all** - web's own JSX-dialog approach has no mobile equivalent to build, only a mutation
+retry to wire into a button's `onPress`.
+
+**Two independent try/catch paths, not one shared error state feeding both forms** - `handleConnectToShop`'s
+own `shopActionError` state serves the inline first-connect-attempt form AND the inline
+move-to-a-different-shop form (only one is ever mounted at a time, same as web), while the
+transfer-confirmed retry's failure surfaces through the same state via the `Alert.alert` Continue
+button's own `.catch`, matching web's `handleConfirmTransfer` clearing `pendingTransfer` and
+setting the same error state on a failed confirmed retry.
+
+Verification: `packages/api` codegen + build clean (new `useConnectArtistToShopMutation`/
+`useDisconnectArtistFromShopMutation`/`useGetShopForConnectionLazyQuery` hooks, widened `Login`
+type), `apps/mobile` `tsc --noEmit` clean, full Jest suite 233/233 (unchanged - no new pure-logic
+module, matching every other settings screen's no-screen-level-test convention).
+
+This closes the Settings/Messages follow-up list in full - both items X44 named as left over
+(Booth Rent, X45; `ShopConnectionPanel.jsx`, this entry) are now done.
+
 ### X45. Booth rent - the artist's read-only "Your booth rent" card
 
 Next slice from X44's own follow-up list - the last of the two items named there as their own

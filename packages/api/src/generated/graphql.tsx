@@ -2868,6 +2868,30 @@ export type GetArtistShopConnectionsQueryVariables = Exact<{
 
 export type GetArtistShopConnectionsQuery = { __typename?: 'Query', getArtistShopConnections?: Array<{ __typename?: 'ArtistShopConnection', id: string, artistId: string, shopId: string, status: string, rateSource: string } | null> | null };
 
+export type ConnectArtistToShopMutationVariables = Exact<{
+  artistId: Scalars['ID']['input'];
+  shopId: Scalars['ID']['input'];
+  confirmTransfer?: InputMaybe<Scalars['Boolean']['input']>;
+}>;
+
+
+export type ConnectArtistToShopMutation = { __typename?: 'Mutation', connectArtistToShop: { __typename?: 'ArtistShopConnection', id: string, artistId: string, shopId: string, status: string } };
+
+export type DisconnectArtistFromShopMutationVariables = Exact<{
+  artistId: Scalars['ID']['input'];
+  shopId: Scalars['ID']['input'];
+}>;
+
+
+export type DisconnectArtistFromShopMutation = { __typename?: 'Mutation', disconnectArtistFromShop: { __typename?: 'ArtistShopConnection', id: string, artistId: string, shopId: string, status: string } };
+
+export type GetShopForConnectionQueryVariables = Exact<{
+  shopId: Scalars['ID']['input'];
+}>;
+
+
+export type GetShopForConnectionQuery = { __typename?: 'Query', getShop?: { __typename?: 'Shop', id: string, name: string, website?: string | null } | null };
+
 export type GetArtistsListQueryVariables = Exact<{
   includeArchived?: InputMaybe<Scalars['Boolean']['input']>;
   page?: InputMaybe<PageInput>;
@@ -3310,7 +3334,7 @@ export type LoginMutationVariables = Exact<{
 }>;
 
 
-export type LoginMutation = { __typename?: 'Mutation', login: { __typename?: 'User', id: string, email: string, firstName?: string | null, lastName?: string | null, avatar?: string | null, role: number, userType: string, tagColor?: string | null, themePreference?: string | null, accessToken: string, firebaseToken?: string | null, userInfo?: { __typename?: 'Artist', id: string, firstName: string, lastName: string, avatar?: string | null, hourlyRate?: number | null, shop?: { __typename?: 'Shop', id: string, name: string } | null } | { __typename?: 'Client', id: string, firstName: string, lastName: string, avatar?: string | null } | { __typename?: 'Staff', id: string, firstName: string, lastName: string, avatar?: string | null, title?: string | null, shop?: { __typename?: 'Shop', id: string, name: string } | null } | null } };
+export type LoginMutation = { __typename?: 'Mutation', login: { __typename?: 'User', id: string, email: string, firstName?: string | null, lastName?: string | null, avatar?: string | null, role: number, userType: string, tagColor?: string | null, themePreference?: string | null, accessToken: string, firebaseToken?: string | null, userInfo?: { __typename?: 'Artist', id: string, firstName: string, lastName: string, avatar?: string | null, hourlyRate?: number | null, shop?: { __typename?: 'Shop', id: string, name: string, website?: string | null } | null } | { __typename?: 'Client', id: string, firstName: string, lastName: string, avatar?: string | null } | { __typename?: 'Staff', id: string, firstName: string, lastName: string, avatar?: string | null, title?: string | null, shop?: { __typename?: 'Shop', id: string, name: string } | null } | null } };
 
 export type GetConversationsByMemberIdQueryVariables = Exact<{
   memberId: Scalars['ID']['input'];
@@ -4324,6 +4348,130 @@ export type GetArtistShopConnectionsQueryHookResult = ReturnType<typeof useGetAr
 export type GetArtistShopConnectionsLazyQueryHookResult = ReturnType<typeof useGetArtistShopConnectionsLazyQuery>;
 export type GetArtistShopConnectionsSuspenseQueryHookResult = ReturnType<typeof useGetArtistShopConnectionsSuspenseQuery>;
 export type GetArtistShopConnectionsQueryResult = Apollo.QueryResult<GetArtistShopConnectionsQuery, GetArtistShopConnectionsQueryVariables>;
+export const ConnectArtistToShopDocument = gql`
+    mutation ConnectArtistToShop($artistId: ID!, $shopId: ID!, $confirmTransfer: Boolean) {
+  connectArtistToShop(
+    artistId: $artistId
+    shopId: $shopId
+    confirmTransfer: $confirmTransfer
+  ) {
+    id
+    artistId
+    shopId
+    status
+  }
+}
+    `;
+export type ConnectArtistToShopMutationFn = Apollo.MutationFunction<ConnectArtistToShopMutation, ConnectArtistToShopMutationVariables>;
+
+/**
+ * __useConnectArtistToShopMutation__
+ *
+ * To run a mutation, you first call `useConnectArtistToShopMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useConnectArtistToShopMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [connectArtistToShopMutation, { data, loading, error }] = useConnectArtistToShopMutation({
+ *   variables: {
+ *      artistId: // value for 'artistId'
+ *      shopId: // value for 'shopId'
+ *      confirmTransfer: // value for 'confirmTransfer'
+ *   },
+ * });
+ */
+export function useConnectArtistToShopMutation(baseOptions?: Apollo.MutationHookOptions<ConnectArtistToShopMutation, ConnectArtistToShopMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<ConnectArtistToShopMutation, ConnectArtistToShopMutationVariables>(ConnectArtistToShopDocument, options);
+      }
+export type ConnectArtistToShopMutationHookResult = ReturnType<typeof useConnectArtistToShopMutation>;
+export type ConnectArtistToShopMutationResult = Apollo.MutationResult<ConnectArtistToShopMutation>;
+export type ConnectArtistToShopMutationOptions = Apollo.BaseMutationOptions<ConnectArtistToShopMutation, ConnectArtistToShopMutationVariables>;
+export const DisconnectArtistFromShopDocument = gql`
+    mutation DisconnectArtistFromShop($artistId: ID!, $shopId: ID!) {
+  disconnectArtistFromShop(artistId: $artistId, shopId: $shopId) {
+    id
+    artistId
+    shopId
+    status
+  }
+}
+    `;
+export type DisconnectArtistFromShopMutationFn = Apollo.MutationFunction<DisconnectArtistFromShopMutation, DisconnectArtistFromShopMutationVariables>;
+
+/**
+ * __useDisconnectArtistFromShopMutation__
+ *
+ * To run a mutation, you first call `useDisconnectArtistFromShopMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useDisconnectArtistFromShopMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [disconnectArtistFromShopMutation, { data, loading, error }] = useDisconnectArtistFromShopMutation({
+ *   variables: {
+ *      artistId: // value for 'artistId'
+ *      shopId: // value for 'shopId'
+ *   },
+ * });
+ */
+export function useDisconnectArtistFromShopMutation(baseOptions?: Apollo.MutationHookOptions<DisconnectArtistFromShopMutation, DisconnectArtistFromShopMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<DisconnectArtistFromShopMutation, DisconnectArtistFromShopMutationVariables>(DisconnectArtistFromShopDocument, options);
+      }
+export type DisconnectArtistFromShopMutationHookResult = ReturnType<typeof useDisconnectArtistFromShopMutation>;
+export type DisconnectArtistFromShopMutationResult = Apollo.MutationResult<DisconnectArtistFromShopMutation>;
+export type DisconnectArtistFromShopMutationOptions = Apollo.BaseMutationOptions<DisconnectArtistFromShopMutation, DisconnectArtistFromShopMutationVariables>;
+export const GetShopForConnectionDocument = gql`
+    query GetShopForConnection($shopId: ID!) {
+  getShop(shopId: $shopId) {
+    id
+    name
+    website
+  }
+}
+    `;
+
+/**
+ * __useGetShopForConnectionQuery__
+ *
+ * To run a query within a React component, call `useGetShopForConnectionQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetShopForConnectionQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetShopForConnectionQuery({
+ *   variables: {
+ *      shopId: // value for 'shopId'
+ *   },
+ * });
+ */
+export function useGetShopForConnectionQuery(baseOptions: Apollo.QueryHookOptions<GetShopForConnectionQuery, GetShopForConnectionQueryVariables> & ({ variables: GetShopForConnectionQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetShopForConnectionQuery, GetShopForConnectionQueryVariables>(GetShopForConnectionDocument, options);
+      }
+export function useGetShopForConnectionLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetShopForConnectionQuery, GetShopForConnectionQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetShopForConnectionQuery, GetShopForConnectionQueryVariables>(GetShopForConnectionDocument, options);
+        }
+// @ts-ignore
+export function useGetShopForConnectionSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetShopForConnectionQuery, GetShopForConnectionQueryVariables>): Apollo.UseSuspenseQueryResult<GetShopForConnectionQuery, GetShopForConnectionQueryVariables>;
+export function useGetShopForConnectionSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetShopForConnectionQuery, GetShopForConnectionQueryVariables>): Apollo.UseSuspenseQueryResult<GetShopForConnectionQuery | undefined, GetShopForConnectionQueryVariables>;
+export function useGetShopForConnectionSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetShopForConnectionQuery, GetShopForConnectionQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetShopForConnectionQuery, GetShopForConnectionQueryVariables>(GetShopForConnectionDocument, options);
+        }
+export type GetShopForConnectionQueryHookResult = ReturnType<typeof useGetShopForConnectionQuery>;
+export type GetShopForConnectionLazyQueryHookResult = ReturnType<typeof useGetShopForConnectionLazyQuery>;
+export type GetShopForConnectionSuspenseQueryHookResult = ReturnType<typeof useGetShopForConnectionSuspenseQuery>;
+export type GetShopForConnectionQueryResult = Apollo.QueryResult<GetShopForConnectionQuery, GetShopForConnectionQueryVariables>;
 export const GetArtistsListDocument = gql`
     query GetArtistsList($includeArchived: Boolean, $page: PageInput) {
   getArtists(includeArchived: $includeArchived, page: $page) {
@@ -7395,6 +7543,7 @@ export const LoginDocument = gql`
         shop {
           id
           name
+          website
         }
       }
       ... on Client {

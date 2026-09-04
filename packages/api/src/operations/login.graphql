@@ -6,6 +6,12 @@
 # on Artist/Staff now even though nothing reads it yet, since every shop-scoped query the
 # appointments screen needs next (Phase 2) needs it and re-running codegen for one extra field
 # later is pure overhead.
+#
+# Artist.shop also selects `website` now (X46) - settings/shop.tsx's ShopConnectionPanel port
+# needs it to show the connected shop's website without a second round trip, and
+# updateCurrentUser's post-connect cache write needs somewhere on CurrentUser to put the value
+# GetShopForConnection just fetched. Staff.shop does NOT get the same field - no Staff-facing
+# screen reads it, matching this file's own "add a field only once something reads it" restraint.
 mutation Login($email: String!, $password: String!) {
 	login(email: $email, password: $password) {
 		id
@@ -29,6 +35,7 @@ mutation Login($email: String!, $password: String!) {
 				shop {
 					id
 					name
+					website
 				}
 			}
 			... on Client {
