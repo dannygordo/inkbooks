@@ -92,13 +92,34 @@ beforeEach(() => {
 	vi.clearAllMocks();
 });
 
+// CORRECTION (2026-09-04, found running npm test for real): this test used to call renderPanel()
+// directly, with no setupHook() first, and asserted AnalyticsService.getShopAnalytics was NEVER
+// called. Both are wrong. ShopAnalyticsPanel.jsx calls
+// `AnalyticsService.getShopAnalytics(shopId, range)` unconditionally, on every render, before its
+// own `if (!shopId)` check even runs - it has to, since the real implementation
+// (services/AnalyticsService.js's _getShopAnalytics) is a thin wrapper around Apollo's useQuery,
+// and Rules of Hooks forbid calling a hook conditionally. useQuery's own `skip: !shopId || !range`
+// option is what actually suppresses the network request when there's no shopId - the hook itself
+// still gets called and still returns a real (just query-less) result. Without setupHook(), the
+// mocked getShopAnalytics has no return value configured, so destructuring
+// `const { data, loading, error } = AnalyticsService.getShopAnalytics(...)` threw
+// "Cannot destructure property 'data' of ... undefined" before the component ever reached its
+// no-shopId branch - a crash the "not.toHaveBeenCalled" assertion right below it could never have
+// been reached to contradict. Calling setupHook() first (its defaults are harmless here - the
+// component returns before ever reading `data`) and asserting the call that DOES happen, with the
+// arguments that document why no network request follows it, is what actually matches how the real
+// hook behaves.
 it("shows a message and no query at all when there is no shopId", () => {
+	setupHook();
 	renderPanel({ shopId: null });
 
 	expect(
 		screen.getByText("You aren't connected to a shop yet, so there are no shop-wide figures to show."),
 	).toBeInTheDocument();
-	expect(AnalyticsService.getShopAnalytics).not.toHaveBeenCalled();
+	// The real getShopAnalytics is always called (Rules of Hooks) - it's useQuery's own
+	// `skip: !shopId` that keeps a null shopId from ever reaching the network, not the component
+	// declining to call the hook.
+	expect(AnalyticsService.getShopAnalytics).toHaveBeenCalledWith(null, expect.any(Object));
 });
 
 it("shows a page loader while loading with nothing cached yet", () => {

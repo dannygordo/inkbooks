@@ -3855,6 +3855,64 @@ backward between the two calls to actually simulate that race. And `apps/web`'s
 is true and at least one artist row renders, because both labels appear as a shop-wide stat AND a
 per-artist column header; switched to `getAllByText(...).toHaveLength(2)`.
 
+### PR4. Web component tests that mock a hook wrapping Apollo's `useQuery`/`useMutation` must give
+it a return value on every render path, and must let a deliberately-delayed mutation finish before
+the test ends
+
+Discovered 2026-09-04 immediately after PR3's fix round, from the very next real `npm test` output:
+fixing `ShopAnalyticsPanel.test.jsx`'s ambiguous "Revenue"/"Tips" match (PR3's own entry) unmasked a
+second, previously-hidden failure in the same file, and a separate unhandled rejection surfaced in
+`GuestConversation.test.jsx` that had apparently been silently there all along. Both are the web
+suite's own version of "the mock doesn't behave like the real thing" - not the CJS issue above
+(this is genuine ESM, `vi.mock()` works correctly here), but the same underlying lesson: know what
+the real dependency actually does before deciding what the mock owes the test.
+
+**`ShopAnalyticsPanel.test.jsx`'s "shows a message... when there is no shopId" test** rendered the
+panel with `shopId: null` *without* calling `setupHook()` first, and asserted
+`AnalyticsService.getShopAnalytics` was never called. Both were wrong. The real
+`_getShopAnalytics` (`services/AnalyticsService.js`) is a thin wrapper around Apollo's `useQuery`
+with `skip: !shopId || !range` - and Rules of Hooks forbid calling a hook conditionally, so
+`ShopAnalyticsPanel.jsx` calls `AnalyticsService.getShopAnalytics(shopId, range)` unconditionally,
+on every render, before its own `if (!shopId)` branch even runs. `skip` is what suppresses the
+*network request*, not the component declining to call the hook. With no `setupHook()`, the mocked
+function had no return value configured, so destructuring `const { data, loading, error } = ...`
+threw before the component ever reached its no-shopId branch - a crash the very next line's
+assertion could never have been reached to contradict. Fixed by calling `setupHook()` first (its
+defaults are harmless here since the component returns before ever reading `data`) and asserting
+the call that actually happens: `toHaveBeenCalledWith(null, expect.any(Object))`.
+
+**The rule this generalizes to**: any test file mocking a component's Apollo-hook-wrapping service
+call (this codebase's own established convention - see this file's header comment on why
+`AnalyticsService` is mocked directly rather than hand-built as `MockedProvider` GraphQL mocks) must
+configure that mock's return value before rendering, on *every* code path being tested, including
+one meant to short-circuit before the data is used - because the real hook is called regardless of
+which branch follows it. A bare `vi.fn()` with no `mockReturnValue` returns `undefined`, and a
+real `useQuery`/`useMutation` never does.
+
+**`GuestConversation.test.jsx`'s "disables the Send button while the mutation is in flight" test**
+registered a mutation mock with `delay: 50` so the button would still be showing `sending` when the
+assertion ran, then ended the test right there - never registering a mock for the `refetch()` that
+`onCompleted()` fires once that delayed mutation resolves, and never waiting for either to actually
+settle. The mutation kept running after the test (and eventually the whole file) finished, and once
+Vitest tore down jsdom, the mutation's resolution called `onCompleted()` → `setSendError(null)` /
+`refetch()`, which tried to schedule a React update against a `window` that no longer existed -
+`ReferenceError: window is not defined`, an unhandled rejection Vitest reported as counted separately
+from the file's pass/fail tally ("might cause false positive tests"), which is exactly why it had
+gone unnoticed even though this test predates this fix round. **This is not a
+`GuestConversation.jsx` bug** - in a real browser tab, `window` survives a component unmount, so the
+component's own existing defensive comment ("setSendError/refetch don't touch the DOM, so they're
+safe to run either way") holds in production. It only breaks when a *test* leaves a delayed async
+operation running past the point where the test framework tears down its environment. Fixed by
+adding the missing `tokenMock` for the triggered refetch and awaiting the button's return to enabled
+(`await waitFor(() => expect(sendButton).not.toBeDisabled())`) before the test ends.
+
+**The rule this generalizes to**: a test that deliberately delays a mock (to observe a pending/
+in-flight UI state) owns that delay - it must wait for the delayed operation, and anything it
+triggers on completion (a `refetch()`, a chained mutation), to fully settle before the test returns,
+with a matching mock registered for whatever that completion fires. Ending the test while a timer or
+promise it created is still pending leaves it free to resolve during a *later* test or file's run,
+attributing a failure to the wrong place at best and silently corrupting jsdom teardown at worst.
+
 ---
 
 ## Sequencing

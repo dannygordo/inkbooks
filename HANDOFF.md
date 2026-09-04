@@ -8,6 +8,42 @@ Last updated: 2026-09-04.
 
 ---
 
+### 2026-09-04 (thirty-seventh entry): the web suite's X72 fix unmasked a second, real bug in the same file, plus a genuine unhandled-rejection flake elsewhere - both fixed
+
+Danny re-ran `npm test` in `apps/web/` after X72. The `ShopAnalyticsPanel.test.jsx` fix landed
+(the "Revenue"/"Tips" ambiguous-match test now passes), which is exactly what let the file's
+*second* failure become visible on its own for the first time - confirming the thirty-sixth entry's
+hedge that the original "Tests 2 failed" summary might not have been the same test's two assertions
+after all. Down to "Tests 1 failed | 2164 passed (2165)", plus one separate unhandled rejection
+Vitest flagged in a different file. Full technical writeup for both: DECISIONS.md PR4.
+
+**The remaining web failure**, `ShopAnalyticsPanel.test.jsx`'s "shows a message and no query at all
+when there is no shopId" test, rendered the panel with a null `shopId` without first configuring
+its `AnalyticsService.getShopAnalytics` mock, and asserted that mock was never called. Both were
+wrong: the real service wraps Apollo's `useQuery` with `skip: !shopId`, and Rules of Hooks mean the
+component calls it on every render regardless of `shopId` - `skip` is what suppresses the network
+request, not the component skipping the call. The unconfigured mock returned `undefined`, and
+destructuring it crashed before the component's own no-shopId branch, and thus before the (also
+wrong) assertion below it, ever ran. Fixed by configuring the mock first and asserting the call
+that actually happens.
+
+**The unhandled rejection**, in `GuestConversation.test.jsx`'s "disables the Send button while the
+mutation is in flight" test, was a real, if latent, gap: that test deliberately delays a mutation
+mock by 50ms to catch the button mid-flight, then ended immediately - never registering a mock for
+the `refetch()` its `onCompleted()` fires on resolution, and never waiting for either to settle.
+The mutation kept running after the test (and the file) finished; once Vitest tore down jsdom, its
+resolution tried to schedule a React update against a `window` that no longer existed. Not a
+`GuestConversation.jsx` bug - a real browser tab's `window` outlives an unmount, so the component's
+own defensive comment about this exact scenario holds in production. Fixed by adding the missing
+mock and awaiting the button's return to enabled before the test ends.
+
+Confirmed in this sandbox and its device-bridge VM: both files parse correctly (`@babel/parser`
+with the `jsx` plugin - Vitest itself still can't run in either environment, `apps/web`'s own
+broken `@rolldown` native binding blocks it even on Danny's machine, on top of this sandbox's
+already-known MongoDB-download block for `server/`). **Not yet confirmed: neither fix has been run
+for real.** Danny needs to run `npm test` in `apps/web/` (and `server/`, still outstanding from the
+thirty-sixth entry) once more.
+
 ### 2026-09-04 (thirty-sixth entry): Danny ran `npm test` for real - 27 failures across both suites, all fixed; the fixes themselves still unconfirmed against a real run
 
 The thirty-fifth entry below asked Danny to run `npm test` in both `server/` and `apps/web/` since
