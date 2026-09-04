@@ -17,6 +17,7 @@ const ShopCutRate = require('../../models/ShopCutRate');
 const Expense = require('../../models/Expense');
 const Income = require('../../models/Income');
 const { generateDueBoothRentCharges } = require('../../utils/booth-rent');
+const Notification = require('../../models/Notification');
 
 function utc(y, m, d) {
 	return new Date(Date.UTC(y, m, d));
@@ -171,7 +172,7 @@ describe('markBoothRentPaidManually -> confirmBoothRentPaid: dual control', () =
 
 	it('markBoothRentPaidManually moves due -> marked_paid, stamps who/when, and creates no ledger rows yet', async () => {
 		const { user: owner } = await createArtistUser();
-		const { shop } = await createShopAdminUser();
+		const { user: shopAdmin, shop } = await createShopAdminUser();
 		const charge = await createBoothRentCharge(owner._id, shop._id);
 		const token = signTestToken(owner);
 		const server = createTestServer();
@@ -198,6 +199,17 @@ describe('markBoothRentPaidManually -> confirmBoothRentPaid: dual control', () =
 		// never be real revenue/expense yet - mirrors applyShopCut's own rule for the percentage side.
 		expect(await Expense.countDocuments({})).toBe(0);
 		expect(await Income.countDocuments({})).toBe(0);
+
+		// Regression coverage for a real bug this test found: Notification's own subjectType enum
+		// was missing 'boothRentCharge' entirely (models/Notification.js), so this notify() call
+		// failed Mongoose validation, was swallowed by notifySafely()'s catch, and the shop admin
+		// silently never heard that a payment was awaiting their confirmation - the mutation itself
+		// still "succeeded" above with no visible error. Fixed by adding the value to the enum.
+		const notif = await Notification.findOne({ userId: shopAdmin._id, type: 'booth_rent_marked_paid' });
+		expect(notif).toBeTruthy();
+		expect(String(notif.actorId)).toBe(String(owner.id));
+		expect(String(notif.subjectId)).toBe(String(charge.id));
+		expect(notif.amountCents).toBe(50000);
 	});
 
 	it('markBoothRentPaidManually rejects a charge that is already marked_paid', async () => {
@@ -355,6 +367,14 @@ describe('markBoothRentPaidManually -> confirmBoothRentPaid: dual control', () =
 		expect(String(income.shopId)).toBe(String(shop.id));
 		expect(income.artistUserId).toBeNull();
 		expect(income.amountCents).toBe(75000);
+
+		// Same regression this file's markBoothRentPaidManually test above documents, the other
+		// direction - the artist waiting to hear their payment landed.
+		const notif = await Notification.findOne({ userId: owner._id, type: 'booth_rent_confirmed' });
+		expect(notif).toBeTruthy();
+		expect(String(notif.actorId)).toBe(String(shopAdmin.id));
+		expect(String(notif.subjectId)).toBe(String(charge.id));
+		expect(notif.amountCents).toBe(75000);
 	});
 
 	it('confirming a second, later charge for the same artist reuses the same "Booth Rent" Expense/Income TYPE, not a duplicate one', async () => {
