@@ -1304,8 +1304,17 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    Back-navigation that depends on how each step was reached, not several independent flows that
    would factor apart cleanly. Confirmed in this sandbox: `packages/api` codegen + build,
    `apps/mobile` `tsc --noEmit` clean, full `apps/mobile` Jest suite - still 247/247 (Apollo-wired
-   screen, no new pure-logic module). Nine items remain on the parity accounting, unprioritized -
-   see HANDOFF.md's "Next" section.
+   screen, no new pure-logic module).
+
+   **Client detail depth and client flags (gaps 3 and 6) are done too (2026-09-04, see
+   DECISIONS.md X49)** - picked as the next-most-blocking item once Danny's own priority closed.
+   `client/[id].tsx` now shows Stats/Projects/Appointments/Notes/Flags alongside the shared-images
+   gallery X15 built, a direct port of web's `ClientDashboard.jsx` field-for-field ("Load more"
+   grows a page limit and refetches rather than porting `EntityListPager`'s pager UI; two of web's
+   sections - `SendAutoResponseButton` and filling out a Form on the client's behalf - are still
+   not ported, named as their own future work). Confirmed in this sandbox: `packages/api` codegen
+   + build, `apps/mobile` `tsc --noEmit` clean, full `apps/mobile` Jest suite - still 247/247.
+   Seven items remain on the parity accounting, unprioritized - see HANDOFF.md's "Next" section.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).
 10. TestFlight beta, then App Store submission - Guideline 3.1.1 already checked in step 5, so this

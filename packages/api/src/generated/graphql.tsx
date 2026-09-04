@@ -3042,6 +3042,42 @@ export type GetChargeQuoteQueryVariables = Exact<{
 
 export type GetChargeQuoteQuery = { __typename?: 'Query', getChargeQuote: { __typename?: 'ChargeQuote', subtotalCents: number, depositCreditCents: number, netSubtotalCents: number, feeOffsetCents: number, taxableCents: number, taxCents: number, tipCents: number, totalCents: number, giftCardCents: number, amountDueCents: number, source: string, canCharge: boolean } };
 
+export type GetClientDashboardQueryVariables = Exact<{
+  clientId: Scalars['ID']['input'];
+  projectsPage?: InputMaybe<PageInput>;
+  appointmentsPage?: InputMaybe<PageInput>;
+}>;
+
+
+export type GetClientDashboardQuery = { __typename?: 'Query', getClient?: { __typename?: 'Client', id: string, firstName: string, lastName: string, email: string, phone: string, avatar?: string | null, stats: { __typename?: 'ClientStats', totalSpentCents: number, totalTipsCents: number, averageTipCents: number, tippedSessionCount: number, completedSessionCount: number, projectCount: number, upcomingAppointmentCount: number }, projects: { __typename?: 'ProjectPage', items: Array<{ __typename?: 'Project', id: string, title: string, status: string, createdAt?: string | null }>, pageInfo: { __typename?: 'PageInfo', totalCount: number, hasMore: boolean, limit: number, offset: number } }, appointments: { __typename?: 'AppointmentPage', items: Array<{ __typename?: 'Appointment', id: string, title?: string | null, appointmentDate: string, appointmentType: string, appointmentStatus: string, totalCents?: number | null, tipCents?: number | null, projectId?: string | null, project?: { __typename?: 'Project', id: string, title: string } | null }>, pageInfo: { __typename?: 'PageInfo', totalCount: number, hasMore: boolean, limit: number, offset: number } }, notes?: Array<{ __typename?: 'IBNote', id: string, author: string, note: string, createdAt?: string | null, updatedAt?: string | null } | null> | null, flags: Array<{ __typename?: 'ClientFlag', id: string, typeKey: string, note?: string | null, systemGenerated: boolean, createdAt: string, type?: { __typename?: 'ClientFlagType', key: string, label: string } | null, createdBy?: { __typename?: 'User', id: string, firstName?: string | null, lastName?: string | null } | null }> } | null };
+
+export type UpdateClientNotesMutationVariables = Exact<{
+  clientId: Scalars['ID']['input'];
+  notes?: InputMaybe<Array<InputMaybe<IbNoteInput>> | InputMaybe<IbNoteInput>>;
+}>;
+
+
+export type UpdateClientNotesMutation = { __typename?: 'Mutation', updateClientNotes?: { __typename?: 'Client', id: string, notes?: Array<{ __typename?: 'IBNote', id: string, author: string, note: string, createdAt?: string | null, updatedAt?: string | null } | null> | null } | null };
+
+export type GetClientFlagTypesQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetClientFlagTypesQuery = { __typename?: 'Query', getClientFlagTypes: Array<{ __typename?: 'ClientFlagType', key: string, label: string, systemGenerated: boolean }> };
+
+export type RaiseClientFlagMutationVariables = Exact<{
+  input: RaiseClientFlagInput;
+}>;
+
+
+export type RaiseClientFlagMutation = { __typename?: 'Mutation', raiseClientFlag: { __typename?: 'ClientFlag', id: string, typeKey: string, note?: string | null, systemGenerated: boolean, createdAt: string, type?: { __typename?: 'ClientFlagType', key: string, label: string } | null, createdBy?: { __typename?: 'User', id: string, firstName?: string | null, lastName?: string | null } | null } };
+
+export type ResolveClientFlagMutationVariables = Exact<{
+  flagId: Scalars['ID']['input'];
+}>;
+
+
+export type ResolveClientFlagMutation = { __typename?: 'Mutation', resolveClientFlag: { __typename?: 'ClientFlag', id: string, resolvedAt?: string | null } };
+
 export type GetClientsQueryVariables = Exact<{
   page?: InputMaybe<PageInput>;
 }>;
@@ -5485,6 +5521,289 @@ export type GetChargeQuoteQueryHookResult = ReturnType<typeof useGetChargeQuoteQ
 export type GetChargeQuoteLazyQueryHookResult = ReturnType<typeof useGetChargeQuoteLazyQuery>;
 export type GetChargeQuoteSuspenseQueryHookResult = ReturnType<typeof useGetChargeQuoteSuspenseQuery>;
 export type GetChargeQuoteQueryResult = Apollo.QueryResult<GetChargeQuoteQuery, GetChargeQuoteQueryVariables>;
+export const GetClientDashboardDocument = gql`
+    query GetClientDashboard($clientId: ID!, $projectsPage: PageInput, $appointmentsPage: PageInput) {
+  getClient(clientId: $clientId) {
+    id
+    firstName
+    lastName
+    email
+    phone
+    avatar
+    stats {
+      totalSpentCents
+      totalTipsCents
+      averageTipCents
+      tippedSessionCount
+      completedSessionCount
+      projectCount
+      upcomingAppointmentCount
+    }
+    projects(page: $projectsPage) {
+      items {
+        id
+        title
+        status
+        createdAt
+      }
+      pageInfo {
+        totalCount
+        hasMore
+        limit
+        offset
+      }
+    }
+    appointments(page: $appointmentsPage) {
+      items {
+        id
+        title
+        appointmentDate
+        appointmentType
+        appointmentStatus
+        totalCents
+        tipCents
+        projectId
+        project {
+          id
+          title
+        }
+      }
+      pageInfo {
+        totalCount
+        hasMore
+        limit
+        offset
+      }
+    }
+    notes {
+      id
+      author
+      note
+      createdAt
+      updatedAt
+    }
+    flags {
+      id
+      typeKey
+      note
+      systemGenerated
+      createdAt
+      type {
+        key
+        label
+      }
+      createdBy {
+        id
+        firstName
+        lastName
+      }
+    }
+  }
+}
+    `;
+
+/**
+ * __useGetClientDashboardQuery__
+ *
+ * To run a query within a React component, call `useGetClientDashboardQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetClientDashboardQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetClientDashboardQuery({
+ *   variables: {
+ *      clientId: // value for 'clientId'
+ *      projectsPage: // value for 'projectsPage'
+ *      appointmentsPage: // value for 'appointmentsPage'
+ *   },
+ * });
+ */
+export function useGetClientDashboardQuery(baseOptions: Apollo.QueryHookOptions<GetClientDashboardQuery, GetClientDashboardQueryVariables> & ({ variables: GetClientDashboardQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetClientDashboardQuery, GetClientDashboardQueryVariables>(GetClientDashboardDocument, options);
+      }
+export function useGetClientDashboardLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetClientDashboardQuery, GetClientDashboardQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetClientDashboardQuery, GetClientDashboardQueryVariables>(GetClientDashboardDocument, options);
+        }
+// @ts-ignore
+export function useGetClientDashboardSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetClientDashboardQuery, GetClientDashboardQueryVariables>): Apollo.UseSuspenseQueryResult<GetClientDashboardQuery, GetClientDashboardQueryVariables>;
+export function useGetClientDashboardSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetClientDashboardQuery, GetClientDashboardQueryVariables>): Apollo.UseSuspenseQueryResult<GetClientDashboardQuery | undefined, GetClientDashboardQueryVariables>;
+export function useGetClientDashboardSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetClientDashboardQuery, GetClientDashboardQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetClientDashboardQuery, GetClientDashboardQueryVariables>(GetClientDashboardDocument, options);
+        }
+export type GetClientDashboardQueryHookResult = ReturnType<typeof useGetClientDashboardQuery>;
+export type GetClientDashboardLazyQueryHookResult = ReturnType<typeof useGetClientDashboardLazyQuery>;
+export type GetClientDashboardSuspenseQueryHookResult = ReturnType<typeof useGetClientDashboardSuspenseQuery>;
+export type GetClientDashboardQueryResult = Apollo.QueryResult<GetClientDashboardQuery, GetClientDashboardQueryVariables>;
+export const UpdateClientNotesDocument = gql`
+    mutation UpdateClientNotes($clientId: ID!, $notes: [IBNoteInput]) {
+  updateClientNotes(clientId: $clientId, notes: $notes) {
+    id
+    notes {
+      id
+      author
+      note
+      createdAt
+      updatedAt
+    }
+  }
+}
+    `;
+export type UpdateClientNotesMutationFn = Apollo.MutationFunction<UpdateClientNotesMutation, UpdateClientNotesMutationVariables>;
+
+/**
+ * __useUpdateClientNotesMutation__
+ *
+ * To run a mutation, you first call `useUpdateClientNotesMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateClientNotesMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateClientNotesMutation, { data, loading, error }] = useUpdateClientNotesMutation({
+ *   variables: {
+ *      clientId: // value for 'clientId'
+ *      notes: // value for 'notes'
+ *   },
+ * });
+ */
+export function useUpdateClientNotesMutation(baseOptions?: Apollo.MutationHookOptions<UpdateClientNotesMutation, UpdateClientNotesMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<UpdateClientNotesMutation, UpdateClientNotesMutationVariables>(UpdateClientNotesDocument, options);
+      }
+export type UpdateClientNotesMutationHookResult = ReturnType<typeof useUpdateClientNotesMutation>;
+export type UpdateClientNotesMutationResult = Apollo.MutationResult<UpdateClientNotesMutation>;
+export type UpdateClientNotesMutationOptions = Apollo.BaseMutationOptions<UpdateClientNotesMutation, UpdateClientNotesMutationVariables>;
+export const GetClientFlagTypesDocument = gql`
+    query GetClientFlagTypes {
+  getClientFlagTypes {
+    key
+    label
+    systemGenerated
+  }
+}
+    `;
+
+/**
+ * __useGetClientFlagTypesQuery__
+ *
+ * To run a query within a React component, call `useGetClientFlagTypesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetClientFlagTypesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetClientFlagTypesQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetClientFlagTypesQuery(baseOptions?: Apollo.QueryHookOptions<GetClientFlagTypesQuery, GetClientFlagTypesQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetClientFlagTypesQuery, GetClientFlagTypesQueryVariables>(GetClientFlagTypesDocument, options);
+      }
+export function useGetClientFlagTypesLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetClientFlagTypesQuery, GetClientFlagTypesQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetClientFlagTypesQuery, GetClientFlagTypesQueryVariables>(GetClientFlagTypesDocument, options);
+        }
+// @ts-ignore
+export function useGetClientFlagTypesSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetClientFlagTypesQuery, GetClientFlagTypesQueryVariables>): Apollo.UseSuspenseQueryResult<GetClientFlagTypesQuery, GetClientFlagTypesQueryVariables>;
+export function useGetClientFlagTypesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetClientFlagTypesQuery, GetClientFlagTypesQueryVariables>): Apollo.UseSuspenseQueryResult<GetClientFlagTypesQuery | undefined, GetClientFlagTypesQueryVariables>;
+export function useGetClientFlagTypesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetClientFlagTypesQuery, GetClientFlagTypesQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetClientFlagTypesQuery, GetClientFlagTypesQueryVariables>(GetClientFlagTypesDocument, options);
+        }
+export type GetClientFlagTypesQueryHookResult = ReturnType<typeof useGetClientFlagTypesQuery>;
+export type GetClientFlagTypesLazyQueryHookResult = ReturnType<typeof useGetClientFlagTypesLazyQuery>;
+export type GetClientFlagTypesSuspenseQueryHookResult = ReturnType<typeof useGetClientFlagTypesSuspenseQuery>;
+export type GetClientFlagTypesQueryResult = Apollo.QueryResult<GetClientFlagTypesQuery, GetClientFlagTypesQueryVariables>;
+export const RaiseClientFlagDocument = gql`
+    mutation RaiseClientFlag($input: RaiseClientFlagInput!) {
+  raiseClientFlag(input: $input) {
+    id
+    typeKey
+    note
+    systemGenerated
+    createdAt
+    type {
+      key
+      label
+    }
+    createdBy {
+      id
+      firstName
+      lastName
+    }
+  }
+}
+    `;
+export type RaiseClientFlagMutationFn = Apollo.MutationFunction<RaiseClientFlagMutation, RaiseClientFlagMutationVariables>;
+
+/**
+ * __useRaiseClientFlagMutation__
+ *
+ * To run a mutation, you first call `useRaiseClientFlagMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useRaiseClientFlagMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [raiseClientFlagMutation, { data, loading, error }] = useRaiseClientFlagMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useRaiseClientFlagMutation(baseOptions?: Apollo.MutationHookOptions<RaiseClientFlagMutation, RaiseClientFlagMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<RaiseClientFlagMutation, RaiseClientFlagMutationVariables>(RaiseClientFlagDocument, options);
+      }
+export type RaiseClientFlagMutationHookResult = ReturnType<typeof useRaiseClientFlagMutation>;
+export type RaiseClientFlagMutationResult = Apollo.MutationResult<RaiseClientFlagMutation>;
+export type RaiseClientFlagMutationOptions = Apollo.BaseMutationOptions<RaiseClientFlagMutation, RaiseClientFlagMutationVariables>;
+export const ResolveClientFlagDocument = gql`
+    mutation ResolveClientFlag($flagId: ID!) {
+  resolveClientFlag(flagId: $flagId) {
+    id
+    resolvedAt
+  }
+}
+    `;
+export type ResolveClientFlagMutationFn = Apollo.MutationFunction<ResolveClientFlagMutation, ResolveClientFlagMutationVariables>;
+
+/**
+ * __useResolveClientFlagMutation__
+ *
+ * To run a mutation, you first call `useResolveClientFlagMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useResolveClientFlagMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [resolveClientFlagMutation, { data, loading, error }] = useResolveClientFlagMutation({
+ *   variables: {
+ *      flagId: // value for 'flagId'
+ *   },
+ * });
+ */
+export function useResolveClientFlagMutation(baseOptions?: Apollo.MutationHookOptions<ResolveClientFlagMutation, ResolveClientFlagMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<ResolveClientFlagMutation, ResolveClientFlagMutationVariables>(ResolveClientFlagDocument, options);
+      }
+export type ResolveClientFlagMutationHookResult = ReturnType<typeof useResolveClientFlagMutation>;
+export type ResolveClientFlagMutationResult = Apollo.MutationResult<ResolveClientFlagMutation>;
+export type ResolveClientFlagMutationOptions = Apollo.BaseMutationOptions<ResolveClientFlagMutation, ResolveClientFlagMutationVariables>;
 export const GetClientsDocument = gql`
     query GetClients($page: PageInput) {
   getClients(includeArchived: false, page: $page) {

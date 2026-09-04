@@ -3076,12 +3076,12 @@ prior summary. Ranked roughly by how much it blocks ordinary daily use, most-blo
    three from a `createProject` mutation existing in `packages/api` - it exists only for
    `AppointmentWizard`'s own new-session-with-a-new-project path, which is part of gap #1 below,
    not a fourth independent thing. Corrected here rather than silently dropped.
-3. **The client detail page is a shell of web's.** `app/client/[id].tsx` (X15) is scoped to exactly
-   one thing - the shared-images gallery. Stats, project history, appointment history, notes, and
-   the client's own flags, which are all real sections on web's `ClientDashboard.jsx`, don't exist
-   on this screen at all. This was named explicitly as future work in X15's own header comment,
-   but it means the actual client record - the thing a shop lives and dies by - is barely visible
-   on the phone today.
+3. ~~The client detail page is a shell of web's~~ - **done 2026-09-04 (X49)**: Stats, Projects,
+   Appointments, and Notes now all render on `app/client/[id].tsx` alongside the shared-images
+   gallery X15 built - a direct port of web's `ClientDashboard.jsx` field-for-field. Two of its
+   sections (`SendAutoResponseButton`, and filling out a Form on the client's behalf) are still not
+   ported - named explicitly as their own future work in X49's own DECISIONS.md entry, not
+   overlooked.
 4. **No dashboard or analytics screen exists on mobile at all.** Web's Home page (`/` and
    `/dashboard`) shows an artist their own performance numbers (`ArtistPerformancePanel`) or a
    shop admin/staff member the shop-wide analytics (`ShopAnalyticsPanel`). Mobile's own landing
@@ -3092,10 +3092,13 @@ prior summary. Ranked roughly by how much it blocks ordinary daily use, most-blo
 5. **Gift cards have no mobile presence whatsoever** - neither the shop-level nor the
    artist-level side of the feature. Confirmed by a repo-wide search: nothing in `apps/mobile/src`
    references gift cards at all.
-6. **Client flags have no mobile presence either** - no marking a no-show, no viewing or resolving
-   an existing flag (web's per-row Resolve button on `ClientDashboard.jsx`), no flag-type admin
-   screen. Ties directly to gap 3 above (flags are a `ClientDashboard` section) but is called out
-   on its own since it's also an operational/accountability gap, not just a missing readout.
+6. ~~Client flags have no mobile presence either~~ - **done 2026-09-04, same X49 as gap 3** (flags
+   are a `ClientDashboard` section server-side too, so both closed in the same pass): viewing,
+   resolving, and hand-raising a flag all now work from `client/[id].tsx`. Automatic no-show flags
+   were already possible server-side (`syncNoShowFlag`) before this - what mobile was missing was
+   the viewing/resolving/hand-raising UI, which this closes. No flag-TYPE admin screen exists on
+   mobile still (matching web, which also has none - see `ClientService.js`'s own comment on
+   `getClientFlagTypes` reading seeded platform-wide types only).
 7. **No email-notification-preferences screen.** Web's Notifications settings category
    (`NotificationSettingsPanel.jsx` - six category toggles, immediate-vs-digest mode, a timezone
    and hour) has no mobile equivalent at all - not to be confused with Reminders/Auto-Responses/
@@ -3143,12 +3146,18 @@ three of web's underlying pipelines (Personal; Consult and a brand-new-project S
 showed the whole file was a single state machine that didn't factor cleanly into independent
 pieces - see X48's own DECISIONS.md entry for the full reasoning.
 
-**Nine items remain on the parity accounting above, unprioritized - Danny's call.** Client detail
-depth (gap 3), dashboard/analytics (gap 4), gift cards (gap 5), client flags (gap 6),
-email-notification preferences (gap 7), the in-app notification feed (gap 8), group/shop-wide
-conversations + search (gap 9), the booking-request field editor (gap 10), and
-registration/first-time password set (gap 11). See that section for the full reasoning behind each
-one - nothing here assumes an order.
+**Client detail depth (gap 3) and client flags (gap 6) are also done now (2026-09-04, X49)** -
+picked next as the most-blocking remaining item once Danny's own priority closed. `client/[id].tsx`
+now shows Stats/Projects/Appointments/Notes/Flags alongside the shared-images gallery X15 built, a
+direct port of `ClientDashboard.jsx` field-for-field (its `SendAutoResponseButton` and
+fill-a-form-on-the-client's-behalf sections are still not ported - named as their own future work
+in X49's own DECISIONS.md entry).
+
+**Seven items remain on the parity accounting above, unprioritized - Danny's call.**
+Dashboard/analytics (gap 4), gift cards (gap 5), email-notification preferences (gap 7), the
+in-app notification feed (gap 8), group/shop-wide conversations + search (gap 9), the
+booking-request field editor (gap 10), and registration/first-time password set (gap 11). See that
+section for the full reasoning behind each one - nothing here assumes an order.
 
 **0 and 1 below (the shop-admin migration, and a real Square payment) are explicitly deferred —
 reconfirmed 2026-08-25: Danny's plan is to pick this back up as the last item before starting the

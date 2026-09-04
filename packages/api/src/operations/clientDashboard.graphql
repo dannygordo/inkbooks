@@ -1,0 +1,146 @@
+# The artist/staff half of apps/web's ClientDashboard.jsx (X49) - client/[id].tsx was scoped to
+# exactly the shared-images gallery at X15, with "Stats, Projects, Appointments, Notes, and the
+# client's own flags... are all separate, independently portable slices" named explicitly as
+# future work in that screen's own header comment. This is that work. The client's OWN view
+# (isSelf=true, a client logged into their own dashboard) is out of scope - mobile has no client
+# login at all (X15/X16).
+#
+# Field selection matches ClientService.js's _FETCH_CLIENT_DASHBOARD exactly. Projects and
+# Appointments are real server-paged connections (Client.projects/appointments take a PageInput) -
+# see that query's own comment on why a client's full history used to ship on every dashboard
+# visit before this. Notes and Flags are NOT paged here - Notes are embedded sub-documents on
+# Client (no separate collection to paginate, and typically the smallest of the three lists in
+# practice per ClientService.js's own comment), and Flags takes no page argument on the server at
+# all (getClient.flags only ever returns LIVE flags - see resolvers/index.js).
+query GetClientDashboard($clientId: ID!, $projectsPage: PageInput, $appointmentsPage: PageInput) {
+	getClient(clientId: $clientId) {
+		id
+		firstName
+		lastName
+		email
+		phone
+		avatar
+		stats {
+			totalSpentCents
+			totalTipsCents
+			averageTipCents
+			tippedSessionCount
+			completedSessionCount
+			projectCount
+			upcomingAppointmentCount
+		}
+		projects(page: $projectsPage) {
+			items {
+				id
+				title
+				status
+				createdAt
+			}
+			pageInfo {
+				totalCount
+				hasMore
+				limit
+				offset
+			}
+		}
+		appointments(page: $appointmentsPage) {
+			items {
+				id
+				title
+				appointmentDate
+				appointmentType
+				appointmentStatus
+				totalCents
+				tipCents
+				projectId
+				project {
+					id
+					title
+				}
+			}
+			pageInfo {
+				totalCount
+				hasMore
+				limit
+				offset
+			}
+		}
+		notes {
+			id
+			author
+			note
+			createdAt
+			updatedAt
+		}
+		flags {
+			id
+			typeKey
+			note
+			systemGenerated
+			createdAt
+			type {
+				key
+				label
+			}
+			createdBy {
+				id
+				firstName
+				lastName
+			}
+		}
+	}
+}
+
+# The mutation replaces the WHOLE notes array, matching updateProjectNotes' own shape - the
+# caller re-sends every existing note (stripped of __typename) alongside the new one. See
+# client/[id].tsx's own handleAddNote for why.
+mutation UpdateClientNotes($clientId: ID!, $notes: [IBNoteInput]) {
+	updateClientNotes(clientId: $clientId, notes: $notes) {
+		id
+		notes {
+			id
+			author
+			note
+			createdAt
+			updatedAt
+		}
+	}
+}
+
+# shopId omitted, same call ClientDashboard.jsx itself makes ("Client.jsx doesn't currently know
+# the viewer's own shop") - platform-wide flag types only, not a shop's own custom ones. Excludes
+# nothing server-side; client/[id].tsx filters out systemGenerated types itself before offering
+# the picker, same as web (a hand-raised NO_SHOWED is refused by raiseClientFlag regardless).
+query GetClientFlagTypes {
+	getClientFlagTypes {
+		key
+		label
+		systemGenerated
+	}
+}
+
+mutation RaiseClientFlag($input: RaiseClientFlagInput!) {
+	raiseClientFlag(input: $input) {
+		id
+		typeKey
+		note
+		systemGenerated
+		createdAt
+		type {
+			key
+			label
+		}
+		createdBy {
+			id
+			firstName
+			lastName
+		}
+	}
+}
+
+mutation ResolveClientFlag($flagId: ID!) {
+	resolveClientFlag(flagId: $flagId) {
+		id
+		resolvedAt
+	}
+}

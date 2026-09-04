@@ -2094,6 +2094,63 @@ for actually sharing it.
 `FORM_FIELD_TYPE_LABELS`/`formFieldTypeLabel`) - same "build the map directly, don't port
 `prettyConstantsListValue`" reasoning as `utils/projectStatus.ts` (X20).
 
+### X49. Client detail depth - Stats, Projects, Appointments, Notes, and Flags
+
+Third slice off the mobile/web parity accounting (HANDOFF.md, 2026-09-04), picked as the
+next-most-blocking item once Danny's own priority (X47/X48) closed - gap #3, "the client detail
+page is a shell of web's." X15 scoped `client/[id].tsx` to exactly the shared-images gallery and
+named Stats/Projects/Appointments/Notes/Flags explicitly as future work in its own header comment;
+this closes all five in one pass, plus gap #6 (client flags), since both live in the same web
+component (`ClientDashboard.jsx`) and the same server query.
+
+**Two sections deliberately NOT ported: `SendAutoResponseButton` and the "Forms" section**
+(filling out a published form on the client's behalf via `FormFillOut`). Both are real, separate
+features layered on top of `ClientDashboard.jsx` rather than part of "what does this client's
+record contain" - this pass is the record itself. Left for a future slice, not overlooked.
+
+**Pagination: "Load more" grows the page LIMIT and refetches from offset 0, not a ported
+`EntityListPager`** (web's dual offset+page-size-selector pager) and not a `fetchMore` that merges
+two array pages together. A client's own project/appointment history is nowhere near the shop-wide
+directories' scale, so re-fetching everything already seen plus one more page costs nothing worth
+a more complex pagination model. Notes and Flags aren't paginated at all, matching the server
+exactly: Notes are embedded sub-documents `Client` returns in full, and `getClient.flags` takes no
+page argument server-side.
+
+**Notes/Flags cache mechanics are a direct port of `ClientDashboard.jsx`'s own
+`handleAddNote`/`handleRaiseFlag`/`handleResolveFlag`**, including the `cache.modify` +
+`cache.identify` + `makeReference` approach web's own comment describes fixing a real bug for
+(`cache.toReference` isn't in Apollo's public API past whatever version that comment refers to;
+every flag-raise silently failed until this exact pattern replaced it). Ported the fix, not the
+original bug. `updateClientNotes` needs no manual cache surgery at all - it returns the whole
+updated notes array plus the Client's id, and Apollo's normalized write updates the cached field
+automatically, same as web's own `refetchQueries: []` comment implies.
+
+**`appointmentDate` is read in LOCAL time, not web's `moment.utc(appointment.appointmentDate)`.**
+That web call reads like the same class of bug `utils/utcDate.ts`'s own header comment warns
+against, just in the opposite direction: `appointmentDate` is a genuine instant (with a time
+component), and mobile's own `formatAppointmentTime` (`utils/appointments.ts`) already reads this
+exact field in local time everywhere else on this app - a UTC read here would show a different
+wall-clock hour than every other appointment list on the phone. Followed mobile's own established,
+correct convention instead of reproducing web's read verbatim. Not fixed on web - out of scope,
+same as the Projects/Search status-column bug already logged in this file's own "Open" section.
+
+**Flag-type picker is `PillRow`, not a ported `<select>`** - same no-cross-platform-`<select>`
+precedent every other web `<select>` port on this app has followed. `manualFlagTypes` excludes
+`systemGenerated` types client-side exactly like web does (a hand-raised `NO_SHOWED` is refused by
+`raiseClientFlag` regardless - the filter is a UI courtesy, not the boundary).
+
+**New `packages/api/src/operations/clientDashboard.graphql`**: `GetClientDashboard` (mirrors
+`ClientService.js`'s `_FETCH_CLIENT_DASHBOARD` field-for-field), `UpdateClientNotes`,
+`GetClientFlagTypes` (no `shopId` argument - same call `ClientDashboard.jsx` itself makes, since
+neither app currently knows the viewer's own shop at this call site), `RaiseClientFlag`,
+`ResolveClientFlag`.
+
+Verification: `packages/api` codegen + build clean (five new generated hooks), `apps/mobile`
+`tsc --noEmit` clean (two `cache.modify` field functions needed an explicit `readonly Reference[]`
+parameter type - Apollo's own `Modifier<T>` type is contravariant on an array field's existing
+value, which TypeScript only accepted once the array type matched exactly, including the
+`readonly`), full Jest suite still 247/247 (Apollo-wired screen, no new pure-logic module).
+
 ### X48. New Appointment - the calendar's tap-and-book wizard
 
 Second and final slice off the mobile/web parity accounting (HANDOFF.md, 2026-09-04) for Danny's
