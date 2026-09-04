@@ -1356,10 +1356,12 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    `SquarePaymentForm.tsx`, not a generalization, matching the web slice's own restraint), plus a
    redeem-a-card entry added to `SessionDetailForm.tsx`. Confirmed in this sandbox:
    `packages/api` codegen and build, `apps/mobile` `tsc --noEmit` clean, full `apps/mobile` Jest
-   suite still 252/252. Not run through `server/test`'s own Vitest suite in this sandbox:
-   `mongodb-memory-server`'s startup download is blocked by network policy here (confirmed via the
-   proxy's own status endpoint); written and manually reviewed, but genuinely unverified by
-   automation until someone runs `npm test` in `server/` outside this sandbox.
+   suite still 252/252. `server/test`'s own Vitest suite still cannot run inside this sandbox
+   (`mongodb-memory-server`'s startup download is blocked at the proxy level here, confirmed
+   directly), but Danny has now run both `server/test` and `apps/web`'s own suite for real on his
+   own machine - three real bugs turned up and got fixed along the way (see HANDOFF.md's gap 5
+   entry and DECISIONS.md M6's follow-up entries for the full RCA on each), and both suites are
+   confirmed green as of this pass.
 
    **Email-notification preferences (gap 7) is done instead (2026-09-04, see DECISIONS.md X51)** -
    a new "Notifications" link on `settings/index.tsx` opens `settings/notifications.tsx`, a direct
