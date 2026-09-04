@@ -2699,10 +2699,11 @@ executable bit, git skips it with a hint on stderr rather than an error — whic
   the same kind of thing as a note (a candid internal record about someone's conduct) and never
   client-visible — see `models/ClientFlag.js`'s own comment. UI: a Flags panel on
   `ClientDashboard.jsx`, shop-side only (same `!isSelf` gate the Notes panel already uses) — a type
-  picker, an optional note, and the existing list. **No resolve-by-id mutation exists yet** — the
-  only way to resolve a flag today is still the automatic one wired into an appointment's status
-  changing; a manually-raised flag has no UI path to mark resolved. Stated here rather than
-  silently missing — see Known gaps below. Pinned by `test/integration/clientFlags.test.js` — **not
+  picker, an optional note, and the existing list. ~~No resolve-by-id mutation exists yet~~ —
+  **done 2026-08-21/22**: `resolveClientFlag(flagId)` shipped, wired into `ClientDashboard.jsx`
+  with a per-row Resolve button, not restricted to manually-raised flags. This paragraph was
+  stale, not the code - see line ~1253 and the "Next" section's item 9 for the other two places
+  this is recorded correctly. Pinned by `test/integration/clientFlags.test.js` — **not
   yet run**, see Test status above.
 - **Expense/income tracking, recurring expenses, and a financial dashboard widget.** Five new
   collections (`ExpenseType`, `IncomeType`, `Expense`, `Income`, `RecurringExpense`), all sharing
@@ -3274,65 +3275,65 @@ DECISIONS.md entry.
 Danny's own product calls (real Square payment collection; web first, then mobile) are both
 settled, and both platforms are built, see that section's own entry for the full file list.
 
-**0 and 1 below (the shop-admin migration, and a real Square payment) were explicitly deferred
-until mobile was otherwise complete - reconfirmed 2026-08-25.** Mobile parity closed in full on
-2026-09-04 (gift cards, gap 5, was the last item), so this is now the active item, not a deferred
-one. Item 1 is already partway done for real, see its own entry below for the current split
-between what Danny has now confirmed and what is still open.
+**Correction (2026-09-04): items 0 and 1 below were already fully closed back on 2026-08-27,
+this section just never caught up.** The paragraph that used to sit here (added 2026-08-25,
+edited again earlier today before this correction) claimed a real Square payment was still
+partly unverified. That was wrong twice over: `utils/square.js`'s own header comment and
+PRODUCTION_ROADMAP.md's "Suggested sequencing" item 6 both record that Danny confirmed real
+sandbox deposit and session charges working through the app's own UI on 2026-08-27, and the
+shop-cut-invoice-plus-webhook half was independently verified live even earlier, 2026-08-01/02
+(PRODUCTION_ROADMAP.md's "Shop-cut ledger" section) - connect, invoice, real sandbox payment,
+real webhook, `shopCutStatus` flipped to `paid`, confirmed by a follow-up query. Both predate
+today's conversation, where Danny separately reconfirmed the charge path again from his own
+memory of using it. See items 0 and 1 below for what each is now marked, and
+PRODUCTION_ROADMAP.md's "Suggested sequencing" for the fuller account, including three more
+sub-items (legacy `square*` field cleanup, the `PAYMENT_RECEIVED` trigger wiring, the shop-admin
+migration turning out to be unnecessary) that were also closed the same day and never mirrored
+back into this file.
 
-0. ~~Run both suites on a real machine~~ — **done, reported green 2026-08-18** (see above). **Then
-   the shop-admin migration** — deferred, not urgent: `node scripts/migrate-shop-admins-to-artists.js
-   --dry-run` first. Until it runs, a `STAFF`-typed shop admin still has no Settings page — which is
-   how this was found. See `DECISIONS.md` S0 for what the migration costs. Explicitly NOT migration-
-   script work right now per Danny (this is dev data he can reseed at will) — this item is about
-   *production/pre-existing* data specifically, which is why it's still deferred rather than dropped.
+0. ~~Run both suites on a real machine~~ — **done, reported green 2026-08-18**, and again
+   2026-08-25 (found and fixed five more real bugs that pass, see PRODUCTION_ROADMAP.md's
+   "Suggested sequencing" item 1), and again 2026-09-04 for gift cards specifically (three more
+   real bugs, see M6's follow-up entries in DECISIONS.md). ~~Then the shop-admin migration~~ —
+   **turned out not to be needed, per PRODUCTION_ROADMAP.md's "Suggested sequencing" item 7**: the
+   divergent-shape bug that would have required it was fixed at the source in `seed.js`/
+   `seed-large.js`, and Danny re-ran those to correct the dev data 2026-08-27, so
+   `migrate-shop-admins-to-artists.js` has nothing left to find against current data. It stays in
+   the repo as a rescue tool if a real signup path ever produces a `STAFF`-only admin again, not
+   as an open task.
 
-1. **The charge itself is confirmed for real (2026-09-04) - the downstream half still is not.**
-   Danny has connected to the Square sandbox and taken payments through the running app many
-   times since this was last written up, not just the single 2026-08-11 handshake test below - so
-   `POST /v2/payments` succeeding, and matching Square's own dashboard, is no longer a deferred
-   item, it is a confirmed fact. What is still genuinely unchecked is everything downstream of a
-   successful charge: does `createShopCutInvoice` fire and does the invoice actually publish, and
-   does the webhook flip the appointment to `paid`. That is the narrower, real remaining gap in
-   this item now, not "nothing has ever touched Square." The original sequence for a from-scratch
-   run is still accurate if it is ever needed again: run `scripts/migrate-square-accounts.js`,
-   connect a Square **sandbox** seller through the OAuth flow, set a tax rate and offset in
-   Settings, then charge a session and a deposit and confirm the figures in Square's dashboard
-   match what InkBooks recorded.
+1. ~~Take one real payment end to end~~ — **done, both halves, confirmed 2026-08-27 and again
+   2026-08-01/02 respectively; Danny reconfirmed the charge half again in conversation
+   2026-09-04.** The shop-cut-invoice-plus-webhook half was verified live first, 2026-08-01/02:
+   connect, `createAndPublishShopCutInvoice`, a real sandbox payment made by hand against Square's
+   own hosted page, a real Square-originated webhook, `shopCutStatus` flipped to `paid`, confirmed
+   by a follow-up query - see PRODUCTION_ROADMAP.md's "Shop-cut ledger" section for the full
+   account, including the exact gross-up figures Square returned. The direct-charge half
+   (`POST /v2/payments` for sessions and deposits) was the one piece still open after that, blocked
+   by a missing `PAYMENTS_WRITE` scope discovered 2026-08-11 (any account connected before that
+   date needs to disconnect and reconnect once, since a scope refresh returns only what was
+   originally granted). Closed per Danny's own confirmation 2026-08-27 that real sandbox deposit
+   and session charges had been working through the app's own UI for a while, including the
+   downstream effects (appointment status, shop-cut math off the real charged amount) - see
+   PRODUCTION_ROADMAP.md's "Suggested sequencing" item 6. `utils/square.js`'s own header comment
+   already reflects this correctly (fixed there back on 2026-08-27, per that same sequencing
+   entry) - this file, not that comment, was the one still out of date.
 
-   **Launch the sandbox seller first.** Square's authorize page refuses with *"To start the OAuth
-   flow for a sandbox account, first launch the seller test account from the Developer Console"* —
-   open the test account from developer.squareup.com/apps → your app → Sandbox → Test accounts, and
-   leave that session active. The error comes from Square's own hosted page, so InkBooks never sees
-   it and cannot explain it for you.
-
-   **Any account connected before 2026-08-11 must disconnect and reconnect.** `PAYMENTS_WRITE` was
-   added to the requested scopes only once client charges moved onto the artist's own connection —
-   before that the list was written for the Invoices-only flow. Scopes are granted at authorization
-   and a refresh returns the original set, so there is no way to gain one without reconnecting. A
-   charge on such a token fails with a message saying exactly that.
-
-   **First verified against a real sandbox seller on 2026-08-11, as far as the Payments call.**
-   Authorization URL → consent → token exchange → encrypted storage → decrypt → `POST /v2/payments`
-   all ran against Square rather than against its documentation that day. The charge was refused
-   for the missing scope at the time - which is granted at authorization, so the refusal itself
-   proved the handshake completed and the stored token was genuinely usable. Superseded by the
-   repeated real charges above, which go all the way through.
-
-   **Still unverified: everything downstream of a successful charge** - `createShopCutInvoice`,
-   publishing it, and the webhook flipping an appointment to `paid`. Danny has not specifically
-   traced these on any of his real test charges. This is the one piece of item 1 left to close.
-2. **Drop the old `Shop` Square fields.** Once the migration has run and a charge has worked, delete
-   the seven now-unread `square*` fields from stored shop documents. Deliberately left in place for
-   one deploy — see M9.
+2. ~~Drop the old `Shop` Square fields~~ — **done, same day, commit `6732aaf` (2026-08-27)**:
+   `scripts/drop-legacy-square-shop-fields.js` has been run for real against the pre-launch Atlas
+   database. See M9 for why they were left in place for one deploy in the first place.
 
 Gift cards, adjustment records, and the client-flags GraphQL surface (previously items 3/4 here)
-are all done - see Done above. What's actually left before this app could take real money is item
-1's downstream half (shop cut invoice creation/publishing, and the webhook flip to `paid` - the
-charge itself is now confirmed) and item 0 (the two suites - done - then the migration), both
-active now that mobile parity is closed, not because there's other feature work queued ahead of
-them. A resolve-by-id mutation for a manually-raised client flag is a real, stated gap (see Known
-gaps) but nobody has asked for it yet.
+are all done - see Done above, and items 0/1/2 immediately above are now done too. What is
+genuinely still open, per PRODUCTION_ROADMAP.md's own "Suggested sequencing" item 10: the
+test-coverage tail (`utils/appChrome.js`, roughly 48 other `components/**/*.jsx` files, and
+roughly 46 `server/utils/*.js` files never audited for unit tests - see that item's own itemized
+account and this file's matching "Known gaps" entry). Atlas automated backups, Square production
+credentials, and the App Store submission are all explicitly deferred by Danny's own call until
+closer to real paying users, not forgotten - see PRODUCTION_ROADMAP.md's own sequencing notes for
+each. A resolve-by-id mutation for a manually-raised client flag turned out to already exist too
+(item 9 in that same sequencing list, done 2026-08-21/22) - a separate paragraph earlier in this
+file claimed otherwise and has been corrected in place, same as everything else in this section.
 
 ~~**New candidate item, found 2026-08-18: wire `ClientFlagType.ensureSeeded()` into application
 boot.**~~ — **done, confirmed 2026-08-21/22**: `server/index.js` calls
