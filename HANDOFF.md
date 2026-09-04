@@ -8,6 +8,70 @@ Last updated: 2026-09-04.
 
 ---
 
+### 2026-09-04 (thirty-fifth entry): Test-coverage tail closed out - every web component and every `server/utils/*.js` file now audited, two real bugs found
+
+PRODUCTION_ROADMAP.md's "Suggested sequencing" item 10 and this file's own "Known gaps" entry both
+named the same remainder: `utils/appChrome.js` and ~48 other `components/**/*.jsx` files with no
+test file, plus ~46 `server/utils/*.js` files never individually audited against the 15 that
+already had unit tests. Both are closed now, across commits `X61`-`X70`.
+
+**Web (`X61`)**: the last of the untested components - `StatCard`, `ShopAnalyticsPanel`, and the
+Square/gift-card payment forms - got real test files, closing out the ~48-file remainder named
+above and in the 2026-08-26 entry.
+
+**Server (`X62`-`X70`)**: went through every remaining `server/utils/*.js` file batch by batch
+(auth/security, business/shop, client/booking, notification-copy, auto-responses, reminders,
+money/analytics, infra/plumbing), then ran a final sweep across all 65 files in the directory to
+catch anything outside the originally-scoped batches. Every file landed in one of three buckets:
+got direct unit tests (`reminders.js`, `shared-images.js`, `tag-color.js`, `event-log.js`,
+`search.js`, `loaders.js`, and others), confirmed already covered indirectly through
+resolver/mutation-level tests (`analytics.js` via `analytics.test.js`, `conversations.js` via
+`conversations.test.js`, `artist-shop.js` via `artistShopConnections.test.js`/`attention.test.js`,
+and several more), or judged a thin infra wrapper not worth a dedicated test (`constants.js`,
+`logger.js`, `error-reporting.js`, `firebase-admin.js` - each is a thin pass-through over pino,
+Sentry, or the Firebase Admin SDK with no branching logic of its own to assert on).
+
+**Two real production bugs turned up doing this**, both found the same way: reading a util's
+actual source and actual `module.exports` in full before trusting how something else mocks or
+destructures it, rather than assuming coverage exists because a resolver test happens to touch the
+same code path with the module mocked out.
+
+1. `models/Notification.js`'s `subjectType` enum was missing `'boothRentCharge'` - every attempt to
+   create that notification type was silently rejected at the Mongoose validation layer. Fixed in
+   `X67`, alongside coverage for the rest of that enum's branches.
+2. `utils/email.js` defined its own `sendEmail()` - the raw primitive every other `send*()` helper
+   in that file calls - but never included it in `module.exports`. `utils/reminders.js` does
+   `const { sendEmail } = require('./email')` directly (it builds its own subject/body from
+   `ReminderSettings` templates rather than going through any of `email.js`'s named wrappers), so
+   that destructuring silently resolved to `undefined`. Every email appointment reminder was
+   throwing `"sendEmail is not a function"`, caught by `sendRemindersForArtist`'s own per-channel
+   try/catch and logged to `ReminderLog` as `'failed'` - the sweep itself never crashed, so nothing
+   surfaced this anywhere a person would see it. SMS reminders were unaffected (`utils/sms.js`
+   correctly exports `sendSms`). Invisible to the existing suite because every test that touches
+   this path does `vi.mock('../../utils/email', () => ({ sendEmail: vi.fn() }))`, which replaces
+   the whole module and can never catch a missing export on the real one. Fixed in `X70`, plus a
+   direct regression test (`test/integration/emailSms.test.js`) that requires the real, unmocked
+   modules the same way `reminders.js` does, so this exact class of bug (a destructured import
+   silently resolving to `undefined`) can't recur unnoticed for either channel.
+
+**New files this round**: `test/integration/reminders.test.js`, `sharedImages.test.js`,
+`tagColor.test.js`, `eventLog.test.js`, `loaders.test.js`, `search.test.js`, `emailSms.test.js`.
+Extended: `attention.test.js` (added `unredeemedInvites`/`squareHealth` coverage - the two
+conditions in `attentionForUser` that had only ever gotten empty-list coverage), `expenses.test.js`
+(added `advanceByFrequency` UTC-exactness, weekly/yearly due-occurrence, the 60-occurrence-per-run
+cap, and duplicate-skip-reporting tests for `generateDueRecurringExpenses`).
+
+Confirmed in this sandbox: every new/modified test file passes `node -c` syntax checks; every new
+test was written and verified line-by-line against the real source file's actual schema, exports,
+and branching logic (not against how existing tests happen to mock it) before being finalized.
+
+Not yet confirmed: **none of this - the ~10 new/modified test files above, nor the two production
+fixes (`models/Notification.js`, `utils/email.js`) - has been run against a real MongoDB in this
+sandbox.** The memory-server binary download this suite needs (`fastdl.mongodb.org`) is blocked
+here, same limitation as every other server test file in this repo. **Danny still needs to run
+`npm test` in both `server/` and `apps/web/`** to confirm the full suite (existing plus everything
+above) actually passes for real before this can be called fully closed.
+
 ### 2026-09-04 (thirty-fourth entry): ShopConnectionPanel - an artist's own shop connect/disconnect/move flow
 
 Last item from the Settings/Messages follow-up list (thirty-third entry above named this as the
@@ -3324,11 +3388,16 @@ back into this file.
    database. See M9 for why they were left in place for one deploy in the first place.
 
 Gift cards, adjustment records, and the client-flags GraphQL surface (previously items 3/4 here)
-are all done - see Done above, and items 0/1/2 immediately above are now done too. What is
+are all done - see Done above, and items 0/1/2 immediately above are now done too. ~~What is
 genuinely still open, per PRODUCTION_ROADMAP.md's own "Suggested sequencing" item 10: the
 test-coverage tail (`utils/appChrome.js`, roughly 48 other `components/**/*.jsx` files, and
 roughly 46 `server/utils/*.js` files never audited for unit tests - see that item's own itemized
-account and this file's matching "Known gaps" entry). Atlas automated backups, Square production
+account and this file's matching "Known gaps" entry).~~ — **done, see this file's 2026-09-04
+"thirty-fifth entry" above** (commits `X61`-`X70`): every remaining web component and every
+`server/utils/*.js` file has been individually audited, with two real bugs found and fixed along
+the way. Still needs a real `npm test` run in both `server/` and `apps/web/` before it's fully
+closed - see that entry for exactly what hasn't been executed yet. Atlas automated backups, Square
+production
 credentials, and the App Store submission are all explicitly deferred by Danny's own call until
 closer to real paying users, not forgotten - see PRODUCTION_ROADMAP.md's own sequencing notes for
 each. A resolve-by-id mutation for a manually-raised client flag turned out to already exist too
@@ -3423,9 +3492,11 @@ regression.
   `ShopAnalyticsPanel`/`StatCard`, and a long tail of smaller single-purpose components (`IBModal`,
   `IBAlert`, `Pager`, `Sidebar`, `CropEasy`, and similar). Being worked through now, in waves,
   without pausing between them.~~ — **all 47 files now have a test file written, done
-  2026-08-26** (see that entry above). Uncommitted and never run against a real `vitest` yet —
-  only Babel-syntax-checked. This is the one item still needing a real test run before it can be
-  called closed.
+  2026-08-26**, and committed as `X61` on 2026-09-04 (see that entry above - this bullet just never
+  got updated when the commit landed). Along with the `server/utils/*.js` audit named in the
+  paragraph above this list, that closes both halves of this item. Neither half has been run
+  against a real `vitest`/MongoDB in this sandbox yet - only syntax-checked - see this file's
+  2026-09-04 "thirty-fifth entry" for exactly what still needs `npm test` run for real.
 - ~~A shop-connected plain artist's personal expense/income ledger has no UI~~ — **resolved
   2026-08-18, see the note near the top of this file.** Was deliberate scope, changed on request.
 - **`ExpenseType`/`IncomeType` have no delete, only deactivate** — matching `ClientFlagType`'s own

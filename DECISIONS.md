@@ -3725,6 +3725,19 @@ is unbroken." That is not a string of coincidences. It is what happens when a te
 later, in a separate pass, against code that has already moved on to the next thing - it catches
 what a same-commit test would have caught days or weeks earlier, for a fraction of the cost.
 
+The streak held again closing out the test-coverage backlog itself (`X61`-`X70`, 2026-09-03/04):
+`models/Notification.js`'s `subjectType` enum was missing `'boothRentCharge'`, rejecting every
+booth-rent-charge notification at the schema level (`X67`); and `utils/email.js` never exported its
+own `sendEmail()`, so `utils/reminders.js`'s destructured `const { sendEmail } = require('./email')`
+silently resolved to `undefined` and every email appointment reminder failed, invisibly, caught by
+its own per-channel try/catch (`X70`). Both were invisible to every *existing* test on those code
+paths precisely because those tests mock the whole module being called - `vi.mock('../../utils/
+email', ...)` replaces the real module outright and can never catch a missing export on it. Writing
+a direct test against the real, unmocked module - not just a resolver test with the dependency
+mocked out - is what caught both. Worth keeping as a standing practice, not just this pass: for any
+util a resolver test only ever exercises through a mock, add one small test that requires the real
+module directly.
+
 This was already the stated intent for Phase 6 ("stood up incrementally starting in Phase 1, not
 bolted on at the end") but was not consistently followed - features shipped, tests followed later
 in batches, and every batch found real bugs the gap had let ship. This decision makes it the actual
@@ -3733,10 +3746,11 @@ rule instead of an intention stated once and drifted from.
 **Rule, effective now, for all new work** - web, server, and mobile once it exists: a feature or fix
 ships with its test in the same commit that introduces it, not queued for a later coverage pass.
 
-This does not retroactively demand tests for everything already shipped without them - the existing
-test-coverage backlog (PRODUCTION_ROADMAP.md Phase 6, item 10: `utils/appChrome.js` and the
-remaining component/server-util tail) is a separate, already-tracked cleanup, not reopened by this
-rule. This is about what ships from here forward.
+This does not retroactively demand tests for everything already shipped without them - the
+existing test-coverage backlog (PRODUCTION_ROADMAP.md Phase 6, item 10: `utils/appChrome.js` and
+the remaining component/server-util tail) was a separate, already-tracked cleanup, not reopened by
+this rule, and is now closed (`X61`-`X70`, 2026-09-04 - see HANDOFF.md's matching dated entry and
+the note above on the two bugs this pass found). This is about what ships from here forward.
 
 ### PR2. `npm install`/`npm ci` never runs directly against the connected-folder mount - only against a local mirror, synced back with a plain file copy
 

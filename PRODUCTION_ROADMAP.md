@@ -3034,17 +3034,32 @@ see the note above. It is not on this list at any priority, not because it was f
    boot). This item was stale, not the underlying code.
 9. ~~Add a `resolveClientFlag(id)` mutation~~ — **done 2026-08-21/22**, wired into
    `ClientDashboard.jsx` with a per-row Resolve button.
-10. ~~Continue the test-coverage initiative~~ — **almost entirely done.** All 6
+10. ~~Continue the test-coverage initiative~~ — **done, 2026-09-04.** All 6
     `ibCalendar`/`appointments` components and the full Forms feature (client + server) were closed
     2026-08-21. The much larger remainder flagged then (~27 services, ~10 utils, ~16 settings
     panels, ~29 pages, ~50+ other components) was closed in a run of batches 2026-08-22 (commits
     `7786262`, `c1a85f2`, `39ba717`, `7d18cdd`, `36a6c3b`, `b3307a6`). A directory scan 2026-08-25
-    confirms every service, every util except `appChrome.js`, every settings panel, and every page
-    now has a test file. **Still genuinely open**: `utils/appChrome.js` and ~48 other
-    `components/**/*.jsx` files (dashboards, image upload/list, messaging, forms-adjacent pieces,
-    wizards, notifications, and a long tail of smaller components - see `HANDOFF.md`'s matching
-    "Known gaps" entry for the itemized list), plus the ~46 `server/utils/*.js` files never audited
-    against the 15 that have unit tests. Being worked through now.
+    confirmed every service, every util except `appChrome.js`, every settings panel, and every page
+    had a test file, leaving `utils/appChrome.js`, ~48 `components/**/*.jsx` files, and the ~46
+    `server/utils/*.js` files never individually audited against the 15 that already had unit
+    tests. That remaining tail is now closed (commits `X61`-`X70`, 2026-09-03/04): every web
+    component lacking real coverage got one (`X61`), and every `server/utils/*.js` file was
+    individually triaged - either given direct tests, confirmed already covered indirectly through
+    resolver/mutation-level tests, or judged a thin infra wrapper not worth a dedicated test
+    (`constants.js`, `logger.js`, `error-reporting.js`, `firebase-admin.js`). Two real production
+    bugs turned up in the process, both found by reading a util's actual source/exports rather than
+    trusting existing mocked-out coverage: `Notification.subjectType`'s enum was missing
+    `'boothRentCharge'`, silently rejecting every booth-rent-charge notification at the schema level
+    (fixed in `X67`); and `utils/email.js` never exported its own `sendEmail()` primitive, so
+    `utils/reminders.js`'s `const { sendEmail } = require('./email')` silently resolved to
+    `undefined` and every email appointment reminder was failing, caught by
+    `sendRemindersForArtist`'s per-channel try/catch and logged to `ReminderLog` as `'failed'`
+    rather than crashing anywhere visible (fixed in `X70`). Neither suite has been run for real in
+    this sandbox (the MongoDB memory-server binary download is blocked here for `server/`;
+    `apps/web/`'s suite has a broken native-binary dependency chain) - Danny still needs to run
+    `npm test` in both `server/` and `apps/web/` to confirm everything passes against a real
+    MongoDB. See `HANDOFF.md`'s matching dated entry and `DECISIONS.md` for the full rationale and
+    file-by-file breakdown.
 11. ~~Smaller, lower-urgency items already on record~~ — **two of three done, one not a real task.**
     `computeChargeBreakdown` already echoes clamped credit figures (checked 2026-08-21/22, the
     roadmap was stale, not the code). The client self-service form-fill lookup shipped 2026-08-21/22
