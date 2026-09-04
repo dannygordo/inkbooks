@@ -75,3 +75,15 @@ query GetBookingRequest($bookingRequestId: ID!) {
 query GetPendingBookingRequestCount {
 	getPendingBookingRequestCount
 }
+
+# The client-intake half of the new-appointment wizard (X48) - Consult and a brand-new-project
+# Session both create one of these, then immediately convertBookingRequest it in the same submit
+# (see app/appointment/new.tsx's own header comment). source: 'artist_created' tags it so
+# GetBookingRequests' inbox excludes it, matching AppointmentWizard.jsx's own comment on why - it
+# is never a real inbound submission waiting on a reply.
+mutation CreateBookingRequest($bookingRequestInput: BookingRequestInput!) {
+	createBookingRequest(bookingRequestInput: $bookingRequestInput) {
+		id
+		status
+	}
+}

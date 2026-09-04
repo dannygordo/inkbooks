@@ -41,10 +41,12 @@ const PAGE = { limit: 200 };
 /**
  * The appointments screen (guarded by _layout.tsx's Stack.Protected - unreachable while `user` is
  * null). PRODUCTION_ROADMAP.md's Phase 5, step 6: real auth (Phase 1), real data through
- * packages/api, FlashList for the list, Apollo cache persistence for offline reads. The list
- * itself stays read-only here - creating a brand-new appointment is still Phase 3's wizard - but
- * step 8 (see openAppointment below) wired up opening an existing one: personal edit/delete,
- * consult detail + convert-to-session, and a session's Project (Details/Sessions/Notes/Tags).
+ * packages/api, FlashList for the list, Apollo cache persistence for offline reads. Step 8 (see
+ * openAppointment below) wired up opening an existing appointment: personal edit/delete, consult
+ * detail + convert-to-session, and a session's Project (Details/Sessions/Notes/Tags).
+ *
+ * **The "New" link now creates one too** (X48, see appointment/new.tsx's own header comment) -
+ * this list was read-only for that until 2026-09-04.
  *
  * Which queries fire mirrors AppointmentsList.jsx exactly: a shop-connected artist reads the
  * shop's appointments (everyone's, server-scoped) plus their own personal entries (never included
@@ -154,6 +156,12 @@ export default function AppointmentsScreen() {
             Appointments
           </ThemedText>
           <View style={styles.headerActions}>
+            {/* Closes gap #1 of HANDOFF.md's 2026-09-04 parity accounting (X48) - the calendar was
+                read-only for this until now. No role gate, matching web's CreateEventButton.jsx
+                having none - any artist can book their own consult/session/personal entry. */}
+            <Pressable onPress={() => router.push('/appointment/new')} testID="new-appointment-button">
+              <ThemedText type="link">New</ThemedText>
+            </Pressable>
             {isStaffOrBetter(user) ? (
               <Pressable onPress={() => router.push('/artists')} testID="artists-button">
                 <ThemedText type="link">Artists</ThemedText>

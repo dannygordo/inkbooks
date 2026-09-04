@@ -124,6 +124,9 @@ function RootNavigator() {
               onPress. Headers shown (unlike index's own headerShown: false above) since each is a
               real drill-down with a back target, not a tab-level root. */}
           <Stack.Screen name="appointment/[id]" options={{ headerShown: true, title: 'Appointment' }} />
+          {/* New Appointment - closes gap #1 of HANDOFF.md's 2026-09-04 parity accounting (X48).
+              Reached from a new "New" link on index.tsx's header, open to any artist. */}
+          <Stack.Screen name="appointment/new" options={{ headerShown: true, title: 'New Appointment' }} />
           <Stack.Screen name="consult/[id]" options={{ headerShown: true, title: 'Consult' }} />
           <Stack.Screen name="project/[id]" options={{ headerShown: true, title: 'Project' }} />
           <Stack.Screen name="session/[id]" options={{ headerShown: true, title: 'Session' }} />

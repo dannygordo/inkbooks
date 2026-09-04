@@ -26,3 +26,19 @@ query GetClients($page: PageInput) {
 		}
 	}
 }
+
+# "Do we already have this person?", by email - for the new-appointment wizard's client-email
+# step (X48). Server-scoped the same as everything else here; a MISS matters (not cosmetic) - see
+# ClientService.js's own header comment on why this is a server lookup and not a scan of an
+# already-paged client list: createBookingRequest's own findOrCreateGuestClient finds an existing
+# person by email regardless, so a client-side miss here would let a freshly typed name silently
+# overwrite the real one.
+query FindClientByEmail($email: String!) {
+	findClientByEmail(email: $email) {
+		id
+		firstName
+		lastName
+		email
+		phone
+	}
+}

@@ -2094,6 +2094,80 @@ for actually sharing it.
 `FORM_FIELD_TYPE_LABELS`/`formFieldTypeLabel`) - same "build the map directly, don't port
 `prettyConstantsListValue`" reasoning as `utils/projectStatus.ts` (X20).
 
+### X48. New Appointment - the calendar's tap-and-book wizard
+
+Second and final slice off the mobile/web parity accounting (HANDOFF.md, 2026-09-04) for Danny's
+picked priority "Create new appointment/client/project" - X47 closed the client/artist/staff half;
+this closes gap #1, "no way to create a brand-new appointment or consult from mobile." Direct,
+faithful port of apps/web's `AppointmentWizard.jsx` as one new `appointment/new.tsx` route, reached
+from a new "New" link on `app/index.tsx`'s header (no role gate, matching web's own
+`CreateEventButton.jsx` having none).
+
+**ONE COMPONENT WITH AN INTERNAL STEP MACHINE, NOT SEVERAL ROUTES - unlike X47.** X47's three
+screens were each a flat form because web's own `EntityWizard` steps are a pacing device, not an
+enforced sequence. `AppointmentWizard.jsx` is the opposite: a real seven-state decision tree
+(`type` / `personal-form` / `client-email` / `intake-details` / `datetime` / `session-project` /
+`session-existing-datetime`) with conditional branching and Back navigation that depends on how you
+got there (`client-email`'s Back goes to `session-project` for a session, `type` for a consult).
+Splitting that across expo-router routes would mean re-deriving "where does Back go" from route
+params instead of local state that already has the answer. So this is a byte-for-byte port of web's
+own `step`/`type`/`calendarChoice` state shape and step names, not a redesign.
+
+**Three pipelines, matching web's own three exactly** (see `AppointmentWizard.jsx`'s own header
+comment, ported into `appointment/new.tsx`'s for the full reasoning): Personal calls
+`createAppointment` directly with `isPersonal: true` and no shopId/projectId, skipping the
+client-intake pipeline entirely - a private entry isn't a booking, and forcing it through machinery
+built for one would create records that don't belong to any real work. Consult and a
+brand-new-project Session share one pipeline (`createBookingRequest` then `convertBookingRequest`
+in the same submit, tagged `source: 'artist_created'` so the Booking Requests inbox excludes it -
+it was never a real inbound submission). Session-on-an-existing-project skips the client step
+entirely (the project already has one) and goes straight to a direct `createAppointment`.
+
+**Email-lookup client step, not a picker** - same replacement web itself already made and explains
+in its own header comment: a real user found the old dropdown confusing, and a missing-selection
+bug went undetected until the final Save step. Typing an email debounces into a server
+`findClientByEmail` lookup (new `clients.graphql` query - NOT a scan of the already-paged client
+list mobile's own `clients/index.tsx` fetches, for the same "a miss here silently overwrites a real
+name" reasoning `ClientService.js`'s own comment gives); a match shows the client read-only, a miss
+reveals name/phone fields for `findOrCreateGuestClient` to create.
+
+**No global success/error alert, unlike web.** Web raises a global `setAlert` specifically because
+a small in-dialog error line was once genuinely missable (the real bug its header comment
+describes). Mobile has no toast/snackbar system anywhere in this app - every other create/save flow
+here (`client/new.tsx`'s error banner, `appointment/[id].tsx`'s own `handleSave`) already relies on
+an inline error plus an immediate `router.back()` on success, so this follows that instead of
+inventing a new one. `router.back()` relies on `refetchQueries: ['GetAppointmentsByShop',
+'GetAppointmentsByArtist']` (the same plain-name-list `BookSessionDatesForm.tsx` and
+`appointment/[id].tsx` already each carry) to make the calendar screen's own already-mounted query
+show the new appointment without any focus-refetch hook - same `@react-navigation/native` isn't a
+resolvable import here reasoning as X47's own `refetchQueries` comment.
+
+**Project picker is `PillRow`, not a ported `IBProjectsByArtistSelect`** (an MUI `Select` with an
+avatar + title + description row per option) - same no-cross-platform-`<select>` precedent every
+web `<select>` port on this app has followed since `DurationPicker.tsx`. Each pill reads
+`"<client first> <client last> - <project title>"` rather than showing an avatar, since a title
+alone can repeat across a shop's projects and the client name is what actually disambiguates them.
+
+**Reused rather than rebuilt**: `DateTimeField`/`DurationPicker` (already built for
+`BookSessionDatesForm.tsx`/personal-appointment editing), `CONSULT_DEFAULT_MINUTES`/
+`SESSION_DEFAULT_MINUTES` (`utils/duration.ts`), `useConvertBookingRequestMutation`/
+`useCreateAppointmentMutation`/`useGetProjectsByArtistQuery` (all already generated for other
+screens). Only two new operations were needed: `CreateBookingRequest` (`bookingRequests.graphql`)
+and `FindClientByEmail` (`clients.graphql`) - `ConvertBookingRequest`, `CreateAppointment`, and
+`GetProjectsByArtist` already existed in `packages/api`.
+
+Verification: `packages/api` codegen + build clean (new `useCreateBookingRequestMutation`/
+`useFindClientByEmailLazyQuery` hooks), `apps/mobile` `tsc --noEmit` clean, full Jest suite still
+247/247 (no new pure-logic module - this screen is Apollo-wired end to end, matching every other
+settings/creation screen's no-screen-level-test convention).
+
+**With both halves of Danny's picked priority now closed (X47 client/artist/staff, this entry the
+appointment/consult half), the mobile/web parity accounting's gap #1 and gap #2 are both done.**
+Nine items remain on that list (client detail depth, dashboard/analytics, gift cards, client flags,
+email-notification preferences, the in-app notification feed, group/shop-wide conversations +
+search, the booking-request field editor, and registration/first-time password set) - see
+HANDOFF.md's own accounting for the full reasoning behind each; priority among them is Danny's call.
+
 ### X47. Add Client / Add Artist / Add Staff - account creation from mobile
 
 First slice off the mobile/web parity accounting written into HANDOFF.md on 2026-09-04 (gap #2:

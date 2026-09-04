@@ -3058,14 +3058,13 @@ no single read told the whole story. This section is that single accounting, bui
 actual mobile source against web's routes and settings categories directly, not by trusting any
 prior summary. Ranked roughly by how much it blocks ordinary daily use, most-blocking first.
 
-1. **No way to create a brand-new appointment or consult from mobile.** The calendar screen
-   (`app/index.tsx`) is read-only for that - deliberately, per PRODUCTION_ROADMAP.md's own Phase 5
-   step 6 ("creating a brand-new appointment is still [a future] wizard"). A consult/session only
-   comes into existence today by converting an existing booking request
-   (`components/BookSessionDatesForm.tsx`) or adding a session to a project that already exists
-   (`components/ProjectSessionsList.tsx`). There is no tap-an-empty-slot-and-book flow the way
-   web's `CreateEventDialog` gives `Appointments.jsx`. An artist taking a walk-in or a phone call
-   has no way to get it onto the calendar from their phone.
+1. ~~No way to create a brand-new appointment or consult from mobile~~ - **done 2026-09-04
+   (X48)**: a new "New" link on `app/index.tsx`'s header opens `appointment/new.tsx`, a direct,
+   faithful port of web's `AppointmentWizard.jsx` as one component with the same internal
+   seven-step machine (Personal / Consult / Session-on-existing-project / Session-with-a-new-project
+   all as their own path through it, exactly matching web's own three underlying pipelines). Closing
+   this and X47 together closes both halves of Danny's picked priority ("Create new
+   appointment/client/project").
 2. ~~No client, project, staff, or artist account can be created from mobile at all~~ - **client/
    artist/staff done 2026-09-04 (X47)**: "Add Client"/"Add Artist"/"Add Staff" buttons on the three
    directory screens open new `client/new.tsx`/`artist/new.tsx`/`staff/new.tsx` routes, direct
@@ -3134,21 +3133,22 @@ items there is Danny's call, not assumed here - see that section for the full re
 one. The deferred items below (0 and 1) are what's left before the app could take real money, and
 Danny's plan is to hold those until mobile is otherwise complete rather than start them early.
 
-**Danny picked "Create new appointment/client/project" first. The client/artist/staff half of that
-is done (X47, 2026-09-04)** - three new "Add" buttons and full-screen creation routes, direct ports
-of web's `AccountWizards.jsx`. **The appointment/consult half (gap #1, the calendar's own
-tap-an-empty-slot-and-book flow) is still open and is the natural next slice** - it's a materially
-bigger port than X47 (web's `AppointmentWizard.jsx` is 767 lines: personal-vs-shop calendar choice,
-consult-vs-session type choice, an email-lookup client step for consult/new-session, an
-intake-details step, a date/time picker, and an existing-vs-new-project branch for a session,
-sitting on top of `createBookingRequest`+`convertBookingRequest` for the consult/new-session paths
-and a more direct `createAppointment` for the rest). X47's own DECISIONS.md entry names this split
-explicitly. Worth scoping as its own read-first pass over `AppointmentWizard.jsx`'s remaining
-~650 lines (only the first ~120 were read while planning X47) plus `AppointmentSlotPicker.jsx`/
-`DurationPicker.jsx`/`IBProjectsByArtistSelect.jsx`/`BookingRequestService.js` before deciding
-whether it ships as one slice or splits further (e.g. Personal/Session-on-existing-project first,
-since those skip the client-lookup and booking-request machinery entirely, then Consult/new-Session
-after).
+**Danny picked "Create new appointment/client/project" first - both halves are now done.**
+X47 (2026-09-04) closed client/artist/staff. X48 (2026-09-04) closed the appointment/consult half -
+a new "New" link on `app/index.tsx`'s header opens `appointment/new.tsx`, a direct port of web's
+`AppointmentWizard.jsx` as one component carrying its own seven-step internal machine, covering all
+three of web's underlying pipelines (Personal; Consult and a brand-new-project Session sharing
+`createBookingRequest`+`convertBookingRequest`; Session-on-an-existing-project going straight to
+`createAppointment`). Shipped as one slice rather than split further, once the read-first pass
+showed the whole file was a single state machine that didn't factor cleanly into independent
+pieces - see X48's own DECISIONS.md entry for the full reasoning.
+
+**Nine items remain on the parity accounting above, unprioritized - Danny's call.** Client detail
+depth (gap 3), dashboard/analytics (gap 4), gift cards (gap 5), client flags (gap 6),
+email-notification preferences (gap 7), the in-app notification feed (gap 8), group/shop-wide
+conversations + search (gap 9), the booking-request field editor (gap 10), and
+registration/first-time password set (gap 11). See that section for the full reasoning behind each
+one - nothing here assumes an order.
 
 **0 and 1 below (the shop-admin migration, and a real Square payment) are explicitly deferred —
 reconfirmed 2026-08-25: Danny's plan is to pick this back up as the last item before starting the

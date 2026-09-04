@@ -3000,6 +3000,13 @@ export type GetPendingBookingRequestCountQueryVariables = Exact<{ [key: string]:
 
 export type GetPendingBookingRequestCountQuery = { __typename?: 'Query', getPendingBookingRequestCount: number };
 
+export type CreateBookingRequestMutationVariables = Exact<{
+  bookingRequestInput: BookingRequestInput;
+}>;
+
+
+export type CreateBookingRequestMutation = { __typename?: 'Mutation', createBookingRequest: { __typename?: 'BookingRequest', id: string, status: string } };
+
 export type GetBoothRentPlansQueryVariables = Exact<{
   artistId: Scalars['ID']['input'];
   shopId: Scalars['ID']['input'];
@@ -3041,6 +3048,13 @@ export type GetClientsQueryVariables = Exact<{
 
 
 export type GetClientsQuery = { __typename?: 'Query', getClients: { __typename?: 'ClientPage', items: Array<{ __typename?: 'Client', id: string, firstName: string, lastName: string, email: string, phone: string, avatar?: string | null }>, pageInfo: { __typename?: 'PageInfo', totalCount: number, hasMore: boolean, limit: number, offset: number } } };
+
+export type FindClientByEmailQueryVariables = Exact<{
+  email: Scalars['String']['input'];
+}>;
+
+
+export type FindClientByEmailQuery = { __typename?: 'Query', findClientByEmail?: { __typename?: 'Client', id: string, firstName: string, lastName: string, email: string, phone: string } | null };
 
 export type GetConsultAppointmentQueryVariables = Exact<{
   appointmentId: Scalars['ID']['input'];
@@ -5205,6 +5219,40 @@ export type GetPendingBookingRequestCountQueryHookResult = ReturnType<typeof use
 export type GetPendingBookingRequestCountLazyQueryHookResult = ReturnType<typeof useGetPendingBookingRequestCountLazyQuery>;
 export type GetPendingBookingRequestCountSuspenseQueryHookResult = ReturnType<typeof useGetPendingBookingRequestCountSuspenseQuery>;
 export type GetPendingBookingRequestCountQueryResult = Apollo.QueryResult<GetPendingBookingRequestCountQuery, GetPendingBookingRequestCountQueryVariables>;
+export const CreateBookingRequestDocument = gql`
+    mutation CreateBookingRequest($bookingRequestInput: BookingRequestInput!) {
+  createBookingRequest(bookingRequestInput: $bookingRequestInput) {
+    id
+    status
+  }
+}
+    `;
+export type CreateBookingRequestMutationFn = Apollo.MutationFunction<CreateBookingRequestMutation, CreateBookingRequestMutationVariables>;
+
+/**
+ * __useCreateBookingRequestMutation__
+ *
+ * To run a mutation, you first call `useCreateBookingRequestMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCreateBookingRequestMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [createBookingRequestMutation, { data, loading, error }] = useCreateBookingRequestMutation({
+ *   variables: {
+ *      bookingRequestInput: // value for 'bookingRequestInput'
+ *   },
+ * });
+ */
+export function useCreateBookingRequestMutation(baseOptions?: Apollo.MutationHookOptions<CreateBookingRequestMutation, CreateBookingRequestMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<CreateBookingRequestMutation, CreateBookingRequestMutationVariables>(CreateBookingRequestDocument, options);
+      }
+export type CreateBookingRequestMutationHookResult = ReturnType<typeof useCreateBookingRequestMutation>;
+export type CreateBookingRequestMutationResult = Apollo.MutationResult<CreateBookingRequestMutation>;
+export type CreateBookingRequestMutationOptions = Apollo.BaseMutationOptions<CreateBookingRequestMutation, CreateBookingRequestMutationVariables>;
 export const GetBoothRentPlansDocument = gql`
     query GetBoothRentPlans($artistId: ID!, $shopId: ID!) {
   getBoothRentPlans(artistId: $artistId, shopId: $shopId) {
@@ -5493,6 +5541,53 @@ export type GetClientsQueryHookResult = ReturnType<typeof useGetClientsQuery>;
 export type GetClientsLazyQueryHookResult = ReturnType<typeof useGetClientsLazyQuery>;
 export type GetClientsSuspenseQueryHookResult = ReturnType<typeof useGetClientsSuspenseQuery>;
 export type GetClientsQueryResult = Apollo.QueryResult<GetClientsQuery, GetClientsQueryVariables>;
+export const FindClientByEmailDocument = gql`
+    query FindClientByEmail($email: String!) {
+  findClientByEmail(email: $email) {
+    id
+    firstName
+    lastName
+    email
+    phone
+  }
+}
+    `;
+
+/**
+ * __useFindClientByEmailQuery__
+ *
+ * To run a query within a React component, call `useFindClientByEmailQuery` and pass it any options that fit your needs.
+ * When your component renders, `useFindClientByEmailQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useFindClientByEmailQuery({
+ *   variables: {
+ *      email: // value for 'email'
+ *   },
+ * });
+ */
+export function useFindClientByEmailQuery(baseOptions: Apollo.QueryHookOptions<FindClientByEmailQuery, FindClientByEmailQueryVariables> & ({ variables: FindClientByEmailQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<FindClientByEmailQuery, FindClientByEmailQueryVariables>(FindClientByEmailDocument, options);
+      }
+export function useFindClientByEmailLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<FindClientByEmailQuery, FindClientByEmailQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<FindClientByEmailQuery, FindClientByEmailQueryVariables>(FindClientByEmailDocument, options);
+        }
+// @ts-ignore
+export function useFindClientByEmailSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<FindClientByEmailQuery, FindClientByEmailQueryVariables>): Apollo.UseSuspenseQueryResult<FindClientByEmailQuery, FindClientByEmailQueryVariables>;
+export function useFindClientByEmailSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<FindClientByEmailQuery, FindClientByEmailQueryVariables>): Apollo.UseSuspenseQueryResult<FindClientByEmailQuery | undefined, FindClientByEmailQueryVariables>;
+export function useFindClientByEmailSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<FindClientByEmailQuery, FindClientByEmailQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<FindClientByEmailQuery, FindClientByEmailQueryVariables>(FindClientByEmailDocument, options);
+        }
+export type FindClientByEmailQueryHookResult = ReturnType<typeof useFindClientByEmailQuery>;
+export type FindClientByEmailLazyQueryHookResult = ReturnType<typeof useFindClientByEmailLazyQuery>;
+export type FindClientByEmailSuspenseQueryHookResult = ReturnType<typeof useFindClientByEmailSuspenseQuery>;
+export type FindClientByEmailQueryResult = Apollo.QueryResult<FindClientByEmailQuery, FindClientByEmailQueryVariables>;
 export const GetConsultAppointmentDocument = gql`
     query GetConsultAppointment($appointmentId: ID!) {
   getAppointment(appointmentId: $appointmentId) {

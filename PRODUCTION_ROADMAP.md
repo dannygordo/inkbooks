@@ -1295,12 +1295,17 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    `tsc --noEmit` clean, full `apps/mobile` Jest suite - 247/247, up from 233 (new
    `bookingSlug.test.ts`, ported test-by-test from web's own).
 
-   **The appointment/consult half of that same pick (the calendar's tap-an-empty-slot-and-book
-   flow) is still open and is the named next slice** - a materially bigger port (web's
-   `AppointmentWizard.jsx` is 767 lines with several branching paths) that X47's own DECISIONS.md
-   entry deliberately left separate. See HANDOFF.md's "Next" section for the specific plan (a
-   read-first pass over the rest of that file plus its supporting components, then a decision on
-   whether it ships as one slice or splits further).
+   **The appointment/consult half of that same pick is done too (2026-09-04, see DECISIONS.md
+   X48) - both halves of "Create new appointment/client/project" are now closed.** A new "New" link
+   on the calendar screen's header opens `appointment/new.tsx`, a direct port of web's 767-line
+   `AppointmentWizard.jsx` as one component carrying its own seven-step internal state machine
+   (Personal / Consult / Session-on-existing-project / Session-with-a-new-project), rather than
+   split across several routes - the read-first pass found a single decision tree with
+   Back-navigation that depends on how each step was reached, not several independent flows that
+   would factor apart cleanly. Confirmed in this sandbox: `packages/api` codegen + build,
+   `apps/mobile` `tsc --noEmit` clean, full `apps/mobile` Jest suite - still 247/247 (Apollo-wired
+   screen, no new pure-logic module). Nine items remain on the parity accounting, unprioritized -
+   see HANDOFF.md's "Next" section.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).
 10. TestFlight beta, then App Store submission - Guideline 3.1.1 already checked in step 5, so this
