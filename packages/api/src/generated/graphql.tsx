@@ -3304,7 +3304,7 @@ export type GetFormForEditQueryVariables = Exact<{
 }>;
 
 
-export type GetFormForEditQuery = { __typename?: 'Query', getForm: { __typename?: 'Form', id: string, title: string, description?: string | null, slug?: string | null, shopUseOnly: boolean, status: string, allowGuestSubmissions: boolean, publicToken?: string | null, systemKey?: string | null, fields: Array<{ __typename?: 'FormField', key: string, type: string, label: string, helpText?: string | null, required: boolean, options: Array<string> }> } };
+export type GetFormForEditQuery = { __typename?: 'Query', getForm: { __typename?: 'Form', id: string, title: string, description?: string | null, slug?: string | null, shopUseOnly: boolean, status: string, allowGuestSubmissions: boolean, publicToken?: string | null, systemKey?: string | null, fields: Array<{ __typename?: 'FormField', key: string, type: string, label: string, helpText?: string | null, required: boolean, options: Array<string>, hidden: boolean }> } };
 
 export type CreateFormFromBuilderMutationVariables = Exact<{
   input: CreateFormInput;
@@ -3319,6 +3319,14 @@ export type UpdateFormMutationVariables = Exact<{
 
 
 export type UpdateFormMutation = { __typename?: 'Mutation', updateForm: { __typename?: 'Form', id: string, title: string, description?: string | null, slug?: string | null, shopUseOnly: boolean, status: string, allowGuestSubmissions: boolean, publicToken?: string | null, systemKey?: string | null, fields: Array<{ __typename?: 'FormField', key: string, type: string, label: string, helpText?: string | null, required: boolean, options: Array<string> }> } };
+
+export type UpdateBookingRequestFieldsMutationVariables = Exact<{
+  formId: Scalars['ID']['input'];
+  fields: Array<BookingRequestFieldInput> | BookingRequestFieldInput;
+}>;
+
+
+export type UpdateBookingRequestFieldsMutation = { __typename?: 'Mutation', updateBookingRequestFields: { __typename?: 'Form', id: string, title: string, description?: string | null, slug?: string | null, shopUseOnly: boolean, status: string, allowGuestSubmissions: boolean, publicToken?: string | null, systemKey?: string | null, fields: Array<{ __typename?: 'FormField', key: string, type: string, label: string, helpText?: string | null, required: boolean, options: Array<string>, hidden: boolean }> } };
 
 export type GetProjectQueryVariables = Exact<{
   projectId: Scalars['ID']['input'];
@@ -7208,6 +7216,7 @@ export const GetFormForEditDocument = gql`
       helpText
       required
       options
+      hidden
     }
   }
 }
@@ -7346,6 +7355,57 @@ export function useUpdateFormMutation(baseOptions?: Apollo.MutationHookOptions<U
 export type UpdateFormMutationHookResult = ReturnType<typeof useUpdateFormMutation>;
 export type UpdateFormMutationResult = Apollo.MutationResult<UpdateFormMutation>;
 export type UpdateFormMutationOptions = Apollo.BaseMutationOptions<UpdateFormMutation, UpdateFormMutationVariables>;
+export const UpdateBookingRequestFieldsDocument = gql`
+    mutation UpdateBookingRequestFields($formId: ID!, $fields: [BookingRequestFieldInput!]!) {
+  updateBookingRequestFields(formId: $formId, fields: $fields) {
+    id
+    title
+    description
+    slug
+    shopUseOnly
+    status
+    allowGuestSubmissions
+    publicToken
+    systemKey
+    fields {
+      key
+      type
+      label
+      helpText
+      required
+      options
+      hidden
+    }
+  }
+}
+    `;
+export type UpdateBookingRequestFieldsMutationFn = Apollo.MutationFunction<UpdateBookingRequestFieldsMutation, UpdateBookingRequestFieldsMutationVariables>;
+
+/**
+ * __useUpdateBookingRequestFieldsMutation__
+ *
+ * To run a mutation, you first call `useUpdateBookingRequestFieldsMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateBookingRequestFieldsMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateBookingRequestFieldsMutation, { data, loading, error }] = useUpdateBookingRequestFieldsMutation({
+ *   variables: {
+ *      formId: // value for 'formId'
+ *      fields: // value for 'fields'
+ *   },
+ * });
+ */
+export function useUpdateBookingRequestFieldsMutation(baseOptions?: Apollo.MutationHookOptions<UpdateBookingRequestFieldsMutation, UpdateBookingRequestFieldsMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<UpdateBookingRequestFieldsMutation, UpdateBookingRequestFieldsMutationVariables>(UpdateBookingRequestFieldsDocument, options);
+      }
+export type UpdateBookingRequestFieldsMutationHookResult = ReturnType<typeof useUpdateBookingRequestFieldsMutation>;
+export type UpdateBookingRequestFieldsMutationResult = Apollo.MutationResult<UpdateBookingRequestFieldsMutation>;
+export type UpdateBookingRequestFieldsMutationOptions = Apollo.BaseMutationOptions<UpdateBookingRequestFieldsMutation, UpdateBookingRequestFieldsMutationVariables>;
 export const GetProjectDocument = gql`
     query GetProject($projectId: ID!) {
   getProject(projectId: $projectId) {

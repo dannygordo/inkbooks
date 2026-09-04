@@ -226,11 +226,13 @@ function RootNavigator() {
               comment. Same `canManageBusinessLedger` gate. */}
           <Stack.Screen name="expenses/index" options={{ headerShown: true, title: 'Expenses' }} />
           {/* Forms - see forms/index.tsx's own header comment for the full scope (list, Responses,
-              and FormBuilder; BookingRequestFieldsEditor/analytics remain deliberately not ported -
-              see form/[id].tsx). Gated `canManageForms`, narrower than Income/Expenses' gate. */}
+              FormBuilder, and the booking_request system form's own restricted editor; getFormAnalytics
+              remains deliberately not ported - see forms.graphql). Gated `canManageForms`, narrower
+              than Income/Expenses' gate. */}
           <Stack.Screen name="forms/index" options={{ headerShown: true, title: 'Forms' }} />
           <Stack.Screen name="form-responses/[id]" options={{ headerShown: true, title: 'Responses' }} />
           <Stack.Screen name="form/[id]" options={{ headerShown: true, title: 'Form' }} />
+          <Stack.Screen name="form-booking-fields/[id]" options={{ headerShown: true, title: 'Booking Request Fields' }} />
         </Stack.Protected>
       </Stack>
     </ThemeProvider>

@@ -2094,6 +2094,68 @@ for actually sharing it.
 `FORM_FIELD_TYPE_LABELS`/`formFieldTypeLabel`) - same "build the map directly, don't port
 `prettyConstantsListValue`" reasoning as `utils/projectStatus.ts` (X20).
 
+### X54. Booking request field editor built on mobile - its own restricted screen, not FormBuilder
+
+Eighth slice off the mobile/web parity accounting (HANDOFF.md, 2026-09-04) - gap #10, "The custom
+booking-request field editor (`BookingRequestFieldsEditor.jsx`, `/forms/:id/booking-fields` on
+web) is explicitly not ported." X30 built the generic FormBuilder but deliberately left this one
+closed (see form/[id].tsx's redirect and its own header comment) - it's a genuinely separate,
+narrower screen on web, not a variant of FormBuilder, and needed the same treatment here.
+
+**Why this can't just be FormBuilder with a flag.** The `booking_request` system form's seven
+optional fields (placement, size, budget, availability, howHeard, isCoverUp, referenceImages) are
+the exact set the real BookingRequest pipeline (server's `mutations/bookingRequests.js`, the
+`BookingRequest` model, the public `/book/:artistHandle` page) knows how to read - nothing here
+can add, remove, or retype one without breaking that pipeline. Web enforces this with a completely
+separate component (`BookingRequestFieldsEditor.jsx`) and a completely separate mutation
+(`updateBookingRequestFields`, taking `BookingRequestFieldInput` - no `type`, no `options`, `key`
+required rather than optional) that the server re-validates against the exact same key set
+independently (`resolvers/forms.js`) - not editor-level UX are the same reasons `getForm` returns
+`hidden` per field only for these seven slots (`typeDefs.js`'s own comment on `FormField.hidden`).
+Mobile follows the same shape: a new mutation, not a flag on `UpdateForm`.
+
+**New `packages/api/src/operations/forms.graphql` mutation `UpdateBookingRequestFields`** -
+`formId` + `fields: [BookingRequestFieldInput!]!`, each `{key, label, required, hidden}`, mirroring
+web's `FormService.UPDATE_BOOKING_REQUEST_FIELDS` exactly. `GetFormForEdit`'s `fields` selection
+gained `hidden` too, reused as-is by the new screen (web's `BookingRequestFieldsEditor.jsx` reuses
+the same `FormService.getForm` its `FormBuilder.jsx` sibling calls, for the same reason - one
+resolver, one field-shape source of truth) - harmless on the generic FormBuilder screen, which
+never sets it (always `false` on a non-system form).
+
+**New route `app/form-booking-fields/[id].tsx`**, named like the sibling `form-responses/[id].tsx`
+rather than nested under `form/` - it's a fully separate screen with its own mutation, not a mode
+of the FormBuilder route. Reached from `forms/index.tsx`'s booking_request row, which gets a new
+"Edit Fields" action in place of the Responses/link-toggle/Duplicate buttons that row never showed
+anyway (X28/X30 already gated those off for `isBookingRequest`). `form/[id].tsx`'s own redirect
+(back to the Forms list, not to this new screen) is unchanged - nothing there needs a
+booking_request form's id once it's identified as one, and the list's own row already links to the
+right place directly, so bouncing through the generic builder first would just add a hop.
+
+**Field reorder: the same Up/Down-button substitute as X30**, not a second drag implementation -
+`utils/formBuilder.ts`'s `moveField` was generalized to `moveField<T>` so this screen's own
+narrower `{key, label, required, hidden}` shape (no `type`/`options`/`_localId` - this screen never
+needs them) can reuse the identical swap logic rather than duplicating it for a second field shape.
+
+**No Add/Remove/type controls, matching web** - the seven-key restriction is a hard server-side
+guarantee (above), so the UI simply never offers what the pipeline can't honor. Relabel is a plain
+text input, required/hidden are RN `Switch`es (`toggleRow`, the same convention `form/[id].tsx`
+already established for its own `required` toggle and `settings/index.tsx`'s appearance toggles) -
+web's "Shown on the booking page" checkbox is the same inverted-`hidden` semantics carried over
+verbatim, including its label text.
+
+**Save navigates back on success; errors show inline** - matching `form/[id].tsx`'s own plain
+`.catch((err) => setSaveError(...))` pattern rather than web's toast-style alert, since mobile has
+no equivalent alert/toast system and this is the same shape of screen.
+
+No dedicated screen-level test, matching the established convention for Apollo-wired screens in
+this slice (X47 onward) - `moveField`'s generalization is covered by the existing `formBuilder.test.ts`
+suite unchanged (its own tests only ever exercised `LocalFormField[]`, and a generic signature
+doesn't change that behavior).
+
+Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean, and
+the full `apps/mobile` Jest suite - 252/252 (unchanged from X53; no new test file, per the
+convention above).
+
 ### X53. Messages search - and why group/shop-wide conversations stay unbuilt
 
 Seventh slice off the mobile/web parity accounting (HANDOFF.md, 2026-09-04) - gap #9, "Group/

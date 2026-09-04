@@ -104,7 +104,10 @@ export function fieldsForInput(fields: LocalFormField[]) {
 // Clamped move-by-one - moving the first field up or the last field down is a no-op (returns the
 // same array reference) rather than wrapping around, since there's no drag gesture here to simply
 // refuse the way dropping above the list's top would.
-export function moveField(fields: LocalFormField[], index: number, direction: 'up' | 'down'): LocalFormField[] {
+// Generic over T (not just LocalFormField) since X54 reuses this exact swap for
+// form-booking-fields/[id].tsx's fixed seven-field array, which has its own narrower shape - the
+// reorder logic itself has nothing to do with what a field looks like.
+export function moveField<T>(fields: T[], index: number, direction: 'up' | 'down'): T[] {
 	const targetIndex = direction === 'up' ? index - 1 : index + 1;
 	if (index < 0 || index >= fields.length || targetIndex < 0 || targetIndex >= fields.length) {
 		return fields;

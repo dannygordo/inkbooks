@@ -3,11 +3,14 @@
 # utils/businessScope.ts's canManageForms (a plain shop-connected artist who isn't a shop admin
 # sees none of this, unlike Income/Expenses' canManageBusinessLedger).
 #
-# DELIBERATELY NOT PORTED this slice: BookingRequestFieldsEditor (the booking_request system
-# form's own restricted editor - form/[id].tsx redirects away from it, same as web's FormBuilder
-# does), and getFormAnalytics (a real, separate secondary feature - aggregate per-field stats/
-# percentages layered on top of the response list, not the core "read what someone submitted" job
-# this slice covers). See DECISIONS.md X28.
+# DELIBERATELY NOT PORTED this slice: getFormAnalytics (a real, separate secondary feature -
+# aggregate per-field stats/percentages layered on top of the response list, not the core "read
+# what someone submitted" job this slice covers). See DECISIONS.md X28.
+#
+# BookingRequestFieldsEditor (the booking_request system form's own restricted editor) WAS ADDED
+# in X54 - see form-booking-fields/[id].tsx and UpdateBookingRequestFields below. form/[id].tsx
+# still redirects a booking_request form back to the list (there's no generic field-add/remove/
+# retype to offer there), but forms/index.tsx now sends that row to the dedicated screen instead.
 #
 # FormBuilder (create a form / edit its title, description, link slug, shop-use-only flag, and
 # fields) WAS ADDED in X30 - see form/[id].tsx and utils/formBuilder.ts for the field-reorder
@@ -132,7 +135,11 @@ query GetFormResponsesList($formId: ID!, $page: PageInput) {
 
 # form/[id].tsx's own load query - the full field shape (including options, unlike GetFormsList's
 # already-known-flat items) plus status/allowGuestSubmissions/publicToken/systemKey for the
-# read-only status chip and the booking_request redirect check.
+# read-only status chip and the booking_request redirect check. Also reused as-is by
+# form-booking-fields/[id].tsx (X54) - same getForm resolver web's BookingRequestFieldsEditor
+# calls through FormService.getForm, so `hidden` is selected here even though the generic
+# FormBuilder screen never sets it (always false on a non-system form - see typeDefs.js's own
+# comment on FormField.hidden).
 query GetFormForEdit($formId: ID!) {
 	getForm(formId: $formId) {
 		id
@@ -151,6 +158,7 @@ query GetFormForEdit($formId: ID!) {
 			helpText
 			required
 			options
+			hidden
 		}
 	}
 }
@@ -199,6 +207,34 @@ mutation UpdateForm($input: UpdateFormInput!) {
 			helpText
 			required
 			options
+		}
+	}
+}
+# form-booking-fields/[id].tsx's own save call - deliberately NOT FormFieldInput/UpdateForm (see
+# typeDefs.js's own comment on BookingRequestFieldInput): key is required, and type/options are
+# absent because the booking_request system form's seven fields keep whatever type/options they
+# were seeded with forever. resolvers/forms.js re-checks the exact-same-key-set server-side too,
+# not just this schema - a mismatched key set here comes back as a GraphQL error, not silently
+# dropped fields.
+mutation UpdateBookingRequestFields($formId: ID!, $fields: [BookingRequestFieldInput!]!) {
+	updateBookingRequestFields(formId: $formId, fields: $fields) {
+		id
+		title
+		description
+		slug
+		shopUseOnly
+		status
+		allowGuestSubmissions
+		publicToken
+		systemKey
+		fields {
+			key
+			type
+			label
+			helpText
+			required
+			options
+			hidden
 		}
 	}
 }

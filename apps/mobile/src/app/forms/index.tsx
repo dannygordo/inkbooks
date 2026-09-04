@@ -35,8 +35,11 @@ type FormItem = GetFormsListQuery['getForms']['items'][number];
  *
  * **"New Form" and tapping a form's title both open `form/[id].tsx`** (X30) - the field editor
  * this list originally shipped without. A form's title links to `/form/:id` to edit it, EXCEPT
- * the booking_request system form, which keeps plain text here (its own restricted editor isn't
- * ported - see form/[id].tsx's own comment on why it redirects back here if reached directly).
+ * the booking_request system form, which keeps plain text here and gets its own "Edit Fields"
+ * action instead, opening `form-booking-fields/[id].tsx` (X54) - form/[id].tsx still redirects
+ * back here if a booking_request form is reached through it directly (there's no generic
+ * add/remove/retype to offer for those seven fixed fields), so this row only ever sends someone
+ * to the dedicated restricted editor.
  *
  * **Duplicate is still ported here rather than routed through the editor** - it's a plain
  * `createForm` call with the source form's own fields client-side-copied (dropping each field's
@@ -233,7 +236,14 @@ export default function FormsScreen() {
                     {form.status === 'published' ? (
                       <Button label="Archive" variant="secondary" onPress={() => runAction(archiveForm({ variables: { formId: form.id } }))} testID={`form-archive-${form.id}`} />
                     ) : null}
-                    {!isBookingRequest ? (
+                    {isBookingRequest ? (
+                      <Button
+                        label="Edit Fields"
+                        variant="secondary"
+                        onPress={() => router.push({ pathname: '/form-booking-fields/[id]', params: { id: form.id } })}
+                        testID={`form-booking-fields-${form.id}`}
+                      />
+                    ) : (
                       <>
                         <Button
                           label="Responses"
@@ -249,7 +259,7 @@ export default function FormsScreen() {
                         />
                         <Button label="Duplicate" variant="secondary" onPress={() => handleDuplicate(form)} testID={`form-duplicate-${form.id}`} />
                       </>
-                    ) : null}
+                    )}
                     {!form.systemKey ? (
                       <Button label="Delete" variant="danger" onPress={() => handleDelete(form)} testID={`form-delete-${form.id}`} />
                     ) : null}

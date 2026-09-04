@@ -50,10 +50,12 @@ import { FORM_FIELD_TYPE_OPTIONS, formStatusLabel, isChoiceFieldType } from '@/u
  *   /form/:id   - loads the existing Form via GetFormForEdit and edits it in place; Save calls
  *                 updateForm.
  *
- * The booking_request system form is redirected away from here (back to the Forms list) exactly
- * like web redirects to its own restricted booking-fields editor - that editor isn't ported on
- * mobile at all (see forms/index.tsx's own comment), so there's nowhere to send someone who lands
- * here for it besides back.
+ * The booking_request system form is redirected away from here (back to the Forms list), not to
+ * its own restricted editor (form-booking-fields/[id].tsx, X54) - unlike web, which redirects
+ * FormBuilder straight to BookingRequestFieldsEditor for this case. Nothing here actually needs
+ * that form's id once it's known to be booking_request, and forms/index.tsx's own row already has
+ * a direct "Edit Fields" action to the right screen, so bouncing through this one first would just
+ * add a hop.
  *
  * The "always asks First Name/Last Name/Email/Phone first" notice is carried over verbatim from
  * web - it's not a field on the form, just a description of something the server always does
@@ -94,7 +96,8 @@ export default function FormBuilderScreen() {
   }, [loadedForm, loadedFormId]);
 
   // See this screen's own header comment - the booking_request system form has its own restricted
-  // editor on web, not ported here, so there's nowhere to send someone but back to the list.
+  // editor now (form-booking-fields/[id].tsx, X54), but forms/index.tsx's list is the one place
+  // that links to it, so a booking_request form reached here directly just bounces back there.
   useEffect(() => {
     if (loadedForm?.systemKey === 'booking_request') {
       router.replace('/forms');

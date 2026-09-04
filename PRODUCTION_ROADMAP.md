@@ -1367,8 +1367,21 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    finding as gift cards (X51), left open rather than built blind. No `packages/api` changes this
    slice. Confirmed in this sandbox: `apps/mobile` `tsc --noEmit` clean, full Jest suite - 252/252,
    up from 247.
-   Three items remain on the parity accounting, unprioritized between the last two - see
-   HANDOFF.md's "Next" section.
+   **The booking-request field editor (gap 10) is done too (2026-09-04, see DECISIONS.md
+   X54)** - a new `form-booking-fields/[id].tsx` screen, direct port of web's
+   `BookingRequestFieldsEditor.jsx`, reached from a new "Edit Fields" action on the
+   `booking_request` row in `forms/index.tsx` (in place of the Responses/link-toggle/Duplicate
+   buttons that row never showed anyway). Same Up/Down-button reorder substitute as X30's generic
+   FormBuilder, via a newly generalized `moveField<T>` in `utils/formBuilder.ts`. New
+   `packages/api/src/operations/forms.graphql` mutation `UpdateBookingRequestFields`
+   (`BookingRequestFieldInput` - no `type`/`options`, `key` required), and `hidden` added to
+   `GetFormForEdit`'s fields selection for this screen to read. `form/[id].tsx` still redirects a
+   booking_request form back to the Forms list rather than to this new screen - the list's own row
+   already links directly to it. Confirmed in this sandbox: `packages/api` codegen + build,
+   `apps/mobile` `tsc --noEmit` clean, full `apps/mobile` Jest suite - still 252/252 (Apollo-wired
+   screen, no new pure-logic module).
+   Two items remain on the parity accounting, unprioritized between them - see HANDOFF.md's
+   "Next" section.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).
 10. TestFlight beta, then App Store submission - Guideline 3.1.1 already checked in step 5, so this

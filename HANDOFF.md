@@ -3133,10 +3133,13 @@ prior summary. Ranked roughly by how much it blocks ordinary daily use, most-blo
    either - no page calls it, and there is no way on web to even start a group conversation. Same
    class of finding as gift cards (gap 5) - left open here with this recorded, not built blind (image-attachment compose and per-row
    mark-unread were both closed earlier, in X35).
-10. **The custom booking-request field editor (`BookingRequestFieldsEditor.jsx`,
-    `/forms/:id/booking-fields` on web) is explicitly not ported** - `form/[id].tsx`'s own header
-    comment redirects away from it, same as web does for its own restricted case, but with nowhere
-    else to send someone who needs it.
+10. ~~The custom booking-request field editor~~ - **done 2026-09-04 (X54)**: a new
+    `form-booking-fields/[id].tsx` screen, direct port of web's `BookingRequestFieldsEditor.jsx`,
+    reached from a new "Edit Fields" action on that row in `forms/index.tsx`. Up/Down buttons
+    substitute for web's drag-reorder (same shape of fix as X30's generic FormBuilder), reusing a
+    now-generalized `utils/formBuilder.ts` `moveField`. `form/[id].tsx` still redirects a
+    booking_request form back to the Forms list rather than to this new screen - see X54's own
+    DECISIONS.md entry for why.
 11. **Registration/onboarding (`/register`) and first-time password set (`/set-password/:token`)
     are web-only.** Lower practical priority than everything above - both are one-time flows
     usually completed off a link before someone has the app installed at all - but worth naming
@@ -3205,10 +3208,15 @@ conversations turned out to be the same shape of finding as gift cards: `getConv
 has a unit test but no UI anywhere, on either platform - left unbuilt, same call as gift cards, not
 re-raised as a fresh question since X51 already settled how to handle this shape of finding.
 
-**Three items remain on the parity accounting above.** Gift cards (gap 5, needs Danny's own
-product call before it can be picked up as a build task), the booking-request field editor (gap
-10), and registration/first-time password set (gap 11). See that section for the full reasoning
-behind each one - nothing here assumes an order between the last two.
+**The booking-request field editor (gap 10) is done too (2026-09-04, X54)** - a new
+`form-booking-fields/[id].tsx` screen, direct port of web's `BookingRequestFieldsEditor.jsx`,
+reached from a new "Edit Fields" action on the booking_request row in `forms/index.tsx`. Same
+Up/Down-button reorder substitute as X30's generic FormBuilder, via a newly generalized
+`moveField<T>`. See X54's own DECISIONS.md entry.
+
+**Two items remain on the parity accounting above.** Gift cards (gap 5, needs Danny's own product
+call before it can be picked up as a build task) and registration/first-time password set (gap
+11). See that section for the full reasoning behind each one.
 
 **0 and 1 below (the shop-admin migration, and a real Square payment) are explicitly deferred —
 reconfirmed 2026-08-25: Danny's plan is to pick this back up as the last item before starting the
