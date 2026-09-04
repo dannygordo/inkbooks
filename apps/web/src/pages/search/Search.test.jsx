@@ -13,7 +13,7 @@ import Search from "./Search";
 
 const RESULTS_LIMIT = 25;
 
-function searchMock(query, clients) {
+function searchMock(query, { clients = [], projects = [] } = {}) {
 	return {
 		request: { query: SearchService.SEARCH, variables: { query, limit: RESULTS_LIMIT } },
 		result: {
@@ -29,7 +29,13 @@ function searchMock(query, clients) {
 						state: null,
 						...c,
 					})),
-					projects: [],
+					projects: projects.map((p) => ({
+						__typename: "Project",
+						description: null,
+						artist: null,
+						client: null,
+						...p,
+					})),
 					messages: [],
 					images: [],
 				},
@@ -75,7 +81,7 @@ describe("Search page", () => {
 		renderSearch({
 			initialQuery: "animal",
 			headerQuery: "dragon",
-			mocks: [searchMock("animal", [{ id: "c1", firstName: "Ann", lastName: "Animalson" }])],
+			mocks: [searchMock("animal", { clients: [{ id: "c1", firstName: "Ann", lastName: "Animalson" }] })],
 		});
 
 		expect(screen.getByPlaceholderText(/Search clients, projects/i)).toHaveValue("animal");
@@ -88,8 +94,8 @@ describe("Search page", () => {
 			initialQuery: "animal",
 			headerQuery: "dragon",
 			mocks: [
-				searchMock("animal", [{ id: "c1", firstName: "Ann", lastName: "Animalson" }]),
-				searchMock("dragon", [{ id: "c2", firstName: "Drew", lastName: "Dragonetti" }]),
+				searchMock("animal", { clients: [{ id: "c1", firstName: "Ann", lastName: "Animalson" }] }),
+				searchMock("dragon", { clients: [{ id: "c2", firstName: "Drew", lastName: "Dragonetti" }] }),
 			],
 		});
 
@@ -105,5 +111,28 @@ describe("Search page", () => {
 		// re-rendered rather than remounted, and the old term used to survive both.
 		expect(await screen.findByText("Drew Dragonetti")).toBeInTheDocument();
 		await waitFor(() => expect(screen.queryByText("Ann Animalson")).not.toBeInTheDocument());
+	});
+
+	// UtilsService.prettyConstantsListValue(APP_SETTINGS_CONSTANTS.PROJECT_STATUS, project.status)
+	// is what this page's own project Status column calls - the exact function DECISIONS.md
+	// documents as having silently returned "" for every real status (see UtilsService.test.js and
+	// Projects.test.jsx, which had the same bug and, until this fix, the same test asserting it).
+	// This file had NO coverage at all of the projects results list before this - searchMock()
+	// defaulted `projects` to `[]` in every existing test - so the bug here was invisible even as a
+	// documented one.
+	it("renders the project's status label in the projects results", async () => {
+		renderSearch({
+			initialQuery: "koi",
+			headerQuery: "dragon",
+			mocks: [
+				searchMock("koi", {
+					projects: [{ id: "p1", title: "Half sleeve - koi", status: "in_progress" }],
+				}),
+			],
+		});
+
+		await screen.findByText("Half sleeve - koi");
+		const statusCell = screen.getByText("In Progress", { selector: '[data-label="Status"]' });
+		expect(statusCell).toBeInTheDocument();
 	});
 });

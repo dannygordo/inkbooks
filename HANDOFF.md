@@ -8,6 +8,34 @@ Last updated: 2026-09-04.
 
 ---
 
+### 2026-09-04 (thirty-ninth entry): fixed the parked Web status-column bug (`UtilsService.prettyConstantsListValue`) - first of the small parked cleanup items
+
+With the test-coverage effort confirmed closed (thirty-eighth entry), Danny asked what's next and
+picked "small parked cleanup items" - the handful of minor, non-blocking things sitting in this
+file's "Known gaps" and DECISIONS.md's "Open" section. Started with the most concrete one: the
+Web Projects/Search Status column has been silently blank since it was built.
+
+`UtilsService._prettyConstantsListValue` checked `item.VALUE`/`item.LABEL` (uppercase) when every
+constants list (`PROJECT_STATUS`, `APPOINTMENT_STATUS`, `BILLING_TYPE`, ...) is keyed lowercase
+`value`/`label`, and separately guarded on `val >= 0` - never true for a status string, which
+coerces to `NaN`. Either defect alone would have broken it; together, the function has never once
+returned a real label for either of its two call sites (`Projects.jsx`, `Search.jsx`). Both pages
+silently rendered an em dash in their Status column for every project, always. Full root-cause and
+fix writeup: DECISIONS.md PR5 (this also removes the now-stale "Open" item that first flagged the
+gap).
+
+`Projects.test.jsx` had a test that had encoded the bug as expected behavior (matching the
+anti-pattern PR3/PR4 corrected elsewhere in the suite) - rewrote it to assert the real label, and
+added a new test confirming the legitimate fallback (an unrecognized status still renders the em
+dash) still holds. `Search.test.jsx` had zero coverage of the projects-results list at all - its
+`searchMock()` helper always defaulted `projects: []` - so extended it to accept a `projects`
+option and added coverage for the same Status column there.
+
+As with every fix this session, this could not be run against a real Vitest suite from here -
+syntax-checked only (`node -c` for the source file, `@babel/parser` with the `jsx` plugin for both
+test files). **Needs a real `npm test` run in `apps/web/` to confirm** before treating this as
+closed.
+
 ### 2026-09-04 (thirty-eighth entry): confirmed green - both suites pass for real, closing out the test-coverage effort
 
 Danny ran `npm test` in both `server/` and `apps/web/` once more after X73 and reported both green.

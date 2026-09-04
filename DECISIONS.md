@@ -3913,6 +3913,42 @@ with a matching mock registered for whatever that completion fires. Ending the t
 promise it created is still pending leaves it free to resolve during a *later* test or file's run,
 attributing a failure to the wrong place at best and silently corrupting jsdom teardown at worst.
 
+### PR5. `UtilsService.prettyConstantsListValue` never matched a real entry - Web's
+Projects/Search status column has been silently blank since it was built
+
+Parked as a known, low-risk gap in this file's own "Open" section (found while building mobile's
+`projectStatusLabel`, but left unfixed as outside that work's own files). Picked up 2026-09-04 as
+the first of the small parked cleanup items, once both suites were confirmed green for real
+(PR3/PR4).
+
+Every constants list in `constants/app.js` - `PROJECT_STATUS`, `APPOINTMENT_STATUS`,
+`BILLING_TYPE`, and the rest - is keyed lowercase `value`/`label`. `_prettyConstantsListValue`
+checked `item.VALUE`/`item.LABEL` (uppercase, a shape nothing in this codebase has ever had), so it
+never matched. It also guarded on `val >= 0`, which is never true for a status *string* like
+`"in_progress"` - a non-numeric string coerces to `NaN`, which fails every numeric comparison - so
+the lookup loop never even ran regardless of casing. Both defects were independently sufficient to
+break every real call; together, this function has never once returned a real label for either of
+its two call sites (`Projects.jsx`, `Search.jsx`). Both silently rendered the empty-value em dash
+in their Status column instead, for every project, since the column was built.
+
+Fixed by matching lowercase `item.value`/`item.label` and guarding on `val !== undefined && val !==
+null && val !== ""` instead of a numeric comparison - correct for the string values this function
+has always actually received.
+
+`Projects.test.jsx` had a test that actively documented the bug as correct behavior (`"renders an
+em dash in the status column, since prettyConstantsListValue never matches a lowercase status"`) -
+the same anti-pattern PR3/PR4 corrected elsewhere. Rewrote it to assert the real label renders, and
+added a new test alongside it confirming the legitimate fallback still holds: a status
+`PROJECT_STATUS` genuinely doesn't recognize still renders the em dash. `Search.test.jsx` had *no*
+coverage of the projects-results list at all - its `searchMock()` helper always defaulted
+`projects: []` - so the identical bug on that page's own identical Status column was invisible even
+as an undocumented one; extended `searchMock()` to accept a `projects` option and added a test
+covering it.
+
+Not run against a real Vitest suite from this sandbox (same environment limitation as PR3/PR4);
+syntax-checked only (`node -c` for `UtilsService.js`, `@babel/parser` with the `jsx` plugin for the
+two test files). Needs a real `npm test` run in `apps/web/` to confirm.
+
 ---
 
 ## Sequencing
@@ -3959,11 +3995,6 @@ share → UI surfaces → dashboard fixes. Standalone fixes pulled forward.
 
 Nothing is blocking. A few things are parked rather than undecided:
 
-- **Web's Projects/Search status column is silently blank** (see X20's own note) -
-  `UtilsService.prettyConstantsListValue`'s uppercase `VALUE`/`LABEL` check never matches
-  `PROJECT_STATUS`'s lowercase `value`/`label` entries. A real, low-risk web bug found while
-  building mobile's own (correct) `projectStatusLabel`; left unfixed since it's outside this
-  mobile-port work's own files, not because it isn't worth fixing.
 - **The reference-image upload 400.** Parked at the user's direction until it recurs and a payload
   exists. `express.json()` was on Express's 100kb default and is now 2mb, but that is **not**
   confirmed as the cause and should not be recorded as the fix.
