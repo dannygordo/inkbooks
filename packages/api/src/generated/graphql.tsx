@@ -3489,6 +3489,20 @@ export type GetMyFormLinksQueryVariables = Exact<{ [key: string]: never; }>;
 
 export type GetMyFormLinksQuery = { __typename?: 'Query', getMyFormLinks: Array<{ __typename?: 'FormLinkSummary', title: string, slug: string }> };
 
+export type GetNotificationSettingsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetNotificationSettingsQuery = { __typename?: 'Query', getNotificationSettings: { __typename?: 'NotificationSettings', moneyMode: string, scheduleMode: string, rosterMode: string, messageMode: string, timezone: string, digestHour: number, prefs: { __typename?: 'NotificationPrefs', moneyEmail?: boolean | null, scheduleEmail?: boolean | null, rosterEmail?: boolean | null, messageEmail?: boolean | null } } };
+
+export type UpdateNotificationSettingsMutationVariables = Exact<{
+  prefs?: InputMaybe<NotificationPrefsInput>;
+  timezone?: InputMaybe<Scalars['String']['input']>;
+  digestHour?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+
+export type UpdateNotificationSettingsMutation = { __typename?: 'Mutation', updateNotificationSettings: { __typename?: 'NotificationSettings', moneyMode: string, scheduleMode: string, rosterMode: string, messageMode: string, timezone: string, digestHour: number, prefs: { __typename?: 'NotificationPrefs', moneyEmail?: boolean | null, scheduleEmail?: boolean | null, rosterEmail?: boolean | null, messageEmail?: boolean | null } } };
+
 export type RequestPasswordResetMutationVariables = Exact<{
   email: Scalars['String']['input'];
 }>;
@@ -8690,6 +8704,109 @@ export type GetMyFormLinksQueryHookResult = ReturnType<typeof useGetMyFormLinksQ
 export type GetMyFormLinksLazyQueryHookResult = ReturnType<typeof useGetMyFormLinksLazyQuery>;
 export type GetMyFormLinksSuspenseQueryHookResult = ReturnType<typeof useGetMyFormLinksSuspenseQuery>;
 export type GetMyFormLinksQueryResult = Apollo.QueryResult<GetMyFormLinksQuery, GetMyFormLinksQueryVariables>;
+export const GetNotificationSettingsDocument = gql`
+    query GetNotificationSettings {
+  getNotificationSettings {
+    prefs {
+      moneyEmail
+      scheduleEmail
+      rosterEmail
+      messageEmail
+    }
+    moneyMode
+    scheduleMode
+    rosterMode
+    messageMode
+    timezone
+    digestHour
+  }
+}
+    `;
+
+/**
+ * __useGetNotificationSettingsQuery__
+ *
+ * To run a query within a React component, call `useGetNotificationSettingsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetNotificationSettingsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetNotificationSettingsQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetNotificationSettingsQuery(baseOptions?: Apollo.QueryHookOptions<GetNotificationSettingsQuery, GetNotificationSettingsQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetNotificationSettingsQuery, GetNotificationSettingsQueryVariables>(GetNotificationSettingsDocument, options);
+      }
+export function useGetNotificationSettingsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetNotificationSettingsQuery, GetNotificationSettingsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetNotificationSettingsQuery, GetNotificationSettingsQueryVariables>(GetNotificationSettingsDocument, options);
+        }
+// @ts-ignore
+export function useGetNotificationSettingsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetNotificationSettingsQuery, GetNotificationSettingsQueryVariables>): Apollo.UseSuspenseQueryResult<GetNotificationSettingsQuery, GetNotificationSettingsQueryVariables>;
+export function useGetNotificationSettingsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetNotificationSettingsQuery, GetNotificationSettingsQueryVariables>): Apollo.UseSuspenseQueryResult<GetNotificationSettingsQuery | undefined, GetNotificationSettingsQueryVariables>;
+export function useGetNotificationSettingsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetNotificationSettingsQuery, GetNotificationSettingsQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetNotificationSettingsQuery, GetNotificationSettingsQueryVariables>(GetNotificationSettingsDocument, options);
+        }
+export type GetNotificationSettingsQueryHookResult = ReturnType<typeof useGetNotificationSettingsQuery>;
+export type GetNotificationSettingsLazyQueryHookResult = ReturnType<typeof useGetNotificationSettingsLazyQuery>;
+export type GetNotificationSettingsSuspenseQueryHookResult = ReturnType<typeof useGetNotificationSettingsSuspenseQuery>;
+export type GetNotificationSettingsQueryResult = Apollo.QueryResult<GetNotificationSettingsQuery, GetNotificationSettingsQueryVariables>;
+export const UpdateNotificationSettingsDocument = gql`
+    mutation UpdateNotificationSettings($prefs: NotificationPrefsInput, $timezone: String, $digestHour: Int) {
+  updateNotificationSettings(
+    prefs: $prefs
+    timezone: $timezone
+    digestHour: $digestHour
+  ) {
+    prefs {
+      moneyEmail
+      scheduleEmail
+      rosterEmail
+      messageEmail
+    }
+    moneyMode
+    scheduleMode
+    rosterMode
+    messageMode
+    timezone
+    digestHour
+  }
+}
+    `;
+export type UpdateNotificationSettingsMutationFn = Apollo.MutationFunction<UpdateNotificationSettingsMutation, UpdateNotificationSettingsMutationVariables>;
+
+/**
+ * __useUpdateNotificationSettingsMutation__
+ *
+ * To run a mutation, you first call `useUpdateNotificationSettingsMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateNotificationSettingsMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateNotificationSettingsMutation, { data, loading, error }] = useUpdateNotificationSettingsMutation({
+ *   variables: {
+ *      prefs: // value for 'prefs'
+ *      timezone: // value for 'timezone'
+ *      digestHour: // value for 'digestHour'
+ *   },
+ * });
+ */
+export function useUpdateNotificationSettingsMutation(baseOptions?: Apollo.MutationHookOptions<UpdateNotificationSettingsMutation, UpdateNotificationSettingsMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<UpdateNotificationSettingsMutation, UpdateNotificationSettingsMutationVariables>(UpdateNotificationSettingsDocument, options);
+      }
+export type UpdateNotificationSettingsMutationHookResult = ReturnType<typeof useUpdateNotificationSettingsMutation>;
+export type UpdateNotificationSettingsMutationResult = Apollo.MutationResult<UpdateNotificationSettingsMutation>;
+export type UpdateNotificationSettingsMutationOptions = Apollo.BaseMutationOptions<UpdateNotificationSettingsMutation, UpdateNotificationSettingsMutationVariables>;
 export const RequestPasswordResetDocument = gql`
     mutation RequestPasswordReset($email: String!) {
   requestPasswordReset(email: $email)

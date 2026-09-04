@@ -1331,7 +1331,23 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    future slice. Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile`
    `tsc --noEmit` clean, full `apps/mobile` Jest suite - still 247/247 (Apollo-wired screen, no new
    pure-logic module).
-   Six items remain on the parity accounting, unprioritized - see HANDOFF.md's "Next" section.
+   Gift cards (gap 5) turned out to need Danny's own product call rather than an autonomous
+   pick - reading `server/graphql/resolvers/giftCards.js` found the backend fully built but the
+   feature has no UI on either platform, unlike every other item on this list. Raised directly;
+   Danny picked skipping it for now.
+
+   **Email-notification preferences (gap 7) is done instead (2026-09-04, see DECISIONS.md X51)** -
+   a new "Notifications" link on `settings/index.tsx` opens `settings/notifications.tsx`, a direct
+   port of web's `NotificationSettingsPanel.jsx`: four category toggles reading the resolved
+   email mode, plus a digest-hour `PillRow` (24 options - no cross-platform `<select>`, same
+   precedent as every other closed list on mobile) and a timezone `FormField`, both shown only
+   once something actually digests. New `packages/api/src/operations/notificationSettings.graphql`
+   (`GetNotificationSettings`/`UpdateNotificationSettings`, the settings half of web's
+   `NotificationService.js` only - not the inbox half, which is gap #8's own separate slice).
+   Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+   full `apps/mobile` Jest suite - still 247/247.
+   Five items remain on the parity accounting, unprioritized among the last four - see
+   HANDOFF.md's "Next" section.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).
 10. TestFlight beta, then App Store submission - Guideline 3.1.1 already checked in step 5, so this

@@ -350,6 +350,21 @@ export default function SettingsScreen() {
             </View>
           </View>
 
+          <View style={styles.card}>
+            <ThemedText type="smallBold">Notifications</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              What you get emailed about, and when.
+            </ThemedText>
+            <View style={styles.linkList}>
+              <Button
+                label="Notifications"
+                variant="secondary"
+                onPress={() => router.push('/settings/notifications')}
+                testID="settings-notifications-link"
+              />
+            </View>
+          </View>
+
           {hasAuditAuthority(user) ? (
             <View style={styles.card}>
               <ThemedText type="smallBold">Security</ThemedText>

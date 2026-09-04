@@ -3095,7 +3095,16 @@ prior summary. Ranked roughly by how much it blocks ordinary daily use, most-blo
    future slice, not folded into this one.
 5. **Gift cards have no mobile presence whatsoever** - neither the shop-level nor the
    artist-level side of the feature. Confirmed by a repo-wide search: nothing in `apps/mobile/src`
-   references gift cards at all.
+   references gift cards at all. **Re-scoped 2026-09-04, before X51**: the feature has no UI on
+   *either* platform. `server/graphql/resolvers/giftCards.js` is a fully built backend (sell an
+   artist-issued or shop-issued card, redeem it against a session, the dual-control shop-cut
+   settlement - see DECISIONS.md M6), but a repo-wide search of `apps/web/src` turns up nothing
+   but a `giftCardCents` field threaded through `AppointmentService.js`'s charge quote - no page,
+   no component, no service file. Every other item on this list is a mobile-behind-web gap; this
+   one is a whole-app gap wearing that shape. Raised with Danny directly, who picked skipping this
+   for now (moved to gap #7) rather than designing a new UI from scratch with nothing to port.
+   Left open here rather than closed or silently reworded, so the next pass at it starts from this
+   finding instead of re-discovering it.
 6. ~~Client flags have no mobile presence either~~ - **done 2026-09-04, same X49 as gap 3** (flags
    are a `ClientDashboard` section server-side too, so both closed in the same pass): viewing,
    resolving, and hand-raising a flag all now work from `client/[id].tsx`. Automatic no-show flags
@@ -3103,11 +3112,12 @@ prior summary. Ranked roughly by how much it blocks ordinary daily use, most-blo
    the viewing/resolving/hand-raising UI, which this closes. No flag-TYPE admin screen exists on
    mobile still (matching web, which also has none - see `ClientService.js`'s own comment on
    `getClientFlagTypes` reading seeded platform-wide types only).
-7. **No email-notification-preferences screen.** Web's Notifications settings category
-   (`NotificationSettingsPanel.jsx` - six category toggles, immediate-vs-digest mode, a timezone
-   and hour) has no mobile equivalent at all - not to be confused with Reminders/Auto-Responses/
-   Response Time (client-facing message nudges), which ARE built; this is the account owner's own
-   inbound-email preferences.
+7. ~~No email-notification-preferences screen~~ - **done 2026-09-04 (X51)**: a new
+   "Notifications" link on `settings/index.tsx` opens `settings/notifications.tsx`, a direct port
+   of web's `NotificationSettingsPanel.jsx` - four category toggles (Money/Schedule/Your
+   team/Messages), a digest-hour `PillRow`, and a timezone field, shown only once something
+   actually digests. Not to be confused with Reminders/Auto-Responses/Response Time (client-facing
+   message nudges, already built) - this is the account owner's own inbound-email preferences.
 8. **No in-app notification feed.** Web's bell icon (`NotificationBell.jsx` + `NotificationItem`)
    opens a real list of past notifications; mobile has push notifications that deep-link correctly
    to the right screen (a genuine mobile-only upgrade over web, per PRODUCTION_ROADMAP.md's own
@@ -3165,11 +3175,21 @@ instead of `EntityListPager`) - see X50's own DECISIONS.md entry for the full re
 why viewing one other specific artist's performance is named as its own separate future slice
 rather than part of this one.
 
-**Six items remain on the parity accounting above, unprioritized - Danny's call.**
-Gift cards (gap 5), email-notification preferences (gap 7), the in-app notification feed (gap 8),
+**Gift cards (gap 5) turned out to need Danny's own call, not an autonomous pick - see that gap's
+own re-scoped entry above.** The backend is fully built but the feature has no UI on either
+platform, which breaks this whole list's working assumption (mobile behind web, something real to
+port). Raised directly; Danny picked skipping it for now.
+
+**Email-notification preferences (gap 7) is done instead (2026-09-04, X51)** - a direct port of
+web's `NotificationSettingsPanel.jsx` onto a new `settings/notifications.tsx` screen. See X51's
+own DECISIONS.md entry for the full reasoning, including the digest-hour `PillRow` and why gift
+cards were set aside first.
+
+**Five items remain on the parity accounting above.** Gift cards (gap 5, needs Danny's own
+product call before it can be picked up as a build task), the in-app notification feed (gap 8),
 group/shop-wide conversations + search (gap 9), the booking-request field editor (gap 10), and
 registration/first-time password set (gap 11). See that section for the full reasoning behind each
-one - nothing here assumes an order.
+one - nothing here assumes an order among the last four.
 
 **0 and 1 below (the shop-admin migration, and a real Square payment) are explicitly deferred —
 reconfirmed 2026-08-25: Danny's plan is to pick this back up as the last item before starting the

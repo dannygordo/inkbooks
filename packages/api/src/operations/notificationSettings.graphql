@@ -1,0 +1,37 @@
+# Email-notification preferences - gap #7 of HANDOFF.md's 2026-09-04 parity accounting. Direct
+# port of apps/web's NotificationService.js's settings half (GET_SETTINGS/UPDATE_SETTINGS) -
+# field-for-field, not the inbox half (getInbox/markNotificationsRead/markNotificationsDone),
+# which is gap #8's own separate query and not needed here.
+query GetNotificationSettings {
+	getNotificationSettings {
+		prefs {
+			moneyEmail
+			scheduleEmail
+			rosterEmail
+			messageEmail
+		}
+		moneyMode
+		scheduleMode
+		rosterMode
+		messageMode
+		timezone
+		digestHour
+	}
+}
+
+mutation UpdateNotificationSettings($prefs: NotificationPrefsInput, $timezone: String, $digestHour: Int) {
+	updateNotificationSettings(prefs: $prefs, timezone: $timezone, digestHour: $digestHour) {
+		prefs {
+			moneyEmail
+			scheduleEmail
+			rosterEmail
+			messageEmail
+		}
+		moneyMode
+		scheduleMode
+		rosterMode
+		messageMode
+		timezone
+		digestHour
+	}
+}

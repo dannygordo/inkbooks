@@ -175,6 +175,10 @@ function RootNavigator() {
               "Appearance" link. Every signed-in user sees this, matching web's own
               no-role-floor gate. */}
           <Stack.Screen name="settings/appearance" options={{ headerShown: true, title: 'Appearance' }} />
+          {/* Email-notification preferences - closes gap #7 of HANDOFF.md's 2026-09-04 parity
+              accounting (X51). Reached from settings/index.tsx's own "Notifications" link, no
+              role gate, matching web's own `isVisible: () => true` on this settings category. */}
+          <Stack.Screen name="settings/notifications" options={{ headerShown: true, title: 'Notifications' }} />
           {/* The audit trail (X44) - reached from settings/index.tsx's own "Security" link,
               gated `hasAuditAuthority`. Read-only; nothing here writes anything. */}
           <Stack.Screen name="settings/security" options={{ headerShown: true, title: 'Security' }} />

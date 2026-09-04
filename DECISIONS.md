@@ -2094,6 +2094,52 @@ for actually sharing it.
 `FORM_FIELD_TYPE_LABELS`/`formFieldTypeLabel`) - same "build the map directly, don't port
 `prettyConstantsListValue`" reasoning as `utils/projectStatus.ts` (X20).
 
+### X51. Notifications settings - email preferences
+
+Fifth slice off the mobile/web parity accounting (HANDOFF.md, 2026-09-04) - gap #7, "No
+email-notification-preferences screen." Picked after gap #5 (gift cards) turned out to need a
+different kind of decision than the rest of this list: reading `server/graphql/resolvers/
+giftCards.js` end to end found the whole feature (sell an artist-issued or shop-issued card,
+redeem it against a session, the dual-control shop-cut settlement) is fully built server-side but
+has **no UI anywhere in this app, on either platform** - a repo-wide search of `apps/web/src`
+turns up nothing but a `giftCardCents` field threaded through `AppointmentService.js`'s charge
+quote. Every prior slice in this session has been a direct port of an existing web screen; gift
+cards would mean designing a new UI from scratch with nothing to mirror, which is a different kind
+of work and a real product decision, not a scoping call to make alone. Raised with Danny directly -
+he picked skipping to gap #7 for now rather than building it blind. Gift cards remain open, gap #5
+in HANDOFF.md, with this finding recorded there so the next person who picks it up doesn't
+re-discover it.
+
+**What was built.** A new `app/settings/notifications.tsx` screen, reached from a new
+"Notifications" card on `settings/index.tsx` (no role gate - matches web's `isVisible: () => true`
+on this settings category; every real account type has one). Direct port of web's
+`NotificationSettingsPanel.jsx`: four category toggles (Money/Schedule/Your team/Messages, email
+only - in-app is always on, since the inbox is also the record of what happened, and the screen
+says so plainly rather than hiding a switch that deliberately doesn't exist), each toggle reading
+the RESOLVED mode (`moneyMode`/etc., `'immediate' | 'digest' | 'off'`) rather than the raw
+nullable preference, so an untouched switch never reads as off when the role default has it on. A
+digest-hour picker and a timezone field appear only when something actually resolves to `digest` -
+a control with no effect is worse than an absent one, same reasoning web's own `usesDigest` guard
+gives.
+
+**New `packages/api/src/operations/notificationSettings.graphql`** - `GetNotificationSettings`/
+`UpdateNotificationSettings`, field-for-field matches of web's `NotificationService.js`'s settings
+half only (not `getInbox`/`markNotificationsRead`/`markNotificationsDone` - that's gap #8's own
+query, a separate slice).
+
+**Digest hour uses a `PillRow` of all 24 hours**, not web's MUI `<select>` - same "no
+cross-platform select primitive" precedent `DurationPicker.tsx`/`PillRow.tsx` already set, just a
+longer, horizontally-scrollable list than this app's other pill rows have needed so far.
+**Timezone is a plain `FormField`**, matching web's own free-text `TextField` (neither platform
+offers a real picker here) - saved `onBlur`, with the device's own detected zone shown as a hint
+when it differs from the stored one, same as web's `detectedZone` line. Offered, not applied
+silently: it's the account's own setting, and a value that appears without being chosen is one
+nobody can explain later.
+
+**Verification.** `packages/api`: `npm run codegen` + `npm run build` clean. `apps/mobile`:
+`npx tsc --noEmit` clean; full Jest suite still 247/247 (Apollo-wired settings screen, no new
+pure-logic module - matches the established no-screen-level-test convention).
+
 ### X50. Dashboard - the mobile counterpart to web's Home.jsx
 
 Fourth slice off the mobile/web parity accounting (HANDOFF.md, 2026-09-04) - gap #4, "No dashboard
