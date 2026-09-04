@@ -51,7 +51,7 @@ const registerInputSchema = z
 const registerAccountInputSchema = z
   .object({
     accountType: z.enum(['shop', 'artist'], {
-      errorMap: () => ({ message: 'Choose whether you are signing up as a shop or an artist.' }),
+      message: 'Choose whether you are signing up as a shop or an artist.',
     }),
     email: z
       .string()
@@ -533,7 +533,7 @@ const createArtistGiftCardInputSchema = z.object({
   faceValueCents: z.number().int().positive('A gift card needs a face value above zero'),
   applyFeeOffset: z.boolean().nullish(),
   paymentMethod: z.enum(['cash', 'square'], {
-    errorMap: () => ({ message: 'Choose how the gift card was paid for - cash or Square.' }),
+    message: 'Choose how the gift card was paid for - cash or Square.',
   }),
   pending: z.boolean().nullish(),
 });
@@ -543,7 +543,7 @@ const createShopGiftCardInputSchema = z.object({
   faceValueCents: z.number().int().positive('A gift card needs a face value above zero'),
   applyFeeOffset: z.boolean().nullish(),
   paymentMethod: z.enum(['cash', 'square'], {
-    errorMap: () => ({ message: 'Choose how the gift card was paid for - cash or Square.' }),
+    message: 'Choose how the gift card was paid for - cash or Square.',
   }),
   pending: z.boolean().nullish(),
 });
@@ -776,7 +776,7 @@ const formFieldInputSchema = z
   .object({
     key: z.string().trim().min(1).nullish(),
     type: z.enum(FORM_FIELD_TYPES_TUPLE, {
-      errorMap: () => ({ message: 'Choose a field type.' }),
+      message: 'Choose a field type.',
     }),
     label: z.string().trim().min(1, 'Every field needs a label'),
     helpText: z.string().nullish(),

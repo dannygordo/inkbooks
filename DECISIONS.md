@@ -252,6 +252,22 @@ fixed:
   genuinely exercises that validation message. No schema change - the non-null field is the
   correct, deliberate design, matching deposits.
 
+**The X59 test fix above still failed once run for real, and that turned up a third, wider bug
+(2026-09-04, X60).** The retried test got the resolver's actual validate() call this time, but
+the message it received was Zod's own generic "Invalid option: expected one of..." rather than
+the custom "cash or Square" text - `z.enum(['cash', 'square'], { errorMap: () => ({ message }) })`
+silently does nothing on the Zod version this server actually runs (`4.4.3`). `errorMap` was the
+v3 way to customize an enum's message; v4 renamed it to a plain `message` option, and v4 does not
+error or warn on an unrecognized option, it just ignores it - the exact "no error, wrong number"
+shape this codebase already has a name for (`utils/object-id.js`). This was never gift-card-
+specific: `utils/validation.js` had three other `z.enum(..., { errorMap })` calls, all equally
+silent - `registerAccountInputSchema.accountType` ("Choose whether you are signing up...") and
+`formFieldInputSchema.type` ("Choose a field type."), neither of which any existing test asserts
+the exact message text for, which is how both survived unnoticed until this one did get asserted
+on. Fixed all four call sites to the real v4 `message` option; verified directly against the
+installed zod package (v3's `errorMap` silently swallowed, `message` and `error` both apply
+correctly) rather than assumed from the changelog.
+
 ### M7. A rate change applies forward only, never backward
 
 Changing an artist's percentage never alters work already performed. The rate that applied is the

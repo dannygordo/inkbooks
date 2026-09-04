@@ -451,7 +451,10 @@ describe('gift card sale - paymentMethod and the pending/square state', () => {
   // was not provided" message and no `data` key on the response whatsoever (not even `null`).
   // What IS reachable, and is the thing worth testing here, is a syntactically valid string that
   // isn't one of the two real values - that's the one path that actually exercises this
-  // resolver's own friendly validate() call and its "cash or Square" errorMap message.
+  // resolver's own friendly validate() call and its "cash or Square" custom message (see
+  // X60's fix to validation.js - z.enum's old v3 `errorMap` option is silently a no-op
+  // under the zod v4 this codebase now runs, so this only worked once that was switched to
+  // the real v4 `message` option).
   it('rejects a paymentMethod that is not cash or square', async () => {
     const { artist } = await shopWithArtist(40);
     const token = signTestToken(artist);
