@@ -224,6 +224,16 @@ export default function AppointmentsScreen() {
                 <ThemedText type="link">Forms</ThemedText>
               </Pressable>
             ) : null}
+            {/* Closes gap #5 of HANDOFF.md's 2026-09-04 parity accounting - the mobile
+                counterpart to web's Sidebar.jsx gift-cards link. canManageBusinessLedger (any
+                artist, or a shop-admin-or-better) rather than canManageForms - wider, since every
+                artist qualifies for at least the artist-issued-card half of the screen, matching
+                web's own Sidebar gate (isArtistUser || isShopAdminOrBetter). */}
+            {canManageBusinessLedger(user) ? (
+              <Pressable onPress={() => router.push('/gift-cards')} testID="gift-cards-button">
+                <ThemedText type="link">Gift Cards</ThemedText>
+              </Pressable>
+            ) : null}
             {/* Closes gap #8 of HANDOFF.md's 2026-09-04 parity accounting - the mobile
                 counterpart to web's NotificationBell.jsx. No role gate: every signed-in user has
                 an inbox, matching web's own bell being visible to any account type. */}

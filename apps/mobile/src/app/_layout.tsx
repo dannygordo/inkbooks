@@ -236,6 +236,12 @@ function RootNavigator() {
           <Stack.Screen name="form-responses/[id]" options={{ headerShown: true, title: 'Responses' }} />
           <Stack.Screen name="form/[id]" options={{ headerShown: true, title: 'Form' }} />
           <Stack.Screen name="form-booking-fields/[id]" options={{ headerShown: true, title: 'Booking Request Fields' }} />
+          {/* Gift cards - see gift-cards/index.tsx's own header comment (mobile port of
+              DECISIONS.md M6 + its 2026-09-04 payment-collection follow-up, closing gap 5 of
+              HANDOFF.md's 2026-09-04 parity accounting). Gated by isArtist OR
+              isShopAdminOrBetter on the header link below - wider than canManageForms, since
+              every artist qualifies for at least the artist-issued-card half of the screen. */}
+          <Stack.Screen name="gift-cards/index" options={{ headerShown: true, title: 'Gift Cards' }} />
         </Stack.Protected>
       </Stack>
     </ThemeProvider>

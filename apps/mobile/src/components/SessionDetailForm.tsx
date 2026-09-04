@@ -8,6 +8,7 @@ import {
   GetChargeQuoteDocument,
   useApplyDepositMutation,
   useDeleteAppointmentMutation,
+  useRedeemGiftCardMutation,
   useGetAvailableDepositsQuery,
   useRecordAdjustmentMutation,
   useResetSessionTimerMutation,
@@ -16,7 +17,7 @@ import {
   useUpdateSessionDetailsMutation,
 } from '@inkbooks/api';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Modal, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Alert, Modal, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
 
 import { Button } from '@/components/Button';
 import { DateTimeField } from '@/components/DateTimeField';
@@ -125,6 +126,15 @@ export function SessionDetailForm({
   const [deleteAppointment] = useDeleteAppointmentMutation();
   const [recordAdjustment, { loading: recordingAdjustment }] = useRecordAdjustmentMutation();
   const [applyDeposit, { loading: applyingDeposit }] = useApplyDepositMutation();
+
+  // Gift card redemption - the spend half of DECISIONS.md M6, added to this screen rather than
+  // GiftCards.jsx (see that screen's own header comment on why). Local, uncontrolled-style state
+  // that clears on a successful redemption - a code/amount pair typed in for one redemption, not
+  // a persistent field of the session.
+  const [giftCardCode, setGiftCardCode] = useState('');
+  const [giftCardAmountDollars, setGiftCardAmountDollars] = useState('');
+  const [giftCardError, setGiftCardError] = useState<string | null>(null);
+  const [redeemGiftCard, { loading: redeemingGiftCard }] = useRedeemGiftCardMutation();
 
   const [adjustmentDollars, setAdjustmentDollars] = useState('');
   const [adjustmentReason, setAdjustmentReason] = useState('');
@@ -322,6 +332,33 @@ export function SessionDetailForm({
     await applyDeposit({ variables: { depositAppointmentId, targetAppointmentId: appointment.id } });
   };
 
+  // Unlike applyDeposit above, this doesn't rely purely on normalized-cache merge for the quote -
+  // RedeemGiftCard's own selection already returns enough Appointment fields (subtotalCents,
+  // totalCents, shopCutCents, giftCardCreditCents, ...) with a matching id for Apollo to merge
+  // into the cache on its own, same as every other mutation here. But the debounced `quote` state
+  // has no dependency on the appointment's money fields (only on appointment.id - see that
+  // useEffect's own deps list above), so it would otherwise keep showing the pre-redemption total
+  // until the artist happened to touch the subtotal/tip fields again. Refreshed explicitly here,
+  // same reasoning handleSaveDetails/handleCloseSession already apply to freshQuote.
+  const handleRedeemGiftCard = async () => {
+    setGiftCardError(null);
+    const amountCents = dollarsToCents(giftCardAmountDollars);
+    if (!giftCardCode.trim() || amountCents <= 0) {
+      return;
+    }
+    try {
+      await redeemGiftCard({
+        variables: { appointmentId: appointment.id, code: giftCardCode.trim(), amountCents },
+      });
+      setGiftCardCode('');
+      setGiftCardAmountDollars('');
+      const freshQuote = await getFreshQuote();
+      setQuote(freshQuote);
+    } catch (err) {
+      setGiftCardError((err as Error).message);
+    }
+  };
+
   const displayTaxCents = isClosed ? appointment.taxCents ?? 0 : quote?.taxCents;
   const displayFeeCents = isClosed ? appointment.feeCents ?? 0 : quote?.feeOffsetCents;
   const displayTotalCents = isClosed ? appointment.totalCents ?? 0 : quote?.amountDueCents;
@@ -444,7 +481,52 @@ export function SessionDetailForm({
           </View>
         ) : null}
 
-        {appointment.shopCutCents && appointment.shopCutCents > 0 ? (
+        {!isClosed ? (
+          <View style={styles.giftCardBlock}>
+            <ThemedText type="small" themeColor="textSecondary">
+              Apply a gift card
+            </ThemedText>
+            <View style={styles.giftCardRow}>
+              <TextInput
+                value={giftCardCode}
+                onChangeText={setGiftCardCode}
+                placeholder="Card code"
+                placeholderTextColor={theme.textSecondary}
+                autoCapitalize="characters"
+                style={[styles.giftCardInput, { color: theme.text, borderColor: theme.backgroundSelected }]}
+                testID="session-gift-card-code"
+              />
+              <TextInput
+                value={giftCardAmountDollars}
+                onChangeText={setGiftCardAmountDollars}
+                placeholder="Amount $"
+                placeholderTextColor={theme.textSecondary}
+                keyboardType="decimal-pad"
+                style={[styles.giftCardInput, { color: theme.text, borderColor: theme.backgroundSelected }]}
+                testID="session-gift-card-amount"
+              />
+              <Button
+                label="Apply"
+                variant="secondary"
+                disabled={redeemingGiftCard || !giftCardCode.trim() || dollarsToCents(giftCardAmountDollars) <= 0}
+                onPress={handleRedeemGiftCard}
+                testID="session-gift-card-apply"
+              />
+            </View>
+            {giftCardError ? (
+              <ThemedText type="small" style={styles.error} testID="session-gift-card-error">
+                {giftCardError}
+              </ThemedText>
+            ) : null}
+            {appointment.giftCardCreditCents && appointment.giftCardCreditCents > 0 ? (
+              <ThemedText type="small" themeColor="textSecondary">
+                {formatCents(appointment.giftCardCreditCents)} in gift card credit applied to this session so far.
+              </ThemedText>
+            ) : null}
+          </View>
+        ) : null}
+
+                {appointment.shopCutCents && appointment.shopCutCents > 0 ? (
           <ThemedText type="small" themeColor="textSecondary">
             Shop cut on this session: {formatCents(appointment.shopCutCents)}
             {appointment.shopCutPercentApplied ? ` (${appointment.shopCutPercentApplied}% of the tattoo work)` : ''}
@@ -605,6 +687,23 @@ const styles = StyleSheet.create({
   },
   depositRow: {
     gap: Spacing.one,
+  },
+  giftCardBlock: {
+    gap: Spacing.two,
+    paddingVertical: Spacing.two,
+  },
+  giftCardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  giftCardInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: Spacing.two,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.two,
+    fontSize: 14,
   },
   adjustments: {
     gap: Spacing.two,

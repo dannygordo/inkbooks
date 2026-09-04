@@ -1344,13 +1344,22 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    exclude a pending sale - see DECISIONS.md M6's follow-up entry for the full design. Web:
    `pages/giftCards/GiftCards.jsx` (sell either issuer type, settle a shop-issued card's cut),
    `IBGiftCardPaymentForm.jsx` (a deliberate sibling of `IBSquarePaymentForm`, not a
-   generalization), and a redeem-a-card entry added to `SessionDetail.jsx`. **No `packages/api` or
-   `apps/mobile` changes this pass** - this was the web half of "web first, then mobile"; the
-   mobile port is the next slice of this same item, now with a real UI to port from. Not run
-   through `server/test`'s own Vitest suite in this sandbox - `mongodb-memory-server`'s startup
-   download is blocked by network policy here (confirmed via the proxy's own status endpoint);
-   written and manually reviewed, but genuinely unverified by automation until someone runs
-   `npm test` in `server/` outside this sandbox.
+   generalization), and a redeem-a-card entry added to `SessionDetail.jsx`.
+
+   **The mobile port is done too, in this same pass.** New
+   `packages/api/src/operations/giftCards.graphql` (ten operations mirroring the web slice's
+   mutations and queries field for field), plus `giftCardCreditCents` and
+   `artistIssuedGiftCardCreditCents` added to `appointmentsByProject.graphql`'s Appointment
+   selection so `SessionDetailForm.tsx` can read them. New `app/gift-cards/index.tsx` screen
+   (sell either issuer type, settle a shop-issued card's cut, same visibility gate as web's own
+   Sidebar entry) and a new `SquareGiftCardPaymentForm.tsx` (a deliberate sibling of
+   `SquarePaymentForm.tsx`, not a generalization, matching the web slice's own restraint), plus a
+   redeem-a-card entry added to `SessionDetailForm.tsx`. Confirmed in this sandbox:
+   `packages/api` codegen and build, `apps/mobile` `tsc --noEmit` clean, full `apps/mobile` Jest
+   suite still 252/252. Not run through `server/test`'s own Vitest suite in this sandbox:
+   `mongodb-memory-server`'s startup download is blocked by network policy here (confirmed via the
+   proxy's own status endpoint); written and manually reviewed, but genuinely unverified by
+   automation until someone runs `npm test` in `server/` outside this sandbox.
 
    **Email-notification preferences (gap 7) is done instead (2026-09-04, see DECISIONS.md X51)** -
    a new "Notifications" link on `settings/index.tsx` opens `settings/notifications.tsx`, a direct
@@ -1412,9 +1421,8 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    through it) for the same missing-mobile-deep-link reason. Confirmed in this sandbox:
    `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean, full `apps/mobile` Jest
    suite - still 252/252 (Apollo-wired screen, no new pure-logic module).
-   One item remains on the parity accounting: gift cards (gap 5), now down to a mobile port (the
-   backend and web UI are both built, see the follow-up entry above) - see HANDOFF.md's "Next"
-   section. Every other named gap in the 2026-09-04 accounting is now closed.
+   Gift cards (gap 5) is now fully closed on both platforms too, see the follow-up entry above.
+   Every named gap in the 2026-09-04 accounting is now closed.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).
 10. TestFlight beta, then App Store submission - Guideline 3.1.1 already checked in step 5, so this

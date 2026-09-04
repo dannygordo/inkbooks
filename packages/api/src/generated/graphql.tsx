@@ -527,6 +527,8 @@ export type CreateArtistAccountInput = {
 export type CreateArtistGiftCardInput = {
   applyFeeOffset?: InputMaybe<Scalars['Boolean']['input']>;
   faceValueCents: Scalars['Int']['input'];
+  paymentMethod: Scalars['String']['input'];
+  pending?: InputMaybe<Scalars['Boolean']['input']>;
 };
 
 export type CreateAutoResponseInput = {
@@ -588,6 +590,8 @@ export type CreateRecurringExpenseInput = {
 export type CreateShopGiftCardInput = {
   applyFeeOffset?: InputMaybe<Scalars['Boolean']['input']>;
   faceValueCents: Scalars['Int']['input'];
+  paymentMethod: Scalars['String']['input'];
+  pending?: InputMaybe<Scalars['Boolean']['input']>;
   shopId: Scalars['ID']['input'];
 };
 
@@ -811,6 +815,8 @@ export type GiftCard = {
   issuerArtist?: Maybe<Artist>;
   issuerArtistId?: Maybe<Scalars['ID']['output']>;
   issuerType: Scalars['String']['output'];
+  paymentMethod?: Maybe<Scalars['String']['output']>;
+  saleStatus: Scalars['String']['output'];
   shop?: Maybe<Shop>;
   shopCutCents?: Maybe<Scalars['Int']['output']>;
   shopCutConfirmedAt?: Maybe<Scalars['DateTime']['output']>;
@@ -825,6 +831,7 @@ export type GiftCard = {
   soldAt: Scalars['DateTime']['output'];
   soldBy?: Maybe<User>;
   soldByUserId: Scalars['ID']['output'];
+  squarePaymentId?: Maybe<Scalars['String']['output']>;
   updatedAt?: Maybe<Scalars['DateTime']['output']>;
 };
 
@@ -2900,7 +2907,7 @@ export type GetAppointmentsByProjectQueryVariables = Exact<{
 }>;
 
 
-export type GetAppointmentsByProjectQuery = { __typename?: 'Query', getAppointmentsByProject?: Array<{ __typename?: 'Appointment', id: string, projectId?: string | null, userId?: string | null, shopId?: string | null, title?: string | null, description?: string | null, appointmentType: string, appointmentDate: string, durationMinutes: number, appointmentEnd: string, appointmentStatus: string, subtotalCents?: number | null, taxCents?: number | null, feeCents?: number | null, tipCents?: number | null, totalCents?: number | null, shopCutCents?: number | null, shopCutStatus: string, shopCutPercentApplied?: number | null, depositCents?: number | null, depositStatus?: string | null, depositCreditCents?: number | null, depositCreditFromAppointmentId?: string | null, timerStatus?: string | null, timerStartedAt?: string | null, accumulatedSeconds?: number | null, sessionNotes?: string | null, adjustments: Array<{ __typename?: 'Adjustment', id: string, amountCents: number, reason: string, createdAt: string, createdBy?: { __typename?: 'User', id: string, firstName?: string | null, lastName?: string | null } | null }> } | null> | null };
+export type GetAppointmentsByProjectQuery = { __typename?: 'Query', getAppointmentsByProject?: Array<{ __typename?: 'Appointment', id: string, projectId?: string | null, userId?: string | null, shopId?: string | null, title?: string | null, description?: string | null, appointmentType: string, appointmentDate: string, durationMinutes: number, appointmentEnd: string, appointmentStatus: string, subtotalCents?: number | null, taxCents?: number | null, feeCents?: number | null, tipCents?: number | null, totalCents?: number | null, shopCutCents?: number | null, shopCutStatus: string, shopCutPercentApplied?: number | null, depositCents?: number | null, depositStatus?: string | null, depositCreditCents?: number | null, depositCreditFromAppointmentId?: string | null, giftCardCreditCents?: number | null, artistIssuedGiftCardCreditCents?: number | null, timerStatus?: string | null, timerStartedAt?: string | null, accumulatedSeconds?: number | null, sessionNotes?: string | null, adjustments: Array<{ __typename?: 'Adjustment', id: string, amountCents: number, reason: string, createdAt: string, createdBy?: { __typename?: 'User', id: string, firstName?: string | null, lastName?: string | null } | null }> } | null> | null };
 
 export type GetArtistShopConnectionsQueryVariables = Exact<{
   artistId: Scalars['ID']['input'];
@@ -3355,6 +3362,75 @@ export type GetProjectsByArtistQueryVariables = Exact<{
 
 
 export type GetProjectsByArtistQuery = { __typename?: 'Query', getProjectsByArtist?: Array<{ __typename?: 'Project', id: string, title: string, description: string, client?: { __typename?: 'Client', user?: { __typename?: 'User', id: string, firstName?: string | null, lastName?: string | null, avatar?: string | null } | null } | null, artist?: { __typename?: 'Artist', user?: { __typename?: 'User', id: string, firstName?: string | null, lastName?: string | null, avatar?: string | null } | null } | null } | null> | null };
+
+export type CreateArtistGiftCardMutationVariables = Exact<{
+  input: CreateArtistGiftCardInput;
+}>;
+
+
+export type CreateArtistGiftCardMutation = { __typename?: 'Mutation', createArtistGiftCard: { __typename?: 'GiftCard', id: string, code: string, issuerType: string, faceValueCents: number, balanceCents: number, feeOffsetCents: number, paymentMethod?: string | null, saleStatus: string } };
+
+export type CreateShopGiftCardMutationVariables = Exact<{
+  input: CreateShopGiftCardInput;
+}>;
+
+
+export type CreateShopGiftCardMutation = { __typename?: 'Mutation', createShopGiftCard: { __typename?: 'GiftCard', id: string, code: string, issuerType: string, shopId?: string | null, faceValueCents: number, balanceCents: number, feeOffsetCents: number, paymentMethod?: string | null, saleStatus: string } };
+
+export type GetMyGiftCardsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetMyGiftCardsQuery = { __typename?: 'Query', getMyGiftCards: Array<{ __typename?: 'GiftCard', id: string, code: string, issuerType: string, shopId?: string | null, faceValueCents: number, balanceCents: number, feeOffsetCents: number, soldAt: string, soldByUserId: string, paymentMethod?: string | null, saleStatus: string, squarePaymentId?: string | null, shopCutStatus: string, shopCutCents?: number | null, shopCutPercentApplied?: number | null }> };
+
+export type GetGiftCardsByShopQueryVariables = Exact<{
+  shopId: Scalars['ID']['input'];
+}>;
+
+
+export type GetGiftCardsByShopQuery = { __typename?: 'Query', getGiftCardsByShop: Array<{ __typename?: 'GiftCard', id: string, code: string, issuerType: string, shopId?: string | null, faceValueCents: number, balanceCents: number, feeOffsetCents: number, soldAt: string, soldByUserId: string, paymentMethod?: string | null, saleStatus: string, squarePaymentId?: string | null, shopCutStatus: string, shopCutCents?: number | null, shopCutPercentApplied?: number | null }> };
+
+export type GetMyGiftCardLiabilityReportQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetMyGiftCardLiabilityReportQuery = { __typename?: 'Query', getMyGiftCardLiabilityReport: { __typename?: 'GiftCardLiabilityReport', outstandingBalanceCents: number, cardCount: number, oldestIssuedAt?: string | null } };
+
+export type GetGiftCardLiabilityReportQueryVariables = Exact<{
+  shopId: Scalars['ID']['input'];
+}>;
+
+
+export type GetGiftCardLiabilityReportQuery = { __typename?: 'Query', getGiftCardLiabilityReport: { __typename?: 'GiftCardLiabilityReport', outstandingBalanceCents: number, cardCount: number, oldestIssuedAt?: string | null } };
+
+export type RedeemGiftCardMutationVariables = Exact<{
+  appointmentId: Scalars['ID']['input'];
+  code: Scalars['String']['input'];
+  amountCents: Scalars['Int']['input'];
+}>;
+
+
+export type RedeemGiftCardMutation = { __typename?: 'Mutation', redeemGiftCard: { __typename?: 'RedeemGiftCardResult', giftCard: { __typename?: 'GiftCard', id: string, balanceCents: number }, appointment: { __typename?: 'Appointment', id: string, subtotalCents?: number | null, totalCents?: number | null, shopCutCents?: number | null, shopCutPercentApplied?: number | null, giftCardCreditCents?: number | null, artistIssuedGiftCardCreditCents?: number | null }, redemption: { __typename?: 'GiftCardRedemption', id: string, amountCents: number, shopPayoutCents?: number | null } } };
+
+export type CreateGiftCardShopCutInvoiceMutationVariables = Exact<{
+  giftCardId: Scalars['ID']['input'];
+  paymentMethod?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type CreateGiftCardShopCutInvoiceMutation = { __typename?: 'Mutation', createGiftCardShopCutInvoice: { __typename?: 'GiftCardShopCutInvoiceResult', invoiceUrl: string, giftCard: { __typename?: 'GiftCard', id: string, shopCutStatus: string, shopCutSquareInvoiceId?: string | null } } };
+
+export type MarkGiftCardShopCutPaidManuallyMutationVariables = Exact<{
+  giftCardId: Scalars['ID']['input'];
+}>;
+
+
+export type MarkGiftCardShopCutPaidManuallyMutation = { __typename?: 'Mutation', markGiftCardShopCutPaidManually: { __typename?: 'GiftCard', id: string, shopCutStatus: string, shopCutMarkedPaidBy?: string | null, shopCutMarkedPaidAt?: string | null } };
+
+export type ConfirmGiftCardShopCutPaidMutationVariables = Exact<{
+  giftCardId: Scalars['ID']['input'];
+}>;
+
+
+export type ConfirmGiftCardShopCutPaidMutation = { __typename?: 'Mutation', confirmGiftCardShopCutPaid: { __typename?: 'GiftCard', id: string, shopCutStatus: string, shopCutConfirmedBy?: string | null, shopCutConfirmedAt?: string | null } };
 
 export type GlobalSearchQueryVariables = Exact<{
   query: Scalars['String']['input'];
@@ -4649,6 +4725,8 @@ export const GetAppointmentsByProjectDocument = gql`
     depositStatus
     depositCreditCents
     depositCreditFromAppointmentId
+    giftCardCreditCents
+    artistIssuedGiftCardCreditCents
     timerStatus
     timerStartedAt
     accumulatedSeconds
@@ -7885,6 +7963,459 @@ export type GetProjectsByArtistQueryHookResult = ReturnType<typeof useGetProject
 export type GetProjectsByArtistLazyQueryHookResult = ReturnType<typeof useGetProjectsByArtistLazyQuery>;
 export type GetProjectsByArtistSuspenseQueryHookResult = ReturnType<typeof useGetProjectsByArtistSuspenseQuery>;
 export type GetProjectsByArtistQueryResult = Apollo.QueryResult<GetProjectsByArtistQuery, GetProjectsByArtistQueryVariables>;
+export const CreateArtistGiftCardDocument = gql`
+    mutation CreateArtistGiftCard($input: CreateArtistGiftCardInput!) {
+  createArtistGiftCard(input: $input) {
+    id
+    code
+    issuerType
+    faceValueCents
+    balanceCents
+    feeOffsetCents
+    paymentMethod
+    saleStatus
+  }
+}
+    `;
+export type CreateArtistGiftCardMutationFn = Apollo.MutationFunction<CreateArtistGiftCardMutation, CreateArtistGiftCardMutationVariables>;
+
+/**
+ * __useCreateArtistGiftCardMutation__
+ *
+ * To run a mutation, you first call `useCreateArtistGiftCardMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCreateArtistGiftCardMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [createArtistGiftCardMutation, { data, loading, error }] = useCreateArtistGiftCardMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useCreateArtistGiftCardMutation(baseOptions?: Apollo.MutationHookOptions<CreateArtistGiftCardMutation, CreateArtistGiftCardMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<CreateArtistGiftCardMutation, CreateArtistGiftCardMutationVariables>(CreateArtistGiftCardDocument, options);
+      }
+export type CreateArtistGiftCardMutationHookResult = ReturnType<typeof useCreateArtistGiftCardMutation>;
+export type CreateArtistGiftCardMutationResult = Apollo.MutationResult<CreateArtistGiftCardMutation>;
+export type CreateArtistGiftCardMutationOptions = Apollo.BaseMutationOptions<CreateArtistGiftCardMutation, CreateArtistGiftCardMutationVariables>;
+export const CreateShopGiftCardDocument = gql`
+    mutation CreateShopGiftCard($input: CreateShopGiftCardInput!) {
+  createShopGiftCard(input: $input) {
+    id
+    code
+    issuerType
+    shopId
+    faceValueCents
+    balanceCents
+    feeOffsetCents
+    paymentMethod
+    saleStatus
+  }
+}
+    `;
+export type CreateShopGiftCardMutationFn = Apollo.MutationFunction<CreateShopGiftCardMutation, CreateShopGiftCardMutationVariables>;
+
+/**
+ * __useCreateShopGiftCardMutation__
+ *
+ * To run a mutation, you first call `useCreateShopGiftCardMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCreateShopGiftCardMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [createShopGiftCardMutation, { data, loading, error }] = useCreateShopGiftCardMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useCreateShopGiftCardMutation(baseOptions?: Apollo.MutationHookOptions<CreateShopGiftCardMutation, CreateShopGiftCardMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<CreateShopGiftCardMutation, CreateShopGiftCardMutationVariables>(CreateShopGiftCardDocument, options);
+      }
+export type CreateShopGiftCardMutationHookResult = ReturnType<typeof useCreateShopGiftCardMutation>;
+export type CreateShopGiftCardMutationResult = Apollo.MutationResult<CreateShopGiftCardMutation>;
+export type CreateShopGiftCardMutationOptions = Apollo.BaseMutationOptions<CreateShopGiftCardMutation, CreateShopGiftCardMutationVariables>;
+export const GetMyGiftCardsDocument = gql`
+    query GetMyGiftCards {
+  getMyGiftCards {
+    id
+    code
+    issuerType
+    shopId
+    faceValueCents
+    balanceCents
+    feeOffsetCents
+    soldAt
+    soldByUserId
+    paymentMethod
+    saleStatus
+    squarePaymentId
+    shopCutStatus
+    shopCutCents
+    shopCutPercentApplied
+  }
+}
+    `;
+
+/**
+ * __useGetMyGiftCardsQuery__
+ *
+ * To run a query within a React component, call `useGetMyGiftCardsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetMyGiftCardsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetMyGiftCardsQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetMyGiftCardsQuery(baseOptions?: Apollo.QueryHookOptions<GetMyGiftCardsQuery, GetMyGiftCardsQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetMyGiftCardsQuery, GetMyGiftCardsQueryVariables>(GetMyGiftCardsDocument, options);
+      }
+export function useGetMyGiftCardsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetMyGiftCardsQuery, GetMyGiftCardsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetMyGiftCardsQuery, GetMyGiftCardsQueryVariables>(GetMyGiftCardsDocument, options);
+        }
+// @ts-ignore
+export function useGetMyGiftCardsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetMyGiftCardsQuery, GetMyGiftCardsQueryVariables>): Apollo.UseSuspenseQueryResult<GetMyGiftCardsQuery, GetMyGiftCardsQueryVariables>;
+export function useGetMyGiftCardsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetMyGiftCardsQuery, GetMyGiftCardsQueryVariables>): Apollo.UseSuspenseQueryResult<GetMyGiftCardsQuery | undefined, GetMyGiftCardsQueryVariables>;
+export function useGetMyGiftCardsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetMyGiftCardsQuery, GetMyGiftCardsQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetMyGiftCardsQuery, GetMyGiftCardsQueryVariables>(GetMyGiftCardsDocument, options);
+        }
+export type GetMyGiftCardsQueryHookResult = ReturnType<typeof useGetMyGiftCardsQuery>;
+export type GetMyGiftCardsLazyQueryHookResult = ReturnType<typeof useGetMyGiftCardsLazyQuery>;
+export type GetMyGiftCardsSuspenseQueryHookResult = ReturnType<typeof useGetMyGiftCardsSuspenseQuery>;
+export type GetMyGiftCardsQueryResult = Apollo.QueryResult<GetMyGiftCardsQuery, GetMyGiftCardsQueryVariables>;
+export const GetGiftCardsByShopDocument = gql`
+    query GetGiftCardsByShop($shopId: ID!) {
+  getGiftCardsByShop(shopId: $shopId) {
+    id
+    code
+    issuerType
+    shopId
+    faceValueCents
+    balanceCents
+    feeOffsetCents
+    soldAt
+    soldByUserId
+    paymentMethod
+    saleStatus
+    squarePaymentId
+    shopCutStatus
+    shopCutCents
+    shopCutPercentApplied
+  }
+}
+    `;
+
+/**
+ * __useGetGiftCardsByShopQuery__
+ *
+ * To run a query within a React component, call `useGetGiftCardsByShopQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetGiftCardsByShopQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetGiftCardsByShopQuery({
+ *   variables: {
+ *      shopId: // value for 'shopId'
+ *   },
+ * });
+ */
+export function useGetGiftCardsByShopQuery(baseOptions: Apollo.QueryHookOptions<GetGiftCardsByShopQuery, GetGiftCardsByShopQueryVariables> & ({ variables: GetGiftCardsByShopQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetGiftCardsByShopQuery, GetGiftCardsByShopQueryVariables>(GetGiftCardsByShopDocument, options);
+      }
+export function useGetGiftCardsByShopLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetGiftCardsByShopQuery, GetGiftCardsByShopQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetGiftCardsByShopQuery, GetGiftCardsByShopQueryVariables>(GetGiftCardsByShopDocument, options);
+        }
+// @ts-ignore
+export function useGetGiftCardsByShopSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetGiftCardsByShopQuery, GetGiftCardsByShopQueryVariables>): Apollo.UseSuspenseQueryResult<GetGiftCardsByShopQuery, GetGiftCardsByShopQueryVariables>;
+export function useGetGiftCardsByShopSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetGiftCardsByShopQuery, GetGiftCardsByShopQueryVariables>): Apollo.UseSuspenseQueryResult<GetGiftCardsByShopQuery | undefined, GetGiftCardsByShopQueryVariables>;
+export function useGetGiftCardsByShopSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetGiftCardsByShopQuery, GetGiftCardsByShopQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetGiftCardsByShopQuery, GetGiftCardsByShopQueryVariables>(GetGiftCardsByShopDocument, options);
+        }
+export type GetGiftCardsByShopQueryHookResult = ReturnType<typeof useGetGiftCardsByShopQuery>;
+export type GetGiftCardsByShopLazyQueryHookResult = ReturnType<typeof useGetGiftCardsByShopLazyQuery>;
+export type GetGiftCardsByShopSuspenseQueryHookResult = ReturnType<typeof useGetGiftCardsByShopSuspenseQuery>;
+export type GetGiftCardsByShopQueryResult = Apollo.QueryResult<GetGiftCardsByShopQuery, GetGiftCardsByShopQueryVariables>;
+export const GetMyGiftCardLiabilityReportDocument = gql`
+    query GetMyGiftCardLiabilityReport {
+  getMyGiftCardLiabilityReport {
+    outstandingBalanceCents
+    cardCount
+    oldestIssuedAt
+  }
+}
+    `;
+
+/**
+ * __useGetMyGiftCardLiabilityReportQuery__
+ *
+ * To run a query within a React component, call `useGetMyGiftCardLiabilityReportQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetMyGiftCardLiabilityReportQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetMyGiftCardLiabilityReportQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetMyGiftCardLiabilityReportQuery(baseOptions?: Apollo.QueryHookOptions<GetMyGiftCardLiabilityReportQuery, GetMyGiftCardLiabilityReportQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetMyGiftCardLiabilityReportQuery, GetMyGiftCardLiabilityReportQueryVariables>(GetMyGiftCardLiabilityReportDocument, options);
+      }
+export function useGetMyGiftCardLiabilityReportLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetMyGiftCardLiabilityReportQuery, GetMyGiftCardLiabilityReportQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetMyGiftCardLiabilityReportQuery, GetMyGiftCardLiabilityReportQueryVariables>(GetMyGiftCardLiabilityReportDocument, options);
+        }
+// @ts-ignore
+export function useGetMyGiftCardLiabilityReportSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetMyGiftCardLiabilityReportQuery, GetMyGiftCardLiabilityReportQueryVariables>): Apollo.UseSuspenseQueryResult<GetMyGiftCardLiabilityReportQuery, GetMyGiftCardLiabilityReportQueryVariables>;
+export function useGetMyGiftCardLiabilityReportSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetMyGiftCardLiabilityReportQuery, GetMyGiftCardLiabilityReportQueryVariables>): Apollo.UseSuspenseQueryResult<GetMyGiftCardLiabilityReportQuery | undefined, GetMyGiftCardLiabilityReportQueryVariables>;
+export function useGetMyGiftCardLiabilityReportSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetMyGiftCardLiabilityReportQuery, GetMyGiftCardLiabilityReportQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetMyGiftCardLiabilityReportQuery, GetMyGiftCardLiabilityReportQueryVariables>(GetMyGiftCardLiabilityReportDocument, options);
+        }
+export type GetMyGiftCardLiabilityReportQueryHookResult = ReturnType<typeof useGetMyGiftCardLiabilityReportQuery>;
+export type GetMyGiftCardLiabilityReportLazyQueryHookResult = ReturnType<typeof useGetMyGiftCardLiabilityReportLazyQuery>;
+export type GetMyGiftCardLiabilityReportSuspenseQueryHookResult = ReturnType<typeof useGetMyGiftCardLiabilityReportSuspenseQuery>;
+export type GetMyGiftCardLiabilityReportQueryResult = Apollo.QueryResult<GetMyGiftCardLiabilityReportQuery, GetMyGiftCardLiabilityReportQueryVariables>;
+export const GetGiftCardLiabilityReportDocument = gql`
+    query GetGiftCardLiabilityReport($shopId: ID!) {
+  getGiftCardLiabilityReport(shopId: $shopId) {
+    outstandingBalanceCents
+    cardCount
+    oldestIssuedAt
+  }
+}
+    `;
+
+/**
+ * __useGetGiftCardLiabilityReportQuery__
+ *
+ * To run a query within a React component, call `useGetGiftCardLiabilityReportQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetGiftCardLiabilityReportQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetGiftCardLiabilityReportQuery({
+ *   variables: {
+ *      shopId: // value for 'shopId'
+ *   },
+ * });
+ */
+export function useGetGiftCardLiabilityReportQuery(baseOptions: Apollo.QueryHookOptions<GetGiftCardLiabilityReportQuery, GetGiftCardLiabilityReportQueryVariables> & ({ variables: GetGiftCardLiabilityReportQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetGiftCardLiabilityReportQuery, GetGiftCardLiabilityReportQueryVariables>(GetGiftCardLiabilityReportDocument, options);
+      }
+export function useGetGiftCardLiabilityReportLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetGiftCardLiabilityReportQuery, GetGiftCardLiabilityReportQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetGiftCardLiabilityReportQuery, GetGiftCardLiabilityReportQueryVariables>(GetGiftCardLiabilityReportDocument, options);
+        }
+// @ts-ignore
+export function useGetGiftCardLiabilityReportSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetGiftCardLiabilityReportQuery, GetGiftCardLiabilityReportQueryVariables>): Apollo.UseSuspenseQueryResult<GetGiftCardLiabilityReportQuery, GetGiftCardLiabilityReportQueryVariables>;
+export function useGetGiftCardLiabilityReportSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetGiftCardLiabilityReportQuery, GetGiftCardLiabilityReportQueryVariables>): Apollo.UseSuspenseQueryResult<GetGiftCardLiabilityReportQuery | undefined, GetGiftCardLiabilityReportQueryVariables>;
+export function useGetGiftCardLiabilityReportSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetGiftCardLiabilityReportQuery, GetGiftCardLiabilityReportQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetGiftCardLiabilityReportQuery, GetGiftCardLiabilityReportQueryVariables>(GetGiftCardLiabilityReportDocument, options);
+        }
+export type GetGiftCardLiabilityReportQueryHookResult = ReturnType<typeof useGetGiftCardLiabilityReportQuery>;
+export type GetGiftCardLiabilityReportLazyQueryHookResult = ReturnType<typeof useGetGiftCardLiabilityReportLazyQuery>;
+export type GetGiftCardLiabilityReportSuspenseQueryHookResult = ReturnType<typeof useGetGiftCardLiabilityReportSuspenseQuery>;
+export type GetGiftCardLiabilityReportQueryResult = Apollo.QueryResult<GetGiftCardLiabilityReportQuery, GetGiftCardLiabilityReportQueryVariables>;
+export const RedeemGiftCardDocument = gql`
+    mutation RedeemGiftCard($appointmentId: ID!, $code: String!, $amountCents: Int!) {
+  redeemGiftCard(
+    appointmentId: $appointmentId
+    code: $code
+    amountCents: $amountCents
+  ) {
+    giftCard {
+      id
+      balanceCents
+    }
+    appointment {
+      id
+      subtotalCents
+      totalCents
+      shopCutCents
+      shopCutPercentApplied
+      giftCardCreditCents
+      artistIssuedGiftCardCreditCents
+    }
+    redemption {
+      id
+      amountCents
+      shopPayoutCents
+    }
+  }
+}
+    `;
+export type RedeemGiftCardMutationFn = Apollo.MutationFunction<RedeemGiftCardMutation, RedeemGiftCardMutationVariables>;
+
+/**
+ * __useRedeemGiftCardMutation__
+ *
+ * To run a mutation, you first call `useRedeemGiftCardMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useRedeemGiftCardMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [redeemGiftCardMutation, { data, loading, error }] = useRedeemGiftCardMutation({
+ *   variables: {
+ *      appointmentId: // value for 'appointmentId'
+ *      code: // value for 'code'
+ *      amountCents: // value for 'amountCents'
+ *   },
+ * });
+ */
+export function useRedeemGiftCardMutation(baseOptions?: Apollo.MutationHookOptions<RedeemGiftCardMutation, RedeemGiftCardMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<RedeemGiftCardMutation, RedeemGiftCardMutationVariables>(RedeemGiftCardDocument, options);
+      }
+export type RedeemGiftCardMutationHookResult = ReturnType<typeof useRedeemGiftCardMutation>;
+export type RedeemGiftCardMutationResult = Apollo.MutationResult<RedeemGiftCardMutation>;
+export type RedeemGiftCardMutationOptions = Apollo.BaseMutationOptions<RedeemGiftCardMutation, RedeemGiftCardMutationVariables>;
+export const CreateGiftCardShopCutInvoiceDocument = gql`
+    mutation CreateGiftCardShopCutInvoice($giftCardId: ID!, $paymentMethod: String) {
+  createGiftCardShopCutInvoice(
+    giftCardId: $giftCardId
+    paymentMethod: $paymentMethod
+  ) {
+    giftCard {
+      id
+      shopCutStatus
+      shopCutSquareInvoiceId
+    }
+    invoiceUrl
+  }
+}
+    `;
+export type CreateGiftCardShopCutInvoiceMutationFn = Apollo.MutationFunction<CreateGiftCardShopCutInvoiceMutation, CreateGiftCardShopCutInvoiceMutationVariables>;
+
+/**
+ * __useCreateGiftCardShopCutInvoiceMutation__
+ *
+ * To run a mutation, you first call `useCreateGiftCardShopCutInvoiceMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useCreateGiftCardShopCutInvoiceMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [createGiftCardShopCutInvoiceMutation, { data, loading, error }] = useCreateGiftCardShopCutInvoiceMutation({
+ *   variables: {
+ *      giftCardId: // value for 'giftCardId'
+ *      paymentMethod: // value for 'paymentMethod'
+ *   },
+ * });
+ */
+export function useCreateGiftCardShopCutInvoiceMutation(baseOptions?: Apollo.MutationHookOptions<CreateGiftCardShopCutInvoiceMutation, CreateGiftCardShopCutInvoiceMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<CreateGiftCardShopCutInvoiceMutation, CreateGiftCardShopCutInvoiceMutationVariables>(CreateGiftCardShopCutInvoiceDocument, options);
+      }
+export type CreateGiftCardShopCutInvoiceMutationHookResult = ReturnType<typeof useCreateGiftCardShopCutInvoiceMutation>;
+export type CreateGiftCardShopCutInvoiceMutationResult = Apollo.MutationResult<CreateGiftCardShopCutInvoiceMutation>;
+export type CreateGiftCardShopCutInvoiceMutationOptions = Apollo.BaseMutationOptions<CreateGiftCardShopCutInvoiceMutation, CreateGiftCardShopCutInvoiceMutationVariables>;
+export const MarkGiftCardShopCutPaidManuallyDocument = gql`
+    mutation MarkGiftCardShopCutPaidManually($giftCardId: ID!) {
+  markGiftCardShopCutPaidManually(giftCardId: $giftCardId) {
+    id
+    shopCutStatus
+    shopCutMarkedPaidBy
+    shopCutMarkedPaidAt
+  }
+}
+    `;
+export type MarkGiftCardShopCutPaidManuallyMutationFn = Apollo.MutationFunction<MarkGiftCardShopCutPaidManuallyMutation, MarkGiftCardShopCutPaidManuallyMutationVariables>;
+
+/**
+ * __useMarkGiftCardShopCutPaidManuallyMutation__
+ *
+ * To run a mutation, you first call `useMarkGiftCardShopCutPaidManuallyMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useMarkGiftCardShopCutPaidManuallyMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [markGiftCardShopCutPaidManuallyMutation, { data, loading, error }] = useMarkGiftCardShopCutPaidManuallyMutation({
+ *   variables: {
+ *      giftCardId: // value for 'giftCardId'
+ *   },
+ * });
+ */
+export function useMarkGiftCardShopCutPaidManuallyMutation(baseOptions?: Apollo.MutationHookOptions<MarkGiftCardShopCutPaidManuallyMutation, MarkGiftCardShopCutPaidManuallyMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<MarkGiftCardShopCutPaidManuallyMutation, MarkGiftCardShopCutPaidManuallyMutationVariables>(MarkGiftCardShopCutPaidManuallyDocument, options);
+      }
+export type MarkGiftCardShopCutPaidManuallyMutationHookResult = ReturnType<typeof useMarkGiftCardShopCutPaidManuallyMutation>;
+export type MarkGiftCardShopCutPaidManuallyMutationResult = Apollo.MutationResult<MarkGiftCardShopCutPaidManuallyMutation>;
+export type MarkGiftCardShopCutPaidManuallyMutationOptions = Apollo.BaseMutationOptions<MarkGiftCardShopCutPaidManuallyMutation, MarkGiftCardShopCutPaidManuallyMutationVariables>;
+export const ConfirmGiftCardShopCutPaidDocument = gql`
+    mutation ConfirmGiftCardShopCutPaid($giftCardId: ID!) {
+  confirmGiftCardShopCutPaid(giftCardId: $giftCardId) {
+    id
+    shopCutStatus
+    shopCutConfirmedBy
+    shopCutConfirmedAt
+  }
+}
+    `;
+export type ConfirmGiftCardShopCutPaidMutationFn = Apollo.MutationFunction<ConfirmGiftCardShopCutPaidMutation, ConfirmGiftCardShopCutPaidMutationVariables>;
+
+/**
+ * __useConfirmGiftCardShopCutPaidMutation__
+ *
+ * To run a mutation, you first call `useConfirmGiftCardShopCutPaidMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useConfirmGiftCardShopCutPaidMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [confirmGiftCardShopCutPaidMutation, { data, loading, error }] = useConfirmGiftCardShopCutPaidMutation({
+ *   variables: {
+ *      giftCardId: // value for 'giftCardId'
+ *   },
+ * });
+ */
+export function useConfirmGiftCardShopCutPaidMutation(baseOptions?: Apollo.MutationHookOptions<ConfirmGiftCardShopCutPaidMutation, ConfirmGiftCardShopCutPaidMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<ConfirmGiftCardShopCutPaidMutation, ConfirmGiftCardShopCutPaidMutationVariables>(ConfirmGiftCardShopCutPaidDocument, options);
+      }
+export type ConfirmGiftCardShopCutPaidMutationHookResult = ReturnType<typeof useConfirmGiftCardShopCutPaidMutation>;
+export type ConfirmGiftCardShopCutPaidMutationResult = Apollo.MutationResult<ConfirmGiftCardShopCutPaidMutation>;
+export type ConfirmGiftCardShopCutPaidMutationOptions = Apollo.BaseMutationOptions<ConfirmGiftCardShopCutPaidMutation, ConfirmGiftCardShopCutPaidMutationVariables>;
 export const GlobalSearchDocument = gql`
     query GlobalSearch($query: String!, $limit: Int) {
   search(query: $query, limit: $limit) {

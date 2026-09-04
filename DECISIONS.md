@@ -212,6 +212,25 @@ exactly, rather than inventing a second one:
 - Notifications remain deliberately unwired for gift cards, per M6's own standing note — this
   follow-up didn't add any, for the same reason the original didn't.
 
+**Mobile port (2026-09-04, same day).** `apps/mobile` gets the same feature, ported field for
+field from the web slice above: `app/gift-cards/index.tsx` (sell either issuer type, settle a
+shop-issued card's cut, using the same three actions `shop-cut-confirmations/index.tsx` already
+has for Appointments, applied to a GiftCard instead), a new
+`packages/api/src/operations/giftCards.graphql`, and `SquareGiftCardPaymentForm.tsx` (a
+WebView-hosted sibling of `SquarePaymentForm.tsx`, for the same reason
+`IBGiftCardPaymentForm.jsx` is a sibling of `IBSquarePaymentForm.jsx` on web: two real, tested,
+money-moving callers of the original component that a generalization would put at risk).
+Redemption is added to `SessionDetailForm.tsx` as a plain code and amount entry, matching web's
+own `SessionDetail.jsx`. `appointmentsByProject.graphql` gained
+`giftCardCreditCents`/`artistIssuedGiftCardCreditCents` on the Appointment selection, needed for
+the same reason `RedeemGiftCard`'s own selection carries them. Header link gated
+`canManageBusinessLedger` (any artist, or a shop-admin-or-better), wider than `canManageForms`,
+matching web's own Sidebar gate (`isArtistUser || isShopAdminOrBetter`) rather than reusing a
+narrower existing helper. Confirmed in this sandbox: `packages/api` codegen and build,
+`apps/mobile` `tsc --noEmit` clean, full `apps/mobile` Jest suite (252/252, unchanged: Apollo-wired
+screens, no new pure-logic module, the same reasoning X48/X54 give for not adding new unit tests
+here).
+
 ### M7. A rate change applies forward only, never backward
 
 Changing an artist's percentage never alters work already performed. The rate that applied is the

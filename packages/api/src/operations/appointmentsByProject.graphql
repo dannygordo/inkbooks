@@ -26,6 +26,8 @@ query GetAppointmentsByProject($projectId: ID!) {
 		depositStatus
 		depositCreditCents
 		depositCreditFromAppointmentId
+		giftCardCreditCents
+		artistIssuedGiftCardCreditCents
 		timerStatus
 		timerStartedAt
 		accumulatedSeconds
