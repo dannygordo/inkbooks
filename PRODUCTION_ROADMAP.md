@@ -3054,12 +3054,19 @@ see the note above. It is not on this list at any priority, not because it was f
     `utils/reminders.js`'s `const { sendEmail } = require('./email')` silently resolved to
     `undefined` and every email appointment reminder was failing, caught by
     `sendRemindersForArtist`'s per-channel try/catch and logged to `ReminderLog` as `'failed'`
-    rather than crashing anywhere visible (fixed in `X70`). Neither suite has been run for real in
+    rather than crashing anywhere visible (fixed in `X70`). Neither suite could be run for real in
     this sandbox (the MongoDB memory-server binary download is blocked here for `server/`;
-    `apps/web/`'s suite has a broken native-binary dependency chain) - Danny still needs to run
-    `npm test` in both `server/` and `apps/web/` to confirm everything passes against a real
-    MongoDB. See `HANDOFF.md`'s matching dated entry and `DECISIONS.md` for the full rationale and
-    file-by-file breakdown.
+    `apps/web/`'s suite has a broken native-binary dependency chain, present even on Danny's own
+    machine) - so Danny ran `npm test` himself, twice more, and it found four further real bugs
+    the first run alone couldn't have surfaced given this sandbox's inability to execute either
+    suite: `vi.mock()` doesn't intercept CommonJS `require()`, which had left four server test
+    files' mocks silently inert (`X72`, see `DECISIONS.md` PR3), a wrong test premise in
+    `expenses.test.js`'s duplicate-rerun test (`X72`), and two web test-hygiene bugs a first fix
+    round unmasked in turn - an unconfigured mock on an early-return path, and a delayed mutation
+    mock a test never waited on (`X73`, see `DECISIONS.md` PR4). **Both suites are now confirmed
+    green for real** (Danny's own run, 2026-09-04) - the test-coverage completion effort (`X61`-
+    `X73`) is done. See `HANDOFF.md`'s matching dated entries and `DECISIONS.md` for the full
+    rationale and file-by-file breakdown.
 11. ~~Smaller, lower-urgency items already on record~~ — **two of three done, one not a real task.**
     `computeChargeBreakdown` already echoes clamped credit figures (checked 2026-08-21/22, the
     roadmap was stale, not the code). The client self-service form-fill lookup shipped 2026-08-21/22

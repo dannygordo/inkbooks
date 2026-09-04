@@ -8,6 +8,22 @@ Last updated: 2026-09-04.
 
 ---
 
+### 2026-09-04 (thirty-eighth entry): confirmed green - both suites pass for real, closing out the test-coverage effort
+
+Danny ran `npm test` in both `server/` and `apps/web/` once more after X73 and reported both green.
+This is the first time either suite has been confirmed passing against a real run since the
+coverage tail closed out in the thirty-fifth entry - every fix since then (X72's CJS `vi.mock()`/
+`vi.spyOn()` correction and the `expenses.test.js` race-condition fix, X73's two web test-hygiene
+fixes) had only ever been verified by reading source and reasoning it through, or by an isolated,
+DB-independent reproduction, because neither this sandbox nor its device-bridge VM could run either
+suite directly (MongoDB memory-server download blocked in both for `server/`; a broken `@rolldown`
+native binding blocking Vitest entirely for `apps/web/`, even on Danny's own machine).
+
+This closes the loop the thirty-fifth entry opened: every web component and every
+`server/utils/*.js` file has real test coverage, and that coverage - plus the four bugs the first
+real run of it surfaced (X72/X73) - is now confirmed working, not just reasoned to be working. The
+test-coverage completion effort (`X61`-`X73`) is done.
+
 ### 2026-09-04 (thirty-seventh entry): the web suite's X72 fix unmasked a second, real bug in the same file, plus a genuine unhandled-rejection flake elsewhere - both fixed
 
 Danny re-ran `npm test` in `apps/web/` after X72. The `ShopAnalyticsPanel.test.jsx` fix landed
