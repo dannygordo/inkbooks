@@ -29,7 +29,12 @@ const {
 	unansweredMessages,
 	findOverdueBoothRentCharges,
 	overdueBoothRent,
+	unredeemedInvites,
+	squareHealth,
 } = require('../../utils/attention');
+const PasswordToken = require('../../models/PasswordToken');
+const SquareAccount = require('../../models/SquareAccount');
+const User = require('../../models/User');
 
 function minutesAgo(minutes) {
 	return new Date(Date.now() - minutes * 60 * 1000);
@@ -82,6 +87,157 @@ async function createBoothRentCharge(artistId, shopId, overrides = {}) {
 		...overrides,
 	}).save();
 }
+
+let inviteTokenCounter = 0;
+async function createInviteToken(userId, overrides = {}) {
+	inviteTokenCounter += 1;
+	return new PasswordToken({
+		userId,
+		tokenHash: `test-invite-hash-${inviteTokenCounter}`,
+		purpose: 'invite',
+		expiresAt: daysFromNow(7),
+		createdAt: daysAgo(5),
+		...overrides,
+	}).save();
+}
+
+async function createSquareAccount(ownerId, overrides = {}) {
+	return new SquareAccount({
+		ownerType: 'SHOP',
+		ownerId,
+		connected: true,
+		merchantId: 'test-merchant-id',
+		tokenExpiresAt: daysAgo(1),
+		...overrides,
+	}).save();
+}
+
+// These two conditions were deliberately left with only empty-list coverage in
+// attentionForUser's own "shop admin with no roster/history" test, on the theory that their
+// positive cases belonged with PasswordToken/SquareAccount's own feature tests. Neither
+// passwordTokens.test.js nor squareAccounts.test.js (nor anything else in the suite) ever
+// actually calls unredeemedInvites or squareHealth, or asserts on an 'invite_unredeemed' or
+// 'square_token_expired' condition - that coverage never materialized. These two describe
+// blocks close that gap directly.
+describe('unredeemedInvites', () => {
+	it('surfaces a staff member who never set a password and has a stale, unused invite token', async () => {
+		const { user: shopAdmin, staff, shop } = await createShopAdminUser();
+		await User.findByIdAndUpdate(staff.userId, { hasSetPassword: false });
+		await createInviteToken(staff.userId);
+
+		const result = await unredeemedInvites([String(shop._id)]);
+
+		expect(result).toHaveLength(1);
+		expect(result[0].type).toBe('invite_unredeemed');
+		expect(result[0].category).toBe('roster');
+		expect(result[0].subjectType).toBe('artist');
+		expect(result[0].subjectId).toBe(String(staff.userId));
+		void shopAdmin;
+	});
+
+	it('surfaces a connected artist the same way, not just shop staff', async () => {
+		const { shop } = await createShopAdminUser();
+		const { user: artist } = await createArtistUser();
+		await connectArtistToShop(artist._id, shop._id);
+		await User.findByIdAndUpdate(artist._id, { hasSetPassword: false });
+		await createInviteToken(artist._id);
+
+		const result = await unredeemedInvites([String(shop._id)]);
+
+		expect(result).toHaveLength(1);
+		expect(result[0].subjectId).toBe(String(artist._id));
+	});
+
+	it('does not surface a member who already set a password, even with a stale invite token on file', async () => {
+		const { staff, shop } = await createShopAdminUser();
+		// hasSetPassword defaults to true (models/User.js) - left as-is here.
+		await createInviteToken(staff.userId);
+
+		const result = await unredeemedInvites([String(shop._id)]);
+
+		expect(result).toEqual([]);
+	});
+
+	it('does not surface a stranded member with no invite ever issued - only a gone-stale invite counts', async () => {
+		const { staff, shop } = await createShopAdminUser();
+		await User.findByIdAndUpdate(staff.userId, { hasSetPassword: false });
+		// No PasswordToken created at all.
+
+		const result = await unredeemedInvites([String(shop._id)]);
+
+		expect(result).toEqual([]);
+	});
+
+	it('does not surface a member whose invite is still fresh (younger than olderThanDays)', async () => {
+		const { staff, shop } = await createShopAdminUser();
+		await User.findByIdAndUpdate(staff.userId, { hasSetPassword: false });
+		await createInviteToken(staff.userId, { createdAt: daysAgo(1) }); // default cutoff is 3 days
+
+		const result = await unredeemedInvites([String(shop._id)]);
+
+		expect(result).toEqual([]);
+	});
+
+	it('does not surface a member whose invite has already been redeemed', async () => {
+		const { staff, shop } = await createShopAdminUser();
+		await User.findByIdAndUpdate(staff.userId, { hasSetPassword: false });
+		await createInviteToken(staff.userId, { usedAt: daysAgo(4) });
+
+		const result = await unredeemedInvites([String(shop._id)]);
+
+		expect(result).toEqual([]);
+	});
+
+	it('returns [] immediately for an empty shopIds list', async () => {
+		expect(await unredeemedInvites([])).toEqual([]);
+	});
+});
+
+describe('squareHealth', () => {
+	it('surfaces a shop whose connected Square account has an expired token', async () => {
+		const { shop } = await createShopAdminUser();
+		const account = await createSquareAccount(shop._id);
+
+		const result = await squareHealth([String(shop._id)]);
+
+		expect(result).toHaveLength(1);
+		expect(result[0].type).toBe('square_token_expired');
+		expect(result[0].category).toBe('money');
+		expect(result[0].subjectType).toBe('shop');
+		expect(result[0].subjectId).toBe(String(account.ownerId));
+	});
+
+	it('does not surface an account with no merchantId - never actually connected, just a row', async () => {
+		const { shop } = await createShopAdminUser();
+		await createSquareAccount(shop._id, { merchantId: undefined, connected: false });
+
+		const result = await squareHealth([String(shop._id)]);
+
+		expect(result).toEqual([]);
+	});
+
+	it('does not surface an account whose token is still valid', async () => {
+		const { shop } = await createShopAdminUser();
+		await createSquareAccount(shop._id, { tokenExpiresAt: daysFromNow(20) });
+
+		const result = await squareHealth([String(shop._id)]);
+
+		expect(result).toEqual([]);
+	});
+
+	it('does not surface an account with no tokenExpiresAt on file at all', async () => {
+		const { shop } = await createShopAdminUser();
+		await createSquareAccount(shop._id, { tokenExpiresAt: undefined });
+
+		const result = await squareHealth([String(shop._id)]);
+
+		expect(result).toEqual([]);
+	});
+
+	it('returns [] immediately for an empty shopIds list', async () => {
+		expect(await squareHealth([])).toEqual([]);
+	});
+});
 
 describe('unansweredMessages / findUnansweredMessages', () => {
 	// One artist, one client, one conversation, one client-sent message at a given age - the shape
