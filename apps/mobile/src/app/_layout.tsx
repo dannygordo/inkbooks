@@ -1,5 +1,5 @@
 import { ApolloProvider } from '@apollo/client';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useRouter, type ImperativeRouter } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
@@ -7,31 +7,8 @@ import { useEffect, useState } from 'react';
 import { AuthProvider, useAuth } from '@/context/auth';
 import { useEffectiveColorScheme } from '@/hooks/use-effective-color-scheme';
 import { apolloClient, initCachePersistence } from '@/lib/apollo-client';
-import { resolveNotificationTarget, type PushNotificationTarget } from '@/lib/push-notifications';
+import { navigateForNotificationTarget, resolveNotificationTarget } from '@/lib/push-notifications';
 import { initSentry } from '@/lib/sentry';
-
-// Every pathname here is a literal typed-routes string (app.json's typedRoutes: true) - see
-// push-notifications.ts's own header comment on why resolveNotificationTarget returns a plain
-// screen+id instead of trying to hand back one of these strings itself.
-function navigateForNotificationTarget(router: ImperativeRouter, target: PushNotificationTarget) {
-  switch (target.screen) {
-    case 'appointment':
-      router.push({ pathname: '/appointment/[id]', params: { id: target.id } });
-      return;
-    case 'bookingRequest':
-      router.push({ pathname: '/booking-requests/[id]', params: { id: target.id } });
-      return;
-    case 'conversation':
-      router.push({ pathname: '/messages/[id]', params: { id: target.id } });
-      return;
-    case 'artist':
-      router.push({ pathname: '/artist/[id]', params: { id: target.id } });
-      return;
-    case 'shop':
-      router.push({ pathname: '/shop/[id]', params: { id: target.id } });
-      return;
-  }
-}
 
 SplashScreen.preventAutoHideAsync();
 initSentry();
@@ -118,6 +95,10 @@ function RootNavigator() {
         </Stack.Protected>
         <Stack.Protected guard={!!user}>
           <Stack.Screen name="index" />
+          {/* The in-app notification feed - closes gap #8 of HANDOFF.md's 2026-09-04 parity
+              accounting (X52). Reached from a new bell-style "Notifications" link on index.tsx's
+              header, no role gate - every signed-in user has an inbox. */}
+          <Stack.Screen name="notifications/index" options={{ headerShown: true, title: 'Notifications' }} />
           {/* Dashboard - closes gap #4 of HANDOFF.md's 2026-09-04 parity accounting (the mobile
               counterpart to web's pages/home/Home.jsx). Reached from a new "Dashboard" link on
               index.tsx's header, open to any signed-in user - see dashboard.tsx's own header

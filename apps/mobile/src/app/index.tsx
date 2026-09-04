@@ -3,6 +3,7 @@ import type { AppointmentListItemFragment } from '@inkbooks/api';
 import {
   useGetAppointmentsByArtistQuery,
   useGetAppointmentsByShopQuery,
+  useGetInboxQuery,
   useGetPendingBookingRequestCountQuery,
   useGetUnreadMessageCountQuery,
 } from '@inkbooks/api';
@@ -77,6 +78,16 @@ export default function AppointmentsScreen() {
     pollInterval: 60000,
   });
   const pendingRequestCount = pendingRequestData?.getPendingBookingRequestCount ?? 0;
+  // Same 60s-poll fallback as the other two header badges - see NotificationBell.jsx's own
+  // reasoning on why opening the menu doesn't clear this itself (a deliberate "mark all read" act,
+  // not a side effect of glancing at the list - see notifications/index.tsx's own header comment).
+  const { data: inboxData } = useGetInboxQuery({
+    variables: { includeRead: false },
+    skip: !user,
+    fetchPolicy: 'cache-and-network',
+    pollInterval: 60000,
+  });
+  const unreadNotificationCount = inboxData?.getInbox?.unreadCount ?? 0;
   // Computed once, on mount, not on every render - matches AppointmentsList.jsx's own
   // useState(getDefaultScheduleRange), which also fixes the window at the moment the screen opens
   // rather than sliding it every re-render.
@@ -213,6 +224,19 @@ export default function AppointmentsScreen() {
                 <ThemedText type="link">Forms</ThemedText>
               </Pressable>
             ) : null}
+            {/* Closes gap #8 of HANDOFF.md's 2026-09-04 parity accounting - the mobile
+                counterpart to web's NotificationBell.jsx. No role gate: every signed-in user has
+                an inbox, matching web's own bell being visible to any account type. */}
+            <Pressable onPress={() => router.push('/notifications')} testID="notifications-button" style={styles.messagesButton}>
+              <ThemedText type="link">Notifications</ThemedText>
+              {unreadNotificationCount > 0 ? (
+                <View style={styles.messagesBadge} testID="notifications-unread-badge">
+                  <ThemedText type="small" style={styles.messagesBadgeText}>
+                    {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
+                  </ThemedText>
+                </View>
+              ) : null}
+            </Pressable>
             <Pressable
               onPress={() => router.push('/booking-requests')}
               testID="booking-requests-button"

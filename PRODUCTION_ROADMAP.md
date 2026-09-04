@@ -1346,7 +1346,19 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    `NotificationService.js` only - not the inbox half, which is gap #8's own separate slice).
    Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
    full `apps/mobile` Jest suite - still 247/247.
-   Five items remain on the parity accounting, unprioritized among the last four - see
+   **The in-app notification feed (gap 8) is done too (2026-09-04, see DECISIONS.md X52)** - a
+   new bell-style "Notifications" link on the calendar screen's header (same unread-badge shape as
+   Requests/Messages) opens `app/notifications/index.tsx`, a direct port of web's
+   `NotificationBell.jsx` + `NotificationItem.jsx` as one full-screen route (a web MUI `Menu`
+   popover, same "no cross-platform dropdown primitive" precedent as every other ported dialog).
+   New `packages/api/src/operations/notificationInbox.graphql` (`GetInbox`/
+   `MarkNotificationsRead`/`MarkNotificationsDone`). One deliberate addition beyond the port: rows
+   are tappable, reusing `lib/push-notifications.ts`'s existing `subjectType`/`subjectId` -> screen
+   mapping (extracted `navigateForNotificationTarget` out of `_layout.tsx` so both call sites share
+   it) - web's own rows carry the same fields but never navigate anywhere. Confirmed in this
+   sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean, full `apps/mobile`
+   Jest suite - still 247/247.
+   Four items remain on the parity accounting, unprioritized among the last three - see
    HANDOFF.md's "Next" section.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).

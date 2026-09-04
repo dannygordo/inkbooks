@@ -3489,6 +3489,27 @@ export type GetMyFormLinksQueryVariables = Exact<{ [key: string]: never; }>;
 
 export type GetMyFormLinksQuery = { __typename?: 'Query', getMyFormLinks: Array<{ __typename?: 'FormLinkSummary', title: string, slug: string }> };
 
+export type GetInboxQueryVariables = Exact<{
+  includeRead?: InputMaybe<Scalars['Boolean']['input']>;
+}>;
+
+
+export type GetInboxQuery = { __typename?: 'Query', getInbox: { __typename?: 'InboxSummary', unreadCount: number, items: Array<{ __typename?: 'InboxItem', key: string, type: string, category: string, subjectType?: string | null, subjectId?: string | null, title: string, body?: string | null, amountCents?: number | null, createdAt: string, readAt?: string | null, doneAt?: string | null, isCondition: boolean }> } };
+
+export type MarkNotificationsReadMutationVariables = Exact<{
+  notificationIds?: InputMaybe<Array<Scalars['ID']['input']> | Scalars['ID']['input']>;
+}>;
+
+
+export type MarkNotificationsReadMutation = { __typename?: 'Mutation', markNotificationsRead: number };
+
+export type MarkNotificationsDoneMutationVariables = Exact<{
+  notificationIds: Array<Scalars['ID']['input']> | Scalars['ID']['input'];
+}>;
+
+
+export type MarkNotificationsDoneMutation = { __typename?: 'Mutation', markNotificationsDone: number };
+
 export type GetNotificationSettingsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -8704,6 +8725,125 @@ export type GetMyFormLinksQueryHookResult = ReturnType<typeof useGetMyFormLinksQ
 export type GetMyFormLinksLazyQueryHookResult = ReturnType<typeof useGetMyFormLinksLazyQuery>;
 export type GetMyFormLinksSuspenseQueryHookResult = ReturnType<typeof useGetMyFormLinksSuspenseQuery>;
 export type GetMyFormLinksQueryResult = Apollo.QueryResult<GetMyFormLinksQuery, GetMyFormLinksQueryVariables>;
+export const GetInboxDocument = gql`
+    query GetInbox($includeRead: Boolean) {
+  getInbox(includeRead: $includeRead) {
+    unreadCount
+    items {
+      key
+      type
+      category
+      subjectType
+      subjectId
+      title
+      body
+      amountCents
+      createdAt
+      readAt
+      doneAt
+      isCondition
+    }
+  }
+}
+    `;
+
+/**
+ * __useGetInboxQuery__
+ *
+ * To run a query within a React component, call `useGetInboxQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetInboxQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetInboxQuery({
+ *   variables: {
+ *      includeRead: // value for 'includeRead'
+ *   },
+ * });
+ */
+export function useGetInboxQuery(baseOptions?: Apollo.QueryHookOptions<GetInboxQuery, GetInboxQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetInboxQuery, GetInboxQueryVariables>(GetInboxDocument, options);
+      }
+export function useGetInboxLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetInboxQuery, GetInboxQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetInboxQuery, GetInboxQueryVariables>(GetInboxDocument, options);
+        }
+// @ts-ignore
+export function useGetInboxSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetInboxQuery, GetInboxQueryVariables>): Apollo.UseSuspenseQueryResult<GetInboxQuery, GetInboxQueryVariables>;
+export function useGetInboxSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetInboxQuery, GetInboxQueryVariables>): Apollo.UseSuspenseQueryResult<GetInboxQuery | undefined, GetInboxQueryVariables>;
+export function useGetInboxSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetInboxQuery, GetInboxQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetInboxQuery, GetInboxQueryVariables>(GetInboxDocument, options);
+        }
+export type GetInboxQueryHookResult = ReturnType<typeof useGetInboxQuery>;
+export type GetInboxLazyQueryHookResult = ReturnType<typeof useGetInboxLazyQuery>;
+export type GetInboxSuspenseQueryHookResult = ReturnType<typeof useGetInboxSuspenseQuery>;
+export type GetInboxQueryResult = Apollo.QueryResult<GetInboxQuery, GetInboxQueryVariables>;
+export const MarkNotificationsReadDocument = gql`
+    mutation MarkNotificationsRead($notificationIds: [ID!]) {
+  markNotificationsRead(notificationIds: $notificationIds)
+}
+    `;
+export type MarkNotificationsReadMutationFn = Apollo.MutationFunction<MarkNotificationsReadMutation, MarkNotificationsReadMutationVariables>;
+
+/**
+ * __useMarkNotificationsReadMutation__
+ *
+ * To run a mutation, you first call `useMarkNotificationsReadMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useMarkNotificationsReadMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [markNotificationsReadMutation, { data, loading, error }] = useMarkNotificationsReadMutation({
+ *   variables: {
+ *      notificationIds: // value for 'notificationIds'
+ *   },
+ * });
+ */
+export function useMarkNotificationsReadMutation(baseOptions?: Apollo.MutationHookOptions<MarkNotificationsReadMutation, MarkNotificationsReadMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<MarkNotificationsReadMutation, MarkNotificationsReadMutationVariables>(MarkNotificationsReadDocument, options);
+      }
+export type MarkNotificationsReadMutationHookResult = ReturnType<typeof useMarkNotificationsReadMutation>;
+export type MarkNotificationsReadMutationResult = Apollo.MutationResult<MarkNotificationsReadMutation>;
+export type MarkNotificationsReadMutationOptions = Apollo.BaseMutationOptions<MarkNotificationsReadMutation, MarkNotificationsReadMutationVariables>;
+export const MarkNotificationsDoneDocument = gql`
+    mutation MarkNotificationsDone($notificationIds: [ID!]!) {
+  markNotificationsDone(notificationIds: $notificationIds)
+}
+    `;
+export type MarkNotificationsDoneMutationFn = Apollo.MutationFunction<MarkNotificationsDoneMutation, MarkNotificationsDoneMutationVariables>;
+
+/**
+ * __useMarkNotificationsDoneMutation__
+ *
+ * To run a mutation, you first call `useMarkNotificationsDoneMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useMarkNotificationsDoneMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [markNotificationsDoneMutation, { data, loading, error }] = useMarkNotificationsDoneMutation({
+ *   variables: {
+ *      notificationIds: // value for 'notificationIds'
+ *   },
+ * });
+ */
+export function useMarkNotificationsDoneMutation(baseOptions?: Apollo.MutationHookOptions<MarkNotificationsDoneMutation, MarkNotificationsDoneMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<MarkNotificationsDoneMutation, MarkNotificationsDoneMutationVariables>(MarkNotificationsDoneDocument, options);
+      }
+export type MarkNotificationsDoneMutationHookResult = ReturnType<typeof useMarkNotificationsDoneMutation>;
+export type MarkNotificationsDoneMutationResult = Apollo.MutationResult<MarkNotificationsDoneMutation>;
+export type MarkNotificationsDoneMutationOptions = Apollo.BaseMutationOptions<MarkNotificationsDoneMutation, MarkNotificationsDoneMutationVariables>;
 export const GetNotificationSettingsDocument = gql`
     query GetNotificationSettings {
   getNotificationSettings {

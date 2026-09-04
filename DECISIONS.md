@@ -2094,6 +2094,52 @@ for actually sharing it.
 `FORM_FIELD_TYPE_LABELS`/`formFieldTypeLabel`) - same "build the map directly, don't port
 `prettyConstantsListValue`" reasoning as `utils/projectStatus.ts` (X20).
 
+### X52. In-app notification feed
+
+Sixth slice off the mobile/web parity accounting (HANDOFF.md, 2026-09-04) - gap #8, "No in-app
+notification feed." Picked as the next-most-blocking remaining item after X51 (gift cards, gap 5,
+stays open pending Danny's own call - see X51's own entry).
+
+**What was built.** A new `app/notifications/index.tsx` screen, reached from a new bell-style
+"Notifications" link on `app/index.tsx`'s header carrying the same unread-badge shape as the
+existing Requests/Messages links (60s poll, `9+` cap). Direct port of web's `NotificationBell.jsx`
++ `NotificationItem.jsx` as one full-screen route - a web MUI `Menu` popover becomes a real screen
+here, the same "no cross-platform modal/dropdown primitive" precedent every other ported dialog in
+this app already follows. Stored events and live conditions render indistinguishably, matching web
+exactly (`server/graphql/resolvers/notifications.js` merges them before either client ever sees
+the difference). Opening the screen does NOT mark anything read - a deliberate "Mark all read"
+button, shown only when a stored item is actually unread, is the only way to clear the badge,
+matching web's own reasoning that auto-clearing on open is how an inbox becomes something people
+stop trusting. A live condition has no "Mark handled" action (it clears itself when the underlying
+situation resolves) and says so in place of the button, same as web.
+
+**New `packages/api/src/operations/notificationInbox.graphql`** - `GetInbox`/
+`MarkNotificationsRead`/`MarkNotificationsDone`, the inbox half of web's `NotificationService.js`
+(the settings half is X51's own separate operations file).
+
+**One deliberate addition beyond a direct port: rows are tappable.** Web's `NotificationItem.jsx`
+selects `subjectType`/`subjectId` but never uses them to navigate anywhere - every row is inert on
+web. Mobile's own push-notification handling (`lib/push-notifications.ts`,
+`resolveNotificationTarget`/the tap-navigation table) already maps that exact same
+`subjectType`/`subjectId` shape to a screen, for a push notification's tap. Reusing it here for an
+in-app row tap is the same mapping mobile already relies on elsewhere, not a second one invented
+for this screen - `navigateForNotificationTarget` was extracted out of `_layout.tsx` (where it was
+a local, unexported function) into `push-notifications.ts` itself so both call sites share one
+source of truth rather than two switch statements that could drift. This makes the mobile feed
+more useful than web's own, which is worth stating plainly rather than leaving as an unremarked
+difference - if web ever wants the same, `NotificationItem.jsx` has the fields already selected
+and only needs the click handler.
+
+**No pagination** - matches web's own unpaged `InboxSummary`; this is the account's currently-live
+attention items, not a growing history, same reasoning `shop-cut-confirmations/index.tsx` already
+gives for the same choice on a structurally similar list.
+
+**Verification.** `packages/api`: `npm run codegen` + `npm run build` clean. `apps/mobile`:
+`npx tsc --noEmit` clean; full Jest suite still 247/247 (Apollo-wired screen; the extracted
+`navigateForNotificationTarget` is a plain routing switch, no new pure-logic module needing its
+own test, same as `resolveNotificationTarget`'s existing coverage in
+`__tests__/push-notifications.test.ts` covers the mapping it depends on).
+
 ### X51. Notifications settings - email preferences
 
 Fifth slice off the mobile/web parity accounting (HANDOFF.md, 2026-09-04) - gap #7, "No

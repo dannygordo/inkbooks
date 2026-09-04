@@ -10,6 +10,7 @@ import {
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
+import type { ImperativeRouter } from 'expo-router';
 import { Platform } from 'react-native';
 
 import { TokenStorageService } from '@/services/TokenStorageService';
@@ -205,4 +206,36 @@ export function resolveNotificationTarget(data: unknown): PushNotificationTarget
     return null;
   }
   return { screen, id: subjectId };
+}
+
+/**
+ * Turns a resolved target into an actual navigation - the single mapping both _layout.tsx's
+ * notification-tap handler and notifications/index.tsx's (X52) in-app feed rows use, so a tap
+ * lands on the same screen whether it came from a push notification or from reading the same
+ * subjectType/subjectId off a stored InboxItem in the feed itself. Takes an ImperativeRouter
+ * (rather than the hook-returned Router) for the same reason _layout.tsx's own RootNavigator
+ * already needed one - see expo-router's own distinction between the two.
+ *
+ * Every pathname here is a literal typed-routes string (app.json's typedRoutes: true) - see this
+ * file's own header comment on why resolveNotificationTarget returns a plain screen+id instead of
+ * trying to hand back one of these strings itself.
+ */
+export function navigateForNotificationTarget(router: ImperativeRouter, target: PushNotificationTarget): void {
+  switch (target.screen) {
+    case 'appointment':
+      router.push({ pathname: '/appointment/[id]', params: { id: target.id } });
+      return;
+    case 'bookingRequest':
+      router.push({ pathname: '/booking-requests/[id]', params: { id: target.id } });
+      return;
+    case 'conversation':
+      router.push({ pathname: '/messages/[id]', params: { id: target.id } });
+      return;
+    case 'artist':
+      router.push({ pathname: '/artist/[id]', params: { id: target.id } });
+      return;
+    case 'shop':
+      router.push({ pathname: '/shop/[id]', params: { id: target.id } });
+      return;
+  }
 }

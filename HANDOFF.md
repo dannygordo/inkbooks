@@ -3118,10 +3118,13 @@ prior summary. Ranked roughly by how much it blocks ordinary daily use, most-blo
    team/Messages), a digest-hour `PillRow`, and a timezone field, shown only once something
    actually digests. Not to be confused with Reminders/Auto-Responses/Response Time (client-facing
    message nudges, already built) - this is the account owner's own inbound-email preferences.
-8. **No in-app notification feed.** Web's bell icon (`NotificationBell.jsx` + `NotificationItem`)
-   opens a real list of past notifications; mobile has push notifications that deep-link correctly
-   to the right screen (a genuine mobile-only upgrade over web, per PRODUCTION_ROADMAP.md's own
-   framing), but nowhere to browse notifications after the fact.
+8. ~~No in-app notification feed~~ - **done 2026-09-04 (X52)**: a new bell-style
+   "Notifications" link on `app/index.tsx`'s header (same unread-badge shape as
+   Requests/Messages) opens `app/notifications/index.tsx`, a direct port of web's
+   `NotificationBell.jsx` + `NotificationItem.jsx` as one full-screen route. One deliberate
+   addition beyond the port: rows are tappable, reusing the same `subjectType`/`subjectId` ->
+   screen mapping mobile's push-notification handling already relies on for a tap - web's own
+   rows are inert despite carrying the same fields. See X52's own DECISIONS.md entry.
 9. **Group/shop-wide conversations and message search remain open**, named since X16 and never
    picked back up - the one piece of Messages parity still missing (image-attachment compose and
    per-row mark-unread were both closed since, in X35).
@@ -3185,11 +3188,17 @@ web's `NotificationSettingsPanel.jsx` onto a new `settings/notifications.tsx` sc
 own DECISIONS.md entry for the full reasoning, including the digest-hour `PillRow` and why gift
 cards were set aside first.
 
-**Five items remain on the parity accounting above.** Gift cards (gap 5, needs Danny's own
-product call before it can be picked up as a build task), the in-app notification feed (gap 8),
-group/shop-wide conversations + search (gap 9), the booking-request field editor (gap 10), and
-registration/first-time password set (gap 11). See that section for the full reasoning behind each
-one - nothing here assumes an order among the last four.
+**The in-app notification feed (gap 8) is done too (2026-09-04, X52)** - a new bell-style
+"Notifications" header link opens `app/notifications/index.tsx`, a direct port of web's
+`NotificationBell.jsx` + `NotificationItem.jsx`, with one deliberate mobile-only addition: rows
+are tappable, reusing the push-notification tap-routing mobile already had. See X52's own
+DECISIONS.md entry.
+
+**Four items remain on the parity accounting above.** Gift cards (gap 5, needs Danny's own
+product call before it can be picked up as a build task), group/shop-wide conversations + search
+(gap 9), the booking-request field editor (gap 10), and registration/first-time password set (gap
+11). See that section for the full reasoning behind each one - nothing here assumes an order among
+the last three.
 
 **0 and 1 below (the shop-admin migration, and a real Square payment) are explicitly deferred —
 reconfirmed 2026-08-25: Danny's plan is to pick this back up as the last item before starting the
