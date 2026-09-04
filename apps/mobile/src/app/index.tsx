@@ -162,6 +162,13 @@ export default function AppointmentsScreen() {
             <Pressable onPress={() => router.push('/appointment/new')} testID="new-appointment-button">
               <ThemedText type="link">New</ThemedText>
             </Pressable>
+            {/* Closes gap #4 of HANDOFF.md's 2026-09-04 parity accounting - the mobile
+                counterpart to web's Home.jsx. No role gate: every signed-in user (Artist or
+                Staff - mobile has no client login) gets a dashboard, same as web's own
+                userType branch having no role floor of its own. */}
+            <Pressable onPress={() => router.push('/dashboard')} testID="dashboard-button">
+              <ThemedText type="link">Dashboard</ThemedText>
+            </Pressable>
             {isStaffOrBetter(user) ? (
               <Pressable onPress={() => router.push('/artists')} testID="artists-button">
                 <ThemedText type="link">Artists</ThemedText>

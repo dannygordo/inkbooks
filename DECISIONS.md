@@ -2094,6 +2094,85 @@ for actually sharing it.
 `FORM_FIELD_TYPE_LABELS`/`formFieldTypeLabel`) - same "build the map directly, don't port
 `prettyConstantsListValue`" reasoning as `utils/projectStatus.ts` (X20).
 
+### X50. Dashboard - the mobile counterpart to web's Home.jsx
+
+Fourth slice off the mobile/web parity accounting (HANDOFF.md, 2026-09-04) - gap #4, "No dashboard
+or analytics screen exists on mobile at all". Picked as the next-most-blocking item once X47/X48/X49
+closed gaps #1, #2, #3, and #6.
+
+**What was built.** A new `app/dashboard.tsx` screen, reached from a new "Dashboard" link on
+index.tsx's header (no role gate - every signed-in Artist or Staff account gets one; mobile has no
+client login, so web's third `Home.jsx` branch has no mobile counterpart at all). Branches on
+`user.userInfo.__typename` exactly the way `Home.jsx` branches on `user.userType`:
+
+- **Artist** -> web's `ArtistPerformancePanel.jsx`. `shopWide` is ported verbatim: an ARTIST-typed
+  shop admin's own dashboard (`Boolean(shopId) && role <= SHOP_ADMIN`) becomes the shop-wide view,
+  not personal figures - mobile only ever renders this with web's `isSelf=true`, since there is no
+  mobile counterpart yet to web's `Artist.jsx` (viewing one OTHER specific artist's performance,
+  `isSelf=false` - see the "not built" note below). A plain artist, or a shop-connected artist below
+  Shop Admin, stays on personal figures. Personal and shop-wide each get their own StatCard grid,
+  field-for-field matches of web's two branches (personal: Revenue/Tips/Average tip/Deposits
+  taken/unspent/Shop cut owed/Expenses/Other income/Grand total/Sessions completed/Active projects;
+  shop-wide: Total Revenue/Shop Total/Shop cut owed/Shop cut awaiting confirmation/Deposits
+  taken/unspent/Expenses/Other income/Grand total, plus an "Artist Totals" table keyed the same way
+  web's own `artistTakeHomeCents` is - revenue minus the FULL assessed cut, not just the settled
+  portion). Upcoming/Completed appointment lists reuse the existing `GetAppointmentsByArtist`/
+  `GetAppointmentsByShop` operations unchanged (their `AppointmentListItem` fragment already carried
+  every field this screen needs - no new appointment query was required), row-tinted and click-
+  through to `project/[id]`/`consult/[id]` exactly like web's `appointmentLinkTo`.
+
+- **Staff** -> web's `ShopAnalyticsPanel.jsx`. `canSeeMoney = isShopAdminOrBetter(user)` gates the
+  Money/Deposits sections exactly like web's own `role <= SHOP_ADMIN` check; Activity and Clients
+  sections are always shown. The "By artist" table is clickable through to the existing
+  `artist/[id].tsx` when `artistId` resolves server-side, unclickable (not a 404) when it doesn't -
+  same rule web's own table uses. A Staff account with no shop connected gets web's own early-return
+  message instead of an empty dashboard.
+
+**New `packages/api/src/operations/analytics.graphql`** - `GetArtistAnalytics`/`GetShopAnalytics`,
+field-for-field matches of web's `AnalyticsService.js` (`_MONEY_FIELDS`/`_ACTIVITY_FIELDS` combined
+into one `AnalyticsFields` fragment, plus `GetShopAnalytics`'s own `artists` breakdown). Both read
+the same server-side `Analytics` type from the same aggregation (`server/utils/analytics.js`), so an
+artist's own figures and the shop's view of that artist can't drift apart on mobile any more than
+they can on web.
+
+**New `components/StatCard.tsx`** - direct port of web's `components/analytics/StatCard.jsx`. Exists
+for one rule: a null value (a money field the server withheld from a Staff caller) renders as an em
+dash, never `$0.00` - `formatCents(null)` returns `"$0.00"` and would erase that distinction, which
+is why `dashboard.tsx` has its own `money()` helper that keeps `null` as `null` rather than
+formatting it before the card sees it. `client/[id].tsx`'s (X49) own inline stat-card grid is NOT
+migrated to this new component - same as `income/index.tsx`'s un-migrated local `PillRow` copy from
+before X37's extraction, this codebase doesn't retroactively sweep every prior inline instance the
+moment a shared version exists.
+
+**Three scope cuts, named rather than silently dropped:**
+
+1. **Date range** - the five presets `utils/businessRanges.ts` (X26) already builds for
+   Income/Expenses, not web's `DateRangePicker.jsx` (those five presets plus a two-date-input custom
+   range). X26 already named "no custom range" as a scope cut for that screen; this dashboard
+   inherits the same cut from the same file rather than re-litigating it or building a second
+   picker.
+2. **Shop Cut Payouts** - web's `ShopCutPayoutList` (the artist-side "mark this cut paid" action) is
+   not on this dashboard. `shop-cut-confirmations/index.tsx`'s own header comment (X21) already
+   flagged `markShopCutPaidManually` as not built on mobile - that mutation is what this section
+   would call, so there is nothing for it to do yet. The other half of that dual-control flow
+   (a shop admin confirming a cut) already has its own mobile screen. Building the mark-paid mutation,
+   and this dashboard section once it exists, are real, separate follow-up work.
+3. **Pagination** - "Load more" grows the page LIMIT and refetches from offset 0, matching
+   `client/[id].tsx`'s own X49 convention, rather than web's `EntityListPager` (offset plus a
+   page-size selector). `apollo-client.ts` still has no `typePolicies`/merge functions configured, so
+   `fetchMore`'s array-merge behavior on this codebase remains unverified - limit-growth sidesteps
+   the question and is simpler for lists this size.
+
+**Deliberately NOT built at all, named as its own future slice**: viewing one OTHER specific
+artist's performance (web's `Artist.jsx`, `isSelf=false`) - `artist/[id].tsx` today only shows that
+artist's record fields, not a performance panel. This is a different question (someone else's
+numbers) than "my own dashboard", not a trimmed version of this slice.
+
+**Verification.** `packages/api`: `npm run codegen` + `npm run build` clean. `apps/mobile`:
+`npx tsc --noEmit` clean; full Jest suite still 247/247 (no new pure-logic module - `dashboard.tsx`
+is Apollo-wired like every other creation/detail screen, so it gets no screen-level test, matching
+the established convention).
+
 ### X49. Client detail depth - Stats, Projects, Appointments, Notes, and Flags
 
 Third slice off the mobile/web parity accounting (HANDOFF.md, 2026-09-04), picked as the

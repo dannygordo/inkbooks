@@ -1,0 +1,71 @@
+# Dashboard analytics - gap #4 of HANDOFF.md's 2026-09-04 parity accounting ("No dashboard or
+# analytics screen exists on mobile at all"). Mirrors apps/web's AnalyticsService.js field-for-
+# field: both queries return the same Analytics type from the same server-side aggregation
+# (server/utils/analytics.js), so an artist's own figures and the shop's view of that artist can't
+# drift apart, and mobile inherits that same guarantee by selecting the same fields.
+#
+# Money fields are nullable and come back null for a caller below Shop Admin on the shop-wide
+# query (server-enforced in the resolver) - StatCard.tsx renders null as an em dash, never $0.00,
+# matching web's own StatCard.jsx and its reasoning for why that distinction matters here.
+fragment AnalyticsFields on Analytics {
+	start
+	end
+	revenueCents
+	subtotalCents
+	taxCents
+	feeCents
+	tipsCents
+	averageTipCents
+	tippedCount
+	shopCutEarnedCents
+	shopCutOutstandingCents
+	shopCutAwaitingConfirmationCents
+	depositsCollectedCents
+	depositsAppliedCents
+	depositsOutstandingCents
+	expensesCents
+	otherIncomeCents
+	netCents
+	completedSessionCount
+	consultCount
+	appointmentCount
+	upcomingCount
+	activeProjectCount
+	newProjectCount
+	totalClientCount
+	newClientCount
+	artistCount
+}
+
+query GetArtistAnalytics($userId: ID!, $start: DateTime!, $end: DateTime!) {
+	getArtistAnalytics(userId: $userId, start: $start, end: $end) {
+		...AnalyticsFields
+	}
+}
+
+# artists (ArtistAnalyticsRow[]) only selected here, not on GetArtistAnalytics - it's the per-
+# artist breakdown a shop-wide dashboard needs, and it's always empty on the single-artist query
+# (see typeDefs.js's own comment on Analytics.artists).
+query GetShopAnalytics($shopId: ID!, $start: DateTime!, $end: DateTime!) {
+	getShopAnalytics(shopId: $shopId, start: $start, end: $end) {
+		...AnalyticsFields
+		artists {
+			userId
+			artistId
+			revenueCents
+			tipsCents
+			shopCutEarnedCents
+			shopCutOutstandingCents
+			shopCutAwaitingConfirmationCents
+			completedSessionCount
+			consultCount
+			appointmentCount
+			user {
+				id
+				firstName
+				lastName
+				tagColor
+			}
+		}
+	}
+}

@@ -2827,6 +2827,26 @@ export type RecordAdjustmentMutationVariables = Exact<{
 
 export type RecordAdjustmentMutation = { __typename?: 'Mutation', recordAdjustment: { __typename?: 'Adjustment', id: string, appointmentId: string, amountCents: number, reason: string, createdByUserId: string, createdAt: string, createdBy?: { __typename?: 'User', id: string, firstName?: string | null, lastName?: string | null } | null } };
 
+export type AnalyticsFieldsFragment = { __typename?: 'Analytics', start: string, end: string, revenueCents?: number | null, subtotalCents?: number | null, taxCents?: number | null, feeCents?: number | null, tipsCents?: number | null, averageTipCents?: number | null, tippedCount?: number | null, shopCutEarnedCents?: number | null, shopCutOutstandingCents?: number | null, shopCutAwaitingConfirmationCents?: number | null, depositsCollectedCents?: number | null, depositsAppliedCents?: number | null, depositsOutstandingCents?: number | null, expensesCents?: number | null, otherIncomeCents?: number | null, netCents?: number | null, completedSessionCount: number, consultCount: number, appointmentCount: number, upcomingCount: number, activeProjectCount: number, newProjectCount: number, totalClientCount: number, newClientCount: number, artistCount: number };
+
+export type GetArtistAnalyticsQueryVariables = Exact<{
+  userId: Scalars['ID']['input'];
+  start: Scalars['DateTime']['input'];
+  end: Scalars['DateTime']['input'];
+}>;
+
+
+export type GetArtistAnalyticsQuery = { __typename?: 'Query', getArtistAnalytics?: { __typename?: 'Analytics', start: string, end: string, revenueCents?: number | null, subtotalCents?: number | null, taxCents?: number | null, feeCents?: number | null, tipsCents?: number | null, averageTipCents?: number | null, tippedCount?: number | null, shopCutEarnedCents?: number | null, shopCutOutstandingCents?: number | null, shopCutAwaitingConfirmationCents?: number | null, depositsCollectedCents?: number | null, depositsAppliedCents?: number | null, depositsOutstandingCents?: number | null, expensesCents?: number | null, otherIncomeCents?: number | null, netCents?: number | null, completedSessionCount: number, consultCount: number, appointmentCount: number, upcomingCount: number, activeProjectCount: number, newProjectCount: number, totalClientCount: number, newClientCount: number, artistCount: number } | null };
+
+export type GetShopAnalyticsQueryVariables = Exact<{
+  shopId: Scalars['ID']['input'];
+  start: Scalars['DateTime']['input'];
+  end: Scalars['DateTime']['input'];
+}>;
+
+
+export type GetShopAnalyticsQuery = { __typename?: 'Query', getShopAnalytics?: { __typename?: 'Analytics', start: string, end: string, revenueCents?: number | null, subtotalCents?: number | null, taxCents?: number | null, feeCents?: number | null, tipsCents?: number | null, averageTipCents?: number | null, tippedCount?: number | null, shopCutEarnedCents?: number | null, shopCutOutstandingCents?: number | null, shopCutAwaitingConfirmationCents?: number | null, depositsCollectedCents?: number | null, depositsAppliedCents?: number | null, depositsOutstandingCents?: number | null, expensesCents?: number | null, otherIncomeCents?: number | null, netCents?: number | null, completedSessionCount: number, consultCount: number, appointmentCount: number, upcomingCount: number, activeProjectCount: number, newProjectCount: number, totalClientCount: number, newClientCount: number, artistCount: number, artists: Array<{ __typename?: 'ArtistAnalyticsRow', userId: string, artistId?: string | null, revenueCents?: number | null, tipsCents?: number | null, shopCutEarnedCents?: number | null, shopCutOutstandingCents?: number | null, shopCutAwaitingConfirmationCents?: number | null, completedSessionCount: number, consultCount: number, appointmentCount: number, user?: { __typename?: 'User', id: string, firstName?: string | null, lastName?: string | null, tagColor?: string | null } | null }> } | null };
+
 export type GetAppointmentQueryVariables = Exact<{
   appointmentId: Scalars['ID']['input'];
 }>;
@@ -3815,6 +3835,37 @@ export type UpdateUserMutationVariables = Exact<{
 
 export type UpdateUserMutation = { __typename?: 'Mutation', updateUser: { __typename?: 'User', id: string, avatar?: string | null, tagColor?: string | null, themePreference?: string | null } };
 
+export const AnalyticsFieldsFragmentDoc = gql`
+    fragment AnalyticsFields on Analytics {
+  start
+  end
+  revenueCents
+  subtotalCents
+  taxCents
+  feeCents
+  tipsCents
+  averageTipCents
+  tippedCount
+  shopCutEarnedCents
+  shopCutOutstandingCents
+  shopCutAwaitingConfirmationCents
+  depositsCollectedCents
+  depositsAppliedCents
+  depositsOutstandingCents
+  expensesCents
+  otherIncomeCents
+  netCents
+  completedSessionCount
+  consultCount
+  appointmentCount
+  upcomingCount
+  activeProjectCount
+  newProjectCount
+  totalClientCount
+  newClientCount
+  artistCount
+}
+    `;
 export const AppointmentListItemFragmentDoc = gql`
     fragment AppointmentListItem on Appointment {
   id
@@ -4128,6 +4179,114 @@ export function useRecordAdjustmentMutation(baseOptions?: Apollo.MutationHookOpt
 export type RecordAdjustmentMutationHookResult = ReturnType<typeof useRecordAdjustmentMutation>;
 export type RecordAdjustmentMutationResult = Apollo.MutationResult<RecordAdjustmentMutation>;
 export type RecordAdjustmentMutationOptions = Apollo.BaseMutationOptions<RecordAdjustmentMutation, RecordAdjustmentMutationVariables>;
+export const GetArtistAnalyticsDocument = gql`
+    query GetArtistAnalytics($userId: ID!, $start: DateTime!, $end: DateTime!) {
+  getArtistAnalytics(userId: $userId, start: $start, end: $end) {
+    ...AnalyticsFields
+  }
+}
+    ${AnalyticsFieldsFragmentDoc}`;
+
+/**
+ * __useGetArtistAnalyticsQuery__
+ *
+ * To run a query within a React component, call `useGetArtistAnalyticsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetArtistAnalyticsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetArtistAnalyticsQuery({
+ *   variables: {
+ *      userId: // value for 'userId'
+ *      start: // value for 'start'
+ *      end: // value for 'end'
+ *   },
+ * });
+ */
+export function useGetArtistAnalyticsQuery(baseOptions: Apollo.QueryHookOptions<GetArtistAnalyticsQuery, GetArtistAnalyticsQueryVariables> & ({ variables: GetArtistAnalyticsQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetArtistAnalyticsQuery, GetArtistAnalyticsQueryVariables>(GetArtistAnalyticsDocument, options);
+      }
+export function useGetArtistAnalyticsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetArtistAnalyticsQuery, GetArtistAnalyticsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetArtistAnalyticsQuery, GetArtistAnalyticsQueryVariables>(GetArtistAnalyticsDocument, options);
+        }
+// @ts-ignore
+export function useGetArtistAnalyticsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetArtistAnalyticsQuery, GetArtistAnalyticsQueryVariables>): Apollo.UseSuspenseQueryResult<GetArtistAnalyticsQuery, GetArtistAnalyticsQueryVariables>;
+export function useGetArtistAnalyticsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetArtistAnalyticsQuery, GetArtistAnalyticsQueryVariables>): Apollo.UseSuspenseQueryResult<GetArtistAnalyticsQuery | undefined, GetArtistAnalyticsQueryVariables>;
+export function useGetArtistAnalyticsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetArtistAnalyticsQuery, GetArtistAnalyticsQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetArtistAnalyticsQuery, GetArtistAnalyticsQueryVariables>(GetArtistAnalyticsDocument, options);
+        }
+export type GetArtistAnalyticsQueryHookResult = ReturnType<typeof useGetArtistAnalyticsQuery>;
+export type GetArtistAnalyticsLazyQueryHookResult = ReturnType<typeof useGetArtistAnalyticsLazyQuery>;
+export type GetArtistAnalyticsSuspenseQueryHookResult = ReturnType<typeof useGetArtistAnalyticsSuspenseQuery>;
+export type GetArtistAnalyticsQueryResult = Apollo.QueryResult<GetArtistAnalyticsQuery, GetArtistAnalyticsQueryVariables>;
+export const GetShopAnalyticsDocument = gql`
+    query GetShopAnalytics($shopId: ID!, $start: DateTime!, $end: DateTime!) {
+  getShopAnalytics(shopId: $shopId, start: $start, end: $end) {
+    ...AnalyticsFields
+    artists {
+      userId
+      artistId
+      revenueCents
+      tipsCents
+      shopCutEarnedCents
+      shopCutOutstandingCents
+      shopCutAwaitingConfirmationCents
+      completedSessionCount
+      consultCount
+      appointmentCount
+      user {
+        id
+        firstName
+        lastName
+        tagColor
+      }
+    }
+  }
+}
+    ${AnalyticsFieldsFragmentDoc}`;
+
+/**
+ * __useGetShopAnalyticsQuery__
+ *
+ * To run a query within a React component, call `useGetShopAnalyticsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetShopAnalyticsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetShopAnalyticsQuery({
+ *   variables: {
+ *      shopId: // value for 'shopId'
+ *      start: // value for 'start'
+ *      end: // value for 'end'
+ *   },
+ * });
+ */
+export function useGetShopAnalyticsQuery(baseOptions: Apollo.QueryHookOptions<GetShopAnalyticsQuery, GetShopAnalyticsQueryVariables> & ({ variables: GetShopAnalyticsQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetShopAnalyticsQuery, GetShopAnalyticsQueryVariables>(GetShopAnalyticsDocument, options);
+      }
+export function useGetShopAnalyticsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetShopAnalyticsQuery, GetShopAnalyticsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetShopAnalyticsQuery, GetShopAnalyticsQueryVariables>(GetShopAnalyticsDocument, options);
+        }
+// @ts-ignore
+export function useGetShopAnalyticsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetShopAnalyticsQuery, GetShopAnalyticsQueryVariables>): Apollo.UseSuspenseQueryResult<GetShopAnalyticsQuery, GetShopAnalyticsQueryVariables>;
+export function useGetShopAnalyticsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetShopAnalyticsQuery, GetShopAnalyticsQueryVariables>): Apollo.UseSuspenseQueryResult<GetShopAnalyticsQuery | undefined, GetShopAnalyticsQueryVariables>;
+export function useGetShopAnalyticsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetShopAnalyticsQuery, GetShopAnalyticsQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetShopAnalyticsQuery, GetShopAnalyticsQueryVariables>(GetShopAnalyticsDocument, options);
+        }
+export type GetShopAnalyticsQueryHookResult = ReturnType<typeof useGetShopAnalyticsQuery>;
+export type GetShopAnalyticsLazyQueryHookResult = ReturnType<typeof useGetShopAnalyticsLazyQuery>;
+export type GetShopAnalyticsSuspenseQueryHookResult = ReturnType<typeof useGetShopAnalyticsSuspenseQuery>;
+export type GetShopAnalyticsQueryResult = Apollo.QueryResult<GetShopAnalyticsQuery, GetShopAnalyticsQueryVariables>;
 export const GetAppointmentDocument = gql`
     query GetAppointment($appointmentId: ID!) {
   getAppointment(appointmentId: $appointmentId) {

@@ -118,6 +118,11 @@ function RootNavigator() {
         </Stack.Protected>
         <Stack.Protected guard={!!user}>
           <Stack.Screen name="index" />
+          {/* Dashboard - closes gap #4 of HANDOFF.md's 2026-09-04 parity accounting (the mobile
+              counterpart to web's pages/home/Home.jsx). Reached from a new "Dashboard" link on
+              index.tsx's header, open to any signed-in user - see dashboard.tsx's own header
+              comment for the full scope, including three named V1 cuts. */}
+          <Stack.Screen name="dashboard" options={{ headerShown: true, title: 'Dashboard' }} />
           {/* Phase 5 step 8's three appointment-opening destinations, plus the Session Detail
               screen a Project's Sessions sub-list drills into - the same branches
               AppointmentsList.jsx's openAppointment() picks between, see index.tsx's own row

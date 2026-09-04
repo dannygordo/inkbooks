@@ -3082,13 +3082,17 @@ prior summary. Ranked roughly by how much it blocks ordinary daily use, most-blo
    sections (`SendAutoResponseButton`, and filling out a Form on the client's behalf) are still not
    ported - named explicitly as their own future work in X49's own DECISIONS.md entry, not
    overlooked.
-4. **No dashboard or analytics screen exists on mobile at all.** Web's Home page (`/` and
-   `/dashboard`) shows an artist their own performance numbers (`ArtistPerformancePanel`) or a
-   shop admin/staff member the shop-wide analytics (`ShopAnalyticsPanel`). Mobile's own landing
-   screen is the appointments calendar, not a dashboard - a deliberate, named cut (`app/
-   artist/[id].tsx`'s own comment calls both panels "pieces of Phase 7's still-evolving analytics
-   dashboard... not a natural extension of a directory port," DECISIONS.md X22), but it means
-   there is currently no at-a-glance business reporting anywhere on the phone.
+4. ~~No dashboard or analytics screen exists on mobile at all~~ - **done 2026-09-04 (X50)**: a
+   new "Dashboard" link on `app/index.tsx`'s header opens `app/dashboard.tsx`, branching by
+   `user.userInfo.__typename` exactly like web's `Home.jsx` branches on `user.userType` - Artist
+   gets a direct port of `ArtistPerformancePanel.jsx` (personal or shop-wide, same `shopWide`
+   condition), Staff gets a direct port of `ShopAnalyticsPanel.jsx`. Three named scope cuts (date
+   range trimmed to `businessRanges.ts`'s five presets, no custom range; web's `ShopCutPayoutList`
+   mark-paid section not ported, since the mutation it needs isn't built on mobile yet per
+   `shop-cut-confirmations/index.tsx`'s own X21 note; "Load more" pagination instead of
+   `EntityListPager`) - see X50's own DECISIONS.md entry. Viewing one OTHER specific artist's
+   performance (web's `Artist.jsx`, `isSelf=false`) remains unbuilt and is named there as its own
+   future slice, not folded into this one.
 5. **Gift cards have no mobile presence whatsoever** - neither the shop-level nor the
    artist-level side of the feature. Confirmed by a repo-wide search: nothing in `apps/mobile/src`
    references gift cards at all.
@@ -3153,11 +3157,19 @@ direct port of `ClientDashboard.jsx` field-for-field (its `SendAutoResponseButto
 fill-a-form-on-the-client's-behalf sections are still not ported - named as their own future work
 in X49's own DECISIONS.md entry).
 
-**Seven items remain on the parity accounting above, unprioritized - Danny's call.**
-Dashboard/analytics (gap 4), gift cards (gap 5), email-notification preferences (gap 7), the
-in-app notification feed (gap 8), group/shop-wide conversations + search (gap 9), the
-booking-request field editor (gap 10), and registration/first-time password set (gap 11). See that
-section for the full reasoning behind each one - nothing here assumes an order.
+**Dashboard/analytics (gap 4) is also done now (2026-09-04, X50)** - picked next as the
+most-blocking remaining item. `app/dashboard.tsx` branches Artist/Staff the way web's `Home.jsx`
+branches `userType`, porting `ArtistPerformancePanel.jsx`/`ShopAnalyticsPanel.jsx` field-for-field
+with three named scope cuts (no custom date range, no shop-cut mark-paid section, "Load more"
+instead of `EntityListPager`) - see X50's own DECISIONS.md entry for the full reasoning, including
+why viewing one other specific artist's performance is named as its own separate future slice
+rather than part of this one.
+
+**Six items remain on the parity accounting above, unprioritized - Danny's call.**
+Gift cards (gap 5), email-notification preferences (gap 7), the in-app notification feed (gap 8),
+group/shop-wide conversations + search (gap 9), the booking-request field editor (gap 10), and
+registration/first-time password set (gap 11). See that section for the full reasoning behind each
+one - nothing here assumes an order.
 
 **0 and 1 below (the shop-admin migration, and a real Square payment) are explicitly deferred —
 reconfirmed 2026-08-25: Danny's plan is to pick this back up as the last item before starting the

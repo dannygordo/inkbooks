@@ -1314,7 +1314,24 @@ section completes it and fixes the build order into a walking-skeleton-first seq
    sections - `SendAutoResponseButton` and filling out a Form on the client's behalf - are still
    not ported, named as their own future work). Confirmed in this sandbox: `packages/api` codegen
    + build, `apps/mobile` `tsc --noEmit` clean, full `apps/mobile` Jest suite - still 247/247.
-   Seven items remain on the parity accounting, unprioritized - see HANDOFF.md's "Next" section.
+
+   **Dashboard/analytics (gap 4) is done too (2026-09-04, see DECISIONS.md X50)** - picked as the
+   next-most-blocking item. A new "Dashboard" link on the calendar screen's header opens
+   `app/dashboard.tsx`, branching Artist/Staff exactly like web's `Home.jsx` branches on
+   `userType`, with direct ports of `ArtistPerformancePanel.jsx` (personal and shop-wide, same
+   `shopWide` condition, plus the shop-wide "Artist Totals" table) and `ShopAnalyticsPanel.jsx`
+   (Money/Deposits/Activity/Clients sections plus its clickable "By artist" table). New
+   `packages/api/src/operations/analytics.graphql` (`GetArtistAnalytics`/`GetShopAnalytics`) and a
+   new shared `components/StatCard.tsx` (renders a withheld money field as an em dash, never
+   `$0.00`, matching web's own `StatCard.jsx`). Three named scope cuts: date range trimmed to
+   `businessRanges.ts`'s five presets (X26) rather than a second custom-range picker; web's
+   `ShopCutPayoutList` mark-paid section not ported, since the mutation it needs isn't built on
+   mobile yet; "Load more" pagination rather than `EntityListPager`. Viewing one other specific
+   artist's performance (web's `Artist.jsx`, `isSelf=false`) remains unbuilt, named as its own
+   future slice. Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile`
+   `tsc --noEmit` clean, full `apps/mobile` Jest suite - still 247/247 (Apollo-wired screen, no new
+   pure-logic module).
+   Six items remain on the parity accounting, unprioritized - see HANDOFF.md's "Next" section.
 9. Square production credentials and go-live (already unblocked; deferred by Danny's own call until
    closer to real paying users - not a mobile-specific gate).
 10. TestFlight beta, then App Store submission - Guideline 3.1.1 already checked in step 5, so this
