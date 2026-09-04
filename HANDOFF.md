@@ -3049,15 +3049,84 @@ executable bit, git skips it with a hint on stderr rather than an error — whic
   create no `SquareAccount` row at all, migrated or not. See Test status above for the open question
   on whether that's worth fixing.
 
+## Mobile/web feature parity — full accounting (2026-09-04)
+
+Danny asked directly whether mobile has reached full functional parity with web. It has not, and
+the gaps had never been written down in one place before this — each was named individually, in
+passing, inside whichever DECISIONS.md entry happened to touch it (X15, X17, X22, and others), so
+no single read told the whole story. This section is that single accounting, built by reading the
+actual mobile source against web's routes and settings categories directly, not by trusting any
+prior summary. Ranked roughly by how much it blocks ordinary daily use, most-blocking first.
+
+1. **No way to create a brand-new appointment or consult from mobile.** The calendar screen
+   (`app/index.tsx`) is read-only for that - deliberately, per PRODUCTION_ROADMAP.md's own Phase 5
+   step 6 ("creating a brand-new appointment is still [a future] wizard"). A consult/session only
+   comes into existence today by converting an existing booking request
+   (`components/BookSessionDatesForm.tsx`) or adding a session to a project that already exists
+   (`components/ProjectSessionsList.tsx`). There is no tap-an-empty-slot-and-book flow the way
+   web's `CreateEventDialog` gives `Appointments.jsx`. An artist taking a walk-in or a phone call
+   has no way to get it onto the calendar from their phone.
+2. **No client, project, staff, or artist account can be created from mobile at all.** Every one of
+   those four record types can be viewed and edited (clients: view/edit only, no archive either -
+   see X17's own note; staff/artists: view/edit/archive all work) but never brought into existence.
+   `createClient`/`createProject`/`createStaffAccount`/`createArtist` (or their equivalents) are
+   not called anywhere in `apps/mobile/src`.
+3. **The client detail page is a shell of web's.** `app/client/[id].tsx` (X15) is scoped to exactly
+   one thing - the shared-images gallery. Stats, project history, appointment history, notes, and
+   the client's own flags, which are all real sections on web's `ClientDashboard.jsx`, don't exist
+   on this screen at all. This was named explicitly as future work in X15's own header comment,
+   but it means the actual client record - the thing a shop lives and dies by - is barely visible
+   on the phone today.
+4. **No dashboard or analytics screen exists on mobile at all.** Web's Home page (`/` and
+   `/dashboard`) shows an artist their own performance numbers (`ArtistPerformancePanel`) or a
+   shop admin/staff member the shop-wide analytics (`ShopAnalyticsPanel`). Mobile's own landing
+   screen is the appointments calendar, not a dashboard - a deliberate, named cut (`app/
+   artist/[id].tsx`'s own comment calls both panels "pieces of Phase 7's still-evolving analytics
+   dashboard... not a natural extension of a directory port," DECISIONS.md X22), but it means
+   there is currently no at-a-glance business reporting anywhere on the phone.
+5. **Gift cards have no mobile presence whatsoever** - neither the shop-level nor the
+   artist-level side of the feature. Confirmed by a repo-wide search: nothing in `apps/mobile/src`
+   references gift cards at all.
+6. **Client flags have no mobile presence either** - no marking a no-show, no viewing or resolving
+   an existing flag (web's per-row Resolve button on `ClientDashboard.jsx`), no flag-type admin
+   screen. Ties directly to gap 3 above (flags are a `ClientDashboard` section) but is called out
+   on its own since it's also an operational/accountability gap, not just a missing readout.
+7. **No email-notification-preferences screen.** Web's Notifications settings category
+   (`NotificationSettingsPanel.jsx` - six category toggles, immediate-vs-digest mode, a timezone
+   and hour) has no mobile equivalent at all - not to be confused with Reminders/Auto-Responses/
+   Response Time (client-facing message nudges), which ARE built; this is the account owner's own
+   inbound-email preferences.
+8. **No in-app notification feed.** Web's bell icon (`NotificationBell.jsx` + `NotificationItem`)
+   opens a real list of past notifications; mobile has push notifications that deep-link correctly
+   to the right screen (a genuine mobile-only upgrade over web, per PRODUCTION_ROADMAP.md's own
+   framing), but nowhere to browse notifications after the fact.
+9. **Group/shop-wide conversations and message search remain open**, named since X16 and never
+   picked back up - the one piece of Messages parity still missing (image-attachment compose and
+   per-row mark-unread were both closed since, in X35).
+10. **The custom booking-request field editor (`BookingRequestFieldsEditor.jsx`,
+    `/forms/:id/booking-fields` on web) is explicitly not ported** - `form/[id].tsx`'s own header
+    comment redirects away from it, same as web does for its own restricted case, but with nowhere
+    else to send someone who needs it.
+11. **Registration/onboarding (`/register`) and first-time password set (`/set-password/:token`)
+    are web-only.** Lower practical priority than everything above - both are one-time flows
+    usually completed off a link before someone has the app installed at all - but worth naming
+    for completeness rather than silently assumed covered.
+
+**Not gaps, by design, not by omission:** the client-facing portal (`ClientSettings.jsx`,
+`ClientDashboard.jsx`'s isSelf=true mode, the public guest-booking/guest-conversation/public-form
+routes) is out of scope for mobile entirely - mobile has no client login at all (a decision made
+back at X15/X16, not revisited here). Web's own Calendar/Taxes/Analytics settings categories are
+themselves still `ComingSoonPanel` placeholders, not real features - mobile isn't behind web on
+those, web hasn't built them either.
+
 ## Next
 
-**The Settings/Messages follow-up list (X31, and everything it spawned through X46) is done in
-full** - Booth Rent and `ShopConnectionPanel.jsx`, the two items left after the thirty-second
-entry, both shipped (thirty-third and thirty-fourth entries above). No named mobile-port slice is
-currently queued; the deferred items below (0 and 1) are what's left before the app could take
-real money, and Danny's plan is to hold those until mobile is otherwise complete rather than start
-them early. The next mobile-port slice, when one is picked, should be chosen fresh against
-`PRODUCTION_ROADMAP.md` and web's own feature set rather than assumed from this list.
+**The mobile/web parity accounting directly above this section is the source for what's next now**
+- the Settings/Messages follow-up list (X31 through X46) is done in full, but that list was never
+the whole gap; it just happened to be the one with names already attached. Priority among the 11
+items there is Danny's call, not assumed here - see that section for the full reasoning behind each
+one. The deferred items below (0 and 1) are what's left before the app could take real money, and
+Danny's plan is to hold those until mobile is otherwise complete rather than start them early.
 
 **0 and 1 below (the shop-admin migration, and a real Square payment) are explicitly deferred —
 reconfirmed 2026-08-25: Danny's plan is to pick this back up as the last item before starting the
