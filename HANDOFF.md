@@ -8,6 +8,16 @@ Last updated: 2026-09-05.
 
 ---
 
+### 2026-09-05 (forty-first entry): confirmed green again - the SessionDetail.test.jsx timeout fix holds for real
+
+Danny ran `npm test` in both `server/` and `apps/web/` once more after X78 and reported both green.
+Confirms the fortieth entry's diagnosis was right: giving that one test 15000ms instead of the
+5000ms default was the whole fix, with no other fallout from that run's heavier machine load.
+
+This closes the loop on the small-parked-cleanup-items pass (X75-X77) and the one real test flake
+it surfaced afterward (X78): every fix made across this session's test-coverage work is now
+confirmed working against a real run, not just reasoned through.
+
 ### 2026-09-05 (fortieth entry): a single test timeout, not a bug - SessionDetail.test.jsx given an explicit longer timeout
 
 With the small parked cleanup items pass closed out (X75-X77), Danny ran `npm test` in `apps/web/`
