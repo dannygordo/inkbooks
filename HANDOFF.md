@@ -3576,8 +3576,10 @@ regression.
   `confirmShopCutPaid`, `confirmBoothRentPaid`, `createStaffAccount`, and similar) are correctly
   left alone - each is a genuinely shop-only action with no independent-artist equivalent to grant,
   exactly as `hasAdminAuthority`'s own header comment enumerates.
-- **The reference-image upload 400** is parked until it recurs and a payload exists. `express.json()`
-  was on Express's 100kb default and is now 2mb; that is **not** confirmed as the cause.
+- ~~The reference-image upload 400~~ - **closed 2026-09-05, per Danny: already resolved, has
+  not recurred.** No specific root cause was confirmed (the `express.json()` 2mb bump was a
+  precaution, never confirmed as the fix); closing on Danny's own word rather than a diagnosis,
+  since there is no longer a failure to diagnose.
 - **Artists who already disconnected and reconnected** have no interval history. There was nothing to
   migrate — the old model overwrote it. New intervals start from the change.
 - ~~`computeChargeBreakdown` echoes raw credit inputs, not the clamped ones~~ — checked

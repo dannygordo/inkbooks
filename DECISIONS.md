@@ -3995,9 +3995,6 @@ share → UI surfaces → dashboard fixes. Standalone fixes pulled forward.
 
 Nothing is blocking. A few things are parked rather than undecided:
 
-- **The reference-image upload 400.** Parked at the user's direction until it recurs and a payload
-  exists. `express.json()` was on Express's 100kb default and is now 2mb, but that is **not**
-  confirmed as the cause and should not be recorded as the fix.
 - **S2's uneven gates** are known work, not an open question. The rule is decided; the
   `withAuth(fn, SHOP_ADMIN)` call sites have not been moved onto it yet.
 - **MSG3's group-thread gap.** `MESSAGE_RECEIVED` currently skips any conversation with more than
