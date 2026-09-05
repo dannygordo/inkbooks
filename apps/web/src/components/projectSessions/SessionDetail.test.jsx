@@ -389,6 +389,16 @@ describe("saving and closing a session", () => {
 		);
 	});
 
+	// DIAGNOSED 2026-09-05: this test timed out at Vitest's default 5000ms on a real npm test run,
+	// the only failure in an otherwise-clean 2167-test run whose own reported `collect` phase took
+	// over 24 minutes - a sign of the machine being under abnormal load that run, not a regression
+	// here. Verified there is no real bug to find: the fixture's timerStatus is "stopped" (no 1s
+	// re-render interval running - see the component's own comment on that effect), and
+	// IBMultilineInput/MUI's TextField do no debouncing of their own. This is simply the longest
+	// user.type() string in this file (36 characters, vs. 32 for the "Reversed after a client
+	// dispute" tests elsewhere here that were not flagged) - closest to the default timeout's
+	// margin under load. Given an explicit timeout, exactly as Vitest's own failure message
+	// suggests, rather than leaving a legitimate, slightly slower interaction test flaky.
 	it("includes typed session notes in the save payload", async () => {
 		const user = userEvent.setup();
 		setupHooks();
@@ -433,7 +443,7 @@ describe("saving and closing a session", () => {
 		await waitFor(() =>
 			expect(setAlert).toHaveBeenCalledWith(expect.objectContaining({ severity: "success", message: "Session saved." })),
 		);
-	});
+	}, 15000);
 
 	it("closes the session, marking it completed and calling onClosed", async () => {
 		const user = userEvent.setup();

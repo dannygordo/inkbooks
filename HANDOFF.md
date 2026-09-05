@@ -4,9 +4,28 @@
 has not been verified. `DECISIONS.md` is *rules* — the settled calls and why. They change at
 different rates, which is why they are separate files.
 
-Last updated: 2026-09-04.
+Last updated: 2026-09-05.
 
 ---
+
+### 2026-09-05 (fortieth entry): a single test timeout, not a bug - SessionDetail.test.jsx given an explicit longer timeout
+
+With the small parked cleanup items pass closed out (X75-X77), Danny ran `npm test` in `apps/web/`
+again and got exactly one failure out of 2167: `SessionDetail.test.jsx`'s "includes typed session
+notes in the save payload" timed out at Vitest's default 5000ms.
+
+Diagnosed rather than assumed a bug, per this project's own rule. Found none: the fixture's
+`timerStatus` is `"stopped"`, so the component's 1-second re-render interval wasn't running during
+this test, and neither `IBMultilineInput` nor MUI's `TextField` do any debouncing. What actually
+sets this test apart is that it types the longest string anywhere in the file (36 characters,
+versus 32 for two other tests in the same file that were not flagged), and the run's own numbers
+point at the real cause: `collect` alone took over 24 minutes that run, a sign of the machine
+being under heavy load, not of anything slower in this codebase. Full writeup: DECISIONS.md PR6.
+
+Fixed by giving that one test an explicit 15000ms timeout - the fix Vitest's own failure message
+names directly - rather than changing application code that isn't actually slow, or leaving a
+legitimate interaction test flaky. Syntax-checked only (`@babel/parser` with the `jsx` plugin);
+needs a real `npm test` run to confirm this was the whole story.
 
 ### 2026-09-04 (thirty-ninth entry): fixed the parked Web status-column bug (`UtilsService.prettyConstantsListValue`) - first of the small parked cleanup items
 

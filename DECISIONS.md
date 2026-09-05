@@ -3949,6 +3949,36 @@ Not run against a real Vitest suite from this sandbox (same environment limitati
 syntax-checked only (`node -c` for `UtilsService.js`, `@babel/parser` with the `jsx` plugin for the
 two test files). Needs a real `npm test` run in `apps/web/` to confirm.
 
+### PR6. A single test timing out at Vitest's default 5000ms is not automatically a real bug -
+diagnose before reaching for a code fix
+
+Found 2026-09-05: Danny's next real `npm test` run in `apps/web/` came back with exactly one
+failure out of 2167 tests - `SessionDetail.test.jsx`'s "includes typed session notes in the save
+payload" - timing out at Vitest's default 5000ms. Worth recording as its own item because the
+instinct after PR3-PR5 is to assume every reported failure is a bug in application code; this one
+wasn't, and the diagnosis is the point.
+
+Checked for a real defect first: the fixture's `timerStatus` is `"stopped"`, so
+`SessionDetail.jsx`'s 1-second `forceTick` interval (which only runs while a timer is actually
+running) was not active during this test - not a hidden per-second re-render tax. `IBMultilineInput`
+and the MUI `TextField` underneath it do no debouncing or other async work of their own on
+`onChange`. Nothing in the component or its dependencies got slower.
+
+What actually distinguishes this test: it is the single longest `user.type()` call anywhere in the
+file - 36 characters ("Client wants more shading next time"), versus 32 for the "Reversed after a
+client dispute" adjustment-reason tests elsewhere in the same file, which were not flagged. The
+run's own reported numbers are the other half of the story: `collect` alone took over 24 minutes
+for this run (`Duration 163.93s ... collect 1457.90s`), an extraordinary number that points at the
+machine being under heavy load that run, not at anything in this codebase. A 36-keystroke
+interaction test sitting closest to the default timeout's margin is exactly what tips over first
+under that kind of load, while everything else still has enough headroom to pass.
+
+**Fixed by giving that one test an explicit 15000ms timeout** (`}, 15000);` - the fix Vitest's own
+failure message names directly - rather than changing any application code for a slowdown that
+isn't there, or leaving a legitimate (if marginal) interaction test flaky. Left every other test in
+the file, including the shorter `user.type()` calls, on the default timeout, since there is no
+evidence they need headroom too.
+
 ---
 
 ## Sequencing
