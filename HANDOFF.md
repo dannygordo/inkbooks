@@ -3593,7 +3593,10 @@ regression.
   paged query — deliberately, since notes are embedded sub-documents on `Client`, not a separate
   collection `paginate()` can query with its own skip/limit. Projects and Appointments are NOT in
   this gap any more (see Done below) — this is now the one remaining list on that page that isn't
-  a real server-paged connection, and it's also the smallest of the three in practice.
+  a real server-paged connection, and it's also the smallest of the three in practice. Reviewed
+  again 2026-09-05 as one of the small parked cleanup items: still the right call per Danny -
+  a real fix means a $slice-based resolver or its own collection, real new infrastructure for a
+  list that's typed by hand and stays small in practice. Staying as-is.
 - ~~A manually-raised client flag has no resolve path~~ — **done 2026-08-21/22**:
   `resolveClientFlag(flagId)` mutation ships, wired into `ClientDashboard.jsx` with a per-row
   Resolve button. Not restricted to manually-raised flags — an admin can also clear a stale
