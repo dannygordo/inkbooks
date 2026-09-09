@@ -58,6 +58,19 @@ const ClientScheduleEmail = require('../models/ClientScheduleEmail');
 const Notification = require('../models/Notification');
 const AutoResponse = require('../models/AutoResponse');
 const AutoResponseLog = require('../models/AutoResponseLog');
+// These eight were added to the schema after this list was last updated and were never folded
+// in - same class of gap this file's own comment above already flags for BookingRequest/
+// PasswordToken and the "everything below" block. Found 2026-09-05 building scripts/
+// seed-copperwolf.js's own collection list against a fresh `ls models/`. Left behind on every
+// re-run, each accumulates rows pointing at a shop/artist/client this script just deleted.
+const BoothRentCharge = require('../models/BoothRentCharge');
+const BoothRentPlan = require('../models/BoothRentPlan');
+const PushToken = require('../models/PushToken');
+const RecurringExpense = require('../models/RecurringExpense');
+const ScheduledRun = require('../models/ScheduledRun');
+const SharedImage = require('../models/SharedImage');
+const ResponseTimeSettings = require('../models/ResponseTimeSettings');
+const SystemMessageTemplate = require('../models/SystemMessageTemplate');
 const { Constants } = require('../utils/constants');
 const { pickDefaultTagColor } = require('../utils/tag-color');
 const { setShopCutRate } = require('../utils/shop-cut');
@@ -164,6 +177,14 @@ async function seed() {
     Notification.deleteMany({}),
     AutoResponse.deleteMany({}),
     AutoResponseLog.deleteMany({}),
+    BoothRentCharge.deleteMany({}),
+    BoothRentPlan.deleteMany({}),
+    PushToken.deleteMany({}),
+    RecurringExpense.deleteMany({}),
+    ScheduledRun.deleteMany({}),
+    SharedImage.deleteMany({}),
+    ResponseTimeSettings.deleteMany({}),
+    SystemMessageTemplate.deleteMany({}),
   ]);
 
   // deleteMany empties collections but leaves their INDEXES behind, and a stale unique index is a
@@ -186,6 +207,8 @@ async function seed() {
       Adjustment, ClientFlag, ClientFlagType, ExpenseType, Expense, IncomeType, Income,
       GiftCard, GiftCardRedemption, ShopCutRate, SquareAccount, EventLog, ReminderSettings,
       ReminderLog, ClientScheduleEmail, Notification, AutoResponse, AutoResponseLog,
+      BoothRentCharge, BoothRentPlan, PushToken, RecurringExpense, ScheduledRun, SharedImage,
+      ResponseTimeSettings, SystemMessageTemplate,
     ].map((model) => model.syncIndexes()),
   );
 
