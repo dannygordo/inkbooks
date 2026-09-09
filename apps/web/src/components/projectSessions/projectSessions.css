@@ -226,9 +226,51 @@
 
 .sessionDetailActions {
 	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	padding: 16px 28px !important;
+}
+
+/* One tier of the action bar (2026-09-06) - see SessionDetail.jsx's own comments on what each
+   row is for. .sessionDetailActions is now a column of these rather than one flat wrapping row,
+   so Row 1 (price/close), Row 2 (no-show/reschedule/cancel) and Row 3 (auto-response/delete)
+   each stay on their own line instead of wrapping unpredictably into each other. */
+.sessionDetailActionsRow {
+	display: flex;
+	align-items: center;
 	gap: 10px;
 	flex-wrap: wrap;
-	padding: 16px 28px !important;
+	width: 100%;
+}
+
+/* Reschedule Session / Cancel Session inline forms (2026-09-06) - same bordered-box treatment as
+   .sessionDetailAdjustments above, toggled open by their own Row 2 button rather than swapping
+   this whole modal's content out (see SessionDetail.jsx's own comment on why). */
+.sessionDetailRescheduleForm,
+.sessionDetailCancelForm {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	padding: 12px 14px;
+	border: 1px solid var(--ib-border);
+	border-radius: 6px;
+}
+.sessionDetailCancelForm {
+	border-color: var(--ib-error);
+	background-color: var(--ib-error-bg);
+}
+.sessionDetailFormLabel {
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--ib-text-primary);
+}
+.sessionDetailFormHint {
+	font-size: 12px;
+	color: var(--ib-text-secondary);
+}
+.sessionDetailFormButtons {
+	display: flex;
+	gap: 8px;
 }
 
 .projectSessionAddForm {
@@ -286,4 +328,192 @@
 .sessionDetailGiftCardApplied {
 	font-size: 12px;
 	color: var(--ib-text-secondary);
+}
+
+/* Card-based redesign (2026-09-08) - see session-modal-mockup/Proposed.dc.html. Status & Timer,
+   Pricing, Deposits & gift cards, Adjustments, Notes and Payment are each one of these instead of
+   sharing one flat stack - .sessionDetailContent's own 16px gap now separates cards from each
+   other instead of separating loose sections. */
+.sessionDetailCard {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	border: 1px solid var(--ib-border);
+	border-radius: 8px;
+	background-color: var(--ib-surface-card);
+	padding: 14px 16px;
+}
+.sessionDetailCardHead {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+.sessionDetailCardHeadLabel {
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--ib-text-secondary);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+.sessionDetailCardBody {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+/* The one figure on this whole card nobody should be able to miss - see
+   .sessionDetailMoneyLabelTotal above for the row style this replaces (Tax/Fees/Offset Fee still
+   use that one; only the Total row moved to this treatment). */
+.sessionDetailTotalRow {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 10px 14px;
+	border: 1px solid var(--ib-primary-border);
+	background-color: var(--ib-primary-bg);
+	border-radius: 6px;
+}
+.sessionDetailTotalName {
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--ib-text-primary);
+}
+.sessionDetailTotalValue {
+	font-size: 22px;
+	font-weight: 700;
+	color: var(--ib-text-primary);
+}
+
+/* The deposit-applied note that used to sit loose in the money stack (was
+   .sessionDetailDepositApplied's only caller) - same look, just a shared name now that the
+   Pricing card can also use it for other read-only notes if one shows up later. */
+.sessionDetailNoteBox {
+	font-size: 13px;
+	color: var(--ib-text-secondary);
+	padding: 10px 14px;
+	background-color: var(--ib-surface-subtle);
+	border-radius: 6px;
+}
+
+/* Deposits & gift cards / Adjustments - both collapse into one of these now (SessionDetail.jsx's
+   depositsExpanded/adjustmentsExpanded). A <button>, not a div with an onClick, so it's keyboard
+   and screen-reader reachable the way the rest of this form already is. */
+.sessionDetailDisclosure {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	width: 100%;
+	border: none;
+	background: none;
+	padding: 0;
+	margin: 0;
+	cursor: pointer;
+	font: inherit;
+	text-align: left;
+	color: inherit;
+}
+.sessionDetailDisclosureLabel {
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--ib-text-secondary);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+.sessionDetailChevron {
+	color: var(--ib-text-muted);
+	transition: transform 0.15s ease;
+	flex-shrink: 0;
+}
+.sessionDetailChevron.expanded {
+	transform: rotate(180deg);
+}
+
+/* The one card tinted to stand out - see Proposed.dc.html's own note that Payment moved to the
+   bottom and is the only card with a colored border, since it's the thing the primary button
+   below is about to act on. */
+.sessionDetailPaymentCard {
+	border-color: var(--ib-primary-border);
+	background-color: var(--ib-primary-bg);
+}
+.sessionDetailPaymentCardHead {
+	align-items: flex-start;
+}
+
+/* Not yet collected / Paid - mirrors .sessionDetailAdjustmentMeta/.sessionDetailQuoteError's own
+   pattern of a filled pill rather than plain text, since this is the one status on the card a
+   glance needs to catch. */
+.sessionDetailStatusPill {
+	display: inline-flex;
+	align-items: center;
+	padding: 3px 10px;
+	border-radius: 999px;
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+	white-space: nowrap;
+}
+.sessionDetailStatusPill.unpaid {
+	color: var(--ib-error-dark);
+	background-color: var(--ib-error-bg);
+	border: 1px solid var(--ib-error);
+}
+.sessionDetailStatusPill.paid {
+	color: var(--ib-success);
+	background-color: var(--ib-success-bg);
+	border: 1px solid var(--ib-success-border);
+}
+
+.sessionDetailFieldLabel {
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--ib-text-primary);
+}
+.sessionDetailFieldHint {
+	font-size: 12px;
+	color: var(--ib-text-secondary);
+	font-style: italic;
+}
+
+/* Square / Cash / Other - a 3-way choice, not a dropdown, since there are only ever three options
+   and the artist should be able to see all of them (and which one's picked) without opening
+   anything. */
+.sessionDetailPayMethods {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+.sessionDetailPayOption {
+	padding: 8px 14px;
+	border: 1px solid var(--ib-border);
+	border-radius: 6px;
+	background-color: var(--ib-surface-card);
+	color: var(--ib-text-primary);
+	font-size: 13px;
+	font-family: inherit;
+	cursor: pointer;
+}
+.sessionDetailPayOption:hover:not(:disabled) {
+	background-color: var(--ib-surface-hover);
+}
+.sessionDetailPayOption.selected {
+	border-color: var(--ib-primary);
+	background-color: var(--ib-primary-bg);
+	color: var(--ib-primary);
+	font-weight: 600;
+}
+.sessionDetailPayOption:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
+/* Row 1 of the redesigned actions bar (2026-09-08) - a single full-width primary button now, not
+   two side-by-side ones (Charge via Square / Close Session merged - see SessionDetail.jsx's
+   handlePrimaryAction). Row 2 (No-Show/Reschedule/Cancel) and Row 3 (Auto-Response/Delete) still
+   use the plain .sessionDetailActionsRow above them. */
+.sessionDetailActionsPrimaryRow {
+	width: 100%;
 }

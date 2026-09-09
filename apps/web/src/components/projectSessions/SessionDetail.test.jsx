@@ -1,15 +1,19 @@
 // SessionDetail.jsx tests. See the component's own header comment: opened in the global modal from
 // ProjectSessionsList, this is the timer/notes/money/adjustments/deposits view for a single
-// session, plus editable date/time, Close Session and Delete Session.
+// session, plus editable date/time, Close Session, Reschedule Session, Cancel Session and Delete
+// Session. There is no standalone Save button (removed 2026-09-06, Danny) - Session Notes
+// autosaves on its own debounce instead (see the component's own comment on that effect).
 //
 // AppointmentService.useChargeQuote (the LAZY hook backing "Charge via Square") and
 // DepositService.getAvailableDeposits are mocked directly, the same "don't hand-build a
 // MockedProvider mock for every read" reasoning ArtistPerformancePanel.test.jsx uses - a lazy
 // query's trigger function is far simpler to control as a plain vi.fn() than to drive through a
-// mocked network response. Every other mutation (timers, save, delete, adjustments, deposits) and
-// the live/save-time charge quote (a plain apolloClient.query() call - see the component's own
-// getFreshQuote comment on why it isn't the lazy hook) go through a real MockedProvider, since
-// this file's job includes confirming the right variables go out.
+// mocked network response. Every other mutation (timers, close, reschedule, cancel, delete,
+// adjustments, deposits) and the live/save-time charge quote (a plain apolloClient.query() call -
+// see the component's own getFreshQuote comment on why it isn't the lazy hook) go through a real
+// MockedProvider, since this file's job includes confirming the right variables go out. The Notes
+// autosave effect is exercised only at the DOM level (see "editing session notes" below) rather
+// than through a mocked network round trip - see that test's own comment on why.
 //
 // IBSquarePaymentForm (components/IBSquarePayments/ - explicitly out of scope to modify) and
 // SendAutoResponseButton (its own full test file already) are mocked out entirely - the same
@@ -18,8 +22,8 @@
 //
 // Sessions default to a zero subtotal/tip in these fixtures wherever the test doesn't care about
 // the live money figures - getFreshQuote short-circuits to `null` for a subtotal <= 0 (see its own
-// comment), which keeps Save/Close/Delete/Adjustments/Deposits tests from needing a charge-quote
-// mock at all. Only the "Charge via Square" tests type in a real subtotal and mock that query.
+// comment), which keeps Close/Delete/Adjustments/Deposits tests from needing a charge-quote mock
+// at all. Only the "Charge via Square" tests type in a real subtotal and mock that query.
 import React from "react";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
@@ -224,9 +228,12 @@ describe("rendering an open session", () => {
 		expect(screen.getByTestId("send-auto-response")).toHaveTextContent("client-1:sess-1");
 	});
 
-	it("shows None recorded when there are no adjustments", () => {
+	it("shows None recorded when there are no adjustments, once the Adjustments card is expanded", async () => {
+		const user = userEvent.setup();
 		setupHooks();
 		renderDetail();
+
+		await user.click(screen.getByRole("button", { name: "Adjustments" }));
 
 		expect(screen.getByText("None recorded.")).toBeInTheDocument();
 	});
@@ -250,9 +257,7 @@ describe("rendering a closed session", () => {
 		expect(screen.getByLabelText("Tip $")).toBeDisabled();
 		expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
 		expect(screen.getByRole("button", { name: "Reset" })).toBeDisabled();
-		expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
-		expect(screen.getByRole("button", { name: "Close Session" })).toBeDisabled();
-		expect(screen.getByRole("button", { name: "Charge via Square" })).toBeDisabled();
+		expect(screen.getByRole("button", { name: "Charge via Square & Close" })).toBeDisabled();
 		// Read straight from the appointment - no "—" placeholder, since hasDisplayFigures is
 		// unconditionally true once closed. taxCents: 800 is $8.00 (8% of the $100 subtotal), not
 		// $800.00 - formatCents divides by 100, so this was a stray extra zero in the assertion,
@@ -341,112 +346,56 @@ describe("timer controls", () => {
 	});
 });
 
-describe("saving and closing a session", () => {
-	it("saves with a zero subtotal without ever asking for a charge quote", async () => {
+describe("editing session notes", () => {
+	it("has no Save button, and Session Notes stays open and editable on an open session", async () => {
 		const user = userEvent.setup();
 		setupHooks();
-		const saveMock = {
-			request: {
-				query: AppointmentService.UPDATE_SESSION_DETAILS,
-				variables: {
-					appointmentInput: {
-						id: "sess-1",
-						appointmentDate: moment("2026-08-10T14:00:00.000Z").toISOString(),
-						subtotalCents: 0,
-						taxCents: 0,
-						feeCents: 0,
-						tipCents: 0,
-						totalCents: 0,
-						sessionNotes: "",
-					},
-				},
-			},
-			result: {
-				data: {
-					updateAppointment: {
-						id: "sess-1",
-						appointmentDate: "2026-08-10T14:00:00.000Z",
-						durationMinutes: 180,
-						appointmentEnd: "2026-08-10T17:00:00.000Z",
-						subtotalCents: 0,
-						tipCents: 0,
-						totalCents: 0,
-						shopCutCents: 0,
-						shopCutStatus: "none",
-						sessionNotes: "",
-					},
-				},
-			},
-		};
-		const { setAlert } = renderDetail({ mocks: [saveMock] });
+		renderDetail();
 
-		await user.click(screen.getByRole("button", { name: "Save" }));
+		expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
+		const notesField = screen.getByLabelText("Session Notes");
+		expect(notesField).not.toBeDisabled();
 
-		await waitFor(() =>
-			expect(setAlert).toHaveBeenCalledWith(
-				expect.objectContaining({ isAlert: true, severity: "success", message: "Session saved." }),
-			),
-		);
+		await user.type(notesField, "Client wants more shading next time");
+
+		expect(notesField).toHaveValue("Client wants more shading next time");
 	});
 
-	// DIAGNOSED 2026-09-05: this test timed out at Vitest's default 5000ms on a real npm test run,
-	// the only failure in an otherwise-clean 2167-test run whose own reported `collect` phase took
-	// over 24 minutes - a sign of the machine being under abnormal load that run, not a regression
-	// here. Verified there is no real bug to find: the fixture's timerStatus is "stopped" (no 1s
-	// re-render interval running - see the component's own comment on that effect), and
-	// IBMultilineInput/MUI's TextField do no debouncing of their own. This is simply the longest
-	// user.type() string in this file (36 characters, vs. 32 for the "Reversed after a client
-	// dispute" tests elsewhere here that were not flagged) - closest to the default timeout's
-	// margin under load. Given an explicit timeout, exactly as Vitest's own failure message
-	// suggests, rather than leaving a legitimate, slightly slower interaction test flaky.
-	it("includes typed session notes in the save payload", async () => {
-		const user = userEvent.setup();
+	it("still has no Save button once the session is closed, and Notes is disabled", () => {
 		setupHooks();
-		const saveMock = {
-			request: {
-				query: AppointmentService.UPDATE_SESSION_DETAILS,
-				variables: {
-					appointmentInput: {
-						id: "sess-1",
-						appointmentDate: moment("2026-08-10T14:00:00.000Z").toISOString(),
-						subtotalCents: 0,
-						taxCents: 0,
-						feeCents: 0,
-						tipCents: 0,
-						totalCents: 0,
-						sessionNotes: "Client wants more shading next time",
-					},
-				},
-			},
-			result: {
-				data: {
-					updateAppointment: {
-						id: "sess-1",
-						appointmentDate: "2026-08-10T14:00:00.000Z",
-						durationMinutes: 180,
-						appointmentEnd: "2026-08-10T17:00:00.000Z",
-						subtotalCents: 0,
-						tipCents: 0,
-						totalCents: 0,
-						shopCutCents: 0,
-						shopCutStatus: "none",
-						sessionNotes: "Client wants more shading next time",
-					},
-				},
-			},
-		};
-		const { setAlert } = renderDetail({ mocks: [saveMock] });
+		renderDetail({ appointmentOverrides: { appointmentStatus: "completed" } });
 
-		await user.type(screen.getByLabelText("Session Notes"), "Client wants more shading next time");
-		await user.click(screen.getByRole("button", { name: "Save" }));
+		expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
+		expect(screen.getByLabelText("Session Notes")).toBeDisabled();
+	});
+});
 
-		await waitFor(() =>
-			expect(setAlert).toHaveBeenCalledWith(expect.objectContaining({ severity: "success", message: "Session saved." })),
-		);
-	}, 15000);
+describe("saving and closing a session", () => {
+	// The standalone Save button is gone (2026-09-06, Danny) - notes now autosave on their own
+	// debounce (see "editing session notes" below), and there is no other way left to trigger a
+	// zero-subtotal UPDATE_SESSION_DETAILS save without also closing the session. That exact
+	// buildSavePayload/getFreshQuote code path (zero subtotal, no charge quote asked for) is still
+	// covered below by "closes the session, marking it completed and calling onClosed" - Save and
+	// Close Session only ever differed by appointmentStatus.
+	//
+	// Close Session now confirms first (2026-09-08, Danny) - the button reads a lot like "close
+	// this window" to someone who has not used this modal before, so a plain click should not be
+	// enough to finalize a session. Same window.confirm pattern already covered for Delete/Cancel
+	// below - mocked true here since this describe block is about what happens once confirmed.
+	it("does nothing when the confirmation is declined", async () => {
+		const user = userEvent.setup();
+		vi.spyOn(window, "confirm").mockReturnValue(false);
+		setupHooks();
+		const { onClosed } = renderDetail();
+
+		await user.click(screen.getByRole("button", { name: "Close Session" }));
+
+		expect(onClosed).not.toHaveBeenCalled();
+	});
 
 	it("closes the session, marking it completed and calling onClosed", async () => {
 		const user = userEvent.setup();
+		vi.spyOn(window, "confirm").mockReturnValue(true);
 		setupHooks();
 		const closeMock = {
 			request: {
@@ -551,6 +500,8 @@ describe("recording an adjustment", () => {
 		setupHooks();
 		renderDetail();
 
+		await user.click(screen.getByRole("button", { name: "Adjustments" }));
+
 		expect(screen.getByRole("button", { name: "Record Adjustment" })).toBeDisabled();
 
 		await user.type(screen.getByLabelText("Amount reversed $"), "50");
@@ -582,6 +533,8 @@ describe("recording an adjustment", () => {
 		};
 		const { setAlert } = renderDetail({ mocks: [recordMock] });
 
+		await user.click(screen.getByRole("button", { name: "Adjustments" }));
+
 		await user.type(screen.getByLabelText("Amount reversed $"), "50");
 		await user.type(screen.getByLabelText("Reason"), "Reversed after a dispute");
 		await user.click(screen.getByRole("button", { name: "Record Adjustment" }));
@@ -607,6 +560,8 @@ describe("recording an adjustment", () => {
 		};
 		const { setAlert } = renderDetail({ mocks: [failingMock] });
 
+		await user.click(screen.getByRole("button", { name: "Adjustments" }));
+
 		await user.type(screen.getByLabelText("Amount reversed $"), "50");
 		await user.type(screen.getByLabelText("Reason"), "Reversed after a dispute");
 		await user.click(screen.getByRole("button", { name: "Record Adjustment" }));
@@ -620,17 +575,22 @@ describe("recording an adjustment", () => {
 });
 
 describe("deposits", () => {
-	it("skips the available-deposits query once a credit is already applied, and shows the applied message", () => {
+	it("skips the available-deposits query once a credit is already applied, and shows the applied message", async () => {
+		const user = userEvent.setup();
 		setupHooks();
 		renderDetail({ appointmentOverrides: { depositCreditCents: 5000 } });
 
 		expect(DepositService.getAvailableDeposits).toHaveBeenCalledWith("sess-1", { skip: true });
+
+		await user.click(screen.getByRole("button", { name: "Deposits & gift cards" }));
+
 		expect(
 			screen.getByText("$50.00 deposit applied - already paid, deducted from this session's total."),
 		).toBeInTheDocument();
 	});
 
-	it("lists available deposits to apply when there's no credit yet", () => {
+	it("lists available deposits to apply when there's no credit yet", async () => {
+		const user = userEvent.setup();
 		setupHooks({
 			deposits: [
 				// depositCollectedAt noon UTC, not midnight - rendered via `moment(...).format(...)`
@@ -641,6 +601,8 @@ describe("deposits", () => {
 			],
 		});
 		renderDetail();
+
+		await user.click(screen.getByRole("button", { name: "Deposits & gift cards" }));
 
 		expect(screen.getByText(/\$50\.00 taken Jul 1, 2026 at consult/)).toBeInTheDocument();
 		expect(screen.getByRole("button", { name: "Apply to this session" })).toBeInTheDocument();
@@ -675,6 +637,7 @@ describe("deposits", () => {
 		};
 		const { setAlert } = renderDetail({ mocks: [applyMock] });
 
+		await user.click(screen.getByRole("button", { name: "Deposits & gift cards" }));
 		await user.click(screen.getByRole("button", { name: "Apply to this session" }));
 
 		expect(await screen.findByText("$50.00 deposit applied - already paid, deducted from this session's total.")).toBeInTheDocument();
@@ -699,6 +662,7 @@ describe("deposits", () => {
 		};
 		const { setAlert } = renderDetail({ mocks: [failingMock] });
 
+		await user.click(screen.getByRole("button", { name: "Deposits & gift cards" }));
 		await user.click(screen.getByRole("button", { name: "Apply to this session" }));
 
 		await waitFor(() =>
@@ -710,11 +674,12 @@ describe("deposits", () => {
 });
 
 describe("charging via Square", () => {
-	it("disables Charge via Square while there's no subtotal entered", () => {
+	it("shows a plain, enabled Close Session button (not Charge via Square) while there's no subtotal entered", () => {
 		setupHooks();
 		renderDetail();
 
-		expect(screen.getByRole("button", { name: "Charge via Square" })).toBeDisabled();
+		expect(screen.getByRole("button", { name: "Close Session" })).not.toBeDisabled();
+		expect(screen.queryByRole("button", { name: "Charge via Square & Close" })).not.toBeInTheDocument();
 	});
 
 	it("saves the current figures, then opens the payment modal when the quote says it can charge", async () => {
@@ -791,7 +756,7 @@ describe("charging via Square", () => {
 
 		await user.clear(screen.getByLabelText("Tattoo work $"));
 		await user.type(screen.getByLabelText("Tattoo work $"), "100");
-		await user.click(screen.getByRole("button", { name: "Charge via Square" }));
+		await user.click(screen.getByRole("button", { name: "Charge via Square & Close" }));
 
 		await waitFor(() => expect(setModal).toHaveBeenCalled());
 		const call = setModal.mock.calls[0][0];
@@ -871,7 +836,7 @@ describe("charging via Square", () => {
 
 		await user.clear(screen.getByLabelText("Tattoo work $"));
 		await user.type(screen.getByLabelText("Tattoo work $"), "100");
-		await user.click(screen.getByRole("button", { name: "Charge via Square" }));
+		await user.click(screen.getByRole("button", { name: "Charge via Square & Close" }));
 
 		await waitFor(() =>
 			expect(setAlert).toHaveBeenCalledWith(

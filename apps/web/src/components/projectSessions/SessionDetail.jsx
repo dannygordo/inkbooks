@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useMutation, useApolloClient } from "@apollo/client";
 import moment from "moment";
 import { Button, Chip, DialogActions, DialogContent } from "@mui/material";
-import { PlayArrow, Stop, RestartAlt, Save, Delete } from "@mui/icons-material";
+import { PlayArrow, Stop, RestartAlt, Delete, ExpandMore } from "@mui/icons-material";
 import { AppointmentService } from "../../services/AppointmentService";
 import IBInput from "../inputs/IBInput";
 import IBMultilineInput from "../inputs/IBMultilineInput";
@@ -23,14 +23,34 @@ import {
 } from "../../utils/sessionRate";
 import "./projectSessions.css";
 
+// Payment method choice for the Payment card / primary action button (2026-09-08 redesign - see
+// session-modal-mockup/Proposed.dc.html). Square is the default - it's the common path, and the
+// only one that actually moves money through this app. Cash/Other don't touch a mutation of their
+// own; they just change which close-out handler the primary button runs and what gets recorded in
+// Session Notes (see handleMarkPaidAndClose's own comment on why a note, not a schema field).
+const PAYMENT_METHOD_OPTIONS = [
+	{ value: "square", label: "Square (in-app)" },
+	{ value: "cash", label: "Cash" },
+	{ value: "other", label: "Other / already handled" },
+];
+const PAYMENT_METHOD_LABELS = { cash: "Cash", other: "Other (already handled)" };
+
 /**
  * Opened inside the global IBModal (see pages/projects/Project.jsx's setModal usage) when an
  * artist clicks a session in ProjectSessionsList. Shows start/stop/reset timer controls, a live
  * elapsed-time readout, an auto-computed-but-editable dollar total, a notes textarea, a "Charge
- * via Square" button (reuses the existing sandbox payment flow - see IBSquarePaymentForm's own
+ * via Square" flow (reuses the existing sandbox payment flow - see IBSquarePaymentForm's own
  * comment on why this isn't real-money infrastructure yet), and a "Close Session" action that
  * sets appointmentStatus to 'completed' - the same gate the shop-cut payout dashboard (still to
  * be built, see PRODUCTION_ROADMAP.md's Phase 7 "still to build" list) will filter on.
+ *
+ * Redesigned 2026-09-08 (Danny) into labeled cards - Status & Timer, Pricing, Deposits & gift
+ * cards, Adjustments, Notes, Payment - instead of five sections sharing one flat visual rank (see
+ * session-modal-mockup/Proposed.dc.html for the mockup this follows). Deposits & gift cards and
+ * Adjustments collapse by default, since most sessions never touch either. The actions bar is
+ * three tiers: one full-width primary button that both prices and ends the session normally (its
+ * label follows the Payment card's method choice), the three ways a session ends abnormally
+ * (No-Show / Reschedule / Cancel), and the two rarely-used items as plain links.
  *
  * Props:
  * - appointment: the session Appointment as returned by getAppointmentsByProject
@@ -100,7 +120,73 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 	const [recordAdjustment, { loading: recordingAdjustment }] = useMutation(
 		AppointmentService.RECORD_ADJUSTMENT
 	);
-	// DECISIONS.md M4 - see the Adjustments section in the render below. Local, uncontrolled-style
+	const [rescheduleSession, { loading: rescheduling }] = useMutation(
+		AppointmentService.RESCHEDULE_SESSION
+	);
+	const [cancelSession, { loading: cancelling }] = useMutation(AppointmentService.CANCEL_SESSION);
+	// Reschedule/Cancel are small confirmations layered INTO this same view (see the inline forms
+	// in the render below), not a full-screen swap the way handleChargeViaSquare's setModal is -
+	// there's no separate flow to send them to, just a bit more to ask before the button's own
+	// action fires.
+	const [showRescheduleForm, setShowRescheduleForm] = useState(false);
+	const [rescheduleDate, setRescheduleDate] = useState(() => moment());
+	const [rescheduleNote, setRescheduleNote] = useState("");
+	const [showCancelForm, setShowCancelForm] = useState(false);
+	const [cancelNote, setCancelNote] = useState("");
+
+	// Which way the client is paying (2026-09-08 redesign) - drives both the Payment card's
+	// selector and the single primary action button's label/handler below. Square is the default.
+	const [paymentMethod, setPaymentMethod] = useState("square");
+	// Deposits & gift cards and Adjustments both collapse into disclosure cards now - most sessions
+	// never touch either, so both start closed regardless of whether either one has anything in it
+	// (same as the mockup).
+	const [depositsExpanded, setDepositsExpanded] = useState(false);
+	const [adjustmentsExpanded, setAdjustmentsExpanded] = useState(false);
+
+	// Notes autosave (2026-09-06, Danny) - a session is never saved partway through and come back
+	// to later, so the standalone Save button that used to live in DialogActions is gone entirely.
+	// Notes is the one field still worth its own autosave: unlike price/tip, which only ever get
+	// entered once right before Close/Charge, notes get added to over several separate visits to
+	// this modal. Reuses the same partial-payload UPDATE_SESSION_DETAILS mutation Mark No-Show
+	// already uses below - appointmentDate is still required by the schema even for a notes-only
+	// save (AppointmentInput's appointmentDate: DateTime!), so it's always resent here as whatever
+	// is currently on screen.
+	//
+	// isFirstNotesRender skips the mount itself - nothing has actually changed yet, so there is
+	// nothing to save.
+	const isFirstNotesRender = useRef(true);
+	useEffect(() => {
+		if (isFirstNotesRender.current) {
+			isFirstNotesRender.current = false;
+			return;
+		}
+		if (appointment.appointmentStatus === "completed") {
+			return;
+		}
+		const handle = setTimeout(() => {
+			updateSessionDetails({
+				variables: {
+					appointmentInput: {
+						id: appointment.id,
+						appointmentDate: moment(sessionDate).toISOString(),
+						sessionNotes: notes,
+					},
+				},
+			}).catch((err) => {
+				setAlert({
+					isAlert: true,
+					severity: ALERT_CONSTANTS.SEVERITY.ERROR,
+					message: `Couldn't save notes: ${err.graphQLErrors?.[0]?.message || err.message}`,
+					timeout: ALERT_CONSTANTS.TIMEOUT,
+					location: ALERT_CONSTANTS.DISPLAY_MODAL,
+				});
+			});
+		}, 900);
+		return () => clearTimeout(handle);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [notes]);
+
+	// DECISIONS.md M4 - see the Adjustments card in the render below. Local, uncontrolled-style
 	// state that clears itself on a successful save, same pattern the rest of this form doesn't
 	// use (those fields stay populated because they describe the session itself) - this one is a
 	// log entry, not a persistent field, so there's nothing to leave filled in afterward.
@@ -264,10 +350,11 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 			setAppointment((prev) => ({ ...prev, ...data.redeemGiftCard.appointment }));
 			setGiftCardCode("");
 			setGiftCardAmountDollars("");
-			// Mirrors handleSaveDetails' own "fetched synchronously right before" reasoning - the
-			// debounced `quote` state has no dependency on the appointment's money fields (only
-			// on appointment.id), so it would otherwise keep showing the pre-redemption total
-			// until the artist happened to touch the subtotal/tip fields again.
+			// Mirrors handleCloseSession/handleChargeViaSquare's own "fetched synchronously right
+			// before" reasoning - the debounced `quote` state has no dependency on the
+			// appointment's money fields (only on appointment.id), so it would otherwise keep
+			// showing the pre-redemption total until the artist happened to touch the
+			// subtotal/tip fields again.
 			const freshQuote = await getFreshQuote();
 			setQuote(freshQuote);
 			setAlert({
@@ -341,23 +428,6 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 			totalCents,
 			sessionNotes: notes,
 		};
-	};
-
-	const handleSaveDetails = async (e) => {
-		e.preventDefault();
-		const freshQuote = await getFreshQuote();
-		const { data } = await updateSessionDetails({
-			variables: { appointmentInput: buildSavePayload(freshQuote) },
-		});
-		setAppointment((prev) => ({ ...prev, ...data.updateAppointment }));
-		setSessionDate(moment(data.updateAppointment.appointmentDate));
-		setAlert({
-			isAlert: true,
-			severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
-			message: "Session saved.",
-			timeout: ALERT_CONSTANTS.TIMEOUT,
-			location: ALERT_CONSTANTS.DISPLAY_MODAL,
-		});
 	};
 
 	const handleDeleteSession = async () => {
@@ -437,8 +507,20 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 	// to that transition by overwriting appointmentDate to the moment this save lands, regardless of
 	// what sessionDate above says. That's deliberate (DECISIONS.md): a session worked early or late
 	// against its booked slot should report on the day it actually happened.
+	//
+	// Reached by the primary button ONLY when there's no price entered (hasPrice below is false) -
+	// a no-charge session (e.g. a consult) has no payment method to choose, so it closes directly.
+	// Once a price exists, the primary button routes through handleChargeViaSquare or
+	// handleMarkPaidAndClose instead - see the Payment card in the render below.
 	const handleCloseSession = async (e) => {
 		e.preventDefault();
+		if (
+			!window.confirm(
+				"Close this session? This marks it complete and locks the price and notes from further changes. It is not the same as just closing this window."
+			)
+		) {
+			return;
+		}
 		const freshQuote = await getFreshQuote();
 		const { data } = await updateSessionDetails({
 			variables: {
@@ -451,6 +533,175 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 			isAlert: true,
 			severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
 			message: "Session closed.",
+			timeout: ALERT_CONSTANTS.TIMEOUT,
+			location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
+		});
+		if (onClosed) {
+			onClosed();
+		}
+	};
+
+	// Wires up automation that already existed server-side but had no way to fire: updateAppointment
+	// (mutations/appointments.js) calls syncNoShowFlag (utils/client-flags.js) on every
+	// appointmentStatus transition, which raises a NO_SHOWED flag on the client the moment a
+	// session's status becomes 'no_show' - fully built and tested, but until now nothing in this
+	// app ever actually sent that status anywhere (2026-09-06: confirmed by grepping the whole web
+	// app for it - the only place 'no_show' appeared was a display-label lookup and an unused
+	// options list, never something a click could set). Found while answering Danny's question
+	// "does the no-show flag automatically get created" - the honest answer was "the code exists
+	// but nothing can reach it," which is what this button fixes.
+	//
+	// Deliberately does NOT go through buildSavePayload/getFreshQuote the way Close Session does -
+	// a no-show has no session to price. Notes are still saved (a reason the artist typed in is
+	// worth keeping), but subtotal/tip/tax/total are left exactly as they already were rather than
+	// quoted and written as if work happened.
+	const handleMarkNoShow = async (e) => {
+		e.preventDefault();
+		if (
+			!window.confirm(
+				"Mark this session as a no-show? This raises a no-show flag on the client's record."
+			)
+		) {
+			return;
+		}
+		const { data } = await updateSessionDetails({
+			variables: {
+				appointmentInput: {
+					id: appointment.id,
+					// Required by the schema even here - see the notes-autosave effect's own comment
+					// above (this was previously missing, which would have failed validation outright).
+					appointmentDate: moment(sessionDate).toISOString(),
+					sessionNotes: notes,
+					appointmentStatus: "no_show",
+				},
+			},
+		});
+		setAppointment((prev) => ({ ...prev, ...data.updateAppointment }));
+		setAlert({
+			isAlert: true,
+			severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
+			message: "Session marked as a no-show.",
+			timeout: ALERT_CONSTANTS.TIMEOUT,
+			location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
+		});
+		// Same practical need as a real close - the parent's list needs refreshing and the modal
+		// needs to go away - so this reuses onClosed rather than plumbing a third callback prop
+		// through Project.jsx for what is, from the parent's point of view, the same event: this
+		// session is no longer open.
+		if (onClosed) {
+			onClosed();
+		}
+	};
+
+	// Reschedule Session (2026-09-06, Danny) - see rescheduleSession's own header comment
+	// (mutations/appointments.js) for the full reasoning. The typed note deliberately never lands
+	// in this component's own state beyond sending it along - the server saves it on the
+	// RESCHEDULED flag and the project's own notes instead, never on the new session.
+	const handleRescheduleSession = async () => {
+		try {
+			await rescheduleSession({
+				variables: {
+					appointmentId: appointment.id,
+					newDate: moment(rescheduleDate).toISOString(),
+					note: rescheduleNote.trim() || undefined,
+				},
+			});
+			setAlert({
+				isAlert: true,
+				severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
+				message: "Session rescheduled.",
+				timeout: ALERT_CONSTANTS.TIMEOUT,
+				location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
+			});
+			// Same practical need as Mark No-Show above - a new session now exists and this one's
+			// status changed, so the parent's list needs refreshing and this modal needs to close.
+			if (onClosed) {
+				onClosed();
+			}
+		} catch (err) {
+			setAlert({
+				isAlert: true,
+				severity: ALERT_CONSTANTS.SEVERITY.ERROR,
+				message: err.graphQLErrors?.[0]?.message || err.message,
+				timeout: ALERT_CONSTANTS.TIMEOUT,
+				location: ALERT_CONSTANTS.DISPLAY_MODAL,
+			});
+		}
+	};
+
+	// Cancel Session (2026-09-06, Danny) - see cancelSession's own header comment
+	// (mutations/appointments.js) for why this settles any available deposit out of the
+	// outstanding bucket rather than adding it to revenue, and why the typed note lands on the
+	// project's notes rather than this session - there's nothing left to meaningfully attach it
+	// to here once the session is cancelled.
+	const handleCancelSession = async () => {
+		if (!window.confirm("Cancel this session? This cannot be undone.")) {
+			return;
+		}
+		try {
+			await cancelSession({
+				variables: {
+					appointmentId: appointment.id,
+					note: cancelNote.trim() || undefined,
+				},
+			});
+			setAlert({
+				isAlert: true,
+				severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
+				message: "Session cancelled.",
+				timeout: ALERT_CONSTANTS.TIMEOUT,
+				location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
+			});
+			if (onClosed) {
+				onClosed();
+			}
+		} catch (err) {
+			setAlert({
+				isAlert: true,
+				severity: ALERT_CONSTANTS.SEVERITY.ERROR,
+				message: err.graphQLErrors?.[0]?.message || err.message,
+				timeout: ALERT_CONSTANTS.TIMEOUT,
+				location: ALERT_CONSTANTS.DISPLAY_MODAL,
+			});
+		}
+	};
+
+	// Mark Paid (Cash) / Mark Paid (Other) - the Payment card's alternative to Charge via Square
+	// (2026-09-08 redesign, see session-modal-mockup/Proposed.dc.html). Exactly the same close-out
+	// as handleCloseSession (buildSavePayload + appointmentStatus: 'completed') - the only
+	// difference is honesty about how the balance was actually collected, which has no dedicated
+	// field on Appointment (server/models/Appointment.js) to write to. Recorded as a line appended
+	// to Session Notes instead, the same durable, artist-visible record every other manual note in
+	// this session already becomes. Charge via Square needs no equivalent line - the charge itself,
+	// verified server-side, IS the record.
+	const handleMarkPaidAndClose = async (method) => {
+		const methodLabel = PAYMENT_METHOD_LABELS[method];
+		if (
+			!window.confirm(
+				`Close this session and record payment as ${methodLabel}? This marks it complete and locks the price and notes from further changes. It is not the same as just closing this window.`
+			)
+		) {
+			return;
+		}
+		const freshQuote = await getFreshQuote();
+		const paidNote = `Payment collected via ${methodLabel} (marked ${moment().format("MMM D, YYYY")}).`;
+		const combinedNotes = notes.trim() ? `${notes.trim()}\n\n${paidNote}` : paidNote;
+		const { data } = await updateSessionDetails({
+			variables: {
+				appointmentInput: {
+					...buildSavePayload(freshQuote),
+					sessionNotes: combinedNotes,
+					appointmentStatus: "completed",
+				},
+			},
+		});
+		setAppointment((prev) => ({ ...prev, ...data.updateAppointment }));
+		setSessionDate(moment(data.updateAppointment.appointmentDate));
+		setNotes(combinedNotes);
+		setAlert({
+			isAlert: true,
+			severity: ALERT_CONSTANTS.SEVERITY.SUCCESS,
+			message: `Session closed. Payment recorded as ${methodLabel}.`,
 			timeout: ALERT_CONSTANTS.TIMEOUT,
 			location: ALERT_CONSTANTS.DISPLAY_MAIN_PAGE,
 		});
@@ -556,372 +807,606 @@ const SessionDetail = ({ appointment: initialAppointment, project, connections, 
 	const displayTotalCents = isClosed ? appointment.totalCents || 0 : quote?.amountDueCents;
 	const hasDisplayFigures = isClosed || Boolean(quote);
 	const subtotalCentsEntered = dollarsToCents(subtotalDollars);
+	// Gates the Payment card and the primary button's Square/Cash/Other branching - a session with
+	// no price yet (e.g. still being timed, or a genuinely free consult) has no balance to choose
+	// how to collect, so the primary button falls back to a plain Close Session (handleCloseSession
+	// above).
+	const hasPrice = subtotalCentsEntered > 0;
+
+	const adjustmentCount = appointment.adjustments ? appointment.adjustments.length : 0;
+
+	let primaryLabel;
+	let handlePrimaryAction;
+	if (!hasPrice) {
+		primaryLabel = "Close Session";
+		handlePrimaryAction = handleCloseSession;
+	} else if (paymentMethod === "cash") {
+		primaryLabel = "Mark Paid (Cash) & Close";
+		handlePrimaryAction = () => handleMarkPaidAndClose("cash");
+	} else if (paymentMethod === "other") {
+		primaryLabel = "Mark Paid (Other) & Close";
+		handlePrimaryAction = () => handleMarkPaidAndClose("other");
+	} else {
+		primaryLabel = quoting ? "Checking..." : "Charge via Square & Close";
+		handlePrimaryAction = handleChargeViaSquare;
+	}
 
 	return (
 		// DialogContent dividers / DialogActions, not a bare div - the same MUI modal chrome
 		// EntityWizard.jsx/UpdateEventDialog.jsx/SharedImagesPanel's AssignImageForm already use.
 		// IBModal.jsx applies no padding of its own (see those components' own comments on why),
-		// so a plain "sessionDetail" div with 8px of padding was the entire margin between this
-		// form's densest content (the money rows, the adjustments block) and the dialog's edge -
-		// which is exactly what read as cramped. sessionDetailContent/sessionDetailActions below
-		// now carry the same 24px/28px and 16px/28px padding every other modal in this app uses.
+		// so sessionDetailContent/sessionDetailActions carry the same 24px/28px and 16px/28px
+		// padding every other modal in this app uses.
 		<>
 			<DialogContent dividers className="sessionDetailContent">
-			<div className="sessionDetailStatusRow">
-				<Chip
-					label={isClosed ? "Completed" : "In progress"}
-					color={isClosed ? "success" : "default"}
-				/>
-				<Chip
-					label={`Rate: ${effectiveRate.source === "shop" ? "Shop" : "Artist"} - ${
-						effectiveRate.billingType === "flat_rate"
-							? `$${effectiveRate.flatRate} flat`
-							: `$${effectiveRate.hourlyRate}/hr`
-					}`}
-				/>
-			</div>
-
-			<IBDateTimePicker
-				label="Session date & time"
-				val={sessionDate}
-				setVal={setSessionDate}
-				disabled={isClosed}
-			/>
-
-			<div className="sessionDetailTimer">
-				<div className="sessionDetailElapsed">{formatElapsed(elapsedSeconds)}</div>
-				<div className="sessionDetailTimerButtons">
-					<Button
-						variant="outlined"
-						startIcon={<PlayArrow />}
-						disabled={appointment.timerStatus === "running" || isClosed}
-						onClick={handleStart}
-					>
-						Start
-					</Button>
-					<Button
-						variant="outlined"
-						startIcon={<Stop />}
-						disabled={appointment.timerStatus !== "running"}
-						onClick={handleStop}
-					>
-						Stop
-					</Button>
-					<Button
-						variant="outlined"
-						startIcon={<RestartAlt />}
+			{/* STATUS & TIMER */}
+			<div className="sessionDetailCard">
+				<div className="sessionDetailCardHead">
+					<span className="sessionDetailCardHeadLabel">Status &amp; Timer</span>
+					<div className="sessionDetailStatusRow">
+						<Chip
+							label={isClosed ? "Completed" : "In progress"}
+							color={isClosed ? "success" : "default"}
+							size="small"
+						/>
+						<Chip
+							size="small"
+							label={`Rate: ${effectiveRate.source === "shop" ? "Shop" : "Artist"} - ${
+								effectiveRate.billingType === "flat_rate"
+									? `$${effectiveRate.flatRate} flat`
+									: `$${effectiveRate.hourlyRate}/hr`
+							}`}
+						/>
+					</div>
+				</div>
+				<div className="sessionDetailCardBody">
+					<IBDateTimePicker
+						label="Session date & time"
+						val={sessionDate}
+						setVal={setSessionDate}
 						disabled={isClosed}
-						onClick={handleReset}
-					>
-						Reset
-					</Button>
+					/>
+
+					<div className="sessionDetailTimer">
+						<div className="sessionDetailElapsed">{formatElapsed(elapsedSeconds)}</div>
+						<div className="sessionDetailTimerButtons">
+							<Button
+								variant="outlined"
+								startIcon={<PlayArrow />}
+								disabled={appointment.timerStatus === "running" || isClosed}
+								onClick={handleStart}
+							>
+								Start
+							</Button>
+							<Button
+								variant="outlined"
+								startIcon={<Stop />}
+								disabled={appointment.timerStatus !== "running"}
+								onClick={handleStop}
+							>
+								Stop
+							</Button>
+							<Button
+								variant="outlined"
+								startIcon={<RestartAlt />}
+								disabled={isClosed}
+								onClick={handleReset}
+							>
+								Reset
+							</Button>
+						</div>
+					</div>
 				</div>
 			</div>
 
-			{/* Tattoo work and tip are the only figures an artist ever types in here. Tax, fees, the
-			    offset and the total are read-only - generated automatically by the same server
-			    function that decides what Square will actually charge (utils/charge-quote.js), so
-			    what's shown here is never a number someone could disagree with the card over. */}
-			<div className="sessionDetailMoney">
-				<div className="sessionDetailMoneyRow">
-					<FormField
-						id="sessionSubtotal"
-						label="Tattoo work $"
-						help={`Suggested from elapsed time: ${formatCents(suggestedSubtotalCents)}`}
-					>
-						<IBInput
+			{/* PRICING. Tattoo work and tip are the only figures an artist ever types in here. Tax,
+			    fees, the offset and the total are read-only - generated automatically by the same
+			    server function that decides what Square will actually charge (utils/charge-quote.js),
+			    so what's shown here is never a number someone could disagree with the card over. */}
+			<div className="sessionDetailCard">
+				<div className="sessionDetailCardHead">
+					<span className="sessionDetailCardHeadLabel">Pricing</span>
+				</div>
+				<div className="sessionDetailCardBody">
+					<div className="sessionDetailMoneyRow">
+						<FormField
 							id="sessionSubtotal"
-							type="number"
-							onFocus={(e) => e.target.select()}
-							autoFocus
-							value={subtotalDollars}
-							onChange={(e) => setSubtotalDollars(e.target.value)}
-							disabled={isClosed}
-						/>
-					</FormField>
-					<Button variant="text" onClick={handleUseSuggested} disabled={isClosed}>
-						Use Suggested
-					</Button>
-				</div>
-				<div className="sessionDetailMoneyRow">
-					<FormField
-						id="sessionTip"
-						label="Tip $"
-						help="The artist keeps 100% of this - never part of the shop cut"
-					>
-						<IBInput
+							label="Tattoo work $"
+							help={`Suggested from elapsed time: ${formatCents(suggestedSubtotalCents)}`}
+						>
+							<IBInput
+								id="sessionSubtotal"
+								type="number"
+								onFocus={(e) => e.target.select()}
+								autoFocus
+								value={subtotalDollars}
+								onChange={(e) => setSubtotalDollars(e.target.value)}
+								disabled={isClosed}
+							/>
+						</FormField>
+						<Button variant="text" onClick={handleUseSuggested} disabled={isClosed}>
+							Use Suggested
+						</Button>
+					</div>
+					<div className="sessionDetailMoneyRow">
+						<FormField
 							id="sessionTip"
-							type="number"
-							value={tipDollars}
-							onChange={(e) => setTipDollars(e.target.value)}
-							disabled={isClosed}
-						/>
-					</FormField>
-					<div className="sessionDetailMoneyLabel">
-						<span className="sessionDetailMoneyLabelName">Tax</span>
-						<span className="sessionDetailMoneyLabelValue">
-							{hasDisplayFigures ? formatCents(displayTaxCents) : "—"}
-						</span>
-						<span className="sessionDetailMoneyLabelHint">
-							Not income - excluded from the shop cut
-						</span>
+							label="Tip $"
+							help="The artist keeps 100% of this - never part of the shop cut"
+						>
+							<IBInput
+								id="sessionTip"
+								type="number"
+								value={tipDollars}
+								onChange={(e) => setTipDollars(e.target.value)}
+								disabled={isClosed}
+							/>
+						</FormField>
+						<div className="sessionDetailMoneyLabel">
+							<span className="sessionDetailMoneyLabelName">Tax</span>
+							<span className="sessionDetailMoneyLabelValue">
+								{hasDisplayFigures ? formatCents(displayTaxCents) : "—"}
+							</span>
+							<span className="sessionDetailMoneyLabelHint">
+								Not income - excluded from the shop cut
+							</span>
+						</div>
+						<div className="sessionDetailMoneyLabel">
+							<span className="sessionDetailMoneyLabelName">Fees</span>
+							<span className="sessionDetailMoneyLabelValue">
+								{hasDisplayFigures ? formatCents(displayFeeCents) : "—"}
+							</span>
+							<span className="sessionDetailMoneyLabelHint">
+								Processing fees - excluded from the shop cut
+							</span>
+						</div>
 					</div>
-					<div className="sessionDetailMoneyLabel">
-						<span className="sessionDetailMoneyLabelName">Fees</span>
-						<span className="sessionDetailMoneyLabelValue">
-							{hasDisplayFigures ? formatCents(displayFeeCents) : "—"}
-						</span>
-						<span className="sessionDetailMoneyLabelHint">
-							Processing fees - excluded from the shop cut
-						</span>
-					</div>
-				</div>
-				{/* The offset is a CHOICE, presented before the card is charged and never applied
-				    silently (DECISIONS.md M5). Unticked by default. Sits right under Tax/Fees and
-				    above the total it affects, so the relationship between checking this and the
-				    total below moving is visible rather than something to discover in a charge
-				    dialog. No separate "Offset Fee" line - when this is checked the amount already
-				    shows up in Fees above, and a second label repeating the same figure under a
-				    different name read as confusing rather than clarifying. */}
-				{!isClosed && (
-					<label className="sessionDetailOffset">
-						<input
-							type="checkbox"
-							checked={applyFeeOffset}
-							onChange={(e) => setApplyFeeOffset(e.target.checked)}
-						/>{" "}
-						Add the card processing offset to this charge
-					</label>
-				)}
-				{/* The actual total the client owes right now - subtotal, tip, tax and the offset,
-				    minus any deposit already credited (DECISIONS.md M8). This is computed by the
-				    exact same function routes/squarePayments.js charges, so it is not an estimate:
-				    if a card is charged for this session, this is the figure that leaves it. */}
-				<div className="sessionDetailMoneyRow">
-					<div className="sessionDetailMoneyLabel sessionDetailMoneyLabelTotal">
-						<span className="sessionDetailMoneyLabelName">Total charged to client</span>
-						<span className="sessionDetailMoneyLabelValue">
+					{/* The offset is a CHOICE, presented before the card is charged and never applied
+					    silently (DECISIONS.md M5). Unticked by default. Sits right under Tax/Fees and
+					    above the total it affects, so the relationship between checking this and the
+					    total below moving is visible rather than something to discover in a charge
+					    dialog. No separate "Offset Fee" line - when this is checked the amount already
+					    shows up in Fees above, and a second label repeating the same figure under a
+					    different name read as confusing rather than clarifying. */}
+					{!isClosed && (
+						<label className="sessionDetailOffset">
+							<input
+								type="checkbox"
+								checked={applyFeeOffset}
+								onChange={(e) => setApplyFeeOffset(e.target.checked)}
+							/>{" "}
+							Add the card processing offset to this charge
+						</label>
+					)}
+					{/* The actual total the client owes right now - subtotal, tip, tax and the offset,
+					    minus any deposit already credited (DECISIONS.md M8). This is computed by the
+					    exact same function routes/squarePayments.js charges, so it is not an estimate:
+					    if a card is charged for this session, this is the figure that leaves it. */}
+					<div className="sessionDetailTotalRow">
+						<span className="sessionDetailTotalName">Total charged to client</span>
+						<span className="sessionDetailTotalValue">
 							{hasDisplayFigures ? formatCents(displayTotalCents) : "—"}
 						</span>
 					</div>
+					{/* Only reachable when there's a real subtotal typed in and hasDisplayFigures is
+					    still false - i.e. the quote was asked for and failed, rather than never asked
+					    for. See getFreshQuote's own comment on why this used to be swallowed silently. */}
+					{!isClosed && quoteError && (
+						<div className="sessionDetailQuoteError">
+							Couldn't calculate tax/fees/total: {quoteError}
+						</div>
+					)}
+					{appointment.depositCreditCents > 0 && (
+						<div className="sessionDetailNoteBox">
+							{formatCents(appointment.depositCreditCents)} deposit already applied to this
+							total.
+						</div>
+					)}
+					{appointment.shopCutCents > 0 && (
+						<div className="sessionDetailShopCutNote">
+							Shop cut on this session:{" "}
+							{formatCents(appointment.shopCutCents)}
+							{appointment.shopCutPercentApplied
+								? ` (${appointment.shopCutPercentApplied}% of the tattoo work)`
+								: ""}
+						</div>
+					)}
 				</div>
-				{/* Only reachable when there's a real subtotal typed in and hasDisplayFigures is
-				    still false - i.e. the quote was asked for and failed, rather than never asked
-				    for. See getFreshQuote's own comment on why this used to be swallowed silently. */}
-				{!isClosed && quoteError && (
-					<div className="sessionDetailQuoteError">
-						Couldn't calculate tax/fees/total: {quoteError}
-					</div>
-				)}
-				{/* Deposits. Two mutually exclusive states: one is already applied to this
-				    session, or there are unspent ones available to apply. Never both - the server
-				    refuses a second credit, and the query is skipped once a credit exists. */}
-				{appointment.depositCreditCents > 0 ? (
-					<div className="sessionDetailDepositApplied">
-						{formatCents(appointment.depositCreditCents)} deposit applied - already paid,
-						deducted from this session's total.
-					</div>
-				) : (
-					availableDeposits.length > 0 &&
-					!isClosed && (
-						<div className="sessionDetailDeposits">
-							<span className="sessionDetailDepositsLabel">
-								Deposit available to apply
-							</span>
-							{availableDeposits.map((deposit) => (
-								<div key={deposit.id} className="sessionDetailDepositRow">
-									<span>
-										{formatCents(deposit.depositCents)} taken{" "}
-										{deposit.depositCollectedAt
-											? moment(deposit.depositCollectedAt).format("MMM D, YYYY")
-											: ""}
-										{deposit.appointmentType === "consult" ? " at consult" : ""}
-									</span>
-									<Button
-										size="small"
-										variant="outlined"
-										disabled={applyingDeposit}
-										onClick={handleApplyDeposit(deposit.id)}
-									>
-										Apply to this session
-									</Button>
-								</div>
-							))}
-							{/* Said plainly because it's the rule that surprises people: applying
-							    is one-way. The deposit is spent the moment this is clicked. */}
-							<span className="sessionDetailDepositsHint">
-								A deposit can only be applied once, and can't be moved afterwards.
-							</span>
-						</div>
-					)
-				)}
+			</div>
 
-				{/* Gift cards. No "available to apply" list the way deposits get - a gift card
-				    is identified by its code (a bearer credential, M6), not looked up by whose
-				    it is, so this is a plain code+amount entry rather than a picker. Available on
-				    an open session only, same as the deposit-apply controls above; a closed
-				    session has nothing left to charge against. */}
-				{!isClosed && (
-					<form className="sessionDetailGiftCard" onSubmit={handleRedeemGiftCard}>
-						<span className="sessionDetailGiftCardLabel">Apply a gift card</span>
-						<div className="sessionDetailGiftCardRow">
-							<IBInput
-								id="sessionGiftCardCode"
-								type="text"
-								placeholder="Card code"
-								value={giftCardCode}
-								onChange={(e) => setGiftCardCode(e.target.value)}
-							/>
-							<IBInput
-								id="sessionGiftCardAmount"
-								type="number"
-								placeholder="Amount $"
-								value={giftCardAmountDollars}
-								onChange={(e) => setGiftCardAmountDollars(e.target.value)}
-							/>
-							<Button
-								type="submit"
-								size="small"
-								variant="outlined"
-								disabled={
-									redeemingGiftCard ||
-									!giftCardCode.trim() ||
-									dollarsToCents(giftCardAmountDollars) <= 0
-								}
-							>
-								Apply
-							</Button>
-						</div>
-						{appointment.giftCardCreditCents > 0 && (
-							<span className="sessionDetailGiftCardApplied">
-								{formatCents(appointment.giftCardCreditCents)} in gift card credit applied
-								to this session so far.
+			{/* DEPOSITS & GIFT CARDS - collapsed by default (2026-09-08 redesign): most sessions
+			    never touch either, so both live behind one disclosure now instead of taking up
+			    permanent space in the main flow. Two mutually exclusive deposit states: one is
+			    already applied to this session, or there are unspent ones available to apply.
+			    Never both - the server refuses a second credit, and the query is skipped once a
+			    credit exists. */}
+			<div className="sessionDetailCard">
+				<button
+					type="button"
+					className="sessionDetailDisclosure"
+					onClick={() => setDepositsExpanded((v) => !v)}
+					aria-expanded={depositsExpanded}
+				>
+					<span className="sessionDetailDisclosureLabel">Deposits &amp; gift cards</span>
+					<ExpandMore
+						className={`sessionDetailChevron${depositsExpanded ? " expanded" : ""}`}
+					/>
+				</button>
+				{depositsExpanded && (
+					<div className="sessionDetailCardBody">
+						{appointment.depositCreditCents > 0 ? (
+							<div className="sessionDetailDepositApplied">
+								{formatCents(appointment.depositCreditCents)} deposit applied - already
+								paid, deducted from this session's total.
+							</div>
+						) : (
+							availableDeposits.length > 0 &&
+							!isClosed && (
+								<div className="sessionDetailDeposits">
+									<span className="sessionDetailDepositsLabel">
+										Deposit available to apply
+									</span>
+									{availableDeposits.map((deposit) => (
+										<div key={deposit.id} className="sessionDetailDepositRow">
+											<span>
+												{formatCents(deposit.depositCents)} taken{" "}
+												{deposit.depositCollectedAt
+													? moment(deposit.depositCollectedAt).format("MMM D, YYYY")
+													: ""}
+												{deposit.appointmentType === "consult" ? " at consult" : ""}
+											</span>
+											<Button
+												size="small"
+												variant="outlined"
+												disabled={applyingDeposit}
+												onClick={handleApplyDeposit(deposit.id)}
+											>
+												Apply to this session
+											</Button>
+										</div>
+									))}
+									{/* Said plainly because it's the rule that surprises people: applying
+									    is one-way. The deposit is spent the moment this is clicked. */}
+									<span className="sessionDetailDepositsHint">
+										A deposit can only be applied once, and can't be moved afterwards.
+									</span>
+								</div>
+							)
+						)}
+						{appointment.depositCreditCents <= 0 && availableDeposits.length === 0 && (
+							<span className="sessionDetailAdjustmentsEmpty">
+								No deposits on this client's other appointments.
 							</span>
 						)}
-					</form>
-				)}
 
-				{appointment.shopCutCents > 0 && (
-					<div className="sessionDetailShopCutNote">
-						Shop cut on this session:{" "}
-						{formatCents(appointment.shopCutCents)}
-						{appointment.shopCutPercentApplied
-							? ` (${appointment.shopCutPercentApplied}% of the tattoo work)`
-							: ""}
+						{/* Gift cards. No "available to apply" list the way deposits get - a gift card
+						    is identified by its code (a bearer credential, M6), not looked up by whose
+						    it is, so this is a plain code+amount entry rather than a picker. Available
+						    on an open session only, same as the deposit-apply controls above; a closed
+						    session has nothing left to charge against. */}
+						{!isClosed && (
+							<form className="sessionDetailGiftCard" onSubmit={handleRedeemGiftCard}>
+								<span className="sessionDetailGiftCardLabel">Apply a gift card</span>
+								<div className="sessionDetailGiftCardRow">
+									<IBInput
+										id="sessionGiftCardCode"
+										type="text"
+										placeholder="Card code"
+										value={giftCardCode}
+										onChange={(e) => setGiftCardCode(e.target.value)}
+									/>
+									<IBInput
+										id="sessionGiftCardAmount"
+										type="number"
+										placeholder="Amount $"
+										value={giftCardAmountDollars}
+										onChange={(e) => setGiftCardAmountDollars(e.target.value)}
+									/>
+									<Button
+										type="submit"
+										size="small"
+										variant="outlined"
+										disabled={
+											redeemingGiftCard ||
+											!giftCardCode.trim() ||
+											dollarsToCents(giftCardAmountDollars) <= 0
+										}
+									>
+										Apply
+									</Button>
+								</div>
+								{appointment.giftCardCreditCents > 0 && (
+									<span className="sessionDetailGiftCardApplied">
+										{formatCents(appointment.giftCardCreditCents)} in gift card credit
+										applied to this session so far.
+									</span>
+								)}
+							</form>
+						)}
 					</div>
 				)}
 			</div>
 
-			{/* DECISIONS.md M4 - "Nothing in InkBooks is refundable." The real reversal happens by
-			    hand in the Square app; this is only the documented record of it. Recording one does
-			    NOT change subtotalCents/tipCents/totalCents above - see server/models/Adjustment.js. */}
-			<div className="sessionDetailAdjustments">
-				<span className="sessionDetailAdjustmentsLabel">Adjustments</span>
-				{appointment.adjustments && appointment.adjustments.length > 0 ? (
-					<div className="sessionDetailAdjustmentsList">
-						{appointment.adjustments.map((adjustment) => (
-							<div key={adjustment.id} className="sessionDetailAdjustmentRow">
-								<span className="sessionDetailAdjustmentAmount">
-									{formatCents(adjustment.amountCents)}
-								</span>
-								<span className="sessionDetailAdjustmentReason">{adjustment.reason}</span>
-								<span className="sessionDetailAdjustmentMeta">
-									{moment(adjustment.createdAt).format("MMM D, YYYY")}
-									{adjustment.createdBy
-										? ` — ${adjustment.createdBy.firstName} ${adjustment.createdBy.lastName}`
-										: ""}
-								</span>
+			{/* ADJUSTMENTS - collapsed by default (2026-09-08 redesign), count shown in the header
+			    so there's still a hint something's there without expanding. DECISIONS.md M4 -
+			    "Nothing in InkBooks is refundable." The real reversal happens by hand in the Square
+			    app; this is only the documented record of it. Recording one does NOT change
+			    subtotalCents/tipCents/totalCents above - see server/models/Adjustment.js. */}
+			<div className="sessionDetailCard">
+				<button
+					type="button"
+					className="sessionDetailDisclosure"
+					onClick={() => setAdjustmentsExpanded((v) => !v)}
+					aria-expanded={adjustmentsExpanded}
+				>
+					<span className="sessionDetailDisclosureLabel">
+						Adjustments{adjustmentCount > 0 ? ` (${adjustmentCount})` : ""}
+					</span>
+					<ExpandMore
+						className={`sessionDetailChevron${adjustmentsExpanded ? " expanded" : ""}`}
+					/>
+				</button>
+				{adjustmentsExpanded && (
+					<div className="sessionDetailCardBody">
+						{appointment.adjustments && appointment.adjustments.length > 0 ? (
+							<div className="sessionDetailAdjustmentsList">
+								{appointment.adjustments.map((adjustment) => (
+									<div key={adjustment.id} className="sessionDetailAdjustmentRow">
+										<span className="sessionDetailAdjustmentAmount">
+											{formatCents(adjustment.amountCents)}
+										</span>
+										<span className="sessionDetailAdjustmentReason">{adjustment.reason}</span>
+										<span className="sessionDetailAdjustmentMeta">
+											{moment(adjustment.createdAt).format("MMM D, YYYY")}
+											{adjustment.createdBy
+												? ` — ${adjustment.createdBy.firstName} ${adjustment.createdBy.lastName}`
+												: ""}
+										</span>
+									</div>
+								))}
 							</div>
-						))}
+						) : (
+							<span className="sessionDetailAdjustmentsEmpty">None recorded.</span>
+						)}
+						<div className="sessionDetailAdjustmentForm">
+							<FormField id="adjustmentAmount" label="Amount reversed $">
+								<IBInput
+									id="adjustmentAmount"
+									type="number"
+									value={adjustmentDollars}
+									onChange={(e) => setAdjustmentDollars(e.target.value)}
+								/>
+							</FormField>
+							<FormField id="adjustmentReason" label="Reason">
+								<IBInput
+									id="adjustmentReason"
+									type="text"
+									placeholder="e.g. Reversed $50 in Square after a client dispute"
+									value={adjustmentReason}
+									onChange={(e) => setAdjustmentReason(e.target.value)}
+								/>
+							</FormField>
+							<Button
+								variant="outlined"
+								disabled={
+									recordingAdjustment ||
+									dollarsToCents(adjustmentDollars) <= 0 ||
+									!adjustmentReason.trim()
+								}
+								onClick={handleRecordAdjustment}
+							>
+								Record Adjustment
+							</Button>
+						</div>
 					</div>
-				) : (
-					<span className="sessionDetailAdjustmentsEmpty">None recorded.</span>
 				)}
-				<div className="sessionDetailAdjustmentForm">
-					<FormField id="adjustmentAmount" label="Amount reversed $">
-						<IBInput
-							id="adjustmentAmount"
-							type="number"
-							value={adjustmentDollars}
-							onChange={(e) => setAdjustmentDollars(e.target.value)}
+			</div>
+
+			{/* NOTES */}
+			<div className="sessionDetailCard">
+				<div className="sessionDetailCardHead">
+					<span className="sessionDetailCardHeadLabel">Notes</span>
+				</div>
+				<div className="sessionDetailCardBody">
+					<FormField id="sessionNotes" label="Session Notes">
+						<IBMultilineInput
+							id="sessionNotes"
+							defaultValue={notes}
+							disabled={isClosed}
+							onChange={(e) => setNotes(e.target.value)}
 						/>
 					</FormField>
-					<FormField id="adjustmentReason" label="Reason">
-						<IBInput
-							id="adjustmentReason"
-							type="text"
-							placeholder="e.g. Reversed $50 in Square after a client dispute"
-							value={adjustmentReason}
-							onChange={(e) => setAdjustmentReason(e.target.value)}
-						/>
-					</FormField>
-					<Button
-						variant="outlined"
-						disabled={
-							recordingAdjustment ||
-							dollarsToCents(adjustmentDollars) <= 0 ||
-							!adjustmentReason.trim()
-						}
-						onClick={handleRecordAdjustment}
-					>
-						Record Adjustment
-					</Button>
 				</div>
 			</div>
 
-			<FormField id="sessionNotes" label="Session Notes">
-				<IBMultilineInput
-					id="sessionNotes"
-					defaultValue={notes}
-					disabled={isClosed}
-					onChange={(e) => setNotes(e.target.value)}
-				/>
-			</FormField>
+			{/* PAYMENT - last card, right above the actions bar it drives (2026-09-08 redesign).
+			    Only shown once there's a real price to collect (hasPrice) - a session with nothing
+			    entered has no balance to choose how to collect. Choosing Cash or Other just records
+			    how payment happened - it does not move money; Square still runs the actual charge.
+			    See handlePrimaryAction above for what each choice wires the primary button to. */}
+			{hasPrice && (
+				<div className="sessionDetailCard sessionDetailPaymentCard">
+					<div className="sessionDetailCardHead sessionDetailPaymentCardHead">
+						<span className="sessionDetailCardHeadLabel">Payment</span>
+						<span
+							className={`sessionDetailStatusPill ${isClosed ? "paid" : "unpaid"}`}
+						>
+							{isClosed ? "Paid" : "Not yet collected"}
+						</span>
+					</div>
+					<div className="sessionDetailCardBody">
+						<span className="sessionDetailFieldLabel">
+							How is the client paying{" "}
+							{hasDisplayFigures ? formatCents(displayTotalCents) : "the balance"}?
+						</span>
+						<div className="sessionDetailPayMethods">
+							{PAYMENT_METHOD_OPTIONS.map((option) => (
+								<button
+									type="button"
+									key={option.value}
+									className={`sessionDetailPayOption${
+										paymentMethod === option.value ? " selected" : ""
+									}`}
+									disabled={isClosed}
+									onClick={() => setPaymentMethod(option.value)}
+								>
+									{option.label}
+								</button>
+							))}
+						</div>
+						<span className="sessionDetailFieldHint">
+							Selecting Cash or Other just records how payment happened - it doesn't move
+							money. Square still runs the actual charge.
+						</span>
+					</div>
+				</div>
+			)}
+
+			{/* Toggled by Row 2's Reschedule Session button below - see that button's own comment. */}
+			{showRescheduleForm && (
+				<div className="sessionDetailRescheduleForm">
+					<span className="sessionDetailFormLabel">Reschedule Session</span>
+					<IBDateTimePicker
+						label="New date & time"
+						val={rescheduleDate}
+						setVal={setRescheduleDate}
+					/>
+					<FormField id="rescheduleNote" label="Note (optional)">
+						<IBInput
+							id="rescheduleNote"
+							type="text"
+							placeholder="e.g. Client asked to move a week out"
+							value={rescheduleNote}
+							onChange={(e) => setRescheduleNote(e.target.value)}
+						/>
+					</FormField>
+					<div className="sessionDetailFormButtons">
+						<Button variant="contained" disabled={rescheduling} onClick={handleRescheduleSession}>
+							Reschedule Session
+						</Button>
+						<Button variant="text" onClick={() => setShowRescheduleForm(false)}>
+							Back
+						</Button>
+					</div>
+				</div>
+			)}
+
+			{/* Toggled by Row 2's Cancel Session button below - see that button's own comment. The
+			    deposit hint mirrors the Deposits & gift cards card above rather than reading from it
+			    directly, since a session already closed to deposits (depositCreditCents > 0) has
+			    nothing left to settle, and more than one available deposit is a judgment call this
+			    form deliberately leaves to that card instead of guessing. */}
+			{showCancelForm && (
+				<div className="sessionDetailCancelForm">
+					<span className="sessionDetailFormLabel">Cancel Session</span>
+					{appointment.depositCreditCents > 0 ? (
+						<span className="sessionDetailFormHint">
+							This session already has a deposit applied - cancelling won't change that.
+						</span>
+					) : availableDeposits.length === 1 ? (
+						<span className="sessionDetailFormHint">
+							{formatCents(availableDeposits[0].depositCents)} deposit will be applied and
+							marked settled - it's already counted as revenue, so this only clears it from
+							your outstanding balance.
+						</span>
+					) : availableDeposits.length > 1 ? (
+						<span className="sessionDetailFormHint">
+							This client has more than one available deposit - apply the correct one from
+							the Deposits &amp; gift cards card above first if it should be settled.
+						</span>
+					) : null}
+					<FormField id="cancelNote" label="Note (optional)">
+						<IBInput
+							id="cancelNote"
+							type="text"
+							placeholder="e.g. Client cancelled, not rebooking"
+							value={cancelNote}
+							onChange={(e) => setCancelNote(e.target.value)}
+						/>
+					</FormField>
+					<div className="sessionDetailFormButtons">
+						<Button variant="contained" color="error" disabled={cancelling} onClick={handleCancelSession}>
+							Cancel Session
+						</Button>
+						<Button variant="text" onClick={() => setShowCancelForm(false)}>
+							Back
+						</Button>
+					</div>
+				</div>
+			)}
 			</DialogContent>
 
 			<DialogActions className="sessionDetailActions">
-				<Button
-					variant="outlined"
-					startIcon={<Save />}
-					disabled={isClosed || saving}
-					onClick={handleSaveDetails}
-				>
-					Save
-				</Button>
-				{/* Gated on the session having a PRICE, not on a computed grand total - the total
-				    is the server's answer now and asking for it is what this button does. A
-				    session with no subtotal is unfinished, and charge-quote.js refuses it. */}
-				<Button
-					variant="outlined"
-					onClick={handleChargeViaSquare}
-					disabled={isClosed || saving || quoting || subtotalCentsEntered <= 0}
-				>
-					{quoting ? "Checking..." : "Charge via Square"}
-				</Button>
-				<Button
-					variant="contained"
-					disabled={isClosed || saving}
-					onClick={handleCloseSession}
-				>
-					Close Session
-				</Button>
-				{/* The manual half of Auto-Responses (decision #7 - see that component's own header
-				    comment) - aftercare, a receipt note, or anything else in the viewer's library,
-				    sent to this session's own client on demand. project.clientId is the Client
-				    document's own _id (see models/Project.js - NOT the client's User._id), the same
-				    id ClientDashboard.jsx passes for its own copy of this button. Renders nothing if
-				    there's nothing to send, so this is safe even before project.clientId exists. */}
-				<SendAutoResponseButton clientId={project?.clientId} appointmentId={appointment.id} />
-				<Button
-					variant="text"
-					color="error"
-					startIcon={<Delete />}
-					disabled={deleting}
-					onClick={handleDeleteSession}
-					sx={{ marginLeft: "auto" }}
-				>
-					Delete Session
-				</Button>
+				{/* Row 1 - one full-width action that both prices and ends the session normally. Its
+				    label and handler follow the Payment card's method choice above (Square/Cash/
+				    Other), or fall back to a plain Close Session when there's no price yet
+				    (hasPrice false) - see handlePrimaryAction. The standalone Save button, and the
+				    separate Charge via Square / Close Session pair, are both gone (2026-09-06 and
+				    2026-09-08, Danny): a session is never saved mid-way to come back and finish
+				    later, Notes autosaves on its own (see the effect above), and the two ways an
+				    open session actually ends normally are now one button whose label says which
+				    one is about to happen. */}
+				<div className="sessionDetailActionsRow sessionDetailActionsPrimaryRow">
+					<Button
+						variant="contained"
+						fullWidth
+						disabled={isClosed || saving || (paymentMethod === "square" && quoting)}
+						onClick={handlePrimaryAction}
+					>
+						{primaryLabel}
+					</Button>
+				</div>
+
+				{/* Row 2 - the three ways a session ends WITHOUT a normal close: the client didn't
+				    show, the client is still coming but not now (Reschedule), or nothing is being
+				    rebooked at all (Cancel). See rescheduleSession/cancelSession's own header
+				    comments (mutations/appointments.js) for what each one actually does. */}
+				<div className="sessionDetailActionsRow">
+					<Button
+						variant="outlined"
+						color="warning"
+						disabled={isClosed || saving}
+						onClick={handleMarkNoShow}
+					>
+						Mark No-Show
+					</Button>
+					<Button
+						variant="outlined"
+						disabled={isClosed || saving}
+						onClick={() => setShowRescheduleForm((v) => !v)}
+					>
+						Reschedule Session
+					</Button>
+					<Button
+						variant="outlined"
+						color="error"
+						disabled={isClosed || saving}
+						onClick={() => setShowCancelForm((v) => !v)}
+					>
+						Cancel Session
+					</Button>
+				</div>
+
+				{/* Row 3 - lighter-weight, less frequent actions. */}
+				<div className="sessionDetailActionsRow">
+					{/* The manual half of Auto-Responses (decision #7 - see that component's own header
+					    comment) - aftercare, a receipt note, or anything else in the viewer's library,
+					    sent to this session's own client on demand. project.clientId is the Client
+					    document's own _id (see models/Project.js - NOT the client's User._id), the same
+					    id ClientDashboard.jsx passes for its own copy of this button. Renders nothing if
+					    there's nothing to send, so this is safe even before project.clientId exists. */}
+					<SendAutoResponseButton clientId={project?.clientId} appointmentId={appointment.id} />
+					<Button
+						variant="text"
+						color="error"
+						startIcon={<Delete />}
+						disabled={deleting}
+						onClick={handleDeleteSession}
+						sx={{ marginLeft: "auto" }}
+					>
+						Delete Session
+					</Button>
+				</div>
 			</DialogActions>
 		</>
 	);

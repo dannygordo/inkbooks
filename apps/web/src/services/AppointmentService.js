@@ -825,6 +825,30 @@ export const AppointmentService = (() => {
         }
     `;
 
+    // Session Detail's "Reschedule Session" button (2026-09-06). One round trip: marks THIS
+    // session rescheduled, creates the new one, and raises/notes the flag server-side - see
+    // mutations/appointments.js's rescheduleSession for why note never lands on the new session.
+    const _RESCHEDULE_SESSION = gql`
+        mutation RescheduleSession($appointmentId: ID!, $newDate: String!, $note: String) {
+            rescheduleSession(appointmentId: $appointmentId, newDate: $newDate, note: $note) {
+                id
+                appointmentStatus
+            }
+        }
+    `;
+
+    // Session Detail's "Cancel Session" button (2026-09-06). Marks THIS session cancelled and,
+    // server-side, settles any single unambiguous deposit out of the outstanding bucket - see
+    // mutations/appointments.js's cancelSession.
+    const _CANCEL_SESSION = gql`
+        mutation CancelSession($appointmentId: ID!, $note: String) {
+            cancelSession(appointmentId: $appointmentId, note: $note) {
+                id
+                appointmentStatus
+            }
+        }
+    `;
+
     /**
      * Every query that draws appointments, by operation name - to hand to a mutation's
      * `refetchQueries` after anything that creates, moves or removes one.
@@ -885,6 +909,8 @@ export const AppointmentService = (() => {
         GET_CHARGE_QUOTE: _GET_CHARGE_QUOTE,
         useChargeQuote: _useChargeQuote,
         RECORD_ADJUSTMENT: _RECORD_ADJUSTMENT,
+        RESCHEDULE_SESSION: _RESCHEDULE_SESSION,
+        CANCEL_SESSION: _CANCEL_SESSION,
         getAppointment: _getAppointment,
         // Exported so tests can build a MockedProvider mock against the same document the
         // component actually runs - mirroring it by hand in a test file is how a query and its

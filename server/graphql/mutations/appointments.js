@@ -1,14 +1,23 @@
 const Appointment = require('../../models/Appointment');
 const ArtistShopConnection = require('../../models/ArtistShopConnection');
+const Project = require('../../models/Project');
+const User = require('../../models/User');
 const withAuth = require('../../utils/with-auth');
 const { AuthenticationError, UserInputError, rethrow } = require('../../utils/errors');
 const { updateAppointmentInputSchema, createAppointmentInputSchema, appointmentIdInputSchema, validate } = require('../../utils/validation');
 const { applyShopCut } = require('../../utils/shop-cut');
 const { queueProjectScheduleEmail } = require('../../utils/client-booking-emails');
-const { syncNoShowFlag } = require('../../utils/client-flags');
+const { syncNoShowFlag, raiseClientFlag } = require('../../utils/client-flags');
 const { canManageArtist, assertCanManageArtist } = require('../../utils/shop-membership');
 const { recordEvent, diffFields } = require('../../utils/event-log');
 const { sendAutoResponsesForTrigger } = require('../../utils/auto-responses');
+const { reportError } = require('../../utils/error-reporting');
+// rescheduleSession/cancelSession call these two as plain functions rather than re-implementing
+// deposit lookup/claiming - both are withAuth-wrapped, so they re-derive and re-check the same
+// authenticated user from `context` a second time, exactly as if the client had called them
+// directly. See cancelSession's own comment for why.
+const depositMutations = require('./deposits');
+const { Query: depositQueries } = require('../resolvers/deposits');
 
 // Fields worth an audit-trail line when they change on an Appointment - see
 // models/EventLog.js's own comment on why this is a deliberate subset rather than every field.
@@ -395,6 +404,209 @@ module.exports = {
           // way the pre-existing 'Action not allowed' throw already was.
           rethrow(err);
       }
+    }),
+
+    /*
+     * Reschedule Session (2026-09-06, Danny) - the client is still coming in, just not at the
+     * booked time. One atomic mutation rather than three client-side calls in sequence, so a
+     * failure partway through can't leave a new session created but the old one still 'scheduled',
+     * or a flag raised with no session behind it.
+     *
+     * note is OPTIONAL and deliberately does NOT land on the new session - a note explaining why
+     * the OLD time didn't work has no place on a session that hasn't happened yet. It's saved on
+     * the RESCHEDULED flag (so it shows up wherever client flags do, including the client
+     * dashboard) and appended to the PROJECT's own notes, so whoever works this project next sees
+     * it without having to go dig through flag history.
+     */
+    rescheduleSession: withAuth(async (_, { appointmentId, newDate, note }, context, info, user) => {
+      const appointment = await Appointment.findById(appointmentId);
+      if (!appointment) {
+        throw new UserInputError('Errors', { errors: { appointmentId: 'Appointment not found' } });
+      }
+      if (!(await canManageArtist(user, appointment.userId))) {
+        throw new AuthenticationError('Action not allowed');
+      }
+      if (!appointment.projectId) {
+        throw new UserInputError('Errors', {
+          errors: { appointmentId: 'This session has no project to reschedule against.' },
+        });
+      }
+      const project = await Project.findById(appointment.projectId);
+      if (!project) {
+        throw new UserInputError('Errors', { errors: { appointmentId: 'Project not found' } });
+      }
+
+      const now = new Date();
+      // Same input shape ProjectSessionsList.jsx's handleAddSession already sends for "+ Add
+      // Session" - durationMinutes carried over from the session being rescheduled (not reset to
+      // a generic default) since the sitting itself hasn't changed, only when it happens.
+      await new Appointment({
+        projectId: project._id,
+        userId: appointment.userId,
+        shopId: appointment.shopId,
+        title: project.title,
+        appointmentType: 'session',
+        shopCutStatus: appointment.shopId ? 'unpaid' : 'none',
+        appointmentStatus: 'scheduled',
+        appointmentDate: new Date(newDate),
+        durationMinutes: appointment.durationMinutes,
+        createdAt: now,
+        updatedAt: now,
+      }).save();
+
+      appointment.appointmentStatus = 'rescheduled';
+      await appointment.save();
+
+      // Best-effort by the same contract as syncNoShowFlag above - the reschedule itself already
+      // happened and must not be undone because a flag or a note could not be written.
+      if (project.clientId) {
+        try {
+          await raiseClientFlag({
+            clientId: project.clientId,
+            typeKey: 'RESCHEDULED',
+            appointmentId: appointment._id,
+            shopId: appointment.shopId || null,
+            note: note || '',
+            systemGenerated: true,
+          });
+        } catch (err) {
+          reportError(err, { context: '[rescheduleSession] LOST a RESCHEDULED flag' });
+        }
+      }
+
+      if (note && note.trim()) {
+        try {
+          const actingUser = await User.findById(user.id).select('firstName lastName');
+          project.notes.push({
+            author: actingUser ? `${actingUser.firstName} ${actingUser.lastName}` : 'System',
+            note: `Rescheduled: ${note.trim()}`,
+            createdAt: now,
+            updatedAt: now,
+          });
+          await project.save();
+        } catch (err) {
+          reportError(err, { context: '[rescheduleSession] LOST a project note' });
+        }
+      }
+
+      await recordEvent({
+        entityType: 'Appointment',
+        entityId: appointment._id,
+        action: 'update',
+        actorUserId: user.id,
+        shopId: appointment.shopId,
+        summary: `Rescheduled session${project.title ? ` — ${project.title}` : ''}`,
+      });
+
+      return appointment;
+    }),
+
+    /*
+     * Cancel Session (2026-09-06, Danny) - nothing is being rebooked. Marks THIS session
+     * 'cancelled', applies any ONE unambiguous available deposit for this client to it, and
+     * raises a Canceled Session flag.
+     *
+     * The deposit step is a LIABILITY correction, not a revenue one. utils/analytics.js already
+     * counts a deposit as collected revenue the moment it's taken, regardless of what later
+     * happens to the session it was meant for (depositsCollectedCents is unconditional on
+     * appointmentStatus) - applying it a second time would double-count, and the code there says
+     * so explicitly. What applying it here actually does is move it out of
+     * depositsOutstandingCents, which that same file treats as a LIABILITY: money the shop still
+     * appears to owe work for. A non-refundable deposit against a session that is never
+     * happening is settled, not owed, and this is what corrects that figure. Confirmed with
+     * Danny 2026-09-06 - this is exactly the behavior he wants, for this reason.
+     *
+     * Deliberately only auto-applies when there is EXACTLY ONE available deposit for this
+     * client - more than one is a judgment call about which sitting it was actually for, and
+     * that stays a human decision made from the session's own Deposits section, not a guess this
+     * button makes for them.
+     */
+    cancelSession: withAuth(async (_, { appointmentId, note }, context, info, user) => {
+      const appointment = await Appointment.findById(appointmentId);
+      if (!appointment) {
+        throw new UserInputError('Errors', { errors: { appointmentId: 'Appointment not found' } });
+      }
+      if (!(await canManageArtist(user, appointment.userId))) {
+        throw new AuthenticationError('Action not allowed');
+      }
+      if (!appointment.projectId) {
+        throw new UserInputError('Errors', {
+          errors: { appointmentId: 'This session has no project to cancel against.' },
+        });
+      }
+      const project = await Project.findById(appointment.projectId);
+      if (!project) {
+        throw new UserInputError('Errors', { errors: { appointmentId: 'Project not found' } });
+      }
+
+      appointment.appointmentStatus = 'cancelled';
+      await appointment.save();
+
+      // Best-effort - calling these two as plain functions (see this file's own import comment)
+      // re-runs their own authorization and their own claim-and-credit logic exactly as if the
+      // client had called applyDeposit itself, so there is nothing to duplicate here.
+      try {
+        const candidates = await depositQueries.getAvailableDeposits(
+          null,
+          { appointmentId: appointment._id.toString() },
+          context,
+          info,
+        );
+        if (candidates.length === 1) {
+          await depositMutations.applyDeposit(
+            null,
+            {
+              depositAppointmentId: candidates[0]._id.toString(),
+              targetAppointmentId: appointment._id.toString(),
+            },
+            context,
+            info,
+          );
+        }
+      } catch (err) {
+        reportError(err, { context: "[cancelSession] could not apply the client's deposit" });
+      }
+
+      if (project.clientId) {
+        try {
+          await raiseClientFlag({
+            clientId: project.clientId,
+            typeKey: 'CANCELED_SESSION',
+            appointmentId: appointment._id,
+            shopId: appointment.shopId || null,
+            note: note || '',
+            systemGenerated: true,
+          });
+        } catch (err) {
+          reportError(err, { context: '[cancelSession] LOST a CANCELED_SESSION flag' });
+        }
+      }
+
+      if (note && note.trim()) {
+        try {
+          const actingUser = await User.findById(user.id).select('firstName lastName');
+          project.notes.push({
+            author: actingUser ? `${actingUser.firstName} ${actingUser.lastName}` : 'System',
+            note: `Canceled: ${note.trim()}`,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+          await project.save();
+        } catch (err) {
+          reportError(err, { context: '[cancelSession] LOST a project note' });
+        }
+      }
+
+      await recordEvent({
+        entityType: 'Appointment',
+        entityId: appointment._id,
+        action: 'update',
+        actorUserId: user.id,
+        shopId: appointment.shopId,
+        summary: `Cancelled session${project.title ? ` — ${project.title}` : ''}`,
+      });
+
+      return appointment;
     }),
     startSessionTimer: withAuth(async (_, args, context, info, user) => {
       const { valid, errors } = validate(appointmentIdInputSchema, args);

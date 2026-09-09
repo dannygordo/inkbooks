@@ -2344,6 +2344,23 @@ module.exports = gql`
     # real buttons call it (UpdateEventDialog.jsx, SessionDetail.jsx); removing an empty
     # scheduled slot is a legitimate thing to want.
     deleteAppointment(appointmentId: ID): String
+
+    # Artist-only (withAuth). The client is still coming in, just not at the booked time. Marks
+    # THIS session 'rescheduled' (the honest record - DECISIONS.md C1/C2 - rather than deleting
+    # it), creates a brand-new session for the same project at newDate (same shape
+    # ProjectSessionsList's own "+ Add Session" already sends), and raises a Rescheduled flag on
+    # the client tied to this session - see mutations/appointments.js's rescheduleSession for the
+    # full reasoning, including why note is saved on the flag and the project's own notes but
+    # deliberately NOT copied onto the new session (2026-09-06, confirmed with Danny).
+    rescheduleSession(appointmentId: ID!, newDate: String!, note: String): Appointment!
+
+    # Artist-only (withAuth). Nothing is being rebooked. Marks THIS session 'cancelled', applies
+    # any single unambiguous available deposit for this client to it (non-refundable, so this
+    # clears it from the "outstanding" liability figure - it was already counted as revenue when
+    # collected, see utils/analytics.js), and raises a Canceled Session flag on the client. note
+    # is saved on the flag and the project's own notes. See mutations/appointments.js's
+    # cancelSession.
+    cancelSession(appointmentId: ID!, note: String): Appointment!
     #
     # The other seven were removed, not re-gated. Nothing in the client called any of them
     # (grepped), and each one silently corrupted the records around it: Project.client is
