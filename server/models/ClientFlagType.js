@@ -76,6 +76,25 @@ ClientFlagType.SEEDED = [
     description: 'Left no tip on a completed session.',
     systemGenerated: false,
   },
+  // Raised by rescheduleSession (mutations/appointments.js) - systemGenerated for the same
+  // reason NO_SHOWED is: it is a direct, automatic byproduct of clicking Reschedule Session on a
+  // real session, tied to that appointment, not a subjective call someone typed in by hand.
+  // Distinct from the pre-existing manual MOVED_APPOINTMENT type above, which stays as-is for
+  // whatever a person wants to record by hand outside that button.
+  {
+    key: 'RESCHEDULED',
+    label: 'Rescheduled',
+    description: 'A booked session was rescheduled to a new date.',
+    systemGenerated: true,
+  },
+  // Raised by cancelSession (mutations/appointments.js) - same systemGenerated reasoning as
+  // RESCHEDULED just above.
+  {
+    key: 'CANCELED_SESSION',
+    label: 'Canceled session',
+    description: 'A booked session was canceled outright, not rescheduled.',
+    systemGenerated: true,
+  },
 ];
 
 /** Idempotent - safe to run on every boot and from a seed script. */

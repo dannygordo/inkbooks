@@ -41,6 +41,7 @@ export const ROUTE_CONSTANTS = {
 	EXPENSES: '/expenses',
 	INCOME: '/income',
 	FORMS: '/forms',
+	GIFT_CARDS: '/gift-cards',
 	// FORM + formId + "/booking-fields" (same ad hoc suffix pattern as FORM + formId + "/responses"
 	// below) is the booking_request system form's own RESTRICTED editor - reorder/relabel/required/
 	// hide only, fixed 7-slot set, never the generic FormBuilder that FORM + formId alone opens. See

@@ -29,8 +29,10 @@ type Sitting = { date: Date; durationMinutes: number };
 
 type BookSessionDatesFormProps = {
   bookingRequestId: string;
-  initialDate: Date;
-  consultAppointmentId: string;
+  // Both optional - see this component's own header comment on the two callers. Defaults to now,
+  // matching web's own `initialDate || moment()`.
+  initialDate?: Date;
+  consultAppointmentId?: string;
   onSuccess: (projectId?: string | null) => void;
   onCancel: () => void;
 };
@@ -43,6 +45,15 @@ type BookSessionDatesFormProps = {
  * asked once there's actually a deposit amount entered, no default preselected (a wrong answer
  * accepted in a hurry is worse than an unanswered one - the shop reconciles the drawer against
  * this).
+ *
+ * TWO CALLERS, ONE OF THEM WITH NO CONSULT TO ATTACH A DEPOSIT TO - `consultAppointmentId` and
+ * `initialDate` are both optional (DECISIONS.md X19), matching web exactly: consult/[id].tsx
+ * passes both (booking a session after a real consult, deposit taken at that meeting);
+ * app/booking-requests/[id].tsx passes neither (booking straight from a still-pending or
+ * consult_booked request, with no consult transaction for a deposit to belong to). The ENTIRE
+ * deposit field - not just the Cash/Card toggle - is hidden without a `consultAppointmentId`,
+ * same as web's own `{consultAppointmentId && (...)}` wrapper: there is nowhere to type an amount
+ * that would just be silently dropped.
  *
  * Also omitted: the per-row DaySchedule conflict-check panel (web's own "what's already on the
  * books that day" hint) - a documented v1 simplification, not a silent one; see DECISIONS.md.
@@ -74,7 +85,7 @@ export function BookSessionDatesForm({
   const theme = useTheme();
 
   const [sessionDates, setSessionDates] = useState<Sitting[]>([
-    { date: initialDate, durationMinutes: SESSION_DEFAULT_MINUTES },
+    { date: initialDate ?? new Date(), durationMinutes: SESSION_DEFAULT_MINUTES },
   ]);
   const [projectTitle, setProjectTitle] = useState('');
   const [depositDollars, setDepositDollars] = useState('');
@@ -85,11 +96,22 @@ export function BookSessionDatesForm({
   const [pendingCardDeposit, setPendingCardDeposit] = useState<{
     depositCents: number;
     projectId: string | null | undefined;
+    // Carried here, not read from the outer consultAppointmentId prop, so this branch's own type
+    // doesn't depend on TypeScript narrowing a value across the async handleSubmit closure - this
+    // state can only ever be SET from inside the `depositCents > 0 && consultAppointmentId`
+    // guard, so it is always a real string by the time this branch renders.
+    consultAppointmentId: string;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const [convertBookingRequest] = useConvertBookingRequestMutation();
+  // Same refetch set web's own BOOKING_BADGE_REFETCH uses everywhere convertBookingRequest is
+  // called - now that the Booking Requests inbox (DECISIONS.md X19) has a badge and a
+  // status-filtered list on mobile too, this call site needs to keep both accurate, not just the
+  // consult/[id].tsx screen it originally shipped for.
+  const [convertBookingRequest] = useConvertBookingRequestMutation({
+    refetchQueries: ['GetPendingBookingRequestCount', 'GetUnreadMessageCount'],
+  });
   const [createAppointment] = useCreateAppointmentMutation();
   const [recordDeposit] = useRecordDepositMutation();
 
@@ -117,7 +139,9 @@ export function BookSessionDatesForm({
   };
 
   const depositCents = depositDollars ? dollarsToCents(depositDollars) : 0;
-  const needsMethod = depositCents > 0;
+  // Only offered when there's a consult to attach the deposit to - see this file's own header
+  // comment. Without one there's no transaction the money belongs to.
+  const needsMethod = depositCents > 0 && Boolean(consultAppointmentId);
 
   // The sessions are already booked by the time a Square deposit reaches this point; only the
   // card charge is outstanding. Direct port of web's handleCardDepositSuccess.
@@ -182,30 +206,34 @@ export function BookSessionDatesForm({
       // Cash is recorded immediately (an assertion someone handed over notes); a Square deposit is
       // recorded PENDING and then charged - see this file's header comment. Either way, a failure
       // recording it doesn't roll back the booking; the sessions are real and on the calendar.
-      if (depositCents > 0 && depositMethod === 'square') {
-        try {
-          await recordDeposit({
-            variables: {
-              appointmentId: consultAppointmentId,
-              depositCents,
-              paymentMethod: 'square',
-              pending: true,
-            },
-          });
-        } catch (depositErr) {
-          setError(
-            `Sessions booked, but the deposit couldn't be recorded: ${(depositErr as Error).message}`,
-          );
+      //
+      // Both branches require consultAppointmentId, matching web's own combined guard exactly -
+      // without one there is no transaction to record the deposit against, and the deposit field
+      // itself is hidden in that case (see the JSX below), so depositCents can only be nonzero
+      // here at all when a consult exists.
+      if (depositCents > 0 && consultAppointmentId) {
+        if (depositMethod === 'square') {
+          try {
+            await recordDeposit({
+              variables: {
+                appointmentId: consultAppointmentId,
+                depositCents,
+                paymentMethod: 'square',
+                pending: true,
+              },
+            });
+          } catch (depositErr) {
+            setError(
+              `Sessions booked, but the deposit couldn't be recorded: ${(depositErr as Error).message}`,
+            );
+            setSubmitting(false);
+            return;
+          }
+          await refetchAppointments();
+          setPendingCardDeposit({ depositCents, projectId, consultAppointmentId });
           setSubmitting(false);
           return;
         }
-        await refetchAppointments();
-        setPendingCardDeposit({ depositCents, projectId });
-        setSubmitting(false);
-        return;
-      }
-
-      if (depositCents > 0) {
         try {
           await recordDeposit({
             variables: {
@@ -244,7 +272,7 @@ export function BookSessionDatesForm({
         </ThemedText>
         <SquarePaymentForm
           amountCents={pendingCardDeposit.depositCents}
-          appointmentId={consultAppointmentId}
+          appointmentId={pendingCardDeposit.consultAppointmentId}
           chargeType="deposit"
           note="InkBooks deposit"
           onSuccess={handleCardDepositSuccess}
@@ -307,63 +335,70 @@ export function BookSessionDatesForm({
 
       <Button label="Add another session" variant="secondary" onPress={addDate} testID="book-session-add" />
 
-      <FormField
-        label="Deposit taken today ($, optional)"
-        placeholder="0"
-        value={depositDollars}
-        onChangeText={setDepositDollars}
-        keyboardType="decimal-pad"
-        testID="book-session-deposit"
-      />
+      {/* Only offered when there's a consult to attach it to - see this file's own header
+          comment. Without one there is no transaction the money belongs to, so the field isn't
+          shown at all rather than accepting a value that would just be silently dropped. */}
+      {consultAppointmentId ? (
+        <>
+          <FormField
+            label="Deposit taken today ($, optional)"
+            placeholder="0"
+            value={depositDollars}
+            onChangeText={setDepositDollars}
+            keyboardType="decimal-pad"
+            testID="book-session-deposit"
+          />
 
-      {/* Only asked once there's an amount - a payment-method question above an empty deposit
-          field is a question about nothing. No default selected - see this file's header comment
-          on why. */}
-      {needsMethod ? (
-        <View style={styles.depositMethod}>
-          <ThemedText type="small" themeColor="textSecondary">
-            How was it taken?
-          </ThemedText>
-          <View style={styles.depositMethodRow}>
-            <Pressable
-              onPress={() => setDepositMethod('cash')}
-              accessibilityRole="button"
-              accessibilityState={{ selected: depositMethod === 'cash' }}
-              testID="book-session-deposit-method-cash"
-              style={[
-                styles.pill,
-                {
-                  backgroundColor: depositMethod === 'cash' ? theme.text : theme.backgroundElement,
-                  borderColor: theme.backgroundSelected,
-                },
-              ]}
-            >
-              <ThemedText type="small" style={{ color: depositMethod === 'cash' ? theme.background : theme.text }}>
-                Cash
+          {/* Only asked once there's an amount - a payment-method question above an empty deposit
+              field is a question about nothing. No default selected - see this file's header
+              comment on why. */}
+          {needsMethod ? (
+            <View style={styles.depositMethod}>
+              <ThemedText type="small" themeColor="textSecondary">
+                How was it taken?
               </ThemedText>
-            </Pressable>
-            <Pressable
-              onPress={() => setDepositMethod('square')}
-              accessibilityRole="button"
-              accessibilityState={{ selected: depositMethod === 'square' }}
-              testID="book-session-deposit-method-square"
-              style={[
-                styles.pill,
-                {
-                  backgroundColor: depositMethod === 'square' ? theme.text : theme.backgroundElement,
-                  borderColor: theme.backgroundSelected,
-                },
-              ]}
-            >
-              <ThemedText type="small" style={{ color: depositMethod === 'square' ? theme.background : theme.text }}>
-                Card (Square)
+              <View style={styles.depositMethodRow}>
+                <Pressable
+                  onPress={() => setDepositMethod('cash')}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: depositMethod === 'cash' }}
+                  testID="book-session-deposit-method-cash"
+                  style={[
+                    styles.pill,
+                    {
+                      backgroundColor: depositMethod === 'cash' ? theme.text : theme.backgroundElement,
+                      borderColor: theme.backgroundSelected,
+                    },
+                  ]}
+                >
+                  <ThemedText type="small" style={{ color: depositMethod === 'cash' ? theme.background : theme.text }}>
+                    Cash
+                  </ThemedText>
+                </Pressable>
+                <Pressable
+                  onPress={() => setDepositMethod('square')}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: depositMethod === 'square' }}
+                  testID="book-session-deposit-method-square"
+                  style={[
+                    styles.pill,
+                    {
+                      backgroundColor: depositMethod === 'square' ? theme.text : theme.backgroundElement,
+                      borderColor: theme.backgroundSelected,
+                    },
+                  ]}
+                >
+                  <ThemedText type="small" style={{ color: depositMethod === 'square' ? theme.background : theme.text }}>
+                    Card (Square)
+                  </ThemedText>
+                </Pressable>
+              </View>
+              <ThemedText type="small" themeColor="textSecondary">
+                {depositMethod === 'square' ? "You'll enter the card on the next step." : 'Recorded against this consult either way.'}
               </ThemedText>
-            </Pressable>
-          </View>
-          <ThemedText type="small" themeColor="textSecondary">
-            {depositMethod === 'square' ? "You'll enter the card on the next step." : 'Recorded against this consult either way.'}
-          </ThemedText>
-        </View>
+            </View>
+          ) : null}
+        </>
       ) : null}
 
       {error ? (

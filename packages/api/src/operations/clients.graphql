@@ -1,0 +1,44 @@
+# Mobile's client roster - see app/clients/index.tsx's own header comment for the full scope cut
+# against apps/web's Clients.jsx (no create/archive/show-archived toggle, no server-side name
+# search - getClients itself takes no search argument, see server/graphql/typeDefs.js). Server-
+# side scoping (clientScopeFilter - a shop-shared client, or one reached through an independent
+# artist's own Project) is identical to every other client-facing query in this schema; nothing
+# mobile-specific needed here.
+#
+# includeArchived is a literal `false`, not a variable - the "Show archived" toggle Clients.jsx
+# has is real web functionality this slice doesn't build (see DECISIONS.md X17); add the variable
+# back if that follow-up lands.
+query GetClients($page: PageInput) {
+	getClients(includeArchived: false, page: $page) {
+		items {
+			id
+			firstName
+			lastName
+			email
+			phone
+			avatar
+		}
+		pageInfo {
+			totalCount
+			hasMore
+			limit
+			offset
+		}
+	}
+}
+
+# "Do we already have this person?", by email - for the new-appointment wizard's client-email
+# step (X48). Server-scoped the same as everything else here; a MISS matters (not cosmetic) - see
+# ClientService.js's own header comment on why this is a server lookup and not a scan of an
+# already-paged client list: createBookingRequest's own findOrCreateGuestClient finds an existing
+# person by email regardless, so a client-side miss here would let a freshly typed name silently
+# overwrite the real one.
+query FindClientByEmail($email: String!) {
+	findClientByEmail(email: $email) {
+		id
+		firstName
+		lastName
+		email
+		phone
+	}
+}

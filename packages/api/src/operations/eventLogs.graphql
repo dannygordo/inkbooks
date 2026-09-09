@@ -1,0 +1,32 @@
+# settings/security.tsx (DECISIONS.md X44) - the audit trail: who changed what, and when. Direct
+# port of apps/web's EventLogPanel.jsx. Read-only from the client; nothing here writes an
+# EventLogEntry directly, they're a side effect of the money/appointment/client mutations that
+# already exist (see server/utils/event-log.js's call sites).
+#
+# entityType/page are the only filters exposed - EventLogFilter also takes shopId/actorUserId/
+# from/to, but the resolver already scopes shopId server-side and there's no caller yet needing to
+# filter by actor or date, matching web's own EventLogService.js comment on the same restraint.
+query GetEventLogs($filter: EventLogFilter, $page: PageInput) {
+	getEventLogs(filter: $filter, page: $page) {
+		items {
+			id
+			entityType
+			entityId
+			action
+			actorName
+			summary
+			changes {
+				field
+				from
+				to
+			}
+			createdAt
+		}
+		pageInfo {
+			totalCount
+			hasMore
+			limit
+			offset
+		}
+	}
+}

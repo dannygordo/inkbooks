@@ -1,0 +1,51 @@
+# New-account creation - Settings/Messages follow-up list closed at X46; this is gap #2 from
+# HANDOFF.md's 2026-09-04 parity accounting ("No client, project, staff, or artist account can be
+# created from mobile at all"). Field selections and input shapes match AccountService.js exactly
+# (apps/web/src/services/AccountService.js) - see server/graphql/typeDefs.js's
+# CreateArtistAccountInput/CreateStaffAccountInput/CreateClientAccountInput for the full optional-
+# field lists these three inputs accept.
+mutation CreateClientAccount($input: CreateClientAccountInput!) {
+	createClientAccount(input: $input) {
+		# False when the email already had an account - the wizard says "was already on file"
+		# rather than implying a new record, same distinction AccountWizards.jsx draws.
+		isNewAccount
+		client {
+			id
+			firstName
+			lastName
+			email
+			phone
+		}
+	}
+}
+
+mutation CreateArtistAccount($input: CreateArtistAccountInput!) {
+	createArtistAccount(input: $input) {
+		# Shown directly, not just "an invite was sent" - utils/email.js no-ops without a
+		# configured provider, so the link is the only thing this app can actually verify. Same
+		# reasoning as AccountWizards.jsx's own InviteResult.
+		inviteLink
+		artist {
+			id
+			firstName
+			lastName
+			email
+			title
+			userId
+		}
+	}
+}
+
+mutation CreateStaffAccount($input: CreateStaffAccountInput!) {
+	createStaffAccount(input: $input) {
+		inviteLink
+		staff {
+			id
+			firstName
+			lastName
+			email
+			title
+			userId
+		}
+	}
+}

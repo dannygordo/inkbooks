@@ -1,0 +1,240 @@
+# Forms - consent forms, waivers, custom intake questionnaires. Same shopId-XOR-artistUserId
+# ownership as Income/Expenses, but visible to a narrower slice of users - see
+# utils/businessScope.ts's canManageForms (a plain shop-connected artist who isn't a shop admin
+# sees none of this, unlike Income/Expenses' canManageBusinessLedger).
+#
+# DELIBERATELY NOT PORTED this slice: getFormAnalytics (a real, separate secondary feature -
+# aggregate per-field stats/percentages layered on top of the response list, not the core "read
+# what someone submitted" job this slice covers). See DECISIONS.md X28.
+#
+# BookingRequestFieldsEditor (the booking_request system form's own restricted editor) WAS ADDED
+# in X54 - see form-booking-fields/[id].tsx and UpdateBookingRequestFields below. form/[id].tsx
+# still redirects a booking_request form back to the list (there's no generic field-add/remove/
+# retype to offer there), but forms/index.tsx now sends that row to the dedicated screen instead.
+#
+# FormBuilder (create a form / edit its title, description, link slug, shop-use-only flag, and
+# fields) WAS ADDED in X30 - see form/[id].tsx and utils/formBuilder.ts for the field-reorder
+# substitute (no cross-platform drag-and-drop primitive exists in this app; a pair of Up/Down move
+# buttons per field row replaces it). GetFormForEdit/CreateFormFromBuilder/UpdateForm below are
+# that screen's own operations - kept separate from GetFormsList's lighter list-row shape and from
+# DuplicateForm's plain create-with-no-editor call.
+#
+# createForm is ALSO used for Duplicate (forms/index.tsx) - a plain mutation call with client-side
+# field copying, no editor involved (see resolvers/forms.js's fieldsFromInput: an omitted field key
+# means a fresh key, so a duplicate never shares field identity with its source).
+query GetFormsList($shopId: ID, $artistUserId: ID, $status: String, $page: PageInput) {
+	getForms(shopId: $shopId, artistUserId: $artistUserId, status: $status, page: $page) {
+		items {
+			id
+			title
+			status
+			allowGuestSubmissions
+			publicToken
+			slug
+			systemKey
+			# Selected for settings/shop.tsx's own use (DECISIONS.md X36) - filters this same list
+			# down to the shop-wide links a shop admin can hand out, mirroring web's ShopPanel.jsx.
+			shopUseOnly
+			fields {
+				key
+				type
+				label
+				helpText
+				required
+				options
+			}
+			createdAt
+		}
+		pageInfo {
+			totalCount
+			hasMore
+			limit
+			offset
+		}
+	}
+}
+
+mutation PublishForm($formId: ID!) {
+	publishForm(formId: $formId) {
+		id
+		status
+	}
+}
+
+mutation ArchiveForm($formId: ID!) {
+	archiveForm(formId: $formId) {
+		id
+		status
+	}
+}
+
+mutation SetFormGuestAccess($formId: ID!, $allow: Boolean!) {
+	setFormGuestAccess(formId: $formId, allow: $allow) {
+		id
+		allowGuestSubmissions
+		publicToken
+		slug
+	}
+}
+
+mutation DeleteForm($formId: ID!) {
+	deleteForm(formId: $formId)
+}
+
+mutation DuplicateForm($input: CreateFormInput!) {
+	createForm(input: $input) {
+		id
+	}
+}
+
+query GetFormTitle($formId: ID!) {
+	getForm(formId: $formId) {
+		id
+		title
+	}
+}
+
+query GetFormResponsesList($formId: ID!, $page: PageInput) {
+	getFormResponses(formId: $formId, page: $page) {
+		items {
+			id
+			formTitle
+			fieldsSnapshot {
+				key
+				type
+				label
+			}
+			client {
+				id
+				firstName
+				lastName
+			}
+			answers {
+				fieldKey
+				textValue
+				selectedOptions
+				dateValue
+				fileUrls
+				signature {
+					signedName
+					signedAt
+				}
+			}
+			source
+			createdAt
+		}
+		pageInfo {
+			totalCount
+			hasMore
+			limit
+			offset
+		}
+	}
+}
+
+
+# form/[id].tsx's own load query - the full field shape (including options, unlike GetFormsList's
+# already-known-flat items) plus status/allowGuestSubmissions/publicToken/systemKey for the
+# read-only status chip and the booking_request redirect check. Also reused as-is by
+# form-booking-fields/[id].tsx (X54) - same getForm resolver web's BookingRequestFieldsEditor
+# calls through FormService.getForm, so `hidden` is selected here even though the generic
+# FormBuilder screen never sets it (always false on a non-system form - see typeDefs.js's own
+# comment on FormField.hidden).
+query GetFormForEdit($formId: ID!) {
+	getForm(formId: $formId) {
+		id
+		title
+		description
+		slug
+		shopUseOnly
+		status
+		allowGuestSubmissions
+		publicToken
+		systemKey
+		fields {
+			key
+			type
+			label
+			helpText
+			required
+			options
+			hidden
+		}
+	}
+}
+
+# form/[id].tsx's create path - named distinctly from DuplicateForm above (both call the same
+# createForm mutation field; GraphQL operation names only need to be unique from each other, not
+# match the field) since this one needs the full form shape back to navigate into edit mode on the
+# new id, where Duplicate only ever needed the id itself.
+mutation CreateFormFromBuilder($input: CreateFormInput!) {
+	createForm(input: $input) {
+		id
+		title
+		description
+		slug
+		shopUseOnly
+		status
+		allowGuestSubmissions
+		publicToken
+		systemKey
+		fields {
+			key
+			type
+			label
+			helpText
+			required
+			options
+		}
+	}
+}
+
+mutation UpdateForm($input: UpdateFormInput!) {
+	updateForm(input: $input) {
+		id
+		title
+		description
+		slug
+		shopUseOnly
+		status
+		allowGuestSubmissions
+		publicToken
+		systemKey
+		fields {
+			key
+			type
+			label
+			helpText
+			required
+			options
+		}
+	}
+}
+# form-booking-fields/[id].tsx's own save call - deliberately NOT FormFieldInput/UpdateForm (see
+# typeDefs.js's own comment on BookingRequestFieldInput): key is required, and type/options are
+# absent because the booking_request system form's seven fields keep whatever type/options they
+# were seeded with forever. resolvers/forms.js re-checks the exact-same-key-set server-side too,
+# not just this schema - a mismatched key set here comes back as a GraphQL error, not silently
+# dropped fields.
+mutation UpdateBookingRequestFields($formId: ID!, $fields: [BookingRequestFieldInput!]!) {
+	updateBookingRequestFields(formId: $formId, fields: $fields) {
+		id
+		title
+		description
+		slug
+		shopUseOnly
+		status
+		allowGuestSubmissions
+		publicToken
+		systemKey
+		fields {
+			key
+			type
+			label
+			helpText
+			required
+			options
+			hidden
+		}
+	}
+}

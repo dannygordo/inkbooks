@@ -1072,6 +1072,11 @@ module.exports = gql`
     shopCutMarkedPaidAt: DateTime
     shopCutConfirmedBy: ID
     shopCutConfirmedAt: DateTime
+    # --- Sale payment - see models/GiftCard.js's own comment. 'pending' means agreed but not yet
+    # charged (only reachable via paymentMethod 'square'); redeemGiftCard refuses a pending card.
+    paymentMethod: String
+    squarePaymentId: String
+    saleStatus: String!
     createdAt: DateTime
     updatedAt: DateTime
   }
@@ -1127,6 +1132,12 @@ module.exports = gql`
     # never applied silently. Never loads onto the card's balance either way - see
     # models/GiftCard.js's feeOffsetCents comment.
     applyFeeOffset: Boolean
+    # 'cash' or 'square' - same two-value set as recordDeposit's paymentMethod, same reason (see
+    # models/GiftCard.js). 'square' REQUIRES pending: true here - a card charge only ever comes
+    # from routes/squarePayments.js's own process-gift-card-payment route filling squarePaymentId
+    # in afterwards, never asserted directly on this mutation.
+    paymentMethod: String!
+    pending: Boolean
   }
 
   # Sold as a shop product - see models/GiftCard.js. shopId IS required here, unlike the artist
@@ -1136,6 +1147,8 @@ module.exports = gql`
     shopId: ID!
     faceValueCents: Int!
     applyFeeOffset: Boolean
+    paymentMethod: String!
+    pending: Boolean
   }
 
   # --- Dashboard analytics -------------------------------------------------------------------
@@ -1952,10 +1965,15 @@ module.exports = gql`
     ######### Shop-cut ledger ###########
     # See PRODUCTION_ROADMAP.md's "Shop-cut ledger" section.
 
-    getSquareAuthorizationUrl(shopId: ID!): String!
+    # platform is 'web' (the default, when omitted) or 'mobile' - it rides inside the signed
+    # state token (routes/squareOAuth.js's signState/verifyState) so the callback route knows
+    # whether to land the seller's browser back on the web app or on a small "return to the app"
+    # page that opens this app's own inkbooks:// scheme. Nothing else about the handshake changes.
+    getSquareAuthorizationUrl(shopId: ID!, platform: String): String!
     # The same handshake for an independent artist, who has no shop to connect one against.
-    # Takes no argument on purpose: it can only ever act for the caller. See DECISIONS.md M9.
-    getMySquareAuthorizationUrl: String!
+    # Takes no argument on purpose beyond platform above: it can only ever act for the caller.
+    # See DECISIONS.md M9.
+    getMySquareAuthorizationUrl(platform: String): String!
     # WHERE THE CALLER'S SESSIONS ACTUALLY CHARGE - resolved through the same owner rule as their
     # tax rate (M8/M9), not just "does this artist have a row". An artist at a shop charges into
     # the SHOP's account, so the source field is what the settings panel needs in order to say
@@ -2022,6 +2040,17 @@ module.exports = gql`
     # leaking their name and phone to whoever can guess an address. Creating them is still correct
     # in that case - createClientAccount links the existing person to this shop.
     findClientByEmail(email: String!): Client
+    # Autosuggest for the same "do we already have this person?" question above, but for while
+    # they're still typing - findClientByEmail only ever answers once a full address is entered,
+    # so the artist gets no help at all until they've typed the whole thing correctly. This
+    # returns up to 'limit' clients whose email starts with 'emailPrefix', so a dropdown can offer
+    # candidates from partway through (2026-09-06: Danny asked for this to kick in at the 3rd
+    # character - see the resolver for where that floor is actually enforced).
+    #
+    # Same scoping as findClientByEmail (nothing leaks across shops), but bulk-scoped like
+    # getClients rather than per-record checked, since this can return several candidates per
+    # keystroke rather than the single record findClientByEmail does.
+    findClientsByEmailPrefix(emailPrefix: String!, limit: Int): [Client!]!
     # The types a manual-flag picker can offer: every platform-wide type (shopId omitted or null)
     # plus, when shopId is passed, that shop's own. Includes systemGenerated types too (NO_SHOWED)
     # so a client's flag list can label one correctly - raiseClientFlag below is what actually
@@ -2315,6 +2344,23 @@ module.exports = gql`
     # real buttons call it (UpdateEventDialog.jsx, SessionDetail.jsx); removing an empty
     # scheduled slot is a legitimate thing to want.
     deleteAppointment(appointmentId: ID): String
+
+    # Artist-only (withAuth). The client is still coming in, just not at the booked time. Marks
+    # THIS session 'rescheduled' (the honest record - DECISIONS.md C1/C2 - rather than deleting
+    # it), creates a brand-new session for the same project at newDate (same shape
+    # ProjectSessionsList's own "+ Add Session" already sends), and raises a Rescheduled flag on
+    # the client tied to this session - see mutations/appointments.js's rescheduleSession for the
+    # full reasoning, including why note is saved on the flag and the project's own notes but
+    # deliberately NOT copied onto the new session (2026-09-06, confirmed with Danny).
+    rescheduleSession(appointmentId: ID!, newDate: String!, note: String): Appointment!
+
+    # Artist-only (withAuth). Nothing is being rebooked. Marks THIS session 'cancelled', applies
+    # any single unambiguous available deposit for this client to it (non-refundable, so this
+    # clears it from the "outstanding" liability figure - it was already counted as revenue when
+    # collected, see utils/analytics.js), and raises a Canceled Session flag on the client. note
+    # is saved on the flag and the project's own notes. See mutations/appointments.js's
+    # cancelSession.
+    cancelSession(appointmentId: ID!, note: String): Appointment!
     #
     # The other seven were removed, not re-gated. Nothing in the client called any of them
     # (grepped), and each one silently corrupted the records around it: Project.client is

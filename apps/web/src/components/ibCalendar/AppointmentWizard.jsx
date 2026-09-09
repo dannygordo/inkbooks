@@ -169,6 +169,40 @@ const AppointmentWizard = ({ selectedDay }) => {
 		return (found.email || "").trim().toLowerCase() === normalizedEmail ? found : null;
 	}, [matchData, normalizedEmail]);
 
+	// Autosuggest, for while the email is still being typed - the exact-match lookup above only
+	// ever answers once a complete, valid address is entered (gated on the "@"), so up to that
+	// point the artist gets no help at all even if the person they want is three keystrokes away
+	// from being unambiguous. 3-character floor per Danny's 2026-09-06 request, matching the app
+	// bar's own search box (components/search/GlobalSearch.jsx's MIN_QUERY_LENGTH) - shorter than
+	// that, a prefix matches too much of the client list to be a useful suggestion.
+	const [findClientsByEmailPrefix, { data: suggestData }] =
+		ClientService.useLazyFindClientsByEmailPrefix();
+
+	useEffect(() => {
+		if (normalizedEmail.length < 3) {
+			return undefined;
+		}
+		// Same debounce as the exact-match lookup just above, and for the same reason - otherwise
+		// this fires on every keystroke instead of once typing has actually settled.
+		const timer = setTimeout(() => {
+			findClientsByEmailPrefix({ variables: { emailPrefix: normalizedEmail, limit: 6 } });
+		}, 350);
+		return () => clearTimeout(timer);
+	}, [normalizedEmail, findClientsByEmailPrefix]);
+
+	// Hidden the moment there's an exact match (matchedClient) - once the artist has landed on a
+	// real, unambiguous person there is nothing left to suggest. Guarded against the same
+	// stale-response risk as matchedClient above: a debounced result for an address the field has
+	// since moved past could otherwise flash suggestions for what was typed a second ago.
+	const emailSuggestions = useMemo(() => {
+		if (matchedClient || normalizedEmail.length < 3) {
+			return [];
+		}
+		return (suggestData?.findClientsByEmailPrefix || []).filter(
+			(c) => (c.email || "").toLowerCase().startsWith(normalizedEmail)
+		);
+	}, [suggestData, normalizedEmail, matchedClient]);
+
 	// Refreshes every appointment list there is - see AppointmentService.CALENDAR_REFETCH_QUERIES
 	// for why it's by operation name and why it doesn't branch on shopId. This used to be a
 	// `{ query, variables: { shopId } }` descriptor, which is what made saving an appointment do
@@ -495,6 +529,26 @@ const AppointmentWizard = ({ selectedDay }) => {
 						placeholder="jon.snow@example.com"
 					/>
 				</FormField>
+				{!matchedClient && emailSuggestions.length > 0 && (
+					<div className="clientEmailSuggestions">
+						{emailSuggestions.map((client) => (
+							<button
+								key={client.id}
+								type="button"
+								className="clientEmailSuggestionRow"
+								onClick={() => setClientEmail(client.email)}
+							>
+								<span className="clientEmailSuggestionPrimary">
+									{client.firstName} {client.lastName}
+								</span>
+								<span className="clientEmailSuggestionSecondary">
+									{client.email}
+									{client.phone ? ` - ${client.phone}` : ""}
+								</span>
+							</button>
+						))}
+					</div>
+				)}
 				{matchedClient ? (
 					<div className="clientEmailMatchCard">
 						Found: {matchedClient.firstName} {matchedClient.lastName}
@@ -509,7 +563,7 @@ const AppointmentWizard = ({ selectedDay }) => {
 						</button>
 					</div>
 				) : (
-					normalizedEmail && (
+					normalizedEmail.length >= 3 && (
 						<>
 							<div className="clientEmailNoMatchNote">
 								No existing client found for this email - enter their details to create

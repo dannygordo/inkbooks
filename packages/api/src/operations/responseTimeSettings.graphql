@@ -1,0 +1,32 @@
+# settings/response-time.tsx (DECISIONS.md X40) - how long a client's message may sit unanswered
+# before the artist is nudged to reply, and how often the nudge repeats. Direct port of apps/web's
+# ResponseTimePanel.jsx. A SINGLETON per owner (shopId XOR artistUserId), not a list - one query
+# returns the one row (real or defaulted), lazily created on first read or write, same convention
+# as ReminderSettings.
+query GetResponseTimeSettings($shopId: ID, $artistUserId: ID) {
+	getResponseTimeSettings(shopId: $shopId, artistUserId: $artistUserId) {
+		id
+		shopId
+		artistUserId
+		initialThresholdMinutes
+		repeatIntervalMinutes
+		shopCeiling {
+			initialThresholdMinutes
+			repeatIntervalMinutes
+		}
+	}
+}
+
+mutation UpdateResponseTimeSettings($input: UpdateResponseTimeSettingsInput!) {
+	updateResponseTimeSettings(input: $input) {
+		id
+		shopId
+		artistUserId
+		initialThresholdMinutes
+		repeatIntervalMinutes
+		shopCeiling {
+			initialThresholdMinutes
+			repeatIntervalMinutes
+		}
+	}
+}

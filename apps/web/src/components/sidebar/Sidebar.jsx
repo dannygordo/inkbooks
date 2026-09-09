@@ -34,6 +34,7 @@ import {
 	Assessment,
 	Assignment,
 	Build,
+	CardGiftcard,
 	Dashboard,
 	DateRange,
 	House,
@@ -901,6 +902,42 @@ export default function Sidebar() {
 							</ListItemIcon>
 							<ListItemText
 								primary="Forms"
+								sx={{ opacity: open ? 1 : 0 }}
+							/>
+						</ListItemButton>
+					)}
+					{/* Every artist can sell their own artist-issued card (createArtistGiftCard's
+					    ROLES.ARTIST floor - resolvers/giftCards.js), and a shop admin can
+					    additionally sell the shop's own gift card product - isArtistUser alone
+					    would miss a shop-admin-only account with no personal Artist record, so
+					    this is the union of both gates rather than either alone. GiftCards.jsx
+					    itself renders nothing for a viewer who is neither. selectedIndex 16 - see
+					    this file's own indices (0-15 already in use; 6 free but skipped so a new
+					    link doesn't reuse a retired one's old highlight by accident). */}
+					{(isArtistUser || isShopAdminOrBetter) && (
+						<ListItemButton
+							selected={selectedIndex === 16}
+							onClick={(event) =>
+								handleListItemClick(event, 16, "gift-cards")
+							}
+							key="Gift Cards"
+							sx={{
+								minHeight: 48,
+								justifyContent: open ? "initial" : "center",
+								px: 2.5,
+							}}
+						>
+							<ListItemIcon
+								sx={{
+									minWidth: 0,
+									mr: open ? 3 : "auto",
+									justifyContent: "center",
+								}}
+							>
+								<CardGiftcard />
+							</ListItemIcon>
+							<ListItemText
+								primary="Gift Cards"
 								sx={{ opacity: open ? 1 : 0 }}
 							/>
 						</ListItemButton>

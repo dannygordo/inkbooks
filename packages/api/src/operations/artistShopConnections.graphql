@@ -13,3 +13,40 @@ query GetArtistShopConnections($artistId: ID!) {
 		rateSource
 	}
 }
+
+# Settings > Shop - an artist's own connect/disconnect/move-shops flow (DECISIONS.md X46). Direct
+# port of apps/web's ArtistShopConnectionService.js's own two mutations, given real operation
+# names here for codegen (web's own gql tags are anonymous, fine there since useMutation is
+# called directly with the tag). confirmTransfer: false on the first attempt; an artist works at
+# one shop at a time, so the server refuses a connect that would end an existing one and returns
+# which shop in extensions.transfer, letting the screen confirm by name before retrying with
+# confirmTransfer: true - see mutations/artistShopConnections.js's own comment on the server side.
+mutation ConnectArtistToShop($artistId: ID!, $shopId: ID!, $confirmTransfer: Boolean) {
+	connectArtistToShop(artistId: $artistId, shopId: $shopId, confirmTransfer: $confirmTransfer) {
+		id
+		artistId
+		shopId
+		status
+	}
+}
+
+mutation DisconnectArtistFromShop($artistId: ID!, $shopId: ID!) {
+	disconnectArtistFromShop(artistId: $artistId, shopId: $shopId) {
+		id
+		artistId
+		shopId
+		status
+	}
+}
+
+# Lazy, fired only right after a successful connect - connectArtistToShop's own response above
+# has no shop name/website, matching apps/web's ShopService.js useLazyShop exactly (a narrower
+# id/name/website selection than GetShopDetail's full one - this is only ever used to refresh the
+# three fields cached on the signed-in user, never rendered as a page of its own).
+query GetShopForConnection($shopId: ID!) {
+	getShop(shopId: $shopId) {
+		id
+		name
+		website
+	}
+}

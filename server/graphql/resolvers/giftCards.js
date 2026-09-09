@@ -19,6 +19,7 @@ const {
 } = require('../../utils/gift-card');
 const { formatCents } = require('../../utils/money');
 const { recordEvent } = require('../../utils/event-log');
+const { toObjectId } = require('../../utils/object-id');
 const square = require('../../utils/square');
 const {
   createArtistGiftCardInputSchema,
@@ -86,7 +87,16 @@ function buildSyntheticGiftCardSale(giftCard) {
 
 async function giftCardLiabilityReport(matchExtra) {
   const [agg] = await GiftCard.aggregate([
-    { $match: { balanceCents: { $gt: 0 }, ...matchExtra } },
+    // A pending square sale hasn't actually been paid for yet - it isn't money the business owes
+    // anyone until the client's card is actually charged, so it isn't counted as a liability
+    // until then (see models/GiftCard.js's own comment on saleStatus).
+    //
+    // matchExtra's id fields must already be real ObjectIds, not strings - Model.aggregate()
+    // does not cast a typed path the way find()/findOne() do (see utils/object-id.js's own
+    // comment on this exact failure mode: no error, just a $match that silently matches
+    // nothing). Enforced at both call sites below via toObjectId rather than trusted here, so
+    // this function's own signature doesn't hide the requirement from a future caller.
+    { $match: { balanceCents: { $gt: 0 }, saleStatus: 'complete', ...matchExtra } },
     {
       $group: {
         _id: null,
@@ -143,11 +153,11 @@ module.exports = {
 
     getGiftCardLiabilityReport: withAuth(async (_, { shopId }, context, info, user) => {
       await assertCanAccessShop(user, shopId);
-      return giftCardLiabilityReport({ shopId });
+      return giftCardLiabilityReport({ shopId: toObjectId(shopId) });
     }),
 
     getMyGiftCardLiabilityReport: withAuth(async (_, __, context, info, user) => {
-      return giftCardLiabilityReport({ issuerArtistId: user.id });
+      return giftCardLiabilityReport({ issuerArtistId: toObjectId(user.id) });
     }),
   },
 
@@ -185,6 +195,20 @@ module.exports = {
           applyFeeOffset: Boolean(data.applyFeeOffset),
         });
 
+        // 'square' can only ever be an agreement to charge, never an assertion that a charge
+        // already happened - same reasoning recordDeposit's own inline check gives (there is a
+        // real system of record for a card payment, cash has none). Only
+        // routes/squarePayments.js's process-gift-card-payment route may set saleStatus to
+        // 'complete' with a real squarePaymentId attached.
+        if (data.paymentMethod === 'square' && !data.pending) {
+          throw new UserInputError('Errors', {
+            errors: {
+              paymentMethod:
+                'A card sale has to go through the payment step - this only records it as pending.',
+            },
+          });
+        }
+
         const giftCard = new GiftCard({
           code: await generateUniqueGiftCardCode(),
           issuerType: 'ARTIST',
@@ -193,10 +217,14 @@ module.exports = {
           faceValueCents: data.faceValueCents,
           // Full face value, regardless of the offset taken - M6: "does not load onto the
           // balance ... the client bought a $200 card and holds $200 of credit, whatever the sale
-          // totalled."
+          // totalled." Written even for a pending square sale, same as a pending deposit's
+          // subtotalCents/totalCents (mutations/deposits.js) - saleStatus is what actually gates
+          // spendability (redeemGiftCard), not this figure.
           balanceCents: data.faceValueCents,
           feeOffsetCents: breakdown.feeOffsetCents,
           soldByUserId: user.id,
+          paymentMethod: data.paymentMethod,
+          saleStatus: data.paymentMethod === 'square' ? 'pending' : 'complete',
         });
 
         // The shop's cut is taken AT THE SALE, exactly as if this were a deposit (M3/M6) - via
@@ -215,7 +243,7 @@ module.exports = {
           action: 'create',
           actorUserId: user.id,
           shopId: giftCard.shopId,
-          summary: `Sold a ${formatCents(giftCard.faceValueCents)} artist-issued gift card`,
+          summary: `${giftCard.saleStatus === 'pending' ? 'Started selling' : 'Sold'} a ${formatCents(giftCard.faceValueCents)} artist-issued gift card`,
         });
 
         return giftCard;
@@ -248,6 +276,16 @@ module.exports = {
           applyFeeOffset: Boolean(data.applyFeeOffset),
         });
 
+        // See createArtistGiftCard's own comment on why 'square' requires pending: true here.
+        if (data.paymentMethod === 'square' && !data.pending) {
+          throw new UserInputError('Errors', {
+            errors: {
+              paymentMethod:
+                'A card sale has to go through the payment step - this only records it as pending.',
+            },
+          });
+        }
+
         const giftCard = new GiftCard({
           code: await generateUniqueGiftCardCode(),
           issuerType: 'SHOP',
@@ -256,8 +294,12 @@ module.exports = {
           balanceCents: data.faceValueCents,
           feeOffsetCents: breakdown.feeOffsetCents,
           soldByUserId: user.id,
+          paymentMethod: data.paymentMethod,
+          saleStatus: data.paymentMethod === 'square' ? 'pending' : 'complete',
           // None of it is the admin's revenue - full face value, at 100%, owed to the shop (M6,
-          // verbatim: "rather than whatever the admin's own artist rate happens to be").
+          // verbatim: "rather than whatever the admin's own artist rate happens to be"). Written
+          // even while saleStatus is 'pending' - same "agreed now, collected momentarily later"
+          // reasoning as balanceCents above.
           shopCutCents: data.faceValueCents,
           shopCutPercentApplied: 100,
           shopCutStatus: 'unpaid',
@@ -270,7 +312,7 @@ module.exports = {
           action: 'create',
           actorUserId: user.id,
           shopId: giftCard.shopId,
-          summary: `Sold a ${formatCents(giftCard.faceValueCents)} shop-issued gift card`,
+          summary: `${giftCard.saleStatus === 'pending' ? 'Started selling' : 'Sold'} a ${formatCents(giftCard.faceValueCents)} shop-issued gift card`,
         });
 
         return giftCard;
@@ -305,6 +347,15 @@ module.exports = {
         });
         if (!giftCard) {
           throw new UserInputError('Errors', { errors: { code: 'Gift card not found' } });
+        }
+        // The gate a pending DEPOSIT gets for free by being excluded from getAvailableDeposits'
+        // own query (mutations/deposits.js) - a gift card has no equivalent query to leave this
+        // out of, so it's checked directly here instead. See models/GiftCard.js's own comment on
+        // saleStatus for why this state exists at all.
+        if (giftCard.saleStatus === 'pending') {
+          throw new UserInputError('Errors', {
+            errors: { code: "This gift card's own sale hasn't been paid for yet." },
+          });
         }
 
         if (data.amountCents > giftCard.balanceCents) {
@@ -425,6 +476,13 @@ module.exports = {
         }
         if (String(user.id) !== String(giftCard.soldByUserId)) {
           throw new AuthenticationError('Only the person who sold this gift card can invoice its shop cut.');
+        }
+        // The client hasn't actually paid for the card yet - invoicing the shop's cut on money
+        // that was never collected would leave the seller owing a cut with nothing behind it.
+        if (giftCard.saleStatus === 'pending') {
+          throw new UserInputError('Errors', {
+            errors: { giftCardId: "This gift card's own sale hasn't been paid for yet." },
+          });
         }
         if (!giftCard.shopId) {
           throw new UserInputError('Errors', { errors: { giftCardId: 'This gift card has no shop attached.' } });

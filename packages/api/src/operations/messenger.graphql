@@ -1,0 +1,88 @@
+# Mobile's Messages slice - the last of X13's three still-unported items (Settings' avatar upload
+# and the client-dashboard shared-images panel are the other two, X14/X15). Mirrors apps/web's
+# MessengerService.js operation-by-operation, with the same "no message bodies on the list query"
+# shape that file's own header comment explains: opening the inbox should not pull every message
+# of every thread just to render a name and a badge. See DECISIONS.md X16 for what's deliberately
+# not ported (live socket delivery, search-by-name, group/shop-wide conversations) and X35 for the
+# image-attachment compose flow and per-row "mark unread" that WERE later added to this slice.
+
+# Self-only server-side (getConversationsByMemberId throws AuthenticationError if memberId isn't
+# the caller's own id - see resolvers/conversations.js) - always call with the signed-in user's
+# own id. Sorted newest-activity-first by the server (Conversation.updatedAt, bumped on every new
+# message), so no client-side sort is needed.
+query GetConversationsByMemberId($memberId: ID!) {
+	getConversationsByMemberId(memberId: $memberId) {
+		id
+		members
+		updatedAt
+		unreadCount
+		membersInfo {
+			id
+			firstName
+			lastName
+			avatar
+		}
+	}
+}
+
+# One thread, fetched only when a conversation is opened - same lazy-on-purpose reasoning as
+# web's own _fetchMessagesByConversationId. Guarded server-side by canAccessConversation (a
+# member, or a shop admin at a member's shop).
+query GetMessagesByConversationId($conversationId: ID!) {
+	getMessagesByConversationId(conversationId: $conversationId) {
+		id
+		conversationId
+		senderId
+		message
+		imageUrls
+		createdAt
+		user {
+			firstName
+			lastName
+			avatar
+		}
+	}
+}
+
+# No timestamps sent - the server stamps them (see typeDefs.js's own comment on createMessage:
+# thread order and unread state may not be caller-controlled). imageUrls is sent by
+# messages/[id].tsx's own image-attachment compose flow (DECISIONS.md X35, closing the gap X16
+# named) - already uploaded via routes/messageUploads.js by the time this mutation fires, so this
+# variable is always a list of already-hosted URLs, never raw file data.
+mutation CreateMessage($conversationId: ID!, $senderId: ID!, $message: String, $imageUrls: [String!]) {
+	createMessage(conversationId: $conversationId, senderId: $senderId, message: $message, imageUrls: $imageUrls) {
+		id
+		conversationId
+		senderId
+		message
+		imageUrls
+		createdAt
+	}
+}
+
+# Idempotent - opening a thread twice costs one write and changes nothing the second time (see
+# utils/conversation-reads.js's own header comment via MessengerService.js).
+mutation MarkConversationRead($conversationId: ID!) {
+	markConversationRead(conversationId: $conversationId) {
+		id
+		unreadCount
+	}
+}
+
+# The reverse of the above - see conversation-reads.js's markConversationUnreadForUser. Same
+# shape deliberately: this is the same field, just clearing it instead of setting it. Closes the
+# "no per-row mark unread" gap X16 named (DECISIONS.md X35) - ConversationRow.tsx's own overflow
+# action.
+mutation MarkConversationUnread($conversationId: ID!) {
+	markConversationUnread(conversationId: $conversationId) {
+		id
+		unreadCount
+	}
+}
+
+# The header badge - one cheap server-side aggregation across every conversation the caller is
+# in, not a sum of the list query's own per-row unreadCount (that would mean fetching the whole
+# list just to total it). Polled, same as web's own sidebar badge - see index.tsx's own usage.
+query GetUnreadMessageCount {
+	getUnreadMessageCount
+}

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useMutation, makeReference } from "@apollo/client";
+import { Link } from "react-router-dom";
 import moment from "moment";
 import { Button } from "@mui/material";
 import { Add } from "@mui/icons-material";
@@ -13,7 +14,7 @@ import EntityListPager from "../entityList/EntityListPager";
 import SendAutoResponseButton from "../autoResponses/SendAutoResponseButton";
 import SharedImagesPanel from "./SharedImagesPanel";
 import { useAuth } from "../../context/auth";
-import { ALERT_CONSTANTS } from "../../constants";
+import { ALERT_CONSTANTS, ROUTE_CONSTANTS } from "../../constants";
 import { formatCents } from "../../utils/money";
 import { businessScopeFor } from "../../utils/businessScope";
 import "./clientDashboard.css";
@@ -347,9 +348,12 @@ const ClientDashboard = ({ clientId, isSelf = false }) => {
 						<ul className="clientDashboardList">
 							{projects.map((project) => (
 								<li key={project.id} className="clientDashboardListRow">
-									<span className="clientDashboardListPrimary">
+									<Link
+										to={`${ROUTE_CONSTANTS.PROJECT}${project.id}`}
+										className="clientDashboardListPrimary clientDashboardListLink"
+									>
 										{project.title || "Untitled project"}
-									</span>
+									</Link>
 									<span className="clientDashboardListMeta">
 										{project.status || "unknown"}
 										{project.createdAt
@@ -382,11 +386,22 @@ const ClientDashboard = ({ clientId, isSelf = false }) => {
 						<ul className="clientDashboardList">
 							{appointments.map((appointment) => (
 								<li key={appointment.id} className="clientDashboardListRow">
-									<span className="clientDashboardListPrimary">
-										{appointment.title ||
-											appointment.project?.title ||
-											"Untitled"}
-									</span>
+									{appointment.projectId ? (
+										<Link
+											to={`${ROUTE_CONSTANTS.PROJECT}${appointment.projectId}`}
+											className="clientDashboardListPrimary clientDashboardListLink"
+										>
+											{appointment.title ||
+												appointment.project?.title ||
+												"Untitled"}
+										</Link>
+									) : (
+										<span className="clientDashboardListPrimary">
+											{appointment.title ||
+												appointment.project?.title ||
+												"Untitled"}
+										</span>
+									)}
 									<span className="clientDashboardListMeta">
 										{moment
 											.utc(appointment.appointmentDate)

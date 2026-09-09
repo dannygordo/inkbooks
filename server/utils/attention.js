@@ -185,14 +185,21 @@ async function unredeemedInvites(shopIds, { olderThanDays = 3 } = {}) {
   if (shopIds.length === 0) return [];
   const cutoff = new Date(Date.now() - olderThanDays * DAY_MS);
 
-  // Everyone at these shops who still has no password.
-  const [staffRows, artistIds] = await Promise.all([
+  // Everyone at these shops who still has no password - staff and artists looked up separately,
+  // not merged into one bag of User ids, because the condition below has to say which roster
+  // someone actually belongs to (BUG: this used to hardcode subjectType: 'artist' for everyone
+  // here, so a brand-new staff member with an unredeemed invite showed up labeled as an artist)
+  // and link to that roster's own detail screen. getOneStaff/getArtist both key off the
+  // Staff/Artist document's own _id, not the shared User._id, so both maps are keyed by userId
+  // but hold the Staff/Artist _id as the value - not just a membership set.
+  const [staffRows, artistUserIds] = await Promise.all([
     Staff.find({ shopId: { $in: shopIds } }).select('userId'),
     getConnectedArtistUserIds(shopIds),
   ]);
-  const memberIds = Array.from(
-    new Set([...staffRows.map((s) => String(s.userId)), ...artistIds.map(String)]),
-  );
+  const artistRows = await Artist.find({ userId: { $in: artistUserIds } }).select('userId');
+  const staffIdByUserId = new Map(staffRows.map((s) => [String(s.userId), s._id]));
+  const artistIdByUserId = new Map(artistRows.map((a) => [String(a.userId), a._id]));
+  const memberIds = Array.from(new Set([...staffIdByUserId.keys(), ...artistIdByUserId.keys()]));
   if (memberIds.length === 0) return [];
 
   const stranded = await User.find({
@@ -212,18 +219,24 @@ async function unredeemedInvites(shopIds, { olderThanDays = 3 } = {}) {
 
   return stranded
     .filter((u) => issuedAt.has(String(u._id)))
-    .map((u) =>
-      condition({
+    .map((u) => {
+      // A user could in principle hold both a Staff row and a connected Artist row at once -
+      // staff wins, since that's the account someone freshly invited through the staff wizard
+      // actually has, and there is only one notification to produce per stranded user.
+      const staffId = staffIdByUserId.get(String(u._id));
+      const subjectType = staffId ? 'staff' : 'artist';
+      const subjectId = staffId || artistIdByUserId.get(String(u._id));
+      return condition({
         key: `unredeemed-invite:${u._id}`,
         type: 'invite_unredeemed',
         category: 'roster',
-        subjectType: 'artist',
-        subjectId: u._id,
+        subjectType,
+        subjectId,
         title: `${u.firstName} ${u.lastName} has not set up their account`,
         body: 'They were invited but have never set a password, so they cannot sign in. Resend the invite.',
         since: issuedAt.get(String(u._id)),
-      }),
-    );
+      });
+    });
 }
 
 /**

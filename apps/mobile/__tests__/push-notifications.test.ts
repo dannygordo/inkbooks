@@ -10,6 +10,7 @@ import * as Notifications from 'expo-notifications';
 
 import {
   registerForPushNotifications,
+  resolveNotificationTarget,
   unregisterPushNotifications,
 } from '@/lib/push-notifications';
 
@@ -198,5 +199,56 @@ describe('unregisterPushNotifications', () => {
     await expect(unregisterPushNotifications(apollo)).resolves.toBeUndefined();
 
     expect(mockStore.has('pushToken')).toBe(false);
+  });
+});
+
+describe('resolveNotificationTarget', () => {
+  it('resolves a known subjectType to its screen and id', () => {
+    expect(resolveNotificationTarget({ type: 'deposit_collected', subjectType: 'appointment', subjectId: 'appt-1' })).toEqual({
+      screen: 'appointment',
+      id: 'appt-1',
+    });
+    expect(resolveNotificationTarget({ subjectType: 'bookingRequest', subjectId: 'br-1' })).toEqual({
+      screen: 'bookingRequest',
+      id: 'br-1',
+    });
+    expect(resolveNotificationTarget({ subjectType: 'conversation', subjectId: 'conv-1' })).toEqual({
+      screen: 'conversation',
+      id: 'conv-1',
+    });
+    expect(resolveNotificationTarget({ subjectType: 'artist', subjectId: 'artist-1' })).toEqual({
+      screen: 'artist',
+      id: 'artist-1',
+    });
+    expect(resolveNotificationTarget({ subjectType: 'shop', subjectId: 'shop-1' })).toEqual({
+      screen: 'shop',
+      id: 'shop-1',
+    });
+    // Regression coverage: utils/attention.js's unredeemedInvites used to tag every stranded
+    // invite 'artist' even when the person was actually staff (2026-09-08 fix).
+    expect(resolveNotificationTarget({ subjectType: 'staff', subjectId: 'staff-1' })).toEqual({
+      screen: 'staff',
+      id: 'staff-1',
+    });
+  });
+
+  it('returns null for a subjectType with no mobile screen (boothRentCharge)', () => {
+    expect(resolveNotificationTarget({ subjectType: 'boothRentCharge', subjectId: 'brc-1' })).toBeNull();
+  });
+
+  it('returns null when subjectId is null', () => {
+    // subjectId is `required: true` on the server's Notification schema, so notify() itself
+    // never produces a push with a null subjectId - this covers resolveNotificationTarget's own
+    // defensive handling of a malformed or otherwise unexpected payload, not a real server case.
+    expect(resolveNotificationTarget({ subjectType: 'appointment', subjectId: null })).toBeNull();
+  });
+
+  it('returns null for missing, malformed, or empty data', () => {
+    expect(resolveNotificationTarget(undefined)).toBeNull();
+    expect(resolveNotificationTarget(null)).toBeNull();
+    expect(resolveNotificationTarget({})).toBeNull();
+    expect(resolveNotificationTarget('not an object')).toBeNull();
+    expect(resolveNotificationTarget({ subjectType: 'appointment', subjectId: '' })).toBeNull();
+    expect(resolveNotificationTarget({ subjectType: 123, subjectId: 'appt-1' })).toBeNull();
   });
 });

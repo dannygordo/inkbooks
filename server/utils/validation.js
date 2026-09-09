@@ -51,7 +51,7 @@ const registerInputSchema = z
 const registerAccountInputSchema = z
   .object({
     accountType: z.enum(['shop', 'artist'], {
-      errorMap: () => ({ message: 'Choose whether you are signing up as a shop or an artist.' }),
+      message: 'Choose whether you are signing up as a shop or an artist.',
     }),
     email: z
       .string()
@@ -523,15 +523,40 @@ const updateReminderSettingsInputSchema = z.object({
 // shop-issued schema takes one, because a shop admin's own shop genuinely isn't derivable any
 // other way (an admin's Staff row can reference more than the one shop being sold for, in theory,
 // so the caller has to say which - the resolver still checks they actually belong to it).
+// paymentMethod/pending mirror recordDeposit's own shape exactly (deposits.js's resolver has the
+// equivalent inline checks, not a Zod schema - this one gets a real schema since it's new code,
+// not a retrofit). The resolver, not this schema, enforces "square requires pending: true" - see
+// resolvers/giftCards.js - the same way the resolver enforces recordDeposit's own conditional
+// rule rather than Zod's own refine, so both gift-card mutations and recordDeposit read identically
+// side by side.
 const createArtistGiftCardInputSchema = z.object({
   faceValueCents: z.number().int().positive('A gift card needs a face value above zero'),
   applyFeeOffset: z.boolean().nullish(),
+  paymentMethod: z.enum(['cash', 'square'], {
+    message: 'Choose how the gift card was paid for - cash or Square.',
+  }),
+  pending: z.boolean().nullish(),
 });
 
 const createShopGiftCardInputSchema = z.object({
   shopId: objectIdSchema,
   faceValueCents: z.number().int().positive('A gift card needs a face value above zero'),
   applyFeeOffset: z.boolean().nullish(),
+  paymentMethod: z.enum(['cash', 'square'], {
+    message: 'Choose how the gift card was paid for - cash or Square.',
+  }),
+  pending: z.boolean().nullish(),
+});
+
+// routes/squarePayments.js's process-gift-card-payment route's own body validator - mirrors
+// processSquarePaymentInputSchema above, minus everything appointment-specific (chargeType,
+// tipCents, applyFeeOffset - the offset choice was already made and stored as feeOffsetCents when
+// the pending card was created, not re-decided at charge time).
+const processGiftCardPaymentInputSchema = z.object({
+  sourceId: z.string().trim().min(1, 'sourceId must not be empty'),
+  idempotencyKey: z.string().trim().min(1).max(45),
+  note: z.string().trim().max(500).nullish(),
+  giftCardId: objectIdSchema,
 });
 
 // code is free text at this layer - normalizeGiftCardCode (utils/gift-card.js) is what actually
@@ -751,7 +776,7 @@ const formFieldInputSchema = z
   .object({
     key: z.string().trim().min(1).nullish(),
     type: z.enum(FORM_FIELD_TYPES_TUPLE, {
-      errorMap: () => ({ message: 'Choose a field type.' }),
+      message: 'Choose a field type.',
     }),
     label: z.string().trim().min(1, 'Every field needs a label'),
     helpText: z.string().nullish(),
@@ -890,6 +915,7 @@ module.exports = {
   updateReminderSettingsInputSchema,
   createArtistGiftCardInputSchema,
   createShopGiftCardInputSchema,
+  processGiftCardPaymentInputSchema,
   redeemGiftCardInputSchema,
   giftCardIdInputSchema,
   createGiftCardShopCutInvoiceInputSchema,

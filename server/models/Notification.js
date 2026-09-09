@@ -53,7 +53,17 @@ const NotificationSchema = new mongoose.Schema({
   // Forty things happening to one project should read as one line in an inbox, not forty.
   subjectType: {
     type: String,
-    enum: ['appointment', 'project', 'conversation', 'artist', 'shop', 'bookingRequest'],
+    // 'boothRentCharge' - Feature 5's own subjectType (utils/notification-jobs.js's
+    // sendBoothRentNudges, graphql/mutations/boothRentPayments.js's markBoothRentPaidManually/
+    // confirmBoothRentPaid) - was missing from this enum entirely, which is not a "no mobile
+    // screen yet" gap (see HANDOFF.md/DECISIONS.md's own notes on that being a named, accepted
+    // gap) but a server-side one: every notify() call using it failed Mongoose validation at
+    // Notification.insertMany, was caught by notifySafely()'s own catch block, and silently never
+    // created a row - so booth rent overdue nudges and both payment-confirmation notifications
+    // never reached anyone, with only a reportError() call (visible in Sentry, not in the app) to
+    // show for it. Found via test/integration/notificationJobs.test.js's own coverage of
+    // sendBoothRentNudges, which is what actually exercises this path end to end.
+    enum: ['appointment', 'project', 'conversation', 'artist', 'shop', 'bookingRequest', 'boothRentCharge'],
     required: true,
   },
   subjectId: { type: mongoose.Schema.Types.ObjectId, required: true },

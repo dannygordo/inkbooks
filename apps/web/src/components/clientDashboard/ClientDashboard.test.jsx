@@ -21,6 +21,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MockedProvider } from "@apollo/client/testing";
+import { MemoryRouter } from "react-router-dom";
 import ClientDashboard from "./ClientDashboard";
 import { AuthContext } from "../../context/auth";
 import ClientService from "../../services/ClientService";
@@ -178,11 +179,13 @@ function renderDashboard({
 	mocks = [],
 } = {}) {
 	render(
-		<MockedProvider mocks={mocks} addTypename={false}>
-			<AuthContext.Provider value={{ user, setAlert, modal, setModal }}>
-				<ClientDashboard clientId={clientId} isSelf={isSelf} />
-			</AuthContext.Provider>
-		</MockedProvider>,
+		<MemoryRouter>
+			<MockedProvider mocks={mocks} addTypename={false}>
+				<AuthContext.Provider value={{ user, setAlert, modal, setModal }}>
+					<ClientDashboard clientId={clientId} isSelf={isSelf} />
+				</AuthContext.Provider>
+			</MockedProvider>
+		</MemoryRouter>,
 	);
 	return { setAlert, modal, setModal };
 }
@@ -204,11 +207,13 @@ describe("no client found", () => {
 		FormService.getMyFillableForms.mockReturnValue({ data: undefined });
 
 		const { container } = render(
-			<MockedProvider>
-				<AuthContext.Provider value={{ user: viewer(), setAlert: vi.fn(), modal: { isOpen: false }, setModal: vi.fn() }}>
-					<ClientDashboard clientId={CLIENT_ID} isSelf={false} />
-				</AuthContext.Provider>
-			</MockedProvider>,
+			<MemoryRouter>
+				<MockedProvider>
+					<AuthContext.Provider value={{ user: viewer(), setAlert: vi.fn(), modal: { isOpen: false }, setModal: vi.fn() }}>
+						<ClientDashboard clientId={CLIENT_ID} isSelf={false} />
+					</AuthContext.Provider>
+				</MockedProvider>
+			</MemoryRouter>,
 		);
 
 		expect(container).toBeEmptyDOMElement();
@@ -269,6 +274,7 @@ describe("staff/artist view (isSelf=false)", () => {
 		expect(screen.getByText("Untitled project")).toBeInTheDocument();
 		expect(screen.getByText("Koi Sleeve")).toBeInTheDocument();
 		expect(screen.getByText(/in_progress - started Jul 1, 2026/)).toBeInTheDocument();
+		expect(screen.getByRole("link", { name: "Koi Sleeve" })).toHaveAttribute("href", "/project/proj-2");
 	});
 
 	it("renders an appointment row with its date, status and totals", () => {
@@ -288,6 +294,7 @@ describe("staff/artist view (isSelf=false)", () => {
 		expect(
 			screen.getByText(/Aug 10, 2026 .*scheduled.*\$400\.00.*\(incl\. \$50\.00 tip\)/),
 		).toBeInTheDocument();
+		expect(screen.getByRole("link", { name: "Full Sleeve" })).toHaveAttribute("href", "/project/proj-1");
 	});
 
 	it("falls back through appointment.title, then project.title, to 'Untitled'", () => {

@@ -23,7 +23,7 @@ const {
 const ExpenseType = require('../../models/ExpenseType');
 const Expense = require('../../models/Expense');
 const RecurringExpense = require('../../models/RecurringExpense');
-const { generateDueRecurringExpenses } = require('../../utils/recurring-expenses');
+const { generateDueRecurringExpenses, advanceByFrequency } = require('../../utils/recurring-expenses');
 
 function run(query, user, variables) {
 	return createTestServer().executeOperation(
@@ -309,6 +309,134 @@ describe('generateDueRecurringExpenses: the scheduled job that turns a template 
 		expect(stillThere.active).toBe(true);
 		const remaining = await Expense.find({ shopId: shop.id, recurringExpenseId: template._id });
 		expect(remaining).toHaveLength(2);
+	});
+
+	// 'monthly' is the only frequency every other test in this describe exercises (it's the
+	// default RecurringExpense.frequency and the one every fixture above sticks with) - 'weekly'
+	// and 'yearly' are the schema's other two enum values (see utils/recurring-expenses.js's own
+	// comment: "the only remaining value the schema's enum allows" for the monthly fallback
+	// branch) and had no coverage of their own anywhere.
+	it('advanceByFrequency steps a week for "weekly" and a year for "yearly", UTC-exact', () => {
+		const date = new Date('2026-01-31T00:00:00.000Z');
+		expect(advanceByFrequency(date, 'weekly').toISOString()).toBe('2026-02-07T00:00:00.000Z');
+		expect(advanceByFrequency(date, 'yearly').toISOString()).toBe('2027-01-31T00:00:00.000Z');
+	});
+
+	it('generates a due occurrence for a WEEKLY template and advances nextRunDate by 7 days', async () => {
+		const { template, shop } = await recurringTemplate({
+			frequency: 'weekly',
+			startDate: new Date('2026-01-01T00:00:00.000Z'),
+			nextRunDate: new Date('2026-01-01T00:00:00.000Z'),
+		});
+		const now = new Date('2026-01-05T00:00:00.000Z'); // 4 days in - only the Jan 1 occurrence is due
+
+		const result = await generateDueRecurringExpenses({ now });
+
+		expect(result.generated).toBe(1);
+		const rows = await Expense.find({ shopId: shop.id, recurringExpenseId: template._id });
+		expect(rows).toHaveLength(1);
+		expect(rows[0].date.toISOString()).toBe('2026-01-01T00:00:00.000Z');
+		const refreshed = await RecurringExpense.findById(template._id);
+		expect(refreshed.nextRunDate.toISOString()).toBe('2026-01-08T00:00:00.000Z');
+	});
+
+	it('generates due occurrences for a YEARLY template, one per elapsed year', async () => {
+		const { template, shop } = await recurringTemplate({
+			frequency: 'yearly',
+			startDate: new Date('2024-06-01T00:00:00.000Z'),
+			nextRunDate: new Date('2024-06-01T00:00:00.000Z'),
+		});
+		const now = new Date('2025-06-15T00:00:00.000Z'); // both 2024-06-01 and 2025-06-01 are due
+
+		const result = await generateDueRecurringExpenses({ now });
+
+		expect(result.generated).toBe(2);
+		const rows = await Expense.find({ shopId: shop.id, recurringExpenseId: template._id }).sort({ date: 1 });
+		expect(rows.map((r) => r.date.toISOString())).toEqual([
+			'2024-06-01T00:00:00.000Z',
+			'2025-06-01T00:00:00.000Z',
+		]);
+		const refreshed = await RecurringExpense.findById(template._id);
+		expect(refreshed.nextRunDate.toISOString()).toBe('2026-06-01T00:00:00.000Z');
+	});
+
+	// MAX_OCCURRENCES_PER_TEMPLATE_PER_RUN (60, see utils/recurring-expenses.js) is "a safety
+	// valve, not a business rule" per that constant's own comment - a corrupted nextRunDate stuck
+	// years in the past fails loudly by running out of budget in ONE tick rather than writing
+	// years of rows at once, and the rest catches up on the NEXT tick rather than being lost.
+	it('caps a single run at 60 occurrences for one template, finishing the rest on the next run', async () => {
+		const { template, shop } = await recurringTemplate({
+			frequency: 'weekly',
+			startDate: new Date('2024-01-01T00:00:00.000Z'),
+			nextRunDate: new Date('2024-01-01T00:00:00.000Z'),
+		});
+		// 70 weekly occurrences (k=0..69) are due by this `now` - more than the 60-per-run cap.
+		const now = new Date('2025-04-28T00:00:00.000Z');
+
+		const firstRun = await generateDueRecurringExpenses({ now });
+		expect(firstRun.generated).toBe(60);
+		const afterFirst = await RecurringExpense.findById(template._id);
+		// Advanced by exactly 60 weeks, not all the way to `now` - the run stopped at its budget,
+		// not at the due window.
+		expect(afterFirst.nextRunDate.toISOString()).toBe('2025-02-24T00:00:00.000Z');
+		expect(afterFirst.active).toBe(true);
+
+		const secondRun = await generateDueRecurringExpenses({ now });
+		// The remaining 10 occurrences (k=60..69) are generated on the very next tick, not lost.
+		expect(secondRun.generated).toBe(10);
+		const rows = await Expense.find({ shopId: shop.id, recurringExpenseId: template._id });
+		expect(rows).toHaveLength(70);
+	});
+
+	it('does not touch a template whose nextRunDate is due but which is not active', async () => {
+		const { template, shop } = await recurringTemplate({ active: false });
+
+		const result = await generateDueRecurringExpenses({ now: new Date('2026-06-01T00:00:00.000Z') });
+
+		expect(result.templatesProcessed).toBe(0);
+		expect(await Expense.countDocuments({ shopId: shop.id, recurringExpenseId: template._id })).toBe(0);
+	});
+
+	it('processes every due template in one sweep, not just the first, and reports the total count', async () => {
+		const { template: templateOne, shop: shopOne } = await recurringTemplate();
+		const { template: templateTwo, shop: shopTwo } = await recurringTemplate();
+		const now = new Date('2026-01-15T00:00:00.000Z');
+
+		const result = await generateDueRecurringExpenses({ now });
+
+		expect(result.templatesProcessed).toBe(2);
+		expect(result.generated).toBe(2);
+		expect(await Expense.countDocuments({ shopId: shopOne.id, recurringExpenseId: templateOne._id })).toBe(1);
+		expect(await Expense.countDocuments({ shopId: shopTwo.id, recurringExpenseId: templateTwo._id })).toBe(1);
+	});
+
+	// CORRECTION (2026-09-04): the original version of this test called generateDueRecurringExpenses
+	// twice in a row at the SAME `now` and expected the second call to hit duplicates. It cannot -
+	// the first run's own conditional updateOne (keyed on the ORIGINAL nextRunDate) advances
+	// nextRunDate past `now` before returning, and the function's own query is
+	// `{ active: true, nextRunDate: { $lte: now } }`, so a same-`now` rerun never even selects the
+	// template a second time; `npm test` run for real confirmed this ("expected +0 to be 2"). The
+	// unique-index catch this test means to exercise is a defense against two overlapping runs
+	// reading the SAME (not-yet-advanced) nextRunDate concurrently - not a same-process rerun - so
+	// the only honest way to reach it here is to force that overlap directly: reset the template's
+	// nextRunDate back to its pre-first-run value, exactly as a second concurrent worker would have
+	// read it before the first worker's updateOne landed.
+	it('reports the rerun\'s no-op occurrences as skippedDuplicate, not silently as zero generated', async () => {
+		const { template } = await recurringTemplate();
+		const now = new Date('2026-02-15T00:00:00.000Z');
+
+		await generateDueRecurringExpenses({ now });
+		// Simulate a second worker that read this template's nextRunDate BEFORE the first run's
+		// own updateOne advanced it - the exact race the {recurringExpenseId, date} unique index
+		// (models/Expense.js) exists to make safe rather than a silent double-charge.
+		await RecurringExpense.updateOne({ _id: template._id }, { nextRunDate: new Date('2026-01-01T00:00:00.000Z') });
+		const secondRun = await generateDueRecurringExpenses({ now });
+
+		expect(secondRun.generated).toBe(0);
+		// Jan 1 and Feb 1 both collide with the first run's own rows via Expense's
+		// {recurringExpenseId, date} unique index (see models/Expense.js) - caught and counted,
+		// not thrown.
+		expect(secondRun.skippedDuplicate).toBe(2);
 	});
 });
 

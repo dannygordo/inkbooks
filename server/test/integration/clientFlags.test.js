@@ -1,7 +1,9 @@
 // Integration tests for the GraphQL surface over utils/client-flags.js: Client.flags,
-// getClientFlagTypes, and raiseClientFlag. The business logic (idempotency, counter recompute,
-// systemGenerated enforcement) is already covered by whatever exercises utils/client-flags.js
-// directly - what's specific to this layer is authorization and shape, so that's what these test.
+// getClientFlagTypes, and raiseClientFlag. The business logic itself (idempotency, counter
+// recompute, systemGenerated enforcement, resolveClientFlag, resolveClientFlagsForAppointment,
+// syncNoShowFlag) is exercised directly, calling the util rather than going through GraphQL, in
+// test/integration/clientFlagsBusinessLogic.test.js - what's specific to THIS layer is
+// authorization and response shape, so that's what these test.
 const { createTestServer, contextWithToken } = require('../helpers/testServer');
 const { signTestToken } = require('../helpers/auth');
 const {

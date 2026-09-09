@@ -358,6 +358,13 @@ describe("sending a guest message", () => {
 					}),
 					delay: 50,
 				},
+				// onCompleted() calls refetch() once the delayed mutation above resolves, same as
+				// the "sends the typed text" test above. Without this, that refetch has no matching
+				// mock once it fires - which, combined with never waiting for it below (see the
+				// CORRECTION beneath this test), used to surface as a MockedProvider error and an
+				// unhandled "window is not defined" rejection AFTER this test (and file) had
+				// already finished and torn down jsdom.
+				tokenMock("tok-123", bookingRequest()),
 			],
 		});
 
@@ -367,5 +374,20 @@ describe("sending a guest message", () => {
 		await user.click(sendButton);
 
 		expect(sendButton).toBeDisabled();
+
+		// CORRECTION (2026-09-04, found running npm test for real): this test used to end here,
+		// with the 50ms-delayed mutation (and the refetch its onCompleted() triggers) still
+		// pending. That mutation kept running after THIS test finished, then after the whole file
+		// finished and Vitest tore down jsdom - so when it finally resolved, onCompleted()'s
+		// setSendError(null)/refetch() calls tried to schedule a React update against a `window`
+		// that no longer existed, throwing "window is not defined" as an unhandled rejection
+		// (Vitest's own words: "caught after test environment was torn down... might cause false
+		// positive tests"). Not a bug in GuestConversation.jsx - a real browser tab's `window`
+		// survives an unmount, so onCompleted's guarded DOM write and its two React-only calls
+		// really are safe there, exactly as the component's own comment says. It is a bug in this
+		// test: it never let the mutation it deliberately delayed actually finish. Waiting for the
+		// button to re-enable (which only happens once the mutation resolves and `sending` goes
+		// back to false) makes the test wait out its own delay instead of leaving it running loose.
+		await waitFor(() => expect(sendButton).not.toBeDisabled());
 	});
 });

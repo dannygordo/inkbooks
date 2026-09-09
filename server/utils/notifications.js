@@ -146,12 +146,27 @@ async function notify({
   // never add latency to the deposit/booking/etc. that triggered this notify() call - the same
   // reason email is queued for a sweep to send rather than sent synchronously here. The rows above
   // are already written and are the source of truth regardless of what push does next.
+  //
+  // `data` carries the same subject identity every in-app row already has (type/subjectType/
+  // subjectId), so a tap on the notification can open the right screen instead of just the app -
+  // see apps/mobile/src/lib/push-notifications.ts's notification-response handler, the client side
+  // of this. subjectId is coerced to a plain string: it's a Mongoose ObjectId here, and Expo's
+  // push payload has to survive a JSON round trip to the device exactly as sent. No null-subject
+  // fallback is needed - subjectId is `required: true` on the Notification schema
+  // (models/Notification.js), so Notification.insertMany above has already thrown for any event
+  // missing one, long before this line could ever run with an empty subjectId.
   if (pushEligibleIds.length > 0) {
-    push.sendPushForRecipients(pushEligibleIds, { title, body }).catch((err) => {
-      reportError(err, {
-        context: `[notifications] push send failed for a ${type} notification`,
+    push
+      .sendPushForRecipients(pushEligibleIds, {
+        title,
+        body,
+        data: { type, subjectType, subjectId: String(subjectId) },
+      })
+      .catch((err) => {
+        reportError(err, {
+          context: `[notifications] push send failed for a ${type} notification`,
+        });
       });
-    });
   }
 
   return created;

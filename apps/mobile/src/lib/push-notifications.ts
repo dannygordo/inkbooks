@@ -10,6 +10,7 @@ import {
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
+import type { ImperativeRouter } from 'expo-router';
 import { Platform } from 'react-native';
 
 import { TokenStorageService } from '@/services/TokenStorageService';
@@ -143,5 +144,115 @@ export async function unregisterPushNotifications(
     // registerForPushNotifications call on this device cleans up a stale row either way.
   } finally {
     await TokenStorageService.deleteItemAsync(LAST_REGISTERED_TOKEN_KEY);
+  }
+}
+
+// --- Notification-tap deep-linking -------------------------------------------------------------
+//
+// server/utils/notifications.js's notify() now attaches `data: { type, subjectType, subjectId }`
+// to every push it sends (the same subject identity every in-app Notification row already
+// carries) - this is the mobile side that reads it back on a tap and decides where to go. See
+// app/_layout.tsx's RootNavigator for the actual navigation call, which uses
+// Notifications.useLastNotificationResponse() (covers both a cold start - the app launched BY the
+// tap - and a live tap while the app is already running, in one hook - see that hook's own
+// implementation for why a separate addNotificationResponseReceivedListener isn't needed too).
+//
+// resolveNotificationTarget is kept here, not in _layout.tsx, and returns a plain discriminated
+// screen+id rather than an expo-router pathname string - app.json's typedRoutes: true means
+// expo-router's `Href` type only accepts known literal route strings, and this table's whole job
+// is picking one of several literals at runtime. Keeping the actual `router.push({ pathname:
+// '/appointment/[id]', ... })` calls as a literal switch in _layout.tsx keeps every pathname a
+// real typed-routes literal there; this function only ever returns which case to take.
+
+export type PushNotificationTargetScreen =
+  | 'appointment'
+  | 'bookingRequest'
+  | 'conversation'
+  | 'artist'
+  | 'shop'
+  | 'staff';
+
+export type PushNotificationTarget = {
+  screen: PushNotificationTargetScreen;
+  id: string;
+};
+
+// Every subjectType utils/notifications.js's call sites actually use (server/graphql/mutations/*,
+// server/utils/attention.js, server/utils/notification-jobs.js) that ALSO has a mobile screen to
+// land on. 'boothRentCharge' is deliberately absent - Booth Rent has no mobile screen at all yet
+// (DECISIONS.md X31 names BoothRentPanel as still-unported Settings work), so a boothRentCharge
+// notification simply opens the app to Home, same as tapping the app icon - not a bug, a real gap
+// named here rather than a dead navigation attempt.
+//
+// 'staff' added 2026-09-08 - utils/attention.js's unredeemedInvites used to tag every stranded
+// invite 'artist' regardless of whether the person was actually staff, which routed a tap on a
+// staff member's unredeemed-invite notification into the Artist screen with the wrong id shape
+// entirely (a User._id where Artist.findById expects an Artist document _id). Now that server
+// side correctly distinguishes the two, this needs its own screen to land on rather than
+// silently falling through to Home the way boothRentCharge does above.
+const SUBJECT_TYPE_SCREENS: Record<string, PushNotificationTargetScreen> = {
+  appointment: 'appointment',
+  bookingRequest: 'bookingRequest',
+  conversation: 'conversation',
+  artist: 'artist',
+  shop: 'shop',
+  staff: 'staff',
+};
+
+/**
+ * Reads a notification response's own `data` payload (an untrusted, loosely-typed object off the
+ * wire - Expo's own types leave it as `Record<string, unknown>`) and decides which screen, if any,
+ * a tap on it should open. Never throws - a malformed, missing, or unrecognized payload (an older
+ * push sent before this data existed, say) is exactly the same "nothing to navigate to" case as no
+ * payload at all.
+ */
+export function resolveNotificationTarget(data: unknown): PushNotificationTarget | null {
+  if (!data || typeof data !== 'object') {
+    return null;
+  }
+  const subjectType = (data as Record<string, unknown>).subjectType;
+  const subjectId = (data as Record<string, unknown>).subjectId;
+  if (typeof subjectType !== 'string' || typeof subjectId !== 'string' || subjectId.length === 0) {
+    return null;
+  }
+  const screen = SUBJECT_TYPE_SCREENS[subjectType];
+  if (!screen) {
+    return null;
+  }
+  return { screen, id: subjectId };
+}
+
+/**
+ * Turns a resolved target into an actual navigation - the single mapping both _layout.tsx's
+ * notification-tap handler and notifications/index.tsx's (X52) in-app feed rows use, so a tap
+ * lands on the same screen whether it came from a push notification or from reading the same
+ * subjectType/subjectId off a stored InboxItem in the feed itself. Takes an ImperativeRouter
+ * (rather than the hook-returned Router) for the same reason _layout.tsx's own RootNavigator
+ * already needed one - see expo-router's own distinction between the two.
+ *
+ * Every pathname here is a literal typed-routes string (app.json's typedRoutes: true) - see this
+ * file's own header comment on why resolveNotificationTarget returns a plain screen+id instead of
+ * trying to hand back one of these strings itself.
+ */
+export function navigateForNotificationTarget(router: ImperativeRouter, target: PushNotificationTarget): void {
+  switch (target.screen) {
+    case 'appointment':
+      router.push({ pathname: '/appointment/[id]', params: { id: target.id } });
+      return;
+    case 'bookingRequest':
+      router.push({ pathname: '/booking-requests/[id]', params: { id: target.id } });
+      return;
+    case 'conversation':
+      router.push({ pathname: '/messages/[id]', params: { id: target.id } });
+      return;
+    case 'artist':
+      router.push({ pathname: '/artist/[id]', params: { id: target.id } });
+      return;
+    case 'shop':
+      router.push({ pathname: '/shop/[id]', params: { id: target.id } });
+      return;
+    case 'staff':
+      router.push({ pathname: '/staff/[id]', params: { id: target.id } });
+      return;
   }
 }

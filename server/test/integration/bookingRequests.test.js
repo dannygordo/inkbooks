@@ -54,6 +54,12 @@ const GET_BOOKING_REQUESTS = `
 	}
 `;
 
+const GET_PENDING_BOOKING_REQUEST_COUNT = `
+	query GetPendingBookingRequestCount {
+		getPendingBookingRequestCount
+	}
+`;
+
 const GET_BOOKING_REQUEST_BY_TOKEN = `
 	query GetBookingRequestByToken($token: String!) {
 		getBookingRequestByToken(token: $token) {
@@ -993,5 +999,95 @@ describe('convertBookingRequest: closing out the consult', () => {
 
 		expect(response.body.singleResult.errors).toBeUndefined();
 		expect(response.body.singleResult.data.getAppointmentsByArtist.items).toHaveLength(0);
+	});
+});
+
+// getPendingBookingRequestCount is the Booking Requests nav badge - see utils/booking-inbox.js's
+// own header comment on why it has to be the exact same query as getBookingRequests' default
+// (no statuses passed), not a second, independently-written count. bookingInboxFilter itself is
+// already exercised above (default-pending, explicit statuses, public_form-only), but this
+// resolver/query had no coverage of its own anywhere in the suite before this.
+describe('getPendingBookingRequestCount', () => {
+	async function fetchCount(server, user) {
+		const response = await server.executeOperation(
+			{ query: GET_PENDING_BOOKING_REQUEST_COUNT },
+			{ contextValue: contextWithToken(signTestToken(user)) },
+		);
+		return response.body.singleResult;
+	}
+
+	it('counts this artist\'s pending, source: public_form requests', async () => {
+		const { user: artistUser } = await createArtistUser();
+		const server = createTestServer();
+		for (let i = 0; i < 3; i += 1) {
+			await server.executeOperation(
+				{ query: CREATE_BOOKING_REQUEST, variables: { bookingRequestInput: bookingInput(artistUser.id) } },
+				{ contextValue: { req: { headers: {}, ip: fakeIp() } } },
+			);
+		}
+
+		const { errors, data } = await fetchCount(server, artistUser);
+
+		expect(errors).toBeUndefined();
+		expect(data.getPendingBookingRequestCount).toBe(3);
+	});
+
+	// The exact regression the shared filter exists to prevent: an artist scheduling their own
+	// consult through AppointmentWizard must not see the badge tick up for work they just booked
+	// themselves.
+	it('excludes artist_created requests from the count', async () => {
+		const { user: artistUser } = await createArtistUser();
+		const server = createTestServer();
+		await server.executeOperation(
+			{
+				query: CREATE_BOOKING_REQUEST,
+				variables: { bookingRequestInput: bookingInput(artistUser.id, { source: 'artist_created' }) },
+			},
+			{ contextValue: { req: { headers: {}, ip: fakeIp() } } },
+		);
+
+		const { data } = await fetchCount(server, artistUser);
+
+		expect(data.getPendingBookingRequestCount).toBe(0);
+	});
+
+	it('excludes requests that have already been decided (booked, declined, not booked)', async () => {
+		const { user: artistUser } = await createArtistUser();
+		const server = createTestServer();
+		for (const status of ['consult_booked', 'session_booked', 'declined', 'not_booked']) {
+			const res = await server.executeOperation(
+				{ query: CREATE_BOOKING_REQUEST, variables: { bookingRequestInput: bookingInput(artistUser.id) } },
+				{ contextValue: { req: { headers: {}, ip: fakeIp() } } },
+			);
+			await BookingRequest.findByIdAndUpdate(res.body.singleResult.data.createBookingRequest.id, { status });
+		}
+
+		const { data } = await fetchCount(server, artistUser);
+
+		expect(data.getPendingBookingRequestCount).toBe(0);
+	});
+
+	it('never counts another artist\'s pending requests', async () => {
+		const { user: artistOne } = await createArtistUser();
+		const { user: artistTwo } = await createArtistUser();
+		const server = createTestServer();
+		await server.executeOperation(
+			{ query: CREATE_BOOKING_REQUEST, variables: { bookingRequestInput: bookingInput(artistOne.id) } },
+			{ contextValue: { req: { headers: {}, ip: fakeIp() } } },
+		);
+
+		const { data } = await fetchCount(server, artistTwo);
+
+		expect(data.getPendingBookingRequestCount).toBe(0);
+	});
+
+	it('returns zero, not an error, for an artist with an empty inbox', async () => {
+		const { user: artistUser } = await createArtistUser();
+		const server = createTestServer();
+
+		const { errors, data } = await fetchCount(server, artistUser);
+
+		expect(errors).toBeUndefined();
+		expect(data.getPendingBookingRequestCount).toBe(0);
 	});
 });

@@ -1,0 +1,157 @@
+# Gift cards - DECISIONS.md M6, plus M6's own 2026-09-04 follow-up (real Square payment collection
+# at sale, web UI in apps/web/src/pages/giftCards/GiftCards.jsx). This is the mobile port of that
+# same web slice - selections mirror GiftCardService.js field-for-field so a card's own figures
+# can't drift depending on which platform sold or redeemed it.
+#
+# RECORD FIRST, THEN CHARGE - same shape as deposits.graphql's own header comment, applied to a
+# gift card's own sale instead of a session's deposit. paymentMethod is required; 'square' requires
+# pending: true - a card sale can only ever be recorded as an agreement to charge, never asserted
+# as already collected. The actual charge happens through routes/squarePayments.js's
+# process-gift-card-payment REST route (SquareGiftCardPaymentForm.tsx), not through GraphQL - the
+# same REST/GraphQL split web's own IBGiftCardPaymentForm already has, for the same reason
+# (SquarePaymentForm.tsx's own header comment on why Square's card field can't be a GraphQL call).
+mutation CreateArtistGiftCard($input: CreateArtistGiftCardInput!) {
+	createArtistGiftCard(input: $input) {
+		id
+		code
+		issuerType
+		faceValueCents
+		balanceCents
+		feeOffsetCents
+		paymentMethod
+		saleStatus
+	}
+}
+
+# Sold as a shop product, always by a shop admin - see resolvers/giftCards.js's own comment on why
+# this mutation's floor stays bare SHOP_ADMIN rather than canManageBusinessLedger's wider one.
+mutation CreateShopGiftCard($input: CreateShopGiftCardInput!) {
+	createShopGiftCard(input: $input) {
+		id
+		code
+		issuerType
+		shopId
+		faceValueCents
+		balanceCents
+		feeOffsetCents
+		paymentMethod
+		saleStatus
+	}
+}
+
+# An independent OR shop-connected artist's own issued cards - no shop argument, matches
+# resolvers/giftCards.js's own issuerArtistId: user.id scoping (works the same regardless of shop
+# connection, unlike GetGiftCardsByShop below).
+query GetMyGiftCards {
+	getMyGiftCards {
+		id
+		code
+		issuerType
+		shopId
+		faceValueCents
+		balanceCents
+		feeOffsetCents
+		soldAt
+		soldByUserId
+		paymentMethod
+		saleStatus
+		squarePaymentId
+		shopCutStatus
+		shopCutCents
+		shopCutPercentApplied
+	}
+}
+
+query GetGiftCardsByShop($shopId: ID!) {
+	getGiftCardsByShop(shopId: $shopId) {
+		id
+		code
+		issuerType
+		shopId
+		faceValueCents
+		balanceCents
+		feeOffsetCents
+		soldAt
+		soldByUserId
+		paymentMethod
+		saleStatus
+		squarePaymentId
+		shopCutStatus
+		shopCutCents
+		shopCutPercentApplied
+	}
+}
+
+query GetMyGiftCardLiabilityReport {
+	getMyGiftCardLiabilityReport {
+		outstandingBalanceCents
+		cardCount
+		oldestIssuedAt
+	}
+}
+
+query GetGiftCardLiabilityReport($shopId: ID!) {
+	getGiftCardLiabilityReport(shopId: $shopId) {
+		outstandingBalanceCents
+		cardCount
+		oldestIssuedAt
+	}
+}
+
+# No "available to apply" list the way deposits.graphql's GetAvailableDeposits gets - a gift card
+# is looked up by its own bearer code (M6), not picked from a list scoped to whose it is. See
+# SessionDetailForm.tsx's own comment on why this is a plain code+amount entry rather than a
+# picker.
+mutation RedeemGiftCard($appointmentId: ID!, $code: String!, $amountCents: Int!) {
+	redeemGiftCard(appointmentId: $appointmentId, code: $code, amountCents: $amountCents) {
+		giftCard {
+			id
+			balanceCents
+		}
+		appointment {
+			id
+			subtotalCents
+			totalCents
+			shopCutCents
+			shopCutPercentApplied
+			giftCardCreditCents
+			artistIssuedGiftCardCreditCents
+		}
+		redemption {
+			id
+			amountCents
+			shopPayoutCents
+		}
+	}
+}
+
+# Mirrors AppointmentService's CreateShopCutInvoice/MarkShopCutPaidManually/ConfirmShopCutPaid
+# exactly - GiftCard's shop-cut fields are the same shape as Appointment's by design (M6).
+mutation CreateGiftCardShopCutInvoice($giftCardId: ID!, $paymentMethod: String) {
+	createGiftCardShopCutInvoice(giftCardId: $giftCardId, paymentMethod: $paymentMethod) {
+		giftCard {
+			id
+			shopCutStatus
+			shopCutSquareInvoiceId
+		}
+		invoiceUrl
+	}
+}
+
+mutation MarkGiftCardShopCutPaidManually($giftCardId: ID!) {
+	markGiftCardShopCutPaidManually(giftCardId: $giftCardId) {
+		id
+		shopCutStatus
+		shopCutMarkedPaidBy
+		shopCutMarkedPaidAt
+	}
+}
+
+mutation ConfirmGiftCardShopCutPaid($giftCardId: ID!) {
+	confirmGiftCardShopCutPaid(giftCardId: $giftCardId) {
+		id
+		shopCutStatus
+		shopCutConfirmedBy
+		shopCutConfirmedAt
+	}
+}

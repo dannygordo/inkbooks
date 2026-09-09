@@ -1,0 +1,96 @@
+# The Artists directory - a shop's own team roster (as opposed to appointments.graphql's
+# appointment-scoped selections). Gated to Staff-or-better both on mobile's own header link
+# (utils/permissions.ts's isStaffOrBetter) and server-side (getArtists/getArtist - see
+# server/graphql/resolvers/artists.js's own comment on why a peer artist was excluded: Artist.jsx
+# used to mount a shop-mate's revenue/shop-cut/appointment-history panel). See DECISIONS.md X22.
+#
+# Leaner than web's own ArtistService.js selections in one respect: hourlyRate/flatRate/
+# billingType are dropped from both GetArtistsList and GetArtistDetail - those back
+# ShopCutRatePanel/ArtistPerformancePanel, both deliberately deferred (see X22's own note on why a
+# Phase-7-scale dashboard doesn't belong bundled into a directory port).
+query GetArtistsList($includeArchived: Boolean, $page: PageInput) {
+	getArtists(includeArchived: $includeArchived, page: $page) {
+		items {
+			id
+			firstName
+			lastName
+			title
+			email
+			phone
+			instagram
+			facebook
+			avatar
+			status
+			user {
+				id
+				avatar
+			}
+		}
+		pageInfo {
+			totalCount
+			hasMore
+			limit
+			offset
+		}
+	}
+}
+
+query GetArtistDetail($artistId: ID!) {
+	getArtist(artistId: $artistId) {
+		id
+		userId
+		firstName
+		lastName
+		email
+		title
+		phone
+		address
+		city
+		state
+		zip
+		instagram
+		facebook
+		avatar
+		startDate
+		status
+		user {
+			id
+			avatar
+		}
+	}
+}
+
+# shopId is deliberately never sent - see server/graphql/mutations/artists.js's own comment:
+# connecting/moving an artist to a different shop is connectArtistToShop (which asks first), and
+# an ordinary profile save sending a mismatched shopId is rejected outright.
+mutation UpdateArtistIdentity($artist: ArtistInput!) {
+	updateArtist(artist: $artist) {
+		id
+		firstName
+		lastName
+		email
+		title
+		phone
+		address
+		city
+		state
+		zip
+		instagram
+		facebook
+		startDate
+	}
+}
+
+mutation ArchiveArtist($artistId: ID!) {
+	archiveArtist(artistId: $artistId) {
+		id
+		status
+	}
+}
+
+mutation UnarchiveArtist($artistId: ID!) {
+	unarchiveArtist(artistId: $artistId) {
+		id
+		status
+	}
+}

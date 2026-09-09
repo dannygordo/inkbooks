@@ -1,0 +1,29 @@
+# settings/your-link.tsx (DECISIONS.md X42) - the artist's own public handle
+# (Artist.bookingSlug), which is the <ownerHandle> half of EVERY form's public URL
+# (/<formSlug>/<ownerHandle> - see server/utils/public-form-lookup.js), booking_request included.
+# Direct port of apps/web's FormsPanel.jsx's "Your link" half (the other half, "Manage Forms", is
+# already reachable from mobile's own home screen - see forms/index.tsx - so isn't rebuilt here).
+#
+# SELF-SCOPED getMyFormLinks, not getForms - a plain shop-connected artist who isn't shop-admin
+# has no authority to call getForms(shopId: ...) at all (see resolvers/forms.js's own comment),
+# so this is the only way they can ever see their own shop's published form links.
+query GetMyBookingSlug($artistId: ID!) {
+	getArtist(artistId: $artistId) {
+		id
+		bookingSlug
+	}
+}
+
+mutation UpdateMyBookingSlug($slug: String!) {
+	updateMyBookingSlug(slug: $slug) {
+		id
+		bookingSlug
+	}
+}
+
+query GetMyFormLinks {
+	getMyFormLinks {
+		title
+		slug
+	}
+}

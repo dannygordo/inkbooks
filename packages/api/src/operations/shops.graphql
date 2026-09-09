@@ -1,0 +1,115 @@
+# The Shops directory - shop-admin-or-better's view of the shop(s) they're connected to. No
+# archiving exists for shops at all (no archiveShop/unarchiveShop mutations server-side), so unlike
+# Artists/Staff this slice has no ArchiveControl and no includeArchived toggle. Gated on mobile's
+# own header link with utils/permissions.ts's isShopAdminOrBetter, matching web's Sidebar.jsx.
+# See DECISIONS.md X24.
+#
+# getShops takes no arguments at all (no page/includeArchived) - it's an inherently small list
+# (the shops a caller is affiliated with), same reasoning as Shop Cut Confirmations' unpaginated
+# screen.
+query GetShopsList {
+	getShops {
+		id
+		name
+		email
+		phone
+		website
+		logo
+		address
+		city
+		state
+		hourlyRate
+		shopMinimum
+	}
+}
+
+# Full detail selection, matching web's ShopService.js getShop exactly. hourlyRate/shopMinimum are
+# whole-dollar fields (NOT cents like nearly everything else in this app - see utils/money.ts's
+# formatCents, which must NOT be used here), rendered as plain numbers on both web and this port.
+query GetShopDetail($shopId: ID!) {
+	getShop(shopId: $shopId) {
+		id
+		name
+		email
+		phone
+		address
+		city
+		state
+		zip
+		instagram
+		facebook
+		website
+		shopMinimum
+		hourlyRate
+		shopCutPercent
+		logo
+		billingType
+		status
+		formSlug
+		squareConnected
+		squareLocationId
+		squareConnectedAt
+	}
+}
+
+# updateShop has a hard SHOP_ADMIN floor server-side (withAuth(fn, SHOP_ADMIN)) with no self-branch
+# at all, same shape as updateStaff - see apps/web's Shop.jsx canEdit comment. ShopInput requires
+# every field non-null or it's nulled out, so shopMinimum/hourlyRate/logo/billingType/status/
+# shopCutPercent are echoed back unchanged from the fetched Shop exactly as web's own
+# buildShopPayload does - none of the six are edited on this page (shopCutPercent has its own
+# read-only readout below; the other five aren't edited anywhere in this port's scope).
+mutation UpdateShopIdentity($shop: ShopInput!) {
+	updateShop(shop: $shop) {
+		id
+		name
+		email
+		phone
+		address
+		city
+		state
+		zip
+		instagram
+		facebook
+		website
+	}
+}
+
+# Square OAuth "Connect": lazy-fetched, then opened externally via Linking.openURL. platform:
+# "mobile" rides inside the signed state token (server/routes/squareOAuth.js) so the callback
+# route lands the seller's browser on a small "return to the app" page that opens this app's own
+# inkbooks:// scheme, instead of the web app's /shop/:shopId?square=... route. See DECISIONS.md
+# X24 (the original gap) and X33 (the deep link that closes it).
+query GetSquareAuthorizationUrl($shopId: ID!) {
+	getSquareAuthorizationUrl(shopId: $shopId, platform: "mobile")
+}
+
+# Plain mutation, no redirect involved - fully portable with none of the Connect flow's caveats.
+mutation DisconnectShopSquare($shopId: ID!) {
+	disconnectShopSquare(shopId: $shopId) {
+		id
+		squareConnected
+		squareLocationId
+		squareConnectedAt
+	}
+}
+
+# settings/shop.tsx - closes the gap shop/[id].tsx's own ShopCutCard names directly (DECISIONS.md
+# X24/X36): this is the SAME updateShop mutation UpdateShopIdentity above already calls (ShopInput
+# requires every field non-null or it's nulled out - see that mutation's own comment), just a
+# second named operation with its own response selection, since IdentityCard's doesn't return
+# shopCutPercent and this screen needs it back to confirm the save.
+mutation UpdateShopCutPercent($shop: ShopInput!) {
+	updateShop(shop: $shop) {
+		id
+		shopCutPercent
+	}
+}
+
+# formSlug is NOT a ShopInput field at all (see typeDefs.js's own ShopInput definition) - it has
+# its own dedicated, self-service mutation, mirroring apps/web's ShopPanel.jsx exactly.
+mutation UpdateMyShopFormSlug($shopId: ID!, $slug: String!) {
+	updateMyShopFormSlug(shopId: $shopId, slug: $slug) {
+		id
+		formSlug
+	}
+}

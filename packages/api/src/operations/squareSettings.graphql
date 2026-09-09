@@ -1,0 +1,54 @@
+# Settings' "Square" and "Tax & processing" cards - the artist's OWN Square connection (the
+# account their clients pay into, distinct from a shop's own connection queried in shops.graphql -
+# see DECISIONS.md M9) and the tax rate / card-processing offset every charge is computed from.
+# Direct port of apps/web/src/services/ShopService.js's own operations of the same names.
+
+query GetMySquareConnection {
+	getMySquareConnection {
+		source
+		connected
+		locationId
+		connectedAt
+		ownerName
+	}
+}
+
+# platform: "mobile" - same deep-link return-to-app mechanism as shops.graphql's
+# GetSquareAuthorizationUrl (DECISIONS.md X33). The callback route sends an ARTIST owner to
+# inkbooks://settings?square=<status>, which settings/index.tsx reads and shows a banner for.
+query GetMySquareAuthorizationUrl {
+	getMySquareAuthorizationUrl(platform: "mobile")
+}
+
+mutation DisconnectMySquare {
+	disconnectMySquare {
+		source
+		connected
+		locationId
+		connectedAt
+		ownerName
+	}
+}
+
+query GetMySquarePricingSettings {
+	getMySquarePricingSettings {
+		source
+		ownerName
+		taxRateBasisPoints
+		squareFeeOffsetCents
+		canEdit
+	}
+}
+
+mutation UpdateSquarePricingSettings($taxRateBasisPoints: Int!, $squareFeeOffsetCents: Int!) {
+	updateSquarePricingSettings(
+		taxRateBasisPoints: $taxRateBasisPoints
+		squareFeeOffsetCents: $squareFeeOffsetCents
+	) {
+		source
+		ownerName
+		taxRateBasisPoints
+		squareFeeOffsetCents
+		canEdit
+	}
+}

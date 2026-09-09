@@ -84,7 +84,7 @@ describe('createArtistGiftCard', () => {
     const server = createTestServer();
 
     const response = await server.executeOperation(
-      { query: CREATE_ARTIST_GIFT_CARD, variables: { input: { faceValueCents: 10000 } } },
+      { query: CREATE_ARTIST_GIFT_CARD, variables: { input: { faceValueCents: 10000, paymentMethod: 'cash' } } },
       { contextValue: contextWithToken(token) },
     );
 
@@ -113,7 +113,7 @@ describe('createArtistGiftCard', () => {
     const server = createTestServer();
 
     const response = await server.executeOperation(
-      { query: CREATE_ARTIST_GIFT_CARD, variables: { input: { faceValueCents: 5000 } } },
+      { query: CREATE_ARTIST_GIFT_CARD, variables: { input: { faceValueCents: 5000, paymentMethod: 'cash' } } },
       { contextValue: contextWithToken(token) },
     );
 
@@ -135,7 +135,7 @@ describe('createShopGiftCard', () => {
     const response = await server.executeOperation(
       {
         query: CREATE_SHOP_GIFT_CARD,
-        variables: { input: { shopId: shop.id, faceValueCents: 20000 } },
+        variables: { input: { shopId: shop.id, faceValueCents: 20000, paymentMethod: 'cash' } },
       },
       { contextValue: contextWithToken(token) },
     );
@@ -162,7 +162,7 @@ describe('createShopGiftCard', () => {
     const response = await server.executeOperation(
       {
         query: CREATE_SHOP_GIFT_CARD,
-        variables: { input: { shopId: otherShop.id, faceValueCents: 20000 } },
+        variables: { input: { shopId: otherShop.id, faceValueCents: 20000, paymentMethod: 'cash' } },
       },
       { contextValue: contextWithToken(token) },
     );
@@ -180,7 +180,7 @@ describe('redeemGiftCard - artist-issued', () => {
     const server = createTestServer();
 
     const saleResponse = await server.executeOperation(
-      { query: CREATE_ARTIST_GIFT_CARD, variables: { input: { faceValueCents: 10000 } } }, // $100
+      { query: CREATE_ARTIST_GIFT_CARD, variables: { input: { faceValueCents: 10000, paymentMethod: 'cash' } } }, // $100
       { contextValue: contextWithToken(token) },
     );
     const card = saleResponse.body.singleResult.data.createArtistGiftCard;
@@ -225,7 +225,7 @@ describe('redeemGiftCard - artist-issued', () => {
     const issuerToken = signTestToken(issuer);
     const server = createTestServer();
     const saleResponse = await server.executeOperation(
-      { query: CREATE_ARTIST_GIFT_CARD, variables: { input: { faceValueCents: 10000 } } },
+      { query: CREATE_ARTIST_GIFT_CARD, variables: { input: { faceValueCents: 10000, paymentMethod: 'cash' } } },
       { contextValue: contextWithToken(issuerToken) },
     );
     const card = saleResponse.body.singleResult.data.createArtistGiftCard;
@@ -265,7 +265,7 @@ describe('redeemGiftCard - shop-issued', () => {
     const saleResponse = await server.executeOperation(
       {
         query: CREATE_SHOP_GIFT_CARD,
-        variables: { input: { shopId: shop.id, faceValueCents: 10000 } }, // $100
+        variables: { input: { shopId: shop.id, faceValueCents: 10000, paymentMethod: 'cash' } }, // $100
       },
       { contextValue: contextWithToken(adminToken) },
     );
@@ -304,7 +304,7 @@ describe('redeemGiftCard - shop-issued', () => {
     const server = createTestServer();
 
     const saleResponse = await server.executeOperation(
-      { query: CREATE_SHOP_GIFT_CARD, variables: { input: { shopId: shop.id, faceValueCents: 5000 } } }, // $50
+      { query: CREATE_SHOP_GIFT_CARD, variables: { input: { shopId: shop.id, faceValueCents: 5000, paymentMethod: 'cash' } } }, // $50
       { contextValue: contextWithToken(adminToken) },
     );
     const card = saleResponse.body.singleResult.data.createShopGiftCard;
@@ -336,7 +336,7 @@ describe('redeemGiftCard - shop-issued', () => {
     const server = createTestServer();
 
     const saleResponse = await server.executeOperation(
-      { query: CREATE_SHOP_GIFT_CARD, variables: { input: { shopId: shop.id, faceValueCents: 10000 } } },
+      { query: CREATE_SHOP_GIFT_CARD, variables: { input: { shopId: shop.id, faceValueCents: 10000, paymentMethod: 'cash' } } },
       { contextValue: contextWithToken(adminToken) },
     );
     const card = saleResponse.body.singleResult.data.createShopGiftCard;
@@ -372,7 +372,7 @@ describe('redeemGiftCard - partial redemption', () => {
     const server = createTestServer();
 
     const saleResponse = await server.executeOperation(
-      { query: CREATE_SHOP_GIFT_CARD, variables: { input: { shopId: shop.id, faceValueCents: 10000 } } },
+      { query: CREATE_SHOP_GIFT_CARD, variables: { input: { shopId: shop.id, faceValueCents: 10000, paymentMethod: 'cash' } } },
       { contextValue: contextWithToken(adminToken) },
     );
     const card = saleResponse.body.singleResult.data.createShopGiftCard;
@@ -416,7 +416,7 @@ describe('redeemGiftCard - partial redemption', () => {
     const server = createTestServer();
 
     const saleResponse = await server.executeOperation(
-      { query: CREATE_SHOP_GIFT_CARD, variables: { input: { shopId: shop.id, faceValueCents: 2000 } } },
+      { query: CREATE_SHOP_GIFT_CARD, variables: { input: { shopId: shop.id, faceValueCents: 2000, paymentMethod: 'cash' } } },
       { contextValue: contextWithToken(adminToken) },
     );
     const card = saleResponse.body.singleResult.data.createShopGiftCard;
@@ -438,5 +438,196 @@ describe('redeemGiftCard - partial redemption', () => {
 
     const stored = await GiftCard.findById(card.id);
     expect(stored.balanceCents).toBe(2000); // untouched
+  });
+});
+
+// A pending, square-method sale - the state a real card charge (routes/squarePayments.js's
+// process-gift-card-payment) exists to finish. See models/GiftCard.js's own comment on saleStatus
+// for why this state exists at all - it's the gift-card-shaped counterpart to a pending deposit.
+describe('gift card sale - paymentMethod and the pending/square state', () => {
+  // paymentMethod is `String!` on CreateArtistGiftCardInput (typeDefs.js), matching
+  // recordDeposit's own non-null field - so an actually OMITTED key never reaches this resolver
+  // at all: GraphQL's own variable coercion rejects the request first, with a generic "field ...
+  // was not provided" message and no `data` key on the response whatsoever (not even `null`).
+  // What IS reachable, and is the thing worth testing here, is a syntactically valid string that
+  // isn't one of the two real values - that's the one path that actually exercises this
+  // resolver's own friendly validate() call and its "cash or Square" custom message (see
+  // X60's fix to validation.js - z.enum's old v3 `errorMap` option is silently a no-op
+  // under the zod v4 this codebase now runs, so this only worked once that was switched to
+  // the real v4 `message` option).
+  it('rejects a paymentMethod that is not cash or square', async () => {
+    const { artist } = await shopWithArtist(40);
+    const token = signTestToken(artist);
+    const server = createTestServer();
+
+    const response = await server.executeOperation(
+      {
+        query: CREATE_ARTIST_GIFT_CARD,
+        variables: { input: { faceValueCents: 10000, paymentMethod: 'venmo' } },
+      },
+      { contextValue: contextWithToken(token) },
+    );
+
+    const { errors, data } = response.body.singleResult;
+    expect(data).toBeNull();
+    expect(errors[0].extensions.errors.paymentMethod).toMatch(/cash or Square/);
+  });
+
+  it('rejects paymentMethod: "square" without pending: true - a card charge is not an assertion', async () => {
+    const { artist } = await shopWithArtist(40);
+    const token = signTestToken(artist);
+    const server = createTestServer();
+
+    const response = await server.executeOperation(
+      {
+        query: CREATE_ARTIST_GIFT_CARD,
+        variables: { input: { faceValueCents: 10000, paymentMethod: 'square' } },
+      },
+      { contextValue: contextWithToken(token) },
+    );
+
+    const { errors, data } = response.body.singleResult;
+    expect(data).toBeNull();
+    expect(errors[0].extensions.errors.paymentMethod).toMatch(/has to go through the payment step/);
+  });
+
+  it('records a "square", pending: true sale as saleStatus pending, with the shop cut already written', async () => {
+    const { artist, shop } = await shopWithArtist(40);
+    const token = signTestToken(artist);
+    const server = createTestServer();
+
+    const response = await server.executeOperation(
+      {
+        query: `
+          mutation CreateArtistGiftCard($input: CreateArtistGiftCardInput!) {
+            createArtistGiftCard(input: $input) {
+              id balanceCents saleStatus paymentMethod shopCutCents shopCutStatus squarePaymentId
+            }
+          }
+        `,
+        variables: {
+          input: { faceValueCents: 10000, paymentMethod: 'square', pending: true },
+        },
+      },
+      { contextValue: contextWithToken(token) },
+    );
+
+    const { errors, data } = response.body.singleResult;
+    expect(errors).toBeUndefined();
+    const card = data.createArtistGiftCard;
+    expect(card.saleStatus).toBe('pending');
+    expect(card.paymentMethod).toBe('square');
+    expect(card.squarePaymentId).toBeNull();
+    // Written even while pending, same as a pending deposit's subtotalCents/totalCents
+    // (mutations/deposits.js) - saleStatus is what actually gates spendability, not this figure.
+    expect(card.balanceCents).toBe(10000);
+    expect(card.shopCutCents).toBe(4000);
+    expect(card.shopCutStatus).toBe('unpaid');
+  });
+
+  it('refuses to redeem a pending card - its own sale has not been paid for yet', async () => {
+    const { artist, shop } = await shopWithArtist(40);
+    const token = signTestToken(artist);
+    const server = createTestServer();
+
+    const saleResponse = await server.executeOperation(
+      {
+        query: `
+          mutation CreateArtistGiftCard($input: CreateArtistGiftCardInput!) {
+            createArtistGiftCard(input: $input) { id code balanceCents }
+          }
+        `,
+        variables: { input: { faceValueCents: 10000, paymentMethod: 'square', pending: true } },
+      },
+      { contextValue: contextWithToken(token) },
+    );
+    const card = saleResponse.body.singleResult.data.createArtistGiftCard;
+    expect(card.balanceCents).toBe(10000); // real balance is already there...
+
+    const appointment = await createAppointment(artist.id, { shopId: shop.id, subtotalCents: 20000 });
+
+    const response = await server.executeOperation(
+      {
+        query: REDEEM_GIFT_CARD,
+        variables: { appointmentId: appointment.id, code: card.code, amountCents: 5000 },
+      },
+      { contextValue: contextWithToken(token) },
+    );
+
+    const { errors, data } = response.body.singleResult;
+    expect(data).toBeNull();
+    expect(errors[0].extensions.errors.code).toMatch(/own sale hasn't been paid for yet/);
+
+    const stored = await GiftCard.findById(card.id);
+    expect(stored.balanceCents).toBe(10000); // ...but untouched, exactly because it's pending
+  });
+
+  it('excludes a pending sale\'s balance from the liability report', async () => {
+    const { artist, shop } = await shopWithArtist(40);
+    const token = signTestToken(artist);
+    const server = createTestServer();
+
+    // One completed cash sale, one still-pending square sale.
+    await server.executeOperation(
+      { query: CREATE_ARTIST_GIFT_CARD, variables: { input: { faceValueCents: 5000, paymentMethod: 'cash' } } },
+      { contextValue: contextWithToken(token) },
+    );
+    await server.executeOperation(
+      {
+        query: CREATE_ARTIST_GIFT_CARD,
+        variables: { input: { faceValueCents: 10000, paymentMethod: 'square', pending: true } },
+      },
+      { contextValue: contextWithToken(token) },
+    );
+
+    const response = await server.executeOperation(
+      {
+        query: `query { getMyGiftCardLiabilityReport { outstandingBalanceCents cardCount } }`,
+      },
+      { contextValue: contextWithToken(token) },
+    );
+
+    const { errors, data } = response.body.singleResult;
+    expect(errors).toBeUndefined();
+    // Only the $50 cash card counts - the $100 pending sale was never actually paid for.
+    expect(data.getMyGiftCardLiabilityReport.outstandingBalanceCents).toBe(5000);
+    expect(data.getMyGiftCardLiabilityReport.cardCount).toBe(1);
+  });
+
+  it('refuses to invoice the shop cut on a pending sale', async () => {
+    const { shopAdmin, shop } = await shopWithArtist(40);
+    const adminToken = signTestToken(shopAdmin);
+    const server = createTestServer();
+
+    const saleResponse = await server.executeOperation(
+      {
+        query: `
+          mutation CreateShopGiftCard($input: CreateShopGiftCardInput!) {
+            createShopGiftCard(input: $input) { id }
+          }
+        `,
+        variables: {
+          input: { shopId: shop.id, faceValueCents: 10000, paymentMethod: 'square', pending: true },
+        },
+      },
+      { contextValue: contextWithToken(adminToken) },
+    );
+    const card = saleResponse.body.singleResult.data.createShopGiftCard;
+
+    const response = await server.executeOperation(
+      {
+        query: `
+          mutation CreateGiftCardShopCutInvoice($giftCardId: ID!) {
+            createGiftCardShopCutInvoice(giftCardId: $giftCardId) { giftCard { id } invoiceUrl }
+          }
+        `,
+        variables: { giftCardId: card.id },
+      },
+      { contextValue: contextWithToken(adminToken) },
+    );
+
+    const { errors, data } = response.body.singleResult;
+    expect(data).toBeNull();
+    expect(errors[0].extensions.errors.giftCardId).toMatch(/own sale hasn't been paid for yet/);
   });
 });

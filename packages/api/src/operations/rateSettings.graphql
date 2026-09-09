@@ -1,0 +1,36 @@
+# settings/rates.tsx (DECISIONS.md X37) - what this artist charges, and, for a shop-connected
+# artist, whose rate actually applies to their sessions. Direct port of apps/web's RatesPanel.jsx.
+#
+# GetArtistDetail (artists.graphql) deliberately drops hourlyRate/flatRate/billingType - that
+# query is the Staff-or-better ROSTER view of an artist, gated away from a shop-mate's own billing
+# details (see that file's own comment). This is a different, SELF-scoped query: the signed-in
+# artist reading their own rate settings, called with their own userInfo.id, mirroring web's own
+# ArtistService.fetchArtist(artistUserInfoId).
+query GetMyRateSettings($artistId: ID!) {
+	getArtist(artistId: $artistId) {
+		id
+		hourlyRate
+		flatRate
+		billingType
+	}
+}
+
+mutation UpdateArtistRateSettings($hourlyRate: Int, $flatRate: Int, $billingType: String!) {
+	updateArtistRateSettings(hourlyRate: $hourlyRate, flatRate: $flatRate, billingType: $billingType) {
+		id
+		hourlyRate
+		flatRate
+		billingType
+	}
+}
+
+# artistShopConnections.graphql's own GetArtistShopConnections already reads rateSource for
+# SessionDetail's effective-rate calculation - this is the write side of that same field, offered
+# here as the one thing about a shop connection that's genuinely the ARTIST's own choice to make
+# (see models/ArtistShopConnection.js's own comment on rateSource).
+mutation SetArtistShopRateSource($artistId: ID!, $shopId: ID!, $rateSource: String!) {
+	setArtistShopRateSource(artistId: $artistId, shopId: $shopId, rateSource: $rateSource) {
+		id
+		rateSource
+	}
+}

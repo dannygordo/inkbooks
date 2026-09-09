@@ -46,8 +46,15 @@ const ProjectService = (() => {
 		});
 	};
 
+	// fetchPolicy: 'cache-and-network' - the same fix, and the same reasoning, as
+	// _fetchProjectsByArtist just above (see its own comment, written when this exact gap was
+	// first predicted but only closed for that dashboard query, not this one). Confirmed 2026-09-06:
+	// converting a consult to a session creates a brand-new Project this list's cached query has no
+	// way to know about, so the Projects page kept showing its stale cached page until a hard
+	// reload forced a real network request. This page is exactly the list that comment predicted
+	// would eventually show the same symptom.
 	const _fetchProjects = (page) => {
-		return useGetProjectsQuery({ variables: { page } });
+		return useGetProjectsQuery({ variables: { page }, fetchPolicy: "cache-and-network" });
 	};
 
 	// Ignores its own `project` argument, same as ClientService.updateClient - callers hand the

@@ -1,0 +1,66 @@
+# Global search - Clients, Projects, Messages, and shared-images-by-tag, grouped by type. See
+# server/utils/search.js: no new authorization rules, reuses the exact same scope filters
+# getClients/getProjects already apply, so this is safe to reach from a header search box with no
+# extra gating of its own. See DECISIONS.md X25.
+#
+# Named GlobalSearch, not Search - apps/web's own SearchService.js defines its own hand-written
+# `Search` gql document locally (never migrated into this shared generated file, unlike
+# ProjectService.js's queries), so there's no actual collision today, but this avoids creating one
+# if that page is ever migrated onto @inkbooks/api later.
+#
+# Selection is trimmed to what a single-column mobile row needs versus web's SearchService.js
+# (drops Client.avatar/email/phone/city/state duplicates that a compact row doesn't have room to
+# show all of at once - kept: enough to identify and link to each result, same reasoning as every
+# other *List query's own leaner selection).
+query GlobalSearch($query: String!, $limit: Int) {
+	search(query: $query, limit: $limit) {
+		clients {
+			id
+			avatar
+			firstName
+			lastName
+			email
+			phone
+			city
+			state
+		}
+		projects {
+			id
+			title
+			description
+			status
+			artist {
+				id
+				firstName
+				lastName
+				avatar
+			}
+			client {
+				id
+				firstName
+				lastName
+			}
+		}
+		messages {
+			id
+			conversationId
+			message
+			senderId
+			user {
+				id
+				firstName
+				lastName
+				avatar
+			}
+			createdAt
+		}
+		images {
+			id
+			url
+			clientId
+			tags
+			assignedProjectId
+			createdAt
+		}
+	}
+}

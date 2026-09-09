@@ -258,6 +258,13 @@ describe("FormBuilder", () => {
 			expect(submit).not.toBeDisabled();
 		});
 
+		// Nine sequential userEvent steps (type, two clicks to open/choose the MUI Select, two
+		// "Add option" clicks, two option-field types) - comfortably clears vitest's 5000ms default
+		// under normal load, but a full-suite run competing for CPU across every worker has been seen
+		// to blow that budget on this test alone (every other test here stays well under it), with no
+		// change to the component behavior it exercises - a longer explicit timeout for this one slow,
+		// legitimately multi-step test instead of loosening a shared/global default for the other
+		// ~2100 tests that do not need it.
 		it("keeps Create Form disabled for a choice field until it has two real options", async () => {
 			const user = userEvent.setup();
 			renderNewFormBuilder();
@@ -280,7 +287,7 @@ describe("FormBuilder", () => {
 
 			expect(screen.queryByText("A choice field needs at least two options.")).not.toBeInTheDocument();
 			expect(submit).not.toBeDisabled();
-		});
+		}, 15000);
 
 		it("creates a form for a shop-scoped user with {shopId} spread into the input, then navigates to it", async () => {
 			const user = userEvent.setup();
@@ -303,7 +310,13 @@ describe("FormBuilder", () => {
 
 			// Only resolves if MockedProvider matched createForm's variables exactly, including the
 			// {shopId} createScopeFor spread - a wrong scope key here would leave this pending.
-			expect(await screen.findByTestId("navigated-form")).toHaveTextContent("form-999");
+			// findByTestId's default wait is 1000ms; the mutation resolving and the resulting re-render
+			// under FormBuilderOrMarker have been seen to land just past that under a loaded full-suite
+			// run even though nothing here is actually pending - widened to match this test's own
+			// dependency on a real (mocked) network round trip plus a route swap, not a fixed guess.
+			expect(await screen.findByTestId("navigated-form", {}, { timeout: 5000 })).toHaveTextContent(
+				"form-999"
+			);
 			expect(contextValue.setAlert).toHaveBeenCalledWith(
 				expect.objectContaining({ message: "Form created." })
 			);

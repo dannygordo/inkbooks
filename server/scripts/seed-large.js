@@ -70,6 +70,18 @@ const ReminderLog = require('../models/ReminderLog');
 const ClientScheduleEmail = require('../models/ClientScheduleEmail');
 const AutoResponse = require('../models/AutoResponse');
 const AutoResponseLog = require('../models/AutoResponseLog');
+// These eight were added to the schema after this list was last updated and were never folded
+// in - same class of gap the comment above already flags for Adjustment/ExpenseType/etc, and the
+// same one scripts/seed.js just got fixed for. Found 2026-09-05 building scripts/
+// seed-copperwolf.js's own collection list against a fresh `ls models/`.
+const BoothRentCharge = require('../models/BoothRentCharge');
+const BoothRentPlan = require('../models/BoothRentPlan');
+const PushToken = require('../models/PushToken');
+const RecurringExpense = require('../models/RecurringExpense');
+const ScheduledRun = require('../models/ScheduledRun');
+const SharedImage = require('../models/SharedImage');
+const ResponseTimeSettings = require('../models/ResponseTimeSettings');
+const SystemMessageTemplate = require('../models/SystemMessageTemplate');
 const { Constants } = require('../utils/constants');
 const { TAG_COLORS } = require('../utils/tag-color');
 const { computeChargeBreakdown } = require('../utils/square-pricing');
@@ -223,6 +235,8 @@ async function main() {
     PasswordToken, Notification, Form, FormResponse,
     Adjustment, ExpenseType, Expense, IncomeType, Income, GiftCard, GiftCardRedemption,
     EventLog, ReminderSettings, ReminderLog, ClientScheduleEmail, AutoResponse, AutoResponseLog,
+    BoothRentCharge, BoothRentPlan, PushToken, RecurringExpense, ScheduledRun, SharedImage,
+    ResponseTimeSettings, SystemMessageTemplate,
   ];
 
   console.log('Wiping existing collections ...');

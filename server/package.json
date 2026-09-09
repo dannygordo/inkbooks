@@ -10,6 +10,10 @@
     "start:prod": "NODE_ENV=PRODUCTION node index.js",
     "seed": "node scripts/seed.js",
     "seed:large": "node scripts/seed-large.js",
+    "export:copperwolf": "node scripts/export-copperwolf-snapshot.js",
+    "export:copperwolf:prod": "NODE_ENV=PRODUCTION node scripts/export-copperwolf-snapshot.js",
+    "seed:copperwolf": "node scripts/seed-copperwolf.js",
+    "seed:copperwolf:prod": "NODE_ENV=PRODUCTION node scripts/seed-copperwolf.js",
     "fix:palettes": "node scripts/fix-invalid-project-palettes.js"
   },
   "keywords": [],

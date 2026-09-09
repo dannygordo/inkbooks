@@ -53,7 +53,7 @@ module.exports = {
         // pointing at Square's hosted consent page; `state` is a signed, 15-minute token binding
         // this attempt to shopId (see routes/squareOAuth.js) so the eventual callback can't be
         // pointed at a different shop.
-        getSquareAuthorizationUrl: withAuth(async (_, { shopId }, context, info, user) => {
+        getSquareAuthorizationUrl: withAuth(async (_, { shopId, platform }, context, info, user) => {
           // The role gate alone let a shop admin start an OAuth handshake against a shop they
           // have nothing to do with. The signed `state` binds the callback to this shopId, so
           // without this check that binding is to someone else's shop.
@@ -62,7 +62,7 @@ module.exports = {
           if (!shop) {
             throw new UserInputError('Errors', { errors: { shopId: 'Shop not found.' } });
           }
-          return square.buildAuthorizationUrl(signState('SHOP', shopId));
+          return square.buildAuthorizationUrl(signState('SHOP', shopId, platform));
         }, Constants.ROLES.SHOP_ADMIN),
         // EVERY artist connects their own account, shop or no shop (DECISIONS.md M9). A client pays
         // the artist for the work; what the artist owes the shop is settled afterwards through the
@@ -75,8 +75,8 @@ module.exports = {
         // Separate from the shop's own handshake rather than a nullable shopId on it, because the
         // two have genuinely different authorization: that one asks "may you act for this shop",
         // this one only ever acts for the caller, so there is no id to check and nothing to pass in.
-        getMySquareAuthorizationUrl: withAuth(async (_, args, context, info, user) => {
-          return square.buildAuthorizationUrl(signState('ARTIST', user.id));
+        getMySquareAuthorizationUrl: withAuth(async (_, { platform }, context, info, user) => {
+          return square.buildAuthorizationUrl(signState('ARTIST', user.id, platform));
         }),
         // The tax rate and offset in force for the caller. Reads through resolveSquareSettings -
         // the same function every charge computes from - rather than looking the owner up again,

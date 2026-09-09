@@ -217,18 +217,38 @@ describe("Projects", () => {
 		expect(screen.getByText("$50.00")).toBeInTheDocument();
 	});
 
-	// UtilsService.prettyConstantsListValue(APP_SETTINGS_CONSTANTS.PROJECT_STATUS, project.status)
-	// is what the status column actually calls. PROJECT_STATUS entries are keyed `value`/`label`
-	// (lowercase) and prettyConstantsListValue only ever matches `item.VALUE`/`item.LABEL`
-	// (uppercase) - so for every real status string this returns "" today, and EntityList renders
-	// the empty-value placeholder ("—") for the whole column regardless of the actual status. This
-	// documents that real, current behavior rather than the label a reader might expect to see.
-	it("renders an em dash in the status column, since prettyConstantsListValue never matches a lowercase status", async () => {
+	// CORRECTION (2026-09-04, found running npm test for real - see DECISIONS.md): this test used
+	// to document a real bug as the expected behavior. UtilsService.prettyConstantsListValue(
+	// APP_SETTINGS_CONSTANTS.PROJECT_STATUS, project.status) is what the status column actually
+	// calls. PROJECT_STATUS entries are keyed `value`/`label` (lowercase); prettyConstantsListValue
+	// used to only match `item.VALUE`/`item.LABEL` (uppercase, an entry shape nothing in this
+	// codebase has ever had) AND guarded on `val >= 0`, which is never true for a status STRING
+	// like "in_progress" (it coerces to NaN). Both meant every real project's status column
+	// silently rendered an em dash instead of a label. Fixed at the source in UtilsService.js;
+	// this test now pins the label that actually renders instead of the placeholder that used to
+	// paper over the bug.
+	it("renders the project's status label in the status column", async () => {
 		renderProjects({
 			mocks: [
 				pageMock({
 					page: { limit: 50, offset: 0 },
 					items: [project({ status: "in_progress" })],
+					pageInfo: { totalCount: 1, hasMore: false, limit: 50, offset: 0 },
+				}),
+			],
+		});
+
+		await screen.findByText("Half sleeve - koi");
+		const statusCell = screen.getByText("In Progress", { selector: '[data-label="Status"]' });
+		expect(statusCell).toBeInTheDocument();
+	});
+
+	it("renders an em dash in the status column for a status PROJECT_STATUS doesn't recognize", async () => {
+		renderProjects({
+			mocks: [
+				pageMock({
+					page: { limit: 50, offset: 0 },
+					items: [project({ status: "some_future_status" })],
 					pageInfo: { totalCount: 1, hasMore: false, limit: 50, offset: 0 },
 				}),
 			],

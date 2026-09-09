@@ -404,6 +404,48 @@ body .ibCalendar * {
     color: var(--ib-text-secondary);
     font-style: italic;
 }
+
+/* Email autosuggest dropdown (AppointmentWizard.jsx's client-email step) - same row pattern as
+   the app bar's own search dropdown (components/search/globalSearch.css's globalSearchResultRow
+   and friends), reused here rather than invented fresh, just not absolutely positioned since this
+   sits inline in a dialog step rather than floating over page content. */
+.clientEmailSuggestions {
+    border: 1px solid var(--ib-border);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+.clientEmailSuggestionRow {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+    padding: 8px 12px;
+    border: none;
+    border-bottom: 1px solid var(--ib-surface-subtle);
+    background-color: var(--ib-surface-card);
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+}
+.clientEmailSuggestionRow:last-child {
+    border-bottom: none;
+}
+.clientEmailSuggestionRow:hover,
+.clientEmailSuggestionRow:focus-visible {
+    background-color: var(--ib-surface-hover);
+    outline: none;
+}
+.clientEmailSuggestionPrimary {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ib-text-primary);
+}
+.clientEmailSuggestionSecondary {
+    font-size: 12.5px;
+    color: var(--ib-text-muted);
+    margin-top: 1px;
+}
 /* min-height added - the previous fix (splitting .ibCalendarDayHeader out of
    .ibCalendarDateCell) was necessary but not sufficient: this element's own height still comes
    from `flex: 1` against its parent (Item, the MUI Paper in Month.jsx, styled with

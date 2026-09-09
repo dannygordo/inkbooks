@@ -31,3 +31,45 @@ export function canManageAppointment(user: UserLike, appointment: AppointmentOwn
 	}
 	return Boolean(user.role) && (user.role as number) <= ROLES.SHOP_ADMIN;
 }
+
+/**
+ * Direct port of apps/web's Sidebar.jsx `isShopAdminOrBetter` inline check - gates which nav
+ * entry points a shop-admin-only screen even shows up as. Shop Cut Confirmations is the first
+ * mobile screen that needs this (see DECISIONS.md X21) - every prior header link (Clients,
+ * Projects, Requests, Messages) is shown to any logged-in artist, matching web's own `!isClient`
+ * gate rather than a role floor, since mobile has no client login at all yet (X15's own note).
+ */
+export function isShopAdminOrBetter(user: UserLike): boolean {
+	return Boolean(user?.role) && (user!.role as number) <= ROLES.SHOP_ADMIN;
+}
+
+/**
+ * Direct port of apps/web's Sidebar.jsx `isStaffOrBetter` inline check - gates the Artists/Staff
+ * directory header links (see DECISIONS.md X22). Looser than isShopAdminOrBetter above
+ * (SHOP_STAFF=15, not SHOP_ADMIN=10) - matches `getArtists`/`getStaff`'s own server-side minRole,
+ * which is deliberately Staff-and-above rather than Shop-Admin-and-above: front-desk staff need
+ * the roster to do their job, even though they can't archive or edit from it.
+ */
+export function isStaffOrBetter(user: UserLike): boolean {
+	return Boolean(user?.role) && (user!.role as number) <= ROLES.SHOP_STAFF;
+}
+
+type UserTypeLike = {
+	id: string;
+	role?: number | null;
+	userType?: string | null;
+} | null | undefined;
+
+/**
+ * Direct port of apps/web's App.jsx route gate on /income and /expenses:
+ * `RoleRoute minRole={ROLES.SHOP_ADMIN} allowIf={(user) => user.userType === "artist"}`. RoleRoute
+ * checks allowIf FIRST and skips the role floor entirely when it's true (see that component's own
+ * comment), so the combined rule is "any artist at all, OR a shop-admin-or-better who isn't" -
+ * this is what lets a plain shop-connected artist (role ARTIST=20, well under SHOP_ADMIN=10) reach
+ * their own personal ledger, which is the whole point of that route's own CHANGED comment: the
+ * server always supported a shop-connected artist's own artistUserId scope
+ * (businessScopeFor/resolveBusinessOwner), the route just didn't let anyone reach it before.
+ */
+export function canManageBusinessLedger(user: UserTypeLike): boolean {
+	return user?.userType === 'artist' || isShopAdminOrBetter(user);
+}

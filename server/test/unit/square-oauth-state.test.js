@@ -104,3 +104,31 @@ describe('signState', () => {
 		expect(() => jwt.verify(state, 'some-other-key')).toThrow();
 	});
 });
+
+// The state token is also how the callback route (routes/squareOAuth.js) decides whether to
+// land the seller's browser back on the web app or on a small "return to the app" page that
+// opens inkbooks://. Getting this wrong doesn't break the Square handshake itself - it just
+// strands a mobile user on a page meant for the browser, or vice versa.
+describe('signState: platform claim', () => {
+	it('defaults to "web" when no platform is given, so every existing call site keeps working', () => {
+		const decoded = decode(signState('SHOP', 'abc'));
+		expect(decoded.platform).toBe('web');
+	});
+
+	it('signs "mobile" when asked, for the app-initiated handshake', () => {
+		const decoded = decode(signState('ARTIST', 'abc', 'mobile'));
+		expect(decoded.platform).toBe('mobile');
+	});
+
+	it('signs "web" explicitly the same as the default', () => {
+		const decoded = decode(signState('SHOP', 'abc', 'web'));
+		expect(decoded.platform).toBe('web');
+	});
+
+	// A typo'd platform would otherwise sign happily and only surface much later, as a seller
+	// stranded on the wrong kind of return page after already authorizing on Square's site.
+	it('refuses to sign an unknown platform', () => {
+		expect(() => signState('SHOP', 'abc', 'ios')).toThrow(/platform/);
+		expect(() => signState('SHOP', 'abc', 'Mobile')).toThrow(/platform/);
+	});
+});

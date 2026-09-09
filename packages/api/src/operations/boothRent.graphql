@@ -1,0 +1,70 @@
+# Settings > Rates - "Your booth rent" (X37 named this as its own future slice: no existing
+# mobile infrastructure at all, unlike everything else on that screen). Direct port of apps/web's
+# BoothRentService.js/BoothRentPanel.jsx scope: an artist's own read-only view of the flat-fee
+# terms a shop admin set for them, plus the one action that's genuinely the artist's own to take -
+# claiming a given month's rent as paid. Setting the plan itself (setBoothRentPlan) and confirming
+# payment (confirmBoothRentPaid) are shop-admin actions with no mobile screen to call them from
+# yet - not included here, same as BoothRentPanel.jsx itself never calls them.
+#
+# Field selections match BoothRentService.js's PLAN_FIELDS/CHARGE_FIELDS exactly.
+query GetBoothRentPlans($artistId: ID!, $shopId: ID!) {
+	getBoothRentPlans(artistId: $artistId, shopId: $shopId) {
+		id
+		artistId
+		shopId
+		amountCents
+		dueDayOfMonth
+		effectiveFrom
+		setByUserId
+		active
+		createdAt
+	}
+}
+
+# artistId-scoped only - this screen has no reason to ever pass shopId/status, matching
+# BoothRentPanel.jsx's own call exactly ({ artistId: user.id, page: { limit: 12 } }).
+query GetBoothRentCharges($artistId: ID, $shopId: ID, $status: String, $page: PageInput) {
+	getBoothRentCharges(artistId: $artistId, shopId: $shopId, status: $status, page: $page) {
+		items {
+			id
+			artistId
+			shopId
+			amountCents
+			periodMonth
+			dueDate
+			status
+			markedPaidAt
+			markedPaidByUserId
+			confirmedAt
+			confirmedByUserId
+			expenseId
+			incomeId
+			createdAt
+		}
+		pageInfo {
+			totalCount
+			hasMore
+			limit
+			offset
+		}
+	}
+}
+
+mutation MarkBoothRentPaidManually($boothRentChargeId: ID!) {
+	markBoothRentPaidManually(boothRentChargeId: $boothRentChargeId) {
+		id
+		artistId
+		shopId
+		amountCents
+		periodMonth
+		dueDate
+		status
+		markedPaidAt
+		markedPaidByUserId
+		confirmedAt
+		confirmedByUserId
+		expenseId
+		incomeId
+		createdAt
+	}
+}

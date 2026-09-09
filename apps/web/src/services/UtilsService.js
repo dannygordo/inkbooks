@@ -23,12 +23,22 @@ const UtilsService = (() => {
 		}
 	};
 
+	// FIX (2026-09-04, found reading Projects.jsx's/Search.jsx's own status columns against
+	// constants/app.js): every list in this app - PROJECT_STATUS, APPOINTMENT_STATUS, BILLING_TYPE,
+	// and the rest - is keyed lowercase `value`/`label`. This used to check `item.VALUE`/
+	// `item.LABEL` (uppercase), which no entry anywhere in the codebase has ever had, so it always
+	// fell through and returned "". The `val >= 0` guard compounded it: every real caller passes a
+	// STRING status ('open', 'in_progress', ...), and a non-numeric string coerces to NaN, which is
+	// never >= 0 - so the loop never even ran, regardless of casing. Together, this function has
+	// never once returned a real label for a real caller; both call sites (Projects.jsx, Search.jsx)
+	// silently rendered an em dash in their Status column instead. See Projects.test.jsx's own
+	// now-corrected test, which used to assert the em dash as the expected behavior.
 	const _prettyConstantsListValue = (list, val) => {
 		let result = "";
-		if (list && val >= 0) {
+		if (list && val !== undefined && val !== null && val !== "") {
 			Object.values(list).map((item) => {
-				if (item.VALUE === val) {
-					result = item.LABEL;
+				if (item.value === val) {
+					result = item.label;
 				}
 			});
 		}

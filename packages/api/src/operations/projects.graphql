@@ -1,0 +1,40 @@
+# The Projects list - reachable from the header next to Clients/Requests/Messages, giving
+# project/[id].tsx (built in Phase 5 step 8's original PR) a browsable entry point of its own
+# rather than only ever being reached through an appointment tap-through or a booking-request
+# conversion. See DECISIONS.md X20.
+#
+# Deliberately its own lean query rather than reusing web's own getProjects.graphql (same
+# `getProjects(page)` resolver, no separate mobile-only endpoint needed) - that query selects
+# every image array, all notes, materialsUsed and tags for a screen that only ever renders a row
+# summary, the same "leaner sibling" call projectDetail.graphql already made against web's own
+# getProject/updateProject (see Phase 5 step 8's own PRODUCTION_ROADMAP.md paragraph). Named
+# GetProjectsList, not GetProjects, so this coexists with web's own query of that name in the same
+# generated file without colliding.
+query GetProjectsList($page: PageInput) {
+	getProjects(page: $page) {
+		items {
+			id
+			title
+			description
+			status
+			depositCollectedCents
+			artistId
+			artist {
+				firstName
+				lastName
+				avatar
+			}
+			clientId
+			client {
+				firstName
+				lastName
+			}
+		}
+		pageInfo {
+			totalCount
+			hasMore
+			limit
+			offset
+		}
+	}
+}

@@ -259,6 +259,123 @@ describe('sendAutoResponsesForTrigger (the automatic path)', () => {
 		expect(result).toEqual({ sent: 0, skipped: 0, failed: 0 });
 		expect(await AutoResponseLog.countDocuments({ appointmentId: appointment._id })).toBe(0);
 	});
+
+	it('sends nothing, without throwing, for an appointment with no userId', async () => {
+		// The same "nothing to resolve an artist from" guard sendAutoResponseForIncomingMessage's
+		// own header comment calls out - a malformed/detached appointment must degrade quietly, not
+		// throw and undo whatever lifecycle transition just happened.
+		const result = await sendAutoResponsesForTrigger({ trigger: 'SESSION_COMPLETED', appointment: null });
+		expect(result).toEqual({ sent: 0, skipped: 0, failed: 0 });
+	});
+
+	it('sends nothing when the resolved response has neither channel enabled', async () => {
+		const { artist, project } = await shopWithConnectedArtist();
+		await new AutoResponse({
+			artistUserId: artist._id,
+			name: 'Aftercare (no channel picked yet)',
+			trigger: 'SESSION_COMPLETED',
+			enabled: true,
+			// emailEnabled defaults true, so this has to be turned off explicitly to reach the
+			// genuinely-no-channel case - a response can be enabled for automatic firing before its
+			// owner has picked a channel, and that must not throw or claim a log.
+			emailEnabled: false,
+		}).save();
+		const appointment = await createAppointment(artist._id, {
+			projectId: project._id,
+			appointmentType: 'session',
+			appointmentStatus: 'completed',
+		});
+
+		const result = await sendAutoResponsesForTrigger({ trigger: 'SESSION_COMPLETED', appointment });
+
+		expect(result).toEqual({ sent: 0, skipped: 0, failed: 0 });
+		expect(await AutoResponseLog.countDocuments({ appointmentId: appointment._id })).toBe(0);
+	});
+
+	it('sends over SMS when smsEnabled, independently of the email channel', async () => {
+		const { artist, client, project } = await shopWithConnectedArtist();
+		client.phone = '+15095550100';
+		await client.save();
+		await new AutoResponse({
+			artistUserId: artist._id,
+			name: 'Aftercare (text only)',
+			trigger: 'SESSION_COMPLETED',
+			enabled: true,
+			emailEnabled: false,
+			smsEnabled: true,
+		}).save();
+		const appointment = await createAppointment(artist._id, {
+			projectId: project._id,
+			appointmentType: 'session',
+			appointmentStatus: 'completed',
+		});
+
+		const texted = [];
+		const result = await sendAutoResponsesForTrigger(
+			{ trigger: 'SESSION_COMPLETED', appointment },
+			{ sendSmsFn: async (m) => { texted.push(m); return { id: 'sms-1' }; } },
+		);
+
+		expect(result.sent).toBe(1);
+		expect(texted).toHaveLength(1);
+		expect(texted[0].to).toBe('+15095550100');
+		const logs = await AutoResponseLog.find({ appointmentId: appointment._id });
+		expect(logs.map((l) => l.channel)).toEqual(['sms']);
+		expect(logs[0].status).toBe('sent');
+	});
+
+	// client.phone defaults to '' (unset) - unlike email, nothing requires a client to have one on
+	// file, so an sms-enabled response with no phone number is the realistic way this is reached
+	// (an all-required client.email means the equivalent "no email on file" branch cannot happen
+	// through this factory - Client.email is `required: true`).
+	it("reports skipped, not sent, when smsEnabled but the client has no phone on file", async () => {
+		const { artist, project } = await shopWithConnectedArtist();
+		await new AutoResponse({
+			artistUserId: artist._id,
+			name: 'Aftercare (text only)',
+			trigger: 'SESSION_COMPLETED',
+			enabled: true,
+			emailEnabled: false,
+			smsEnabled: true,
+		}).save();
+		const appointment = await createAppointment(artist._id, {
+			projectId: project._id,
+			appointmentType: 'session',
+			appointmentStatus: 'completed',
+		});
+
+		const result = await sendAutoResponsesForTrigger({ trigger: 'SESSION_COMPLETED', appointment });
+
+		expect(result).toEqual({ sent: 0, skipped: 1, failed: 0 });
+		const logs = await AutoResponseLog.find({ appointmentId: appointment._id });
+		expect(logs[0].status).toBe('skipped');
+	});
+
+	it('reports failed and logs the error, without throwing, when the send provider itself throws', async () => {
+		const { artist, project } = await shopWithConnectedArtist();
+		await new AutoResponse({
+			artistUserId: artist._id,
+			name: 'Aftercare',
+			trigger: 'SESSION_COMPLETED',
+			enabled: true,
+			emailEnabled: true,
+		}).save();
+		const appointment = await createAppointment(artist._id, {
+			projectId: project._id,
+			appointmentType: 'session',
+			appointmentStatus: 'completed',
+		});
+
+		const result = await sendAutoResponsesForTrigger(
+			{ trigger: 'SESSION_COMPLETED', appointment },
+			{ sendEmailFn: async () => { throw new Error('provider timed out'); } },
+		);
+
+		expect(result).toEqual({ sent: 0, skipped: 0, failed: 1 });
+		const logs = await AutoResponseLog.find({ appointmentId: appointment._id });
+		expect(logs[0].status).toBe('failed');
+		expect(logs[0].error).toBe('provider timed out');
+	});
 });
 
 describe('sendManualAutoResponse (the manual "Send a message" path - decisions #7/#8)', () => {
@@ -338,5 +455,109 @@ describe('sendManualAutoResponse (the manual "Send a message" path - decisions #
 				triggeredByUserId: artist._id,
 			}),
 		).rejects.toThrow(/no longer exists|deactivated/);
+	});
+
+	it('rejects a response with no channel enabled', async () => {
+		const { artist, client } = await shopWithConnectedArtist();
+		const response = await new AutoResponse({
+			artistUserId: artist._id,
+			name: 'Nothing picked yet',
+			trigger: 'MANUAL',
+			// emailEnabled defaults true - has to be turned off explicitly to reach the
+			// genuinely-no-channel case this rejects.
+			emailEnabled: false,
+		}).save();
+
+		await expect(
+			sendManualAutoResponse({
+				autoResponseId: response._id,
+				clientId: client._id,
+				triggeredByUserId: artist._id,
+			}),
+		).rejects.toThrow(/no channel enabled/);
+	});
+
+	it('rejects when the client cannot be found', async () => {
+		const { artist } = await shopWithConnectedArtist();
+		const response = await new AutoResponse({
+			artistUserId: artist._id,
+			name: 'Out of studio',
+			trigger: 'MANUAL',
+			emailEnabled: true,
+		}).save();
+
+		await expect(
+			sendManualAutoResponse({
+				autoResponseId: response._id,
+				clientId: '507f1f77bcf86cd799439011',
+				triggeredByUserId: artist._id,
+			}),
+		).rejects.toThrow(/Client not found/);
+	});
+
+	it('sends over SMS when smsEnabled', async () => {
+		const { artist, client } = await shopWithConnectedArtist();
+		client.phone = '+15095550100';
+		await client.save();
+		const response = await new AutoResponse({
+			artistUserId: artist._id,
+			name: 'Out of studio (text)',
+			trigger: 'MANUAL',
+			emailEnabled: false,
+			smsEnabled: true,
+		}).save();
+
+		const texted = [];
+		const result = await sendManualAutoResponse(
+			{ autoResponseId: response._id, clientId: client._id, triggeredByUserId: artist._id },
+			{ sendSmsFn: async (m) => { texted.push(m); return { id: 'sms-1' }; } },
+		);
+
+		expect(result.ok).toBe(true);
+		expect(result.results).toEqual([{ channel: 'sms', ok: true }]);
+		expect(texted).toHaveLength(1);
+		expect(texted[0].to).toBe('+15095550100');
+	});
+
+	// client.phone defaults to '' - the realistic way a channel goes unsent (see the equivalent
+	// note on sendAutoResponsesForTrigger's own "no phone on file" test).
+	it('reports a skipped channel, not an ok send, when smsEnabled but the client has no phone', async () => {
+		const { artist, client } = await shopWithConnectedArtist();
+		const response = await new AutoResponse({
+			artistUserId: artist._id,
+			name: 'Out of studio (text)',
+			trigger: 'MANUAL',
+			emailEnabled: false,
+			smsEnabled: true,
+		}).save();
+
+		const result = await sendManualAutoResponse(
+			{ autoResponseId: response._id, clientId: client._id, triggeredByUserId: artist._id },
+		);
+
+		expect(result).toEqual({ ok: false, results: [{ channel: 'sms', ok: false, reason: 'skipped' }] });
+	});
+
+	it('reports a failed channel and logs the error, without throwing itself, when the provider throws', async () => {
+		const { artist, client } = await shopWithConnectedArtist();
+		const response = await new AutoResponse({
+			artistUserId: artist._id,
+			name: 'Out of studio',
+			trigger: 'MANUAL',
+			emailEnabled: true,
+		}).save();
+
+		const result = await sendManualAutoResponse(
+			{ autoResponseId: response._id, clientId: client._id, triggeredByUserId: artist._id },
+			{ sendEmailFn: async () => { throw new Error('provider timed out'); } },
+		);
+
+		expect(result.ok).toBe(false);
+		expect(result.results).toEqual([
+			{ channel: 'email', ok: false, reason: 'failed', error: 'provider timed out' },
+		]);
+		const logs = await AutoResponseLog.find({ autoResponseId: response._id });
+		expect(logs[0].status).toBe('failed');
+		expect(logs[0].error).toBe('provider timed out');
 	});
 });

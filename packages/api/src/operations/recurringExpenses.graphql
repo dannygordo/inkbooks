@@ -1,0 +1,46 @@
+# Recurring expenses - Settings > Expenses on web (RecurringExpensesPanel.jsx). A TEMPLATE, not a
+# ledger row - see server/models/RecurringExpense.js: the real Expense rows it generates show up
+# on the Expenses page (expenses.graphql), written by a scheduled job as each occurrence comes
+# due. Creating/editing one here never touches the ledger directly. Named as a real, separate,
+# feature-sized cut from expenses.graphql's own header comment (X27) - this is that follow-up. See
+# DECISIONS.md X31.
+#
+# Reuses expenseTypeSettings.graphql's GetExpenseTypesForSettings for the category picker rather
+# than a third copy of the same query - this screen needs only the active list for a NEW
+# template's picker (an inactive category shouldn't be offered for a new recurring expense, even
+# though it can still be seen/reactivated from the Expense Categories screen), so it's called with
+# includeInactive left false/omitted.
+query GetRecurringExpensesList($shopId: ID, $artistUserId: ID, $includeInactive: Boolean) {
+	getRecurringExpenses(shopId: $shopId, artistUserId: $artistUserId, includeInactive: $includeInactive) {
+		id
+		expenseTypeId
+		expenseType {
+			id
+			name
+		}
+		amountCents
+		description
+		frequency
+		startDate
+		nextRunDate
+		endDate
+		active
+	}
+}
+
+mutation CreateRecurringExpense($input: CreateRecurringExpenseInput!) {
+	createRecurringExpense(input: $input) {
+		id
+	}
+}
+
+mutation UpdateRecurringExpense($input: UpdateRecurringExpenseInput!) {
+	updateRecurringExpense(input: $input) {
+		id
+		active
+	}
+}
+
+mutation DeleteRecurringExpense($recurringExpenseId: ID!) {
+	deleteRecurringExpense(recurringExpenseId: $recurringExpenseId)
+}

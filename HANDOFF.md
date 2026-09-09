@@ -4,7 +4,1352 @@
 has not been verified. `DECISIONS.md` is *rules* — the settled calls and why. They change at
 different rates, which is why they are separate files.
 
-Last updated: 2026-08-26.
+Last updated: 2026-09-05.
+
+---
+
+### 2026-09-05 (forty-first entry): confirmed green again - the SessionDetail.test.jsx timeout fix holds for real
+
+Danny ran `npm test` in both `server/` and `apps/web/` once more after X78 and reported both green.
+Confirms the fortieth entry's diagnosis was right: giving that one test 15000ms instead of the
+5000ms default was the whole fix, with no other fallout from that run's heavier machine load.
+
+This closes the loop on the small-parked-cleanup-items pass (X75-X77) and the one real test flake
+it surfaced afterward (X78): every fix made across this session's test-coverage work is now
+confirmed working against a real run, not just reasoned through.
+
+### 2026-09-05 (fortieth entry): a single test timeout, not a bug - SessionDetail.test.jsx given an explicit longer timeout
+
+With the small parked cleanup items pass closed out (X75-X77), Danny ran `npm test` in `apps/web/`
+again and got exactly one failure out of 2167: `SessionDetail.test.jsx`'s "includes typed session
+notes in the save payload" timed out at Vitest's default 5000ms.
+
+Diagnosed rather than assumed a bug, per this project's own rule. Found none: the fixture's
+`timerStatus` is `"stopped"`, so the component's 1-second re-render interval wasn't running during
+this test, and neither `IBMultilineInput` nor MUI's `TextField` do any debouncing. What actually
+sets this test apart is that it types the longest string anywhere in the file (36 characters,
+versus 32 for two other tests in the same file that were not flagged), and the run's own numbers
+point at the real cause: `collect` alone took over 24 minutes that run, a sign of the machine
+being under heavy load, not of anything slower in this codebase. Full writeup: DECISIONS.md PR6.
+
+Fixed by giving that one test an explicit 15000ms timeout - the fix Vitest's own failure message
+names directly - rather than changing application code that isn't actually slow, or leaving a
+legitimate interaction test flaky. Syntax-checked only (`@babel/parser` with the `jsx` plugin);
+needs a real `npm test` run to confirm this was the whole story.
+
+### 2026-09-04 (thirty-ninth entry): fixed the parked Web status-column bug (`UtilsService.prettyConstantsListValue`) - first of the small parked cleanup items
+
+With the test-coverage effort confirmed closed (thirty-eighth entry), Danny asked what's next and
+picked "small parked cleanup items" - the handful of minor, non-blocking things sitting in this
+file's "Known gaps" and DECISIONS.md's "Open" section. Started with the most concrete one: the
+Web Projects/Search Status column has been silently blank since it was built.
+
+`UtilsService._prettyConstantsListValue` checked `item.VALUE`/`item.LABEL` (uppercase) when every
+constants list (`PROJECT_STATUS`, `APPOINTMENT_STATUS`, `BILLING_TYPE`, ...) is keyed lowercase
+`value`/`label`, and separately guarded on `val >= 0` - never true for a status string, which
+coerces to `NaN`. Either defect alone would have broken it; together, the function has never once
+returned a real label for either of its two call sites (`Projects.jsx`, `Search.jsx`). Both pages
+silently rendered an em dash in their Status column for every project, always. Full root-cause and
+fix writeup: DECISIONS.md PR5 (this also removes the now-stale "Open" item that first flagged the
+gap).
+
+`Projects.test.jsx` had a test that had encoded the bug as expected behavior (matching the
+anti-pattern PR3/PR4 corrected elsewhere in the suite) - rewrote it to assert the real label, and
+added a new test confirming the legitimate fallback (an unrecognized status still renders the em
+dash) still holds. `Search.test.jsx` had zero coverage of the projects-results list at all - its
+`searchMock()` helper always defaulted `projects: []` - so extended it to accept a `projects`
+option and added coverage for the same Status column there.
+
+As with every fix this session, this could not be run against a real Vitest suite from here -
+syntax-checked only (`node -c` for the source file, `@babel/parser` with the `jsx` plugin for both
+test files). **Needs a real `npm test` run in `apps/web/` to confirm** before treating this as
+closed.
+
+### 2026-09-04 (thirty-eighth entry): confirmed green - both suites pass for real, closing out the test-coverage effort
+
+Danny ran `npm test` in both `server/` and `apps/web/` once more after X73 and reported both green.
+This is the first time either suite has been confirmed passing against a real run since the
+coverage tail closed out in the thirty-fifth entry - every fix since then (X72's CJS `vi.mock()`/
+`vi.spyOn()` correction and the `expenses.test.js` race-condition fix, X73's two web test-hygiene
+fixes) had only ever been verified by reading source and reasoning it through, or by an isolated,
+DB-independent reproduction, because neither this sandbox nor its device-bridge VM could run either
+suite directly (MongoDB memory-server download blocked in both for `server/`; a broken `@rolldown`
+native binding blocking Vitest entirely for `apps/web/`, even on Danny's own machine).
+
+This closes the loop the thirty-fifth entry opened: every web component and every
+`server/utils/*.js` file has real test coverage, and that coverage - plus the four bugs the first
+real run of it surfaced (X72/X73) - is now confirmed working, not just reasoned to be working. The
+test-coverage completion effort (`X61`-`X73`) is done.
+
+### 2026-09-04 (thirty-seventh entry): the web suite's X72 fix unmasked a second, real bug in the same file, plus a genuine unhandled-rejection flake elsewhere - both fixed
+
+Danny re-ran `npm test` in `apps/web/` after X72. The `ShopAnalyticsPanel.test.jsx` fix landed
+(the "Revenue"/"Tips" ambiguous-match test now passes), which is exactly what let the file's
+*second* failure become visible on its own for the first time - confirming the thirty-sixth entry's
+hedge that the original "Tests 2 failed" summary might not have been the same test's two assertions
+after all. Down to "Tests 1 failed | 2164 passed (2165)", plus one separate unhandled rejection
+Vitest flagged in a different file. Full technical writeup for both: DECISIONS.md PR4.
+
+**The remaining web failure**, `ShopAnalyticsPanel.test.jsx`'s "shows a message and no query at all
+when there is no shopId" test, rendered the panel with a null `shopId` without first configuring
+its `AnalyticsService.getShopAnalytics` mock, and asserted that mock was never called. Both were
+wrong: the real service wraps Apollo's `useQuery` with `skip: !shopId`, and Rules of Hooks mean the
+component calls it on every render regardless of `shopId` - `skip` is what suppresses the network
+request, not the component skipping the call. The unconfigured mock returned `undefined`, and
+destructuring it crashed before the component's own no-shopId branch, and thus before the (also
+wrong) assertion below it, ever ran. Fixed by configuring the mock first and asserting the call
+that actually happens.
+
+**The unhandled rejection**, in `GuestConversation.test.jsx`'s "disables the Send button while the
+mutation is in flight" test, was a real, if latent, gap: that test deliberately delays a mutation
+mock by 50ms to catch the button mid-flight, then ended immediately - never registering a mock for
+the `refetch()` its `onCompleted()` fires on resolution, and never waiting for either to settle.
+The mutation kept running after the test (and the file) finished; once Vitest tore down jsdom, its
+resolution tried to schedule a React update against a `window` that no longer existed. Not a
+`GuestConversation.jsx` bug - a real browser tab's `window` outlives an unmount, so the component's
+own defensive comment about this exact scenario holds in production. Fixed by adding the missing
+mock and awaiting the button's return to enabled before the test ends.
+
+Confirmed in this sandbox and its device-bridge VM: both files parse correctly (`@babel/parser`
+with the `jsx` plugin - Vitest itself still can't run in either environment, `apps/web`'s own
+broken `@rolldown` native binding blocks it even on Danny's machine, on top of this sandbox's
+already-known MongoDB-download block for `server/`). **Not yet confirmed: neither fix has been run
+for real.** Danny needs to run `npm test` in `apps/web/` (and `server/`, still outstanding from the
+thirty-sixth entry) once more.
+
+### 2026-09-04 (thirty-sixth entry): Danny ran `npm test` for real - 27 failures across both suites, all fixed; the fixes themselves still unconfirmed against a real run
+
+The thirty-fifth entry below asked Danny to run `npm test` in both `server/` and `apps/web/` since
+neither this sandbox nor its device-bridge VM can (`fastdl.mongodb.org`, the MongoDB memory-server
+binary host, returns 403 from both). He did, and pasted the raw output: `apps/web` came back
+"Tests 2 failed | 2163 passed (2165)" and `server` came back "Tests 26 failed | 1276 passed
+(1302)" across five files. Exactly the outcome PR1/DECISIONS.md predicts every real run has so far
+produced - genuine bugs, not flukes.
+
+**The 26 server failures were one root cause wearing four hats.** `test/integration/loaders.test.js`,
+`test/integration/reminders.test.js`, `test/integration/notificationJobs.test.js`, and
+`test/unit/business-jobs.test.js` all used `vi.mock('../../utils/x', factory)` followed by a
+destructured `const { fn } = require('../../utils/x')` - which is the documented, correct pattern
+under Jest and under Vitest for ES `import`/`export`, but this whole server is CommonJS, and
+Vitest's `vi.mock()` hoisting only rewrites Vite's own ESM module graph. A plain `require()` call
+never consults that graph - it resolves straight to the real, unmocked module - so every one of
+those "mocked" functions had actually been running for real all along. Confirmed with a
+from-scratch, DB-independent Vitest reproduction (couldn't run the real DB-backed suite here for
+the same MongoDB-download reason above). Fixed by `vi.spyOn()`-ing the already-`require()`'d module
+object instead, installed before the consumer module is required wherever that consumer
+destructures at its own module-load time. Full writeup, including the one ordering gotcha and why
+it wasn't caught sooner: DECISIONS.md PR3. Audited the other four files in the suite that mention
+`vi.mock` (`emailSms.test.js`, `messageNotifications.test.js`, `pushNotifications.test.js`,
+`shopCutLedger.test.js`) - all four are false-positive greps already using `vi.spyOn()` or plain
+dependency injection, not exposed to this.
+
+**A fifth server failure was a wrong test premise, not a mocking bug**:
+`test/integration/expenses.test.js`'s duplicate-rerun test called `generateDueRecurringExpenses`
+twice at the same `now`, but the function's own query (`nextRunDate: { $lte: now }`) excludes a
+template from a second same-`now` call after the first call's `updateOne` advances it past `now` -
+so the duplicate-key catch it meant to exercise (a defense against two *concurrent* runs, not a
+same-process rerun) could never fire. Fixed by resetting the template's `nextRunDate` backward
+between the two calls to actually simulate the race.
+
+**The 2 web failures were both the same, single, genuine assertion bug**:
+`ShopAnalyticsPanel.test.jsx`'s "shows the money columns on the per-artist table" test called plain
+`getByText("Revenue")`/`getByText("Tips")`, which throws "multiple elements found" the moment
+`canSeeMoney: true` and a non-empty artist list are both true, because the component renders both
+labels twice (a shop-wide `StatCard` and a per-artist table column header). Fixed with
+`getAllByText(...).toHaveLength(2)`. (Danny's paste showed a "Tests 2 failed" summary for one
+located bug in this file; a full read of all 286 lines found no second ambiguous-match site, so the
+"2" is most likely this one test's two assertions, both counted - flagged here rather than silently
+assumed, in case a re-run still shows a second, distinct failure.)
+
+Confirmed in this sandbox: `node -c` on every changed file. **Not yet confirmed: none of these five
+fixes has been run against a real MongoDB or the real web test runner anywhere** - only reasoned
+through against the actual source and validated generically (the vi.mock/vi.spyOn mechanics, not
+these specific test files) via an isolated repro harness. **Danny needs to run `npm test` in both
+`server/` and `apps/web/` again** to confirm these fixes actually clear the reported failures.
+
+### 2026-09-04 (thirty-fifth entry): Test-coverage tail closed out - every web component and every `server/utils/*.js` file now audited, two real bugs found
+
+PRODUCTION_ROADMAP.md's "Suggested sequencing" item 10 and this file's own "Known gaps" entry both
+named the same remainder: `utils/appChrome.js` and ~48 other `components/**/*.jsx` files with no
+test file, plus ~46 `server/utils/*.js` files never individually audited against the 15 that
+already had unit tests. Both are closed now, across commits `X61`-`X70`.
+
+**Web (`X61`)**: the last of the untested components - `StatCard`, `ShopAnalyticsPanel`, and the
+Square/gift-card payment forms - got real test files, closing out the ~48-file remainder named
+above and in the 2026-08-26 entry.
+
+**Server (`X62`-`X70`)**: went through every remaining `server/utils/*.js` file batch by batch
+(auth/security, business/shop, client/booking, notification-copy, auto-responses, reminders,
+money/analytics, infra/plumbing), then ran a final sweep across all 65 files in the directory to
+catch anything outside the originally-scoped batches. Every file landed in one of three buckets:
+got direct unit tests (`reminders.js`, `shared-images.js`, `tag-color.js`, `event-log.js`,
+`search.js`, `loaders.js`, and others), confirmed already covered indirectly through
+resolver/mutation-level tests (`analytics.js` via `analytics.test.js`, `conversations.js` via
+`conversations.test.js`, `artist-shop.js` via `artistShopConnections.test.js`/`attention.test.js`,
+and several more), or judged a thin infra wrapper not worth a dedicated test (`constants.js`,
+`logger.js`, `error-reporting.js`, `firebase-admin.js` - each is a thin pass-through over pino,
+Sentry, or the Firebase Admin SDK with no branching logic of its own to assert on).
+
+**Two real production bugs turned up doing this**, both found the same way: reading a util's
+actual source and actual `module.exports` in full before trusting how something else mocks or
+destructures it, rather than assuming coverage exists because a resolver test happens to touch the
+same code path with the module mocked out.
+
+1. `models/Notification.js`'s `subjectType` enum was missing `'boothRentCharge'` - every attempt to
+   create that notification type was silently rejected at the Mongoose validation layer. Fixed in
+   `X67`, alongside coverage for the rest of that enum's branches.
+2. `utils/email.js` defined its own `sendEmail()` - the raw primitive every other `send*()` helper
+   in that file calls - but never included it in `module.exports`. `utils/reminders.js` does
+   `const { sendEmail } = require('./email')` directly (it builds its own subject/body from
+   `ReminderSettings` templates rather than going through any of `email.js`'s named wrappers), so
+   that destructuring silently resolved to `undefined`. Every email appointment reminder was
+   throwing `"sendEmail is not a function"`, caught by `sendRemindersForArtist`'s own per-channel
+   try/catch and logged to `ReminderLog` as `'failed'` - the sweep itself never crashed, so nothing
+   surfaced this anywhere a person would see it. SMS reminders were unaffected (`utils/sms.js`
+   correctly exports `sendSms`). Invisible to the existing suite because every test that touches
+   this path does `vi.mock('../../utils/email', () => ({ sendEmail: vi.fn() }))`, which replaces
+   the whole module and can never catch a missing export on the real one. Fixed in `X70`, plus a
+   direct regression test (`test/integration/emailSms.test.js`) that requires the real, unmocked
+   modules the same way `reminders.js` does, so this exact class of bug (a destructured import
+   silently resolving to `undefined`) can't recur unnoticed for either channel.
+
+**New files this round**: `test/integration/reminders.test.js`, `sharedImages.test.js`,
+`tagColor.test.js`, `eventLog.test.js`, `loaders.test.js`, `search.test.js`, `emailSms.test.js`.
+Extended: `attention.test.js` (added `unredeemedInvites`/`squareHealth` coverage - the two
+conditions in `attentionForUser` that had only ever gotten empty-list coverage), `expenses.test.js`
+(added `advanceByFrequency` UTC-exactness, weekly/yearly due-occurrence, the 60-occurrence-per-run
+cap, and duplicate-skip-reporting tests for `generateDueRecurringExpenses`).
+
+Confirmed in this sandbox: every new/modified test file passes `node -c` syntax checks; every new
+test was written and verified line-by-line against the real source file's actual schema, exports,
+and branching logic (not against how existing tests happen to mock it) before being finalized.
+
+Not yet confirmed: **none of this - the ~10 new/modified test files above, nor the two production
+fixes (`models/Notification.js`, `utils/email.js`) - has been run against a real MongoDB in this
+sandbox.** The memory-server binary download this suite needs (`fastdl.mongodb.org`) is blocked
+here, same limitation as every other server test file in this repo. **Danny still needs to run
+`npm test` in both `server/` and `apps/web/`** to confirm the full suite (existing plus everything
+above) actually passes for real before this can be called fully closed.
+
+### 2026-09-04 (thirty-fourth entry): ShopConnectionPanel - an artist's own shop connect/disconnect/move flow
+
+Last item from the Settings/Messages follow-up list (thirty-third entry above named this as the
+one remaining item after Booth Rent). Full reasoning: DECISIONS.md X46.
+
+Folded into `settings/shop.tsx` alongside the existing shop-admin money panel, each gated
+separately now (admin-with-shop for the money section, any artist at all for the connection
+section). Widened `settings/index.tsx`'s "Shop" nav link from admin-with-shop to any artist, since
+an independent artist or a non-admin shop-connected artist could never reach this screen under the
+old gate. New `ConnectArtistToShop`/`DisconnectArtistFromShop`/`GetShopForConnection` operations in
+`artistShopConnections.graphql`; `login.graphql`'s `Artist.shop` selection gained `website`.
+
+Both of web's confirmation dialogs (a `window.confirm` for disconnect, a custom backdrop-and-modal
+for the shop-transfer case) became native `Alert.alert` calls, matching `ArchiveControl.tsx`'s own
+established precedent for this - no ported dialog markup, no `pendingTransfer` render state.
+
+This closes the Settings/Messages follow-up list in full - every item from X31's original list,
+including both of X44's own named leftovers, is done.
+
+Confirmed in this sandbox: `packages/api` codegen + build clean (new mutation/lazy-query hooks,
+widened `Login` response type), `apps/mobile` `tsc --noEmit` clean, full `apps/mobile` Jest suite -
+still 233/233. No server-side changes - all three operations already existed.
+
+---
+
+### 2026-09-04 (thirty-third entry): Booth rent - the artist's read-only "Your booth rent" card
+
+Next slice after the Settings/Messages follow-up list closed (thirty-second entry) - one of the
+two items left over from that list, picked over the other (`ShopConnectionPanel.jsx`) for having
+no confirm-dialog/native-alert design work and one screen it can fold straight into. Full
+reasoning: DECISIONS.md X45.
+
+Folded into `settings/rates.tsx`, not a new screen - same placement as web (Rates category, right
+after the rate fields). Renders nothing at all when `getBoothRentPlans` comes back empty, same as
+web's `BoothRentPanel.jsx`. New `packages/api/src/operations/boothRent.graphql`
+(`GetBoothRentPlans`/`GetBoothRentCharges`/`MarkBoothRentPaidManually` only - the shop-admin
+mutations aren't called from any mobile screen yet) - server-side, everything already existed, so
+client-operations-only.
+
+New `formatUtcMonthYear`/`formatUtcMonthDay` in `utils/utcDate.ts`, extending the module
+`formatUtcCalendarDate` already established rather than inlining two more UTC-safe date
+formatters - each gets its own test cases in `utcDate.test.ts`. Status label kept as fixed hex
+text color (matching `styles.error`'s `'#D33'` precedent) rather than adding a success/warning/
+info slot to `constants/theme.ts` or building a `Chip`-equivalent component for three short
+labels. Ordinal due-day suffix ("1st"/"2nd"/"3rd"/"...th") ported byte-for-byte from web, existing
+"21th" edge case included - a direct port, not a fix for a bug nobody has raised.
+
+This closes the last item named as its own future slice from the Settings/Messages follow-up work
+except `ShopConnectionPanel.jsx` itself, which remains open - see Next below.
+
+Confirmed in this sandbox: `packages/api` codegen + build clean (new `useGetBoothRentPlansQuery`/
+`useGetBoothRentChargesQuery`/`useMarkBoothRentPaidManuallyMutation` hooks), `apps/mobile`
+`tsc --noEmit` clean, full `apps/mobile` Jest suite - 233/233 (229 plus 4 new `utcDate.test.ts`
+cases). No server-side changes - all three operations already existed.
+
+---
+
+### 2026-09-04 (thirty-second entry): Security - the audit trail (Settings/Messages follow-up list complete)
+
+Next slice from the Settings follow-up list, after Appearance (X43). Full reasoning: DECISIONS.md
+X44.
+
+New `settings/security.tsx`, direct port of `EventLogPanel.jsx`: a read-only audit trail of who
+changed what, filterable by entity type and paged. New `packages/api/src/operations/
+eventLogs.graphql` (`GetEventLogs`) - server-side, everything already existed, so
+client-operations-only.
+
+Gated on a new, more general `hasAuditAuthority` export in `utils/businessScope.ts`
+(`isShopAdminOrBetter(user) || !hasShop(user)`) rather than a new one-off check - it turned out to
+be byte-for-byte what mobile's existing `canManageForms` already computed under a
+feature-specific name, so `canManageForms` now delegates to it instead of duplicating the
+expression. Verified no behavior change: `businessScope.test.ts` passes unmodified. Page-size
+picker (unlike X42's cut of the live-availability check) was ported as-is via the shared
+`PillRow` component, same as the entity-type filter. Date/time formatting is a new screen-local
+`formatEntryTime` (hand-rolled `toLocaleDateString`/`toLocaleTimeString`, no `moment`/`date-fns`
+dependency on mobile) rather than reusing `utils/messageTime.ts`, which formats a different kind
+of timestamp for a different purpose. `formatChangeValue` reuses the existing `Cents$`
+field-name-suffix convention (via `utils/money`'s `formatCents`) to render dollar amounts instead
+of raw cent integers in the changes list.
+
+This completes every item on X31's originally-named Settings/Messages follow-up list except the
+two named separately as their own future slices from the start: Booth Rent (`BoothRentPanel.jsx`,
+named under X37) and `ShopConnectionPanel.jsx` (named under X36) - neither had existing mobile
+infrastructure to build on.
+
+Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+full `apps/mobile` Jest suite - still 229/229. No server-side changes.
+
+---
+
+### 2026-09-04 (thirty-first entry): Appearance - account-level theme, not a device setting
+
+Next slice from the Settings follow-up list, after Forms' "Your link" (X42). Full reasoning:
+DECISIONS.md X43.
+
+New `settings/appearance.tsx`, direct port of `AppearancePanel.jsx`: light/dark/match-device,
+saved to the account (`User.themePreference`), not the device. Turned out to require more than a
+new screen: mobile's `useTheme()` had no override mechanism at all before this, only a raw OS
+read. Added `hooks/use-effective-color-scheme.ts` as the one hook that now resolves the account
+preference (falling back to the OS setting), wired both `hooks/use-theme.ts` (every screen's
+StyleSheet colors) and `_layout.tsx`'s React Navigation `ThemeProvider` (header/nav chrome)
+through it - the header would otherwise have silently disagreed with the body the moment someone
+picked an explicit override, which nothing about the screen itself would have caught. Moved that
+`ThemeProvider` from `RootLayout` into `RootNavigator` in the process, since resolving the
+preference needs `useAuth()`, only callable inside `AuthProvider`.
+
+Widened `packages/api/src/operations/updateUser.graphql` to select `themePreference` on the
+response - its own header comment had predicted this moment. No new query needed; `login.graphql`
+already selects `themePreference`.
+
+Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+full `apps/mobile` Jest suite - still 229/229. No server-side changes.
+
+---
+
+### 2026-09-03 (thirtieth entry): Forms' per-artist "Your link" section
+
+Next slice from the Settings follow-up list, after Messages (X38-X41) completed. Full reasoning:
+DECISIONS.md X42.
+
+New `settings/your-link.tsx`, direct port of `FormsPanel.jsx`'s "Your link" half: the artist's own
+handle, the `<ownerHandle>` part of every form's public URL. New `packages/api/src/operations/
+myBookingLink.graphql` - server-side, everything already existed, so client-operations-only.
+"Manage Forms" (web's other half of this category) is NOT rebuilt here - mobile's home screen
+already has its own direct button to forms/index.tsx.
+
+Two things worth flagging: no live availability check as you type (web's own debounced
+`checkBookingSlugAvailable` call, explicitly named a "courtesy" in its own header comment) - a
+real, separate scope cut, not silently dropped. And this is the first screen in the port that
+needed to read a field-scoped GraphQL error (`err.graphQLErrors[0].extensions.errors.bookingSlug`)
+rather than the top-level message, since `updateMyBookingSlug` throws `UserInputError('Errors',
+...)` on a collision and the plain message would just say "Errors."
+
+Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+full `apps/mobile` Jest suite - still 229/229. No server-side changes.
+
+---
+
+### 2026-09-03 (twenty-ninth entry): Messages batch 4 - System Message Templates (Messages category complete)
+
+Fourth and last Messages sub-slice, completing the category. Full reasoning: DECISIONS.md X41.
+
+New `settings/system-message-templates.tsx`, direct port of `SystemMessageTemplatesPanel.jsx`: an
+owner-editable override for one of the app's hardcoded outbound emails - a fixed list of 7 keys
+(account-invite/password-reset stay hardcoded on purpose, never in this list), each always shown
+as either "Customized" or "Default." New `packages/api/src/operations/
+systemMessageTemplates.graphql` - server-side, everything already existed, so
+client-operations-only.
+
+Reused the inline-editor-card shape from Auto-Responses (X39), edit-only since there's no create
+step for a fixed key list. Reset uses the `secondary` Button variant (not `danger`, unlike
+Auto-Responses' "Deactivate") since it's a low-consequence, instantly-reversible action - matches
+web's own choice not to confirm it either.
+
+This completes X31's Messages category: Reminders (X38), Auto-Responses (X39), Response Time
+(X40), and System Messages (X41) are all built. Remaining named Settings/follow-up work: Booth
+Rent, Forms' per-artist "Your link" section, Appearance, Security, and `ShopConnectionPanel.jsx`.
+
+Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+full `apps/mobile` Jest suite - still 229/229. No server-side changes.
+
+---
+
+### 2026-09-03 (twenty-eighth entry): Messages batch 3 - Response Time
+
+Continuing down the Messages sub-slice list from the twenty-seventh entry. Full reasoning:
+DECISIONS.md X40.
+
+New `settings/response-time.tsx`, direct port of `ResponseTimePanel.jsx`: how long an unanswered
+client message waits before the artist is nudged, and how often the nudge repeats. New
+`packages/api/src/operations/responseTimeSettings.graphql` - server-side, everything already
+existed, so client-operations-only.
+
+The one real structural difference from Auto-Responses (X39): only the artist's OWN card is ever
+editable here. A shop-connected artist sees the shop's numbers only as a read-only ceiling on
+their own row, never as a second editable section - checked directly against web's own header
+comment rather than assumed. A shop-admin-and-artist gets both: their own card plus a genuinely
+separate, editable "Shop Response Time" card.
+
+Not built: `SystemMessageTemplatesPanel.jsx` - the last Messages sub-slice.
+
+Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+full `apps/mobile` Jest suite - still 229/229. No server-side changes.
+
+---
+
+### 2026-09-03 (twenty-seventh entry): Messages batch 2 - Auto-Responses
+
+Continuing down the Messages sub-slice list from the twenty-sixth entry. Full reasoning:
+DECISIONS.md X39.
+
+New `settings/auto-responses.tsx`, direct port of `AutoResponsesPanel.jsx`: message templates
+fired automatically on a trigger (session completed, payment received, client message) or kept
+for a manual send elsewhere (that manual picker, `sendAutoResponseNow`, stays out - already
+excluded per `SessionDetailForm.tsx`'s own note). New `packages/api/src/operations/
+autoResponses.graphql` - server-side, everything already existed, so client-operations-only.
+
+Two independent sections render at once for a shop-connected shop-admin (own set + shop's set),
+matching web exactly - never a toggle between them. No cross-platform modal primitive exists in
+this app (confirmed by grep), so web's create/edit Dialog became an inline editor card instead -
+one editor slot per section, opened by "New" or a row's "Edit", the same "actions stay on the
+list" shape as FormBuilder (X30) and recurring-expenses.tsx's own add-new-entry layout, extended
+here to also cover editing an existing row.
+
+Not built: `ResponseTimePanel.jsx`, `SystemMessageTemplatesPanel.jsx` - the rest of Messages.
+
+Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+full `apps/mobile` Jest suite - still 229/229. No server-side changes.
+
+---
+
+### 2026-09-03 (twenty-sixth entry): Messages batch 1 - Reminders
+
+Next slice from the same Settings follow-up list. Full reasoning: DECISIONS.md X38.
+
+Messages is web's largest remaining named chunk (four panels, 1,175 combined lines) - taken one
+screen at a time rather than as one slice, same as Settings itself was. This is the first:
+Reminders (appointment nudges to clients, by email and/or text). New `settings/reminders.tsx`
+(gated `user.userType === 'artist'`), new self-scoped `packages/api/src/operations/
+reminderSettings.graphql` (`GetReminderSettings`/`UpdateReminderSettings` - both already existed
+server-side, so this was client-operations-only). Reached from a new "Messages" card on
+`settings/index.tsx`.
+
+Confirmed directly against `server/models/ReminderSettings.js` before writing the helper text:
+one shared InkBooks texting number, not one registered per artist - turning Text reminders on
+just starts using the number InkBooks already has.
+
+Fully controlled, hydrated once (a `hydrated` flag, matching web's own `useEffect` gate) rather
+than rates.tsx's (X37) uncontrolled/edit-tracked pattern - every field here is meant to reflect
+live local state after load, unlike a `TextInput` needing only an initial value.
+
+`PillRow` (X37) used again for the per-rule unit picker - third real call site.
+
+Not built: `AutoResponsesPanel.jsx`, `ResponseTimePanel.jsx`, `SystemMessageTemplatesPanel.jsx` -
+each its own remaining Messages sub-slice.
+
+Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+full `apps/mobile` Jest suite - still 229/229 (no new pure-logic module needed). No server-side
+changes.
+
+---
+
+### 2026-09-03 (twenty-fifth entry): Settings batch 4 - an artist's own Rates
+
+Next slice from the same Settings follow-up list. Full reasoning: DECISIONS.md X37.
+
+New `settings/rates.tsx` (gated `user.userType === 'artist'`, matching web's own category gate),
+port of `RatesPanel.jsx`: billing type + hourly/flat rate (new `GetMyRateSettings`/
+`UpdateArtistRateSettings` operations - a SELF-scoped query, deliberately not the leaner
+Staff-or-better `GetArtistDetail` roster query, which drops these fields on purpose - X22) and,
+for a shop-connected artist, which rate actually applies to their sessions (new
+`SetArtistShopRateSource` mutation against `GetArtistShopConnections`'s existing `rateSource`
+field). Verified the two different id shapes this touches (`getArtist` takes the Artist profile's
+own id; `getArtistShopConnections`/`setArtistShopRateSource` take the artist's USER id) against
+the resolver source and existing mobile call sites, not assumed from field names.
+
+`PillRow` extracted from `form/[id].tsx` into `components/PillRow.tsx` - built there as a local
+component (X30), this screen's billing-type/rate-source pickers are the second real caller. No
+behavior change to the form editor's own picker.
+
+Not built: `BoothRentPanel.jsx`'s "your booth rent" card - real, separate scope, no existing
+mobile infrastructure to build it on.
+
+Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+full `apps/mobile` Jest suite - still 229/229. No server-side changes - everything used here
+already existed.
+
+---
+
+### 2026-09-03 (twenty-fourth entry): Settings batch 3 - Shop's shop-cut-percent editor + shop-wide form link
+
+Picked as the next slice after the three-item follow-up round closed - "More Settings," highest
+remaining priority per X31/X34's own list. Full reasoning: DECISIONS.md X36.
+
+New `settings/shop.tsx` (its own screen, not a third card on `settings/index.tsx` - needs its own
+`GetShopDetail`+`GetFormsList` queries). Two fields, matching web's `ShopPanel.jsx` exactly: shop
+cut percent (save-on-blur, new `UpdateShopCutPercent` operation against the existing `updateShop`
+mutation) and the shop's own form-link handle (`formSlug` - not a `ShopInput` field at all, its
+own dedicated `updateMyShopFormSlug` mutation), plus the resulting shop-wide form links list
+(`selectTextOnFocus` relative-path display, same call as `form/[id].tsx`/`forms/index.tsx` - no
+`window.location.origin` equivalent on mobile). `shop/[id].tsx`'s `ShopCutCard` now links to this
+screen instead of admitting no such screen existed.
+
+Named, not folded in: `ShopConnectionPanel.jsx` (an artist's own shop connect/disconnect/move
+flow) - checked directly, found substantial, left as its own future slice.
+
+Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+full `apps/mobile` Jest suite - still 229/229. No server-side changes - both mutations already
+existed.
+
+---
+
+### 2026-09-03 (twenty-third entry): Messages follow-ups - image-attachment compose + per-row "mark unread"
+
+Last of three follow-up items ("Settings batch 2, Messages follow-ups, Mobile deep-link scheme") -
+closes the round. Full reasoning: DECISIONS.md X35.
+
+Closes two of X16's three named gaps: **image-attachment compose** (`messages/[id].tsx`, port of
+web's `IBChatBox.jsx` - upload-on-select via a hand-built multipart POST to `routes/
+messageUploads.js`, using `restApi.ts`'s existing `restApiUrl`/`getAccessToken`; up to 5 images,
+image-only sends allowed) and **per-row "mark unread"** (`ConversationRow.tsx` +
+`messages/index.tsx`, new `MarkConversationUnread` operation against the `markConversationUnread`
+mutation that already existed server-side - rendered as a plain trailing text button, no icon
+library in this app). Group/shop-wide conversations and search-by-name (X16's third gap) remain
+open - real, separate scope, named rather than attempted here.
+
+Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+full `apps/mobile` Jest suite - still 229/229 (no new screen-level tests, matching X16's own
+precedent for this slice's components). **Not verified**: a real multipart upload against a
+running server or a real device - built by reading `routes/messageUploads.js`'s multer config and
+web's own working fetch call directly, not assumed, but not exercised end-to-end here.
+
+**This closes the requested three-item follow-up round in full** ("Settings batch 2, Messages
+follow-ups, Mobile deep-link scheme" - X33/X34/X35, done in that order for continuity between the
+first two).
+
+---
+
+### 2026-09-03 (twenty-second entry): Settings batch 2 - artist's own Square connection + tax/processing pricing
+
+Third of three follow-up items ("Settings batch 2, Messages follow-ups, Mobile deep-link scheme"),
+done first for continuity with the entry above. Full reasoning: DECISIONS.md X34.
+
+Two new cards on `settings/index.tsx` (not new routes): `SquareConnectionCard` and
+`SquarePricingCard`, ports of web's `SquarePanel.jsx`/`SquarePricingPanel.jsx`. Distinct from
+`shop/[id].tsx`'s `SquareCard` - that connects the SHOP's account, this is the ARTIST's own
+(M9). Reuses X33's `platform: "mobile"` deep-link mechanism for free (the resolver already
+supported it) - `settings/index.tsx` now reads `?square=` and shows a banner, closing the one
+follow-up X33 itself named as open. New `packages/api/src/operations/squareSettings.graphql`
+(`GetMySquareConnection`, `GetMySquareAuthorizationUrl`, `DisconnectMySquare`,
+`GetMySquarePricingSettings`, `UpdateSquarePricingSettings`). New `utils/money.ts` exports
+`basisPointsToPercent`/`percentToBasisPoints`, promoted out of `SquarePricingPanel.jsx`'s own
+local helpers.
+
+One noted, not fixed, inconsistency: this card's disconnect confirms first (`Alert.alert`,
+matching web); `shop/[id].tsx`'s own disconnect has no confirmation at all - a real gap noticed
+while building this, named rather than copied, left for whenever that screen is next touched.
+
+Confirmed in this sandbox: `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+full `apps/mobile` Jest suite - 229/229, up from 223. No server-side changes in this entry (X33
+already touched typeDefs/resolvers).
+
+This closes two of the three new follow-up items ("Settings batch 2, Messages follow-ups, Mobile
+deep-link scheme") - Mobile deep-link scheme (X33) and this. Messages follow-ups (image-attachment
+sending, group/shop-wide conversations, per-row mark-unread - X16) is next.
+
+---
+
+### 2026-09-03 (twenty-first entry): Mobile's first real deep link - Square OAuth "return to the app"
+
+Second of three follow-up items ("Settings batch 2, Messages follow-ups, Mobile deep-link scheme").
+Full reasoning: DECISIONS.md X33.
+
+`app.json`'s `"scheme": "inkbooks"` has existed since the app was scaffolded but nothing ever
+constructed or consumed an `inkbooks://` URL until now. Fixes exactly one of the two named
+"no deep link" gaps - Square OAuth's return-to-app (X24) - and NOT the other: a custom scheme can
+only fire from script or a tapped link on a page the app controls, so it cannot make the
+password-reset email link (X29) tappable the way a real Universal Link would. That gap is
+unchanged and still needs a registered domain, hosted association files, and signed builds - none
+buildable here.
+
+**Server:** `getSquareAuthorizationUrl`/`getMySquareAuthorizationUrl` take a new optional
+`platform: String` arg (defaults to `'web'`, so every existing web call site is unaffected).
+`routes/squareOAuth.js`'s `signState`/`verifyState` seal it inside the same signed `state` JWT that
+already carries `ownerType`/`ownerId`/`purpose` (M9). The callback route's new
+`respondToOAuthResult` branches on it: `'web'` keeps the old redirect
+(`webRedirectUrl`, renamed from `settingsRedirectUrl`), `'mobile'` gets a small self-contained HTML
+page (`mobileReturnPageHtml`) that scripts a redirect to `inkbooks://shop/:id?square=<status>` (or
+`inkbooks://settings?square=<status>` for an independent artist) with a manual "Open InkBooks"
+button as fallback. New `describe('signState: platform claim')` block in
+`test/unit/square-oauth-state.test.js` - four pure-function tests (default, explicit mobile,
+explicit web, rejecting a bad value), no schema/mongod involved this time, specifically to avoid
+repeating the twentieth entry's mistake. Confirmed the three existing Square test files don't pass
+a `platform` argument anywhere, so nothing already-passing changes. `node --check` on every touched
+server file.
+
+**Mobile:** `packages/api`'s `GetSquareAuthorizationUrl` operation now sends `platform: "mobile"`
+as a literal (mobile-only operation, so no call-site variable needed) - ran `codegen`+`build` after
+the change. `shop/[id].tsx` reads the new `?square=` param, shows a connected/cancelled/error
+banner (`SquareCard`'s new `returnStatus` prop), and `refetch()`s on that param via `useEffect` as
+a belt-and-suspenders alongside the query's existing `cache-and-network` policy. Corrected the
+screen's own header comment, which used to name this exact gap. `settings/index.tsx` (the
+independent-artist equivalent) does NOT yet read a `square` param or show a banner - named here as
+a narrow, real follow-up, since Settings batch 2 (next in this same round) is about to touch that
+screen anyway.
+
+**Confirmed in this sandbox:** `apps/mobile` `tsc --noEmit` clean, full `apps/mobile` Jest suite -
+223/223 (no new mobile tests added - none of the touched mobile code has branching pure logic worth
+isolating beyond what's already covered). `packages/api` codegen + build clean. `node --check` on
+`typeDefs.js`/`resolvers/shops.js`/`routes/squareOAuth.js`/`square-oauth-state.test.js`. **Not
+confirmed:** whether `inkbooks://shop/<id>?square=connected` actually resolves to the right route
+with the right params on a real device or simulator - relies on expo-router's default scheme-based
+linking with no explicit `linking` config, which nothing in this sandbox can tap and watch land.
+Also not confirmed: the full server integration suite (same standing `fastdl.mongodb.org` block as
+always).
+
+---
+
+### 2026-09-03 (twentieth entry): Push notifications now carry a subject, and tapping one opens the right screen
+
+Last of four follow-up items ("do 2, 3, 4 and 5") - closes out this round. Full reasoning:
+DECISIONS.md X32.
+
+**Server:** `utils/notifications.js`'s `notify()` now passes `data: { type, subjectType,
+subjectId }` into its one `push.sendPushForRecipients` call - `sendPushForRecipients` itself
+(`utils/push.js`) has accepted and forwarded a `data` object since Phase 5 step 7, but nothing was
+ever passed. Checked directly against the current code rather than trusting an earlier note in
+this project's own history that claimed this was already wired up - it wasn't. One test in
+`test/integration/pushNotifications.test.js` (a second, invalid one - "sends null subjectId when
+an event has none" - was removed after the user's own `npm test` run caught it: `subjectId` is
+`required: true` on the `Notification` schema, so `delete event.subjectId` before calling
+`notify()` fails at `Notification.insertMany`, before the test ever reaches the code it meant to
+exercise. This sandbox's `node --check`-only confirmation couldn't have caught that - a real gap
+in what this sandbox can verify server-side, not a one-off mistake to shrug off. See DECISIONS.md
+X32's own note on the fix). **Not run against a real `mongod` in this sandbox** (no route to
+`fastdl.mongodb.org` - same standing block as every other server integration test here); `node
+--check` passed.
+
+**Mobile:** new `resolveNotificationTarget` in `lib/push-notifications.ts` maps a push's
+`subjectType` to one of five mobile screens (appointment/bookingRequest/conversation/artist/shop) -
+every real `subjectType` that has a mobile screen to land on. `boothRentCharge` has none (Booth
+Rent isn't ported - X31) and falls back to opening the app to Home, a named gap not a bug. Actual
+navigation lives in `app/_layout.tsx`'s `RootNavigator`, using
+`Notifications.useLastNotificationResponse()` (covers cold-start AND a live tap in one hook) plus
+a literal `switch` so every `router.push` pathname stays a real typed-routes string. 4 new tests
+in `push-notifications.test.ts`.
+
+**Confirmed in this sandbox:** `apps/mobile` `tsc --noEmit` clean, full `apps/mobile` Jest suite -
+223/223, up from 219. Server: `node --check` only (see above). **Not yet confirmed:** a real
+device/simulator run of an actual notification tap, and the server integration suite anywhere with
+real network access.
+
+This closes the requested four-item follow-up round ("do 2, 3, 4 and 5") in full: forgot-password
+recovery, FormBuilder, Settings batch 1, and this.
+
+---
+
+### 2026-09-03 (nineteenth entry): Settings batch 1 - Income/Expense categories + Recurring Expenses; rest of Settings named as a follow-up list
+
+Third of four follow-up items ("do 2, 3, 4 and 5"). Full reasoning: DECISIONS.md X31. Web's
+Settings is eighteen panels across twelve categories - too large for one slice at this project's
+usual rigor, so taken as a batch, same shape as the earlier six-feature batch: this closes the two
+gaps X26/X27 already named (category management, recurring expenses), everything else in Settings
+is listed as a named follow-up rather than left implicit.
+
+**Built:** three new routes - `settings/income-types.tsx`, `settings/expense-types.tsx`,
+`settings/recurring-expenses.tsx` - reached from a new "Business" section on `settings/index.tsx`
+(gated `canManageBusinessLedger`). New `packages/api` operations: `incomeTypeSettings.graphql`,
+`expenseTypeSettings.graphql`, `recurringExpenses.graphql`. New `utils/utcDate.ts`
+(`formatUtcCalendarDate`, pulled out of `utils/formAnswers.ts` where it started, now shared by
+both Forms and Recurring Expenses' date fields). Two new tests (`utcDate.test.ts`).
+
+**What's still not in Settings, in rough priority order:** Shop (the shop-cut-percent editor
+named as a gap back in X24), Square Config's pricing/tax-rate editor, Rates/Booth Rent, the whole
+Messages category (Reminders/Auto-Responses/Response Time/System Message Templates - the largest
+remaining chunk), Forms' shop-wide link section, Appearance (lower value than it looks - mobile's
+theme already follows the system setting), Security's audit log. Calendar/Taxes/Analytics are
+`ComingSoonPanel` placeholders on web itself - skipped, nothing real to port yet.
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+and the full `apps/mobile` Jest suite - 219/219, up from 217. **Not yet confirmed:** a real
+device/simulator run of the three new screens.
+
+---
+
+### 2026-09-03 (eighteenth entry): FormBuilder built on mobile - Up/Down buttons replace drag-and-drop
+
+Second of four follow-up items ("do 2, 3, 4 and 5"). Full reasoning: DECISIONS.md X30. Closes the
+single biggest cut named in X28 (Forms) - there is now a way to create/edit a form's fields on
+mobile.
+
+**Built:** `app/form/[id].tsx` (new route, singular like `client/[id]`; `id === 'new'` is the
+create sentinel, matching web's `formId === "new"`), `utils/formBuilder.ts` (pure `newLocalField`/
+`localFieldFromServer`/`canSaveForm`/`fieldsForInput`/`moveField`/`fieldNeedsMoreOptions`, direct
+ports of `FormBuilder.jsx`'s own logic), three new `forms.graphql` operations
+(`GetFormForEdit`/`CreateFormFromBuilder`/`UpdateForm`), and `FORM_CHOICE_FIELD_TYPES`/
+`isChoiceFieldType`/`FORM_FIELD_TYPE_OPTIONS` added to `utils/formConstants.ts`. `forms/index.tsx`
+gained a "New Form" button and its form titles are now links into the editor (except the
+`booking_request` system form, which stays plain text and redirects back here if opened directly -
+its own restricted editor still isn't ported). New test file `formBuilder.test.ts` (19 tests).
+
+**Field reorder is Up/Down buttons per row, not drag-and-drop** - `moveField` is a clamped array
+swap (first-field-up and last-field-down are no-ops) standing in for `@dnd-kit`, which has no
+cross-platform equivalent here. Same shape of fix as `DurationPicker.tsx`'s pill-row-instead-of-
+`<select>` precedent, applied to reordering instead of picking.
+
+**Publish/Archive/guest-link toggle/Responses stay on the list screen, not duplicated in the
+builder** - a deliberate mobile-specific choice (X30), not a gap: every one of those actions
+already works from `forms/index.tsx` (X28), so the builder just shows status read-only and leaves
+the actions where they are.
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+and the full `apps/mobile` Jest suite - 217/217, up from 198. **Not yet confirmed:** a real
+device/simulator run of the new screen.
+
+---
+
+### 2026-09-03 (seventeenth entry): Forgot-password recovery built on mobile - request only, never redemption
+
+Requested directly after the six-feature batch closed, as the first of four follow-up items
+("do 2, 3, 4 and 5" against that batch's own "what's next" list). Full reasoning: DECISIONS.md X29.
+
+**Built:** a new "Forgot password?" link on `login.tsx`, a new `app/reset-password.tsx` (logged-
+out request form, unconditional "check your email" confirmation), a new `passwordReset.graphql`
+(`RequestPasswordReset` only). Two new test files: `login.test.tsx` gained a case for the new
+link, `reset-password.test.tsx` is new (disabled-until-filled, the unconditional confirmation on
+both success AND error, back navigation).
+
+**The actual password-reset redemption (web's `SetPassword.jsx`, where the emailed link lands) is
+NOT built on mobile** - that link is a plain web URL with no mobile deep link registered for it
+(same gap as Square's OAuth callback, X24), so it always opens in the phone's browser regardless.
+This screen only sends the email.
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+and the full `apps/mobile` Jest suite - 198/198, up from 193. **Not yet confirmed:** a real
+device/simulator run, or that the reset email actually arrives against a real mail-sending
+configuration (out of this port's scope - that's server-side, already built per Phase 1 of
+`PRODUCTION_ROADMAP.md`).
+
+---
+
+### 2026-09-03 (sixteenth entry): Forms built - list + Responses only; FormBuilder is the biggest named cut yet
+
+Last of the requested batch (Artists/Staff, Shops, Search, Income/Expenses, Forms) - all six
+named features are now done. Full reasoning: DECISIONS.md X28.
+
+**Built:** `app/forms/index.tsx` (status-filtered list: Publish/Archive/guest-link toggle/
+Duplicate/Delete), `app/form-responses/[id].tsx` (expandable per-response answer viewer, no
+analytics panel), a new `forms.graphql` operation set, `utils/formAnswers.ts`'s
+`formatFormAnswer` (UTC-safe date formatting, ported from web's own), `utils/formConstants.ts`,
+and `utils/businessScope.ts`'s new `canManageForms` (narrower than Income/Expenses' gate - excludes
+a plain shop-connected artist). Also backfilled a `businessScope.test.ts` covering X26's
+`businessScopeFor`/`createScopeFor`, which shipped without one.
+
+**The headline cut: there is currently no way to create or edit a form's fields from mobile at
+all.** `FormBuilder.jsx`'s drag-and-drop field reordering (`@dnd-kit`) has no cross-platform mobile
+equivalent in this app, and building fields from scratch is real, separate, feature-sized scope.
+Duplicate/Publish/Archive/guest-link/Delete are all still ported - none of them touch a form's
+fields, so none of them needed the missing editor. The `booking_request` system form's own
+restricted editor (`BookingRequestFieldsEditor.jsx`, task #162) and `getFormAnalytics`'s per-field
+stat breakdown are likewise not ported, both named as deliberate, separate-scope cuts.
+
+**No "Copy link" button** - no clipboard library installed; the guest link shows in a
+`selectTextOnFocus` read-only field instead, with only the relative path (mobile has no reliable
+web-origin source).
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean
+on the first pass, and the full `apps/mobile` Jest suite - 193/193, up from 177
+(`businessScope.test.ts` + `formAnswers.test.ts`). **Not yet confirmed:** a real device/simulator
+run.
+
+This closes the six-feature batch (Artists/Staff, Shops, Search, Income/Expenses, Forms) the user
+asked for together with "do all of those, keep going." All six shipped as separate, individually
+verified and documented commits (`f800607` was already in before this batch; `d90ad1b`, `52ed7ed`,
+`7cdecc1`, `8742695`, `80e0553`, `6037bb2`, and this entry's forms commit are the batch itself),
+none pushed - the standing "push once at the end of the day" instruction is still in force.
+
+---
+
+### 2026-09-03 (fifteenth entry): Expenses built - same shape as Income, minus the recurring-expense CRUD subsystem
+
+Sixth of the requested batch (Artists/Staff, Shops, Search, Income/Expenses, Forms) - the last of
+the six named together. Full reasoning: DECISIONS.md X27.
+
+**Built:** `app/expenses/index.tsx` (identical structure to `income/index.tsx` - log-entry form,
+five preset date ranges, inline edit/delete), a new `expenses.graphql` operation set
+(`GetExpenseTypesList`, `GetExpensesList`, `RecordExpense`, `UpdateExpense`, `DeleteExpense`).
+Every helper Income built last slice (`canManageBusinessLedger`, `businessScopeFor`/
+`createScopeFor`, `businessRanges.ts`, `DateField`) is reused unchanged - nothing new needed here.
+
+**Recurring Expenses (the template CRUD behind a "Recurring" chip) is NOT ported** - a real,
+separate feature-sized subsystem, named as a deliberate cut. Only the read-only chip itself
+survives on a generated row, matching web's own `Expenses.jsx` exactly.
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean
+on the first pass, and the full `apps/mobile` Jest suite - 177/177, unchanged (no new pure-logic
+module this slice). **Not yet confirmed:** a real device/simulator run.
+
+This closes out the six-feature batch (Artists/Staff, Shops, Search, Income/Expenses, Forms) taken
+one slice at a time - Forms is the one remaining name from that list and the largest by far (see
+PRODUCTION_ROADMAP.md's own note on FormBuilder's drag-and-drop reordering needing its own
+interaction decision before that slice starts).
+
+---
+
+### 2026-09-03 (fourteenth entry): Income built - a new role-gate helper, a new scoping convention, a new date-only field
+
+Fifth of the requested batch (Artists/Staff, Shops, Search, Income/Expenses, Forms). Full
+reasoning: DECISIONS.md X26.
+
+**Built:** `app/income/index.tsx` (log-entry form, five preset date ranges, list with inline
+edit/delete), a new `income.graphql` operation set (`GetIncomeTypesList`, `GetIncomesList`,
+`RecordIncome`, `UpdateIncome`, `DeleteIncome`). Three new pure-logic modules this slice reuses
+going forward: `utils/businessScope.ts` (`businessScopeFor`/`createScopeFor`, direct port of web's
+own), `utils/businessRanges.ts` (five backward-looking date presets, native Date not moment), and
+`utils/permissions.ts`'s new `canManageBusinessLedger` (any artist, or shop-admin-or-better -
+web's own `/income`/`/expenses` route gate). A new `components/DateField.tsx` (date-only sibling
+of `DateTimeField.tsx`) will be reused unchanged by Expenses next.
+
+**Two named scope cuts, not oversights:** no custom date-range picker (five presets only - the
+same five web's own backward-looking analytics ranges offer), and category
+management (create/edit/deactivate an IncomeType) stays Settings-only, matching web's own page/
+Settings split exactly.
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean
+(one round-trip needed - the new `UserTypeLike` type alias was written as an intersection with the
+existing nullable `UserLike`, which collapses to `never` on the null/undefined branches; fixed by
+writing it as its own nullable union instead), and the full `apps/mobile` Jest suite - 177/177, up
+from 167 (`businessRanges.test.ts` 6 cases + `canManageBusinessLedger` 4 cases). **Not yet
+confirmed:** a real device/simulator run.
+
+---
+
+### 2026-09-03 (thirteenth entry): Global Search built - one screen, grouped by type, no new authorization
+
+Fourth of the requested batch (Artists/Staff, Shops, Search, Income/Expenses, Forms). Full
+reasoning: DECISIONS.md X25.
+
+**Built:** `app/search/index.tsx` (debounced TextInput, four grouped result sections - Clients,
+Projects, Messages, Shared Images - matching web's own `/search` results page, not the app bar's
+live dropdown), a new `globalSearch.graphql` operation (`GlobalSearch`). Header link shows to any
+logged-in artist with no role gate - `search` applies no authorization beyond what
+`getClients`/`getProjects` already enforce.
+
+**Reuses existing screens for every result type**, no new detail screens needed: client results
+open `client/[id].tsx`, project results open `project/[id].tsx`, message results open
+`messages/[id].tsx` (keyed on `conversationId`), and shared-image results also open
+`client/[id].tsx` (same click-through as web's own dropdown).
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit`
+clean, and the full `apps/mobile` Jest suite - 167/167, unchanged (no new pure-logic module this
+slice). **Not yet confirmed:** a real device/simulator run.
+
+---
+
+### 2026-09-03 (twelfth entry): Shops directory built - no archiving, hard-floor editing, honest Square gap
+
+Third of the requested batch (Artists/Staff, Shops, Search, Income/Expenses, Forms). Full
+reasoning: DECISIONS.md X24.
+
+**Built:** `app/shops/index.tsx` (list - no toggle, no pagination, no create button; `getShops`
+takes no arguments) and `app/shop/[id].tsx` (identity autosave form, a read-only shop-cut-percent
+readout, and a Square Connected/Not-connected section), a new `shops.graphql` operation set
+(`GetShopsList`, `GetShopDetail`, `UpdateShopIdentity`, `GetSquareAuthorizationUrl`,
+`DisconnectShopSquare`). Same `isShopAdminOrBetter`-gated header link as Shop Cut Confirmations.
+
+**No archiving at all** - there is no `archiveShop`/`unarchiveShop` mutation server-side, so this
+is the first directory slice with no `ArchiveControl`. `canEdit` is a hard `SHOP_ADMIN` floor with
+no self-branch (same shape as Staff's `updateStaff`, not Artists' self-or-shop-admin rule).
+`hourlyRate`/`shopMinimum` are rendered as plain whole-dollar numbers, never through
+`utils/money.ts`'s `formatCents` (that pair is a deliberate exception to this app's usual
+integer-cents convention).
+
+**Two named, honest gaps, not silent cuts:** the shop-cut-percent readout's "Change in Settings"
+link has nowhere to point yet (mobile's Settings screen only ports `AccountPanel` so far), so it's
+a plain note instead of a dead link; and Square's "Connect" flow opens the OAuth consent page via
+`Linking.openURL` with no automatic return to the app (no deep link is registered for the
+callback, and building one would mean changing the web-facing OAuth redirect target - out of scope
+here), so the screen says plainly that the user has to come back and reopen it themselves.
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean
+(one round-trip needed - `GetShopsListQuery['getShops']` is nullable, so indexing it into a list-
+item type needed `NonNullable<...>` first), and the full `apps/mobile` Jest suite - 167/167,
+unchanged (no new pure-logic module this slice). **Not yet confirmed:** a real device/simulator
+run, and neither is Square's actual OAuth round-trip against a real Square sandbox account.
+
+---
+
+### 2026-09-03 (eleventh entry): Staff directory built - same shape as Artists, simpler throughout
+
+Second of the requested batch (Artists/Staff, Shops, Search, Income/Expenses, Forms). Full
+reasoning: DECISIONS.md X23.
+
+**Built:** `app/staff/index.tsx` (list, "Show archived" toggle) and `app/staff/[id].tsx` (identity
+fields, autosave-on-blur, reusing `ArchiveControl.tsx` from X22 unchanged), a new `staff.graphql`
+operation set (`GetStaffList`, `GetStaffDetail`, `UpdateStaffIdentity`, `ArchiveStaff`,
+`UnarchiveStaff`). Same `isStaffOrBetter`-gated header link as Artists (web gates both nav items
+identically).
+
+**Genuinely simpler than Artists, not a scope cut:** no self-service edit (`updateStaff` has a
+hard `SHOP_ADMIN` floor, no self-branch) and no dashboard panels to defer - Staff never had an
+`ArtistPerformancePanel` equivalent. List and detail share one route directory
+(`app/staff/index.tsx` + `app/staff/[id].tsx`), matching `booking-requests/`'s pattern rather than
+Clients'/Artists' singular-plural directory split, since "staff" has no natural plural to split on.
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean
+(one round-trip needed - `GetStaffDetail` initially omitted `user { avatar }`, caught immediately
+by the typecheck), and the full `apps/mobile` Jest suite - 167/167, unchanged (no new pure-logic
+module this slice). **Not yet confirmed:** a real device/simulator run.
+
+---
+
+### 2026-09-03 (tenth entry): Artists directory built - team roster, minus the Phase-7 dashboard panels
+
+First of a batch requested together (Artists/Staff, Shops, Search, Income/Expenses, Forms), taken
+one at a time in the established slice-by-slice way. Full reasoning: DECISIONS.md X22.
+
+**Built:** `app/artists/index.tsx` (list, real "Show archived" toggle - `getArtists` already takes
+that boolean), `app/artist/[id].tsx` (identity fields, autosave-on-blur, same structural pattern as
+`project/[id].tsx`'s `ProjectDetailsCard`), a new reusable `components/ArchiveControl.tsx` (ported
+from web's own, using RN's native `Alert.alert` for confirmation instead of a custom dialog), a new
+`isStaffOrBetter` in `utils/permissions.ts` gating the header link, `ARTIST_STATUS`/
+`STAFF_STATUS`/`CLIENT_STATUS` added to `constants/auth.ts`, and a new `artists.graphql` operation
+set (`GetArtistsList`, `GetArtistDetail`, `UpdateArtistIdentity`, `ArchiveArtist`,
+`UnarchiveArtist`).
+
+**Deliberately not ported: `ArtistPerformancePanel`/`ShopCutRatePanel`** - both pieces of a large,
+still-evolving Phase 7 dashboard (seven numbered follow-up fixes and counting in
+PRODUCTION_ROADMAP.md), not a natural extension of a directory port. **Also not built: "Add
+Artist"** - unlike Clients/Projects, this one really is a scope cut relative to web, since
+`CreateArtistWizard` creates a real account (email/password/role), not a small form.
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+and the full `apps/mobile` Jest suite - 167/167 (164 before this slice, +3: new `isStaffOrBetter`
+cases in `permissions.test.ts`). **Not yet confirmed:** a real device/simulator run, and - same
+caveat as Shop Cut Confirmations - never exercised against a real multi-artist shop fixture in
+this sandbox.
+
+---
+
+### 2026-09-03 (ninth entry): Shop Cut Confirmations built - the first role-gated header link
+
+The shop-side inbox for the manual mark-paid/confirm dual-control flow (an artist marks their
+shop cut paid, a shop admin independently confirms it). Full reasoning: DECISIONS.md X21.
+
+**Built:** `app/shop-cut-confirmations/index.tsx` (no pagination, matching web exactly - this
+list is inherently small), a new `shopCutConfirmations.graphql` operation set
+(`GetPendingShopCutConfirmations`, `ConfirmShopCutPaid`), `utils/tagColor.ts` (singular - distinct
+from the existing swatch-picker `utils/tagColors.ts` - `resolveTagColor`/`tagColorRowStyle`, with
+`__tests__/tagColor.test.ts`), and `isShopAdminOrBetter` added to `utils/permissions.ts` (with new
+test cases in `__tests__/permissions.test.ts`).
+
+**The real new thing, not just another screen: the header link is role-gated.** Every prior entry
+point (Clients, Projects, Requests, Messages) shows to any logged-in artist. This one only shows
+for a shop admin (or platform Admin) - `isShopAdminOrBetter(user)` - matching web's `Sidebar.jsx`
+exactly, since `getPendingShopCutConfirmations` itself is server-gated `SHOP_ADMIN`-or-better.
+
+**Deliberately not built: the artist-side `markShopCutPaidManually`/Square-invoice actions.** This
+screen only *confirms* a cut some other flow (today, always web) already marked paid - still real
+value on its own for a shop admin who wants to confirm from their phone rather than a laptop.
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+and the full `apps/mobile` Jest suite - 164/164 (154 before this slice, +10:
+`tagColor.test.ts` and four new `isShopAdminOrBetter` cases in `permissions.test.ts`).
+**Not yet confirmed:** a real device/simulator run - and this slice in particular has never been
+exercised against a shop account with an actual pending confirmation, since no such fixture exists
+in this sandbox. Same standing caveat as every mobile slice this session, worth naming twice here.
+
+---
+
+### 2026-09-02 (eighth entry): Projects list built - project/[id].tsx's first browsable entry point
+
+Picked as the next slice, smallest remaining item with real value: `project/[id].tsx` has shipped
+since step 8's original PR but was only ever reachable by tapping through an appointment or
+converting a booking request - never a plain "see all my projects" list. Full reasoning:
+DECISIONS.md X20.
+
+**Built:** `app/projects/index.tsx` (plain paginated list, no filter/search - matching web's own
+`Projects.jsx` scope exactly), `utils/projectStatus.ts` (with `__tests__/projectStatus.test.ts`),
+a new `GetProjectsList` query in `packages/api/src/operations/projects.graphql` (a leaner sibling
+of web's own over-fetching `GetProjects`, named differently so both coexist in the same generated
+file), registered in `_layout.tsx`, and a "Projects" header link on `index.tsx` next to Clients.
+
+**Found a real bug in web while porting the status column, and didn't port it.**
+`Projects.jsx`/`Search.jsx` render project status via a helper (`UtilsService.
+prettyConstantsListValue`) that compares uppercase `VALUE`/`LABEL` fields against
+`PROJECT_STATUS`'s actual lowercase `value`/`label` entries - the comparison can never match, so
+that column has rendered blank on both web pages, unconditionally, seemingly since it was written.
+Mobile's own `projectStatusLabel` does a correct lowercase lookup instead. Left unfixed on web
+itself deliberately - out of scope for this mobile-port slice, flagged in DECISIONS.md's Open
+section instead of silently working around it or silently reproducing it.
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+and the full `apps/mobile` Jest suite - 154/154 (151 before this slice, +3:
+`projectStatus.test.ts`). **Not yet confirmed:** a real device/simulator run, same standing
+caveat as every mobile slice this session.
+
+---
+
+### 2026-09-02 (seventh entry): Booking Requests inbox built - list + detail, closes out X19
+
+The next slice of Phase 5 step 8's remaining list, paired naturally with X16's Messages (a booking
+request carries a real Conversation of its own). Full reasoning: DECISIONS.md X19.
+
+**Built:** `packages/api/src/operations/bookingRequests.graphql` (`GetBookingRequests`,
+`GetBookingRequest`, `GetPendingBookingRequestCount` - codegen + build both ran clean),
+`utils/bookingRequests.ts` (status labels + filter definitions, with
+`__tests__/bookingRequests.test.ts`), `app/booking-requests/index.tsx` (list, filter pills,
+`fetchMore`-paginated) and `app/booking-requests/[id].tsx` (detail - intake fields, reference
+images, status actions, and the conversation thread reused from Messages), both registered in
+`_layout.tsx`, and a "Requests" header link + pending-count badge on `index.tsx` next to Clients
+and Messages.
+
+**One real, load-bearing change to existing code, not just new screens:** `BookSessionDatesForm.tsx`
+(previously built only for `consult/[id].tsx`, always requiring a consult appointment) is now
+usable with or without one, matching `ArtistBookingRequests.jsx`'s own reuse of the identical
+component for booking a session straight from a pending or consult-booked request. The deposit
+field and its recording logic are both now gated on `consultAppointmentId` actually being present -
+there is no appointment to attach a deposit to otherwise. `consult/[id].tsx`'s own call site is
+unaffected; its props were already always provided.
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+and the full `apps/mobile` Jest suite - 151/151 (146 before this slice, +5:
+`bookingRequests.test.ts`; the three existing `index.test.tsx` cases were also updated with a
+`GetPendingBookingRequestCount` mock for the new header badge, so they run warning-free instead of
+just passing). **Not yet confirmed:** a real device/simulator run, same standing caveat as every
+mobile slice this session.
+
+---
+
+### 2026-09-02 (sixth entry): Settings' Password + Calendar color built - closes out X14 in full
+
+The two pieces X14 deferred when Photo shipped. Both land as two more cards on the same
+`app/settings/index.tsx`. Full reasoning: DECISIONS.md X18.
+
+**Built:** `ChangePassword` and `GetUserTagColors` in a new `packages/api/src/operations/
+accountSettings.graphql` (codegen + build clean), `UpdateUser`'s selection widened to include
+`tagColor` (predicted by X14's own comment), `utils/tagColors.ts` (the 15-color palette +
+`showAvailableColorTags`, ported from web + `__tests__/tagColors.test.ts`), and the two new cards
+on the Settings screen.
+
+**The one real correctness point, not just a scope note: `ChangePassword`'s `accessToken` is
+REAL** (unlike `UpdateUser`'s placeholder, per X14's own comment) - `handleChangePassword`
+persists it via `updateCurrentUser`, the other two Settings mutations (avatar, tag color)
+correctly still don't. Getting this backwards either way is a real bug, not a style choice -
+DECISIONS.md X18 spells out both failure directions.
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+and the full `apps/mobile` Jest suite - 146/146 (142 before this slice, +4:
+`tagColors.test.ts`). **Not yet confirmed:** a real device/simulator run, same standing caveat as
+every mobile slice this session.
+
+**X14 is now fully closed** - nothing named as deferred in that entry remains open.
+
+---
+
+### 2026-09-02 (fifth entry): Client roster (list + search) built - Phase 5 step 8's next slice past X13's now-closed three-item list
+
+Picked from the rest of step 8's ~40-screen list, over a booking-requests inbox or finishing
+Settings' password/calendar-color - smaller, and gives `client/[id].tsx` (X15) a real second entry
+point, which that screen's own comment had flagged as worth building. Full reasoning: DECISIONS.md
+X17.
+
+**Built:** `app/clients/index.tsx` (new route, registered in `_layout.tsx`, reached from
+`index.tsx`'s header), `utils/clients.ts` (`matchesClientSearch` + `__tests__/clients.test.ts`),
+`utils/phone.ts` (`formatPhone` + `__tests__/phone.test.ts`), and a new `GetClients` operation in
+`packages/api` (codegen + build both ran clean).
+
+**Real, named limitation, not a bug: search only covers what's already loaded.** `getClients` has
+no server-side search argument - mobile's search box filters the current page client-side, same
+shape as `Messenger.jsx`'s own name filter. Fetches the server's own max page size (200) up front,
+so this is a non-issue for the vast majority of shops; `onEndReached` triggers `fetchMore` for
+anyone past that. No create-client action and no archive/"Show archived" toggle either - both real
+`Clients.jsx` features, neither built here since archiving doesn't exist anywhere on mobile yet.
+
+**One test caught a real bug in the TEST, not the code, while writing this** -
+`matchesClientSearch`'s "missing name doesn't crash" test originally searched for a term
+("marta") that was still present in the fixture's unrelated `email` field, so it passed for the
+wrong reason (matching the email, not exercising the null-name path at all) until the fixture was
+corrected to use an email that doesn't collide. Worth noting per DECISIONS.md PR1's own logged
+history of every real test run finding something - this one found a test bug rather than a
+runtime one, which is the same category of value: it would have hidden a real regression exactly
+where it mattered most.
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean,
+and the full `apps/mobile` Jest suite - 142/142 (133 before this slice, +9: `clients.test.ts` and
+`phone.test.ts`). **Not yet confirmed:** a real device/simulator run, same standing caveat as
+every mobile slice this session.
+
+---
+
+### 2026-09-02 (fourth entry): Messages built - inbox + thread, polling instead of a socket - closes out X13's three-item list
+
+Last of the three items X13 named as still unported (avatar upload and the client-dashboard
+shared-images panel, the third entry below and X14/X15, were the other two). Full reasoning and
+every scope call: DECISIONS.md X16.
+
+**Built:** `packages/api/src/operations/messenger.graphql` (`GetConversationsByMemberId`,
+`GetMessagesByConversationId`, `CreateMessage`, `MarkConversationRead`, `GetUnreadMessageCount` -
+codegen + build both ran clean), `app/messages/index.tsx` (inbox, registered in `_layout.tsx`),
+`app/messages/[id].tsx` (thread), `components/ConversationRow.tsx`, `components/MessageBubble.tsx`,
+`utils/conversations.ts` (+ `__tests__/conversations.test.ts`), `utils/messageTime.ts` (+
+`__tests__/messageTime.test.ts`), and a header entry point on `index.tsx` (a "Messages" link next
+to the Settings avatar, with the same unread-count badge shape `ConversationRow.tsx` uses per-row).
+
+**The one real architectural call, not just another scope cut: polling instead of porting web's
+socket.io-client delivery.** Mobile has no socket dependency anywhere in this codebase; the inbox
+polls every 30s (web's own documented fallback interval for every non-messenger page) and an open
+thread polls every 4s, with `createMessage`'s `refetchQueries` pulling a just-sent message back
+immediately so sending doesn't feel like it's waiting on the poll. DECISIONS.md X16 has the full
+case for why this is the right call now rather than a stopgap to feel bad about.
+
+**Also cut, all named explicitly rather than silently missing:** composing an image attachment
+(receiving still works - a web-sent image message renders fine in `MessageBubble.tsx`, just
+without a full-size tap-to-view), shop-wide/group conversations (`getConversationsByShopId`),
+per-row "mark unread," and the messenger's search-by-name box.
+
+**Corrected a stale claim in DECISIONS.md's own X13 entry** while writing X16: it called the
+Messages thread "Firestore-backed." It never was - `Conversation`/`Message` are Mongoose models
+behind GraphQL, delivered live via socket.io on web. The scope call X13 made off that wrong premise
+(no Firestore SDK on mobile) was still correct, just for the wrong stated reason.
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean
+(stale `.expo/types/router.d.ts` deleted first, now routine), and the full `apps/mobile` Jest
+suite - 133/133 (119 before this slice, +14: `messageTime.test.ts` and `conversations.test.ts`).
+`index.test.tsx` needed one update (a mocked `GetUnreadMessageCount` response) for the new header
+badge - not a new screen-level test, an update to an existing one. **Not yet confirmed:** a real
+device/simulator run, same standing caveat as every mobile slice this session - nothing here can
+launch Expo Go or a simulator, and polling behavior/keyboard-avoidance on the compose input in
+particular are the two things in this slice most worth actually looking at on a device.
+
+**X13's three-item list is now fully closed.** Nothing named as "still unported" in X13/X14/X15
+remains open from that list - see PRODUCTION_ROADMAP.md's Phase 5 step 8 for what's next instead.
+
+---
+
+### 2026-09-02 (third entry): Client Detail screen + client-dashboard shared-images panel built - view-only, second of X13's three still-unported items
+
+Picked up from the second entry below: X13 named Messages and the shared-images panel as the two
+remaining unported items; asked "do them both," starting with the panel since it needed a
+client-detail screen built under it first (mobile had none). Full reasoning and every scope call:
+DECISIONS.md X15.
+
+**Built:** `app/client/[id].tsx` (new route, registered in `_layout.tsx`, reached only from
+`project/[id].tsx`'s client name, now a "View Client" link), `components/SharedImagesGallery.tsx`
+(new - view-only grid+modal, no delete/tag/assign), `utils/sharedImages.ts` (`assignedLabel` +
+`__tests__/sharedImages.test.ts`), and `packages/api/src/operations/sharedImages.graphql` (new
+`getSharedImagesForClient` query - codegen + build both ran clean, same schema-from-typeDefs.js
+path X14 used, no live server needed).
+
+**Deliberately read-only:** web's `SharedImagesPanel.jsx` also lets an artist file an image onto a
+project (`assignSharedImageToProject`) and delete/re-tag a row (`removeSharedImageFromList`/
+`updateSharedImageTags`); none of the three are built here. `client/[id].tsx` gets the client's
+name from the route params `project/[id].tsx` already had in hand, not a new `getClient` query -
+so this screen has nothing to show if reached any other way (nothing else reaches it yet).
+
+**Auth note carried into the UI:** `getSharedImagesForClient` is gated by
+`canManageClientSharedImages`, which excludes plain `SHOP_STAFF` (unlike every other client screen's
+`canAccessClient`) - the screen's error state names this possibility instead of showing a bare
+GraphQL error.
+
+**Also registered in `_layout.tsx` this session, not yet built:** `messages/index` and
+`messages/[id]` route stubs - placeholders for the Messages slice, next up per "do them both."
+Navigating to either right now would fail; nothing links to them yet.
+
+**Confirmed in this sandbox:** `packages/api` codegen + build, `apps/mobile` `tsc --noEmit` clean
+(stale `.expo/types/router.d.ts` deleted first - same recurring sandbox artifact X14's entry
+documents, now routine to check before every mobile typecheck), and the full `apps/mobile` Jest
+suite - 119/119 (115 before this slice, +4 from `sharedImages.test.ts`). **Not yet confirmed:** a
+real device/simulator run - same caveat as every mobile slice so far, nothing in this sandbox can
+launch Expo Go or a simulator.
+
+**Still open from X13:** Messages (starting now), and password/calendar-color on the Settings
+screen (X14's own deferred items).
+
+---
+
+### 2026-09-02 (second entry): Settings' avatar upload built - the first of X13's still-unported list, scoped down to photo only
+
+Picked Phase 5's next slice by asking which of X13's three remaining items (avatar upload,
+Messages, client-dashboard shared-images panel) to build first - avatar upload chosen as smallest
+and self-contained. Full reasoning and every scope call: DECISIONS.md X14.
+
+**Built:** `app/settings/index.tsx` (new route, registered in `_layout.tsx`, reached from
+`index.tsx`'s header next to Log out via a new tappable `Avatar`), `components/Avatar.tsx` (new -
+initials fallback instead of web's generic-person-icon one), `utils/avatar.ts` (+
+`__tests__/avatar.test.ts`), and `packages/api/src/operations/updateUser.graphql` (new operation,
+`id`/`avatar` only - codegen + build both ran clean, no live server needed since the schema loads
+straight from `server/graphql/typeDefs.js`).
+
+**Two deliberate departures from web's `AccountPanel.jsx`, both in X14:** no crop screen
+(`expo-image-picker`'s native `allowsEditing`/`aspect` replaces `CropEasy.jsx`'s `react-easy-crop`
+entirely - no new dependency), and the old avatar is deleted only AFTER `updateUser` succeeds
+rather than before, so a failure mid-flow never leaves the account with neither an old nor a new
+avatar reference.
+
+**Real environment finding, not a code bug:** `apps/mobile/.expo/types/router.d.ts` - gitignored,
+never generated by CI (confirmed by reading `.github/workflows`'s mobile job: `npm ci` → build
+`packages/api` → `tsc --noEmit` → `jest`, no `expo` command anywhere in it) - had a STALE copy
+sitting in this sandbox from some earlier session's interactive `expo` run, and its closed set of
+known routes doesn't include the new `/settings` screen. `tsc --noEmit` failed against it; deleting
+the stale file (falls back to the same permissive routing type CI's own fresh checkout always
+has) fixed it with no code change. Worth knowing before the next new route costs the same
+half hour again: this file regenerates itself correctly the moment `expo start` runs for real, so
+this is purely a leftover-sandbox-artifact problem, not something to chase in the actual code.
+
+**Confirmed in this sandbox:** `packages/api` codegen + `tsc` build, `apps/mobile` `tsc --noEmit`
+clean, and the full `apps/mobile` Jest suite - 115/115 (108 before this slice, +7 from
+`avatar.test.ts`), `index.test.tsx` still green with the new header button added. **Not yet
+confirmed:** a real device/simulator run (nothing in this sandbox can launch Expo Go or a
+simulator) - the native `allowsEditing` crop UI in particular is the one piece of this slice that
+can only really be judged by looking at it on a real device.
+
+**Still open from X13/X14, not touched this session:** password change and the calendar-color
+picker (both explicitly deferred, not part of this slice - see X14), Messages, and the
+client-dashboard shared-images panel.
+
+---
+
+### 2026-09-02: PR #11 confirmed merged/green; PAYMENT_RECEIVED's roadmap entry was stale, not the code - new route-level tests written, confirmed green on Danny's machine, item 7 fully closed
+
+Picked up from the 2026-09-01 entry's own open item: **confirmed via the GitHub API** (no `gh` on
+the connected device, so `curl`'d `api.github.com` directly) that PR #11
+(`feat/push-notifications`, which by the end carried both step 7's push-notification work and step
+8's appointment-opening/image-upload/Square-charge slice) **merged into `main` 2026-09-01T14:07:11Z
+as `eca520f`, with every check on its final commit (`c6b3284`) green**: `packages/api`
+build/typecheck/codegen, client tests+build, mobile typecheck+tests, server tests, and Cloudflare
+Pages' own checks. Nothing left blocking from that entry.
+
+Asked to "take care of the payment-received trigger" next - PRODUCTION_ROADMAP.md's Suggested
+Sequencing item 7 said this was still open ("the template and toggle already exist in Settings;
+nothing calls it yet"). **It wasn't open - it was done on 2026-08-27, commit `6732aaf`**, the same
+commit that dropped the seven legacy `Shop.square*` fields. `routes/squarePayments.js` already
+calls `sendAutoResponsesForTrigger({ trigger: 'PAYMENT_RECEIVED', appointment })` unconditionally
+on both the deposit and session-charge success branches. The roadmap entry was simply never updated
+after that commit landed - same class of staleness as several other entries this doc has already
+flagged and corrected (see the 2026-08-21/22 entries). Corrected in place rather than left to
+mislead the next session again.
+
+What genuinely was missing: **test coverage.** `test/integration/squarePaymentRoute.test.js` (563
+lines) had zero mentions of `PAYMENT_RECEIVED`/`AutoResponse`/`sendAutoResponsesForTrigger` before
+today, and `auto-responses.test.js` only ever exercises the trigger-agnostic function directly with
+`SESSION_COMPLETED` - nothing proved the *route* actually reaches it. Added a
+`describe('PAYMENT_RECEIVED fires a receipt on a real charge', ...)` block: fires on a session
+charge, fires on a deposit charge, falls back to the shop's response when the artist has none of
+their own (the precedence rule already covered generically in `autoResponses.test.js`, now proven
+through this specific call site too), and the charge still succeeds when nobody has the trigger
+enabled at all (the best-effort contract). Deliberately does NOT `vi.spyOn` the auto-responses
+module the way `square.createPaymentForAccount` is spied on above it in the same file -
+`squarePayments.js` destructures `sendAutoResponsesForTrigger` at `require` time, so a spy applied
+in `beforeEach` would replace a property on the module's exports object after the route already
+closed over the original function reference, and would silently never be called. Asserted on the
+real side effect instead: an `AutoResponseLog` row claimed under the resolved `AutoResponse` for
+the appointment. `client.email` sends nowhere in this sandbox (no `RESEND_API_KEY` - see
+`globalSetup.js`), so the log lands as `status: 'skipped'` rather than `'sent'`; the test only
+asserts the row exists at all, which is what answers "did the route reach the trigger."
+
+**Confirmed for real on Danny's own machine, same day**: both the new
+`describe('PAYMENT_RECEIVED fires a receipt on a real charge', ...)` block and the full client
+suite passed - closing the one gap the sandbox couldn't (same `fastdl.mongodb.org` 403 every other
+server test file here already carries; this sandbox only got as far as `node --check`).
+
+Getting there surfaced one real environment bug, unrelated to this feature: `apps/web`'s root
+`node_modules/@rollup/` held only Linux binaries (`rollup-linux-x64-gnu`/`-musl`), no Darwin
+variant, so `npm test` in `apps/web` failed with `Cannot find module @rollup/rollup-darwin-x64`
+before a single test ran. Root cause: the 2026-09-01 entry's own connected-folder-mount
+workaround (`npm install` in a Linux sandbox, `rsync`'d into the real Mac folder) fixed the mobile
+install but left Linux-native rollup binaries sitting in the ROOT workspace's `node_modules`,
+which `apps/web` hoists from. Fixed the only way that's safe for a real machine: `rm -rf
+node_modules apps/*/node_modules packages/*/node_modules && npm install`, run directly in Danny's
+own Terminal (not this session - this sandbox's own shell is Linux too and would just reproduce
+the contamination). Confirmed via `uname -m` from inside this session's own view of the mount
+that the corrupted binaries were exactly what the error was missing. Left one small,
+correct lockfile change behind: `fsevents`' `dev: true` flag dropped in `package-lock.json` (it's
+a real macOS-only optional dependency Vite's file watcher needs, not a dev-only one - a real
+install on a real Mac resolved it correctly where the sandbox-origin lockfile hadn't).
+
+**Item 7 (see PRODUCTION_ROADMAP.md) is now fully closed.** `scripts/drop-legacy-square-shop-
+fields.js` has been run for real by Danny, against the pre-launch Atlas database (`.env`/
+`.env.production`'s `cluster0.6sz1d.mongodb.net/inkbook` - confirmed with Danny this holds no real
+client data yet, only seed/dev data) - the seven legacy `Shop.square*` fields are gone from
+existing documents. Could not be run from this session either way: this sandbox has no network
+path to that cluster (`querySrv ECONNREFUSED` on the SRV lookup) or to a local dev Mongo (same
+`ECONNREFUSED 127.0.0.1:27017` the 2026-08-19 entry already hit).
+
+---
+
+### 2026-09-01: Step 8's mobile appointment screens + the reversed Firebase/image-upload/Square scope are built, synced to the real device, committed, and pushed - CI status not yet confirmed
+
+**Start here.** Everything below is done; the one open item is confirming CI is green on
+`feat/push-notifications` after the second fix commit, then merging. See DECISIONS.md X12/X13 for
+the architecture, DECISIONS.md's Process section (PR2) for the device-sync mechanics, and
+PRODUCTION_ROADMAP.md Phase 5 item 8 for the full writeup - this entry is the short version.
+
+**What shipped:** the appointment/consult/project/session-detail screens (step 8's first concrete
+slice of the ~40-screen mobile port), plus - reversing X12's original deferral, per Danny's own
+explicit call mid-build - Firebase Storage sign-in, image upload/gallery on Project Detail, and
+Charge via Square on Session Detail + the consult-booking deposit flow. Full reasoning in X12/X13;
+this entry is about what happened getting it from "built and tested in a sandbox clone" to
+"live on Danny's machine, committed, pushed."
+
+**Three commits on `feat/push-notifications`, in order:**
+- `b008ffa` - the feature itself. Typechecked and Jest-passing (108/108) in the sandbox clone.
+- `ea56888` - fixes `package-lock.json`. The on-device dependency install used a workaround (see
+  next paragraph) that updates `node_modules` without ever touching the lockfile, so `b008ffa`
+  shipped with a stale one - broke CI's `npm ci` immediately (`EUSAGE`, "Missing: firebase@12.18.0
+  from lock file" and ~60 similar lines for every new transitive dependency). Fixed with
+  `npm install --package-lock-only` (updates the lockfile only, never touches `node_modules`, so
+  none of the below applies to it) and verified with `npm ci --dry-run` before this push.
+- `c6b3284` - an unrelated pre-existing flaky test, surfaced by the same CI run, fixed per Danny's
+  explicit go-ahead (asked first, since it's outside this PR's mobile-only scope) rather than
+  deferred, since it was the only thing left blocking green. `RemindersPanel.test.jsx`'s hydration
+  test checked a MUI Switch's checked state with a synchronous `getByRole` right after an awaited
+  `findByRole` for the heading - the Switch's `checked` prop commits a render later than the
+  heading (the component hydrates `emailEnabled`/`smsEnabled` from a `useEffect`, not the initial
+  render), so the assertion could observe it before that commit landed. Confirmed unrelated to this
+  branch: the affected files were last touched in the already-merged PR #9. Fixed by awaiting that
+  assertion too (`findByRole`), matching the file's own style elsewhere; verified with 4 consecutive
+  clean on-device `vitest` runs of the file before committing.
+
+**What's NOT yet confirmed: whether CI passed after `c6b3284`, and whether the PR has been merged.**
+Danny pushed after each fix; the actual CI result of the third push was never reported back into
+this session. That's the first thing to check picking this back up - `gh pr checks` /
+`gh pr view --json mergeable,statusCheckRollup` on `feat/push-notifications` (no `gh` on the
+connected device as of this session - check the sandbox or ask Danny) or just asking Danny directly.
+If it's green and merged, move on to whatever's next in Suggested sequencing. If it's still red,
+the failure log is the fastest way back into whatever's actually wrong - paste it rather than
+re-deriving state from the repo.
+
+**A real environment finding worth knowing before it costs another round of `ENOTEMPTY` debugging:
+`npm install`/`npm ci` must never run directly against the connected-folder mount.** It's a FUSE
+bridge to the real filesystem and doesn't reliably support the atomic rename-of-non-empty-directory
+npm's install strategy depends on - not corruption, a real capability gap, confirmed by watching it
+fail on completely unrelated already-installed packages, not just the new ones. Full writeup and
+the fix (install in a local mirror off the mount, `rsync` the result in, `--package-lock-only`
+separately since a copy never touches the lockfile) is DECISIONS.md's Process section, PR2. Budget
+real wall-clock for this next time - the on-device sync+install+verify step alone took the better
+part of this session, almost entirely `rsync` copying ~1.5GB across many 178-second command
+windows, not application logic.
 
 ---
 
@@ -1577,10 +2922,11 @@ executable bit, git skips it with a hint on stderr rather than an error — whic
   the same kind of thing as a note (a candid internal record about someone's conduct) and never
   client-visible — see `models/ClientFlag.js`'s own comment. UI: a Flags panel on
   `ClientDashboard.jsx`, shop-side only (same `!isSelf` gate the Notes panel already uses) — a type
-  picker, an optional note, and the existing list. **No resolve-by-id mutation exists yet** — the
-  only way to resolve a flag today is still the automatic one wired into an appointment's status
-  changing; a manually-raised flag has no UI path to mark resolved. Stated here rather than
-  silently missing — see Known gaps below. Pinned by `test/integration/clientFlags.test.js` — **not
+  picker, an optional note, and the existing list. ~~No resolve-by-id mutation exists yet~~ —
+  **done 2026-08-21/22**: `resolveClientFlag(flagId)` shipped, wired into `ClientDashboard.jsx`
+  with a per-row Resolve button, not restricted to manually-raised flags. This paragraph was
+  stale, not the code - see line ~1253 and the "Next" section's item 9 for the other two places
+  this is recorded correctly. Pinned by `test/integration/clientFlags.test.js` — **not
   yet run**, see Test status above.
 - **Expense/income tracking, recurring expenses, and a financial dashboard widget.** Five new
   collections (`ExpenseType`, `IncomeType`, `Expense`, `Income`, `RecurringExpense`), all sharing
@@ -1927,59 +3273,295 @@ executable bit, git skips it with a hint on stderr rather than an error — whic
   create no `SquareAccount` row at all, migrated or not. See Test status above for the open question
   on whether that's worth fixing.
 
+## Mobile/web feature parity — full accounting (2026-09-04)
+
+Danny asked directly whether mobile has reached full functional parity with web. It has not, and
+the gaps had never been written down in one place before this — each was named individually, in
+passing, inside whichever DECISIONS.md entry happened to touch it (X15, X17, X22, and others), so
+no single read told the whole story. This section is that single accounting, built by reading the
+actual mobile source against web's routes and settings categories directly, not by trusting any
+prior summary. Ranked roughly by how much it blocks ordinary daily use, most-blocking first.
+
+1. ~~No way to create a brand-new appointment or consult from mobile~~ - **done 2026-09-04
+   (X48)**: a new "New" link on `app/index.tsx`'s header opens `appointment/new.tsx`, a direct,
+   faithful port of web's `AppointmentWizard.jsx` as one component with the same internal
+   seven-step machine (Personal / Consult / Session-on-existing-project / Session-with-a-new-project
+   all as their own path through it, exactly matching web's own three underlying pipelines). Closing
+   this and X47 together closes both halves of Danny's picked priority ("Create new
+   appointment/client/project").
+2. ~~No client, project, staff, or artist account can be created from mobile at all~~ - **client/
+   artist/staff done 2026-09-04 (X47)**: "Add Client"/"Add Artist"/"Add Staff" buttons on the three
+   directory screens open new `client/new.tsx`/`artist/new.tsx`/`staff/new.tsx` routes, direct
+   ports of web's `CreateClientWizard`/`CreateArtistWizard`/`CreateStaffWizard`. **Project creation
+   remains open, but isn't actually a gap** - re-reading `IBPageActionBar.jsx`'s own comment while
+   scoping X47 found that web has no standalone "Add Project" button either: a project is only ever
+   spawned by the booking workflow (`convertBookingRequest`, inside `AppointmentWizard.jsx`), not
+   created directly on either platform. This line originally listed "project" alongside the other
+   three from a `createProject` mutation existing in `packages/api` - it exists only for
+   `AppointmentWizard`'s own new-session-with-a-new-project path, which is part of gap #1 below,
+   not a fourth independent thing. Corrected here rather than silently dropped.
+3. ~~The client detail page is a shell of web's~~ - **done 2026-09-04 (X49)**: Stats, Projects,
+   Appointments, and Notes now all render on `app/client/[id].tsx` alongside the shared-images
+   gallery X15 built - a direct port of web's `ClientDashboard.jsx` field-for-field. Two of its
+   sections (`SendAutoResponseButton`, and filling out a Form on the client's behalf) are still not
+   ported - named explicitly as their own future work in X49's own DECISIONS.md entry, not
+   overlooked.
+4. ~~No dashboard or analytics screen exists on mobile at all~~ - **done 2026-09-04 (X50)**: a
+   new "Dashboard" link on `app/index.tsx`'s header opens `app/dashboard.tsx`, branching by
+   `user.userInfo.__typename` exactly like web's `Home.jsx` branches on `user.userType` - Artist
+   gets a direct port of `ArtistPerformancePanel.jsx` (personal or shop-wide, same `shopWide`
+   condition), Staff gets a direct port of `ShopAnalyticsPanel.jsx`. Three named scope cuts (date
+   range trimmed to `businessRanges.ts`'s five presets, no custom range; web's `ShopCutPayoutList`
+   mark-paid section not ported, since the mutation it needs isn't built on mobile yet per
+   `shop-cut-confirmations/index.tsx`'s own X21 note; "Load more" pagination instead of
+   `EntityListPager`) - see X50's own DECISIONS.md entry. Viewing one OTHER specific artist's
+   performance (web's `Artist.jsx`, `isSelf=false`) remains unbuilt and is named there as its own
+   future slice, not folded into this one.
+5. **Gift cards have no mobile presence whatsoever** - neither the shop-level nor the
+   artist-level side of the feature. **Re-scoped 2026-09-04, before X51**: raised with Danny
+   directly once it turned out the feature had no UI on *either* platform (the backend -
+   `server/graphql/resolvers/giftCards.js`, DECISIONS.md M6 - was fully built with nothing to
+   port from). Danny's call, in two parts:
+
+   - **Real payment collection at sale (2026-09-04, same day, after X55).** The sale side of M6
+     had no payment collection wired up at all - no Square charge, no `paymentMethod` field.
+     Danny: "Real Square charge, like deposits." Fixed by mirroring M11's own record-then-charge
+     shape exactly - see DECISIONS.md M6's own follow-up entry for the full design
+     (`paymentMethod`/`pending`/`saleStatus` on both create mutations, the new
+     `POST /square/process-gift-card-payment` route). This is now real, not sandboxed-looking
+     arithmetic, same caveat item 1 below carries for every other Square path in this app.
+   - **Platform order: web first, then mobile** (Danny's call, matching this app's established
+     feature-development order whenever there's nothing to port). **Both are done now.** Web:
+     `pages/giftCards/GiftCards.jsx` (sell an artist-issued or shop-issued card, manage the
+     shop-cut settlement for shop-issued ones, liability reports) plus a redeem-a-card entry added
+     to `SessionDetail.jsx` (this page deliberately doesn't handle redemption itself, spending a
+     card happens at a session, not from a management screen). **Mobile (2026-09-04, same day),
+     ported field for field**: `app/gift-cards/index.tsx`, a new
+     `packages/api/src/operations/giftCards.graphql`, `SquareGiftCardPaymentForm.tsx` (a sibling
+     of `SquarePaymentForm.tsx`, same restraint as web's `IBGiftCardPaymentForm` not touching
+     `IBSquarePaymentForm`'s two real callers), and the matching redeem entry in
+     `SessionDetailForm.tsx`. See DECISIONS.md M6's own follow-up entry for the full design on
+     both platforms.
+
+   **Run for real by Danny, outside this sandbox, three times (2026-09-04, X59, X60, then
+   green) - three real bugs found and fixed, then a clean pass on both suites.**
+   `server/test`'s own Vitest suite still cannot run inside this sandbox itself
+   (`mongodb-memory-server`'s download of `fastdl.mongodb.org` is blocked at the proxy level,
+   confirmed directly rather than assumed), but Danny running it for real caught what a manual
+   read alone had missed twice in a row: `getMyGiftCardLiabilityReport`/
+   `getGiftCardLiabilityReport` matched ids as plain strings inside an aggregation `$match`,
+   which Mongoose never casts the way `find()` does, so the report silently read zero (X59); the
+   "missing paymentMethod" test's own premise didn't hold given that field is deliberately
+   non-null (X59); and once that test reached the resolver's real validation on the retry, the
+   custom "cash or Square" message it expected was never actually showing up - `z.enum(...,
+   { errorMap })` is a silently-ignored no-op on the Zod v4 this server runs, a bug shared by two
+   other, unrelated schemas in the same file that no existing test happened to assert the exact
+   message text for (X60). All three fixed, see DECISIONS.md M6's own follow-up entries for the
+   full RCA on each. A separate, unrelated problem surfaced in between: this sandbox's own earlier
+   `npm install` (run to unblock a different investigation) had corrupted the shared
+   `node_modules`' `@rollup/rollup-darwin-x64` package on Danny's actual machine, which is not a
+   server-side issue at all but did block `apps/web`'s own suite from running until a plain
+   `npm install` from the project root reconciled it. With that fixed too, both `server/test` and
+   `apps/web`'s own Vitest suite are now confirmed green for real, on Danny's own machine - not
+   just reviewed by eye and not stopped at the first fix that happened to be wrong. Still worth
+   running again after any further change to this code, the same as any other test suite, but
+   this item no longer carries an outstanding verification gap.
+6. ~~Client flags have no mobile presence either~~ - **done 2026-09-04, same X49 as gap 3** (flags
+   are a `ClientDashboard` section server-side too, so both closed in the same pass): viewing,
+   resolving, and hand-raising a flag all now work from `client/[id].tsx`. Automatic no-show flags
+   were already possible server-side (`syncNoShowFlag`) before this - what mobile was missing was
+   the viewing/resolving/hand-raising UI, which this closes. No flag-TYPE admin screen exists on
+   mobile still (matching web, which also has none - see `ClientService.js`'s own comment on
+   `getClientFlagTypes` reading seeded platform-wide types only).
+7. ~~No email-notification-preferences screen~~ - **done 2026-09-04 (X51)**: a new
+   "Notifications" link on `settings/index.tsx` opens `settings/notifications.tsx`, a direct port
+   of web's `NotificationSettingsPanel.jsx` - four category toggles (Money/Schedule/Your
+   team/Messages), a digest-hour `PillRow`, and a timezone field, shown only once something
+   actually digests. Not to be confused with Reminders/Auto-Responses/Response Time (client-facing
+   message nudges, already built) - this is the account owner's own inbound-email preferences.
+8. ~~No in-app notification feed~~ - **done 2026-09-04 (X52)**: a new bell-style
+   "Notifications" link on `app/index.tsx`'s header (same unread-badge shape as
+   Requests/Messages) opens `app/notifications/index.tsx`, a direct port of web's
+   `NotificationBell.jsx` + `NotificationItem.jsx` as one full-screen route. One deliberate
+   addition beyond the port: rows are tappable, reusing the same `subjectType`/`subjectId` ->
+   screen mapping mobile's push-notification handling already relies on for a tap - web's own
+   rows are inert despite carrying the same fields. See X52's own DECISIONS.md entry.
+9. **Group/shop-wide conversations and message search** - split in two by X53
+   (2026-09-04). ~~Message search~~ **done**: `app/messages/index.tsx` now has a name-filter
+   search box over the loaded conversation list, direct port of `Messenger.jsx`'s own filter.
+   **Group/shop-wide conversations stay unbuilt**, and X53 found why: `getConversationsByShopId`
+   (`MessengerService.js`'s `fetchShopConversations`) has a unit test but no UI anywhere on web
+   either - no page calls it, and there is no way on web to even start a group conversation. Same
+   class of finding as gift cards (gap 5) - left open here with this recorded, not built blind (image-attachment compose and per-row
+   mark-unread were both closed earlier, in X35).
+10. ~~The custom booking-request field editor~~ - **done 2026-09-04 (X54)**: a new
+    `form-booking-fields/[id].tsx` screen, direct port of web's `BookingRequestFieldsEditor.jsx`,
+    reached from a new "Edit Fields" action on that row in `forms/index.tsx`. Up/Down buttons
+    substitute for web's drag-reorder (same shape of fix as X30's generic FormBuilder), reusing a
+    now-generalized `utils/formBuilder.ts` `moveField`. `form/[id].tsx` still redirects a
+    booking_request form back to the Forms list rather than to this new screen - see X54's own
+    DECISIONS.md entry for why.
+11. ~~Registration/onboarding~~ - **done 2026-09-04 (X55), scoped to account creation only**: a
+    new `register.tsx` screen, reached from a new "Create a new account" link on `login.tsx`, ports
+    web's `Register.jsx` account-type-and-account-fields steps (accountType, shopName when shop,
+    firstName, lastName, email, password, confirmPassword, optional bookingSlug), then logs the new
+    account in and goes straight to Home. Web's three SKIPPABLE follow-up steps (notifications,
+    rates, shop cut) are deliberately not re-offered here - `settings/notifications.tsx` (X51),
+    `settings/rates.tsx` (X37), and `shop/[id].tsx` already cover all three once the account is
+    real, so a second wizard would just duplicate them. **First-time password set
+    (`/set-password/:token`) stays unbuilt** - not a new gap, X29 already covers this exact URL
+    (both the invite and reset purposes redeem through it): no mobile deep link is registered for
+    it, so the emailed link always opens the phone's browser regardless of whether a native screen
+    exists. See X55's own DECISIONS.md entry for the full reasoning on both halves.
+
+**Not gaps, by design, not by omission:** the client-facing portal (`ClientSettings.jsx`,
+`ClientDashboard.jsx`'s isSelf=true mode, the public guest-booking/guest-conversation/public-form
+routes) is out of scope for mobile entirely - mobile has no client login at all (a decision made
+back at X15/X16, not revisited here). Web's own Calendar/Taxes/Analytics settings categories are
+themselves still `ComingSoonPanel` placeholders, not real features - mobile isn't behind web on
+those, web hasn't built them either.
+
 ## Next
 
-**0 and 1 below (the shop-admin migration, and a real Square payment) are explicitly deferred —
-reconfirmed 2026-08-25: Danny's plan is to pick this back up as the last item before starting the
-mobile applications, not before.** Left written out below rather than deleted, since the "Run it
-once, for real" suite item is now reported done for both suites (see the 2026-08-25 entry above,
-which supersedes the 2026-08-18/19 reports below) and the rest of each item's own detail is still
-accurate and will still be needed whenever this is picked up again.
+**The mobile/web parity accounting directly above this section is the source for what's next now**
+- the Settings/Messages follow-up list (X31 through X46) is done in full, but that list was never
+the whole gap; it just happened to be the one with names already attached. Priority among the 11
+items there is Danny's call, not assumed here - see that section for the full reasoning behind each
+one. The deferred items below (0 and 1) are what's left before the app could take real money, and
+Danny's plan is to hold those until mobile is otherwise complete rather than start them early.
 
-0. ~~Run both suites on a real machine~~ — **done, reported green 2026-08-18** (see above). **Then
-   the shop-admin migration** — deferred, not urgent: `node scripts/migrate-shop-admins-to-artists.js
-   --dry-run` first. Until it runs, a `STAFF`-typed shop admin still has no Settings page — which is
-   how this was found. See `DECISIONS.md` S0 for what the migration costs. Explicitly NOT migration-
-   script work right now per Danny (this is dev data he can reseed at will) — this item is about
-   *production/pre-existing* data specifically, which is why it's still deferred rather than dropped.
+**Danny picked "Create new appointment/client/project" first - both halves are now done.**
+X47 (2026-09-04) closed client/artist/staff. X48 (2026-09-04) closed the appointment/consult half -
+a new "New" link on `app/index.tsx`'s header opens `appointment/new.tsx`, a direct port of web's
+`AppointmentWizard.jsx` as one component carrying its own seven-step internal machine, covering all
+three of web's underlying pipelines (Personal; Consult and a brand-new-project Session sharing
+`createBookingRequest`+`convertBookingRequest`; Session-on-an-existing-project going straight to
+`createAppointment`). Shipped as one slice rather than split further, once the read-first pass
+showed the whole file was a single state machine that didn't factor cleanly into independent
+pieces - see X48's own DECISIONS.md entry for the full reasoning.
 
-1. **DEFERRED — take one real payment end to end**, when told to pick it back up. Nothing in the
-   charge path has ever touched Square. It was
-   built against their published REST docs, and `utils/square.js` has said so at the top since it
-   was written. The sequence: run `scripts/migrate-square-accounts.js`, connect a Square **sandbox**
-   seller through the OAuth flow, set a tax rate and offset in Settings, then charge a session and a
-   deposit and confirm the figures in Square's dashboard match what InkBooks recorded. Everything
-   below is built on arithmetic that has only ever been checked against itself.
+**Client detail depth (gap 3) and client flags (gap 6) are also done now (2026-09-04, X49)** -
+picked next as the most-blocking remaining item once Danny's own priority closed. `client/[id].tsx`
+now shows Stats/Projects/Appointments/Notes/Flags alongside the shared-images gallery X15 built, a
+direct port of `ClientDashboard.jsx` field-for-field (its `SendAutoResponseButton` and
+fill-a-form-on-the-client's-behalf sections are still not ported - named as their own future work
+in X49's own DECISIONS.md entry).
 
-   **Launch the sandbox seller first.** Square's authorize page refuses with *"To start the OAuth
-   flow for a sandbox account, first launch the seller test account from the Developer Console"* —
-   open the test account from developer.squareup.com/apps → your app → Sandbox → Test accounts, and
-   leave that session active. The error comes from Square's own hosted page, so InkBooks never sees
-   it and cannot explain it for you.
+**Dashboard/analytics (gap 4) is also done now (2026-09-04, X50)** - picked next as the
+most-blocking remaining item. `app/dashboard.tsx` branches Artist/Staff the way web's `Home.jsx`
+branches `userType`, porting `ArtistPerformancePanel.jsx`/`ShopAnalyticsPanel.jsx` field-for-field
+with three named scope cuts (no custom date range, no shop-cut mark-paid section, "Load more"
+instead of `EntityListPager`) - see X50's own DECISIONS.md entry for the full reasoning, including
+why viewing one other specific artist's performance is named as its own separate future slice
+rather than part of this one.
 
-   **Any account connected before 2026-08-11 must disconnect and reconnect.** `PAYMENTS_WRITE` was
-   added to the requested scopes only once client charges moved onto the artist's own connection —
-   before that the list was written for the Invoices-only flow. Scopes are granted at authorization
-   and a refresh returns the original set, so there is no way to gain one without reconnecting. A
-   charge on such a token fails with a message saying exactly that.
+**Gift cards (gap 5) turned out to need Danny's own call, not an autonomous pick, see that gap's
+own re-scoped entry above.** The backend was fully built but the feature had no UI on either
+platform, which broke this whole list's working assumption (mobile behind web, something real to
+port). Raised directly; Danny picked skipping it at the time (moved to gap #7), then came back to
+it after X55 with two decisions: real Square payment collection at sale ("Real Square charge, like
+deposits"), and web first, then mobile. **Both platforms are done now** (see gap 5's own entry
+above for the full file list on each).
 
-   **Verified against a real sandbox seller on 2026-08-11, as far as the Payments call.**
-   Authorization URL → consent → token exchange → encrypted storage → decrypt → `POST /v2/payments`
-   all ran against Square rather than against its documentation. The charge was refused for the
-   missing scope — which is granted at authorization, so the refusal itself proves the handshake
-   completed and the stored token was genuinely usable.
+**Email-notification preferences (gap 7) is done instead (2026-09-04, X51)** - a direct port of
+web's `NotificationSettingsPanel.jsx` onto a new `settings/notifications.tsx` screen. See X51's
+own DECISIONS.md entry for the full reasoning, including the digest-hour `PillRow` and why gift
+cards were set aside first.
 
-   **Still unverified:** a payment that succeeds, and everything downstream — `createShopCutInvoice`,
-   publishing it, and the webhook flipping an appointment to `paid`.
-2. **Drop the old `Shop` Square fields.** Once the migration has run and a charge has worked, delete
-   the seven now-unread `square*` fields from stored shop documents. Deliberately left in place for
-   one deploy — see M9.
+**The in-app notification feed (gap 8) is done too (2026-09-04, X52)** - a new bell-style
+"Notifications" header link opens `app/notifications/index.tsx`, a direct port of web's
+`NotificationBell.jsx` + `NotificationItem.jsx`, with one deliberate mobile-only addition: rows
+are tappable, reusing the push-notification tap-routing mobile already had. See X52's own
+DECISIONS.md entry.
+
+**Gap 9 split in two (2026-09-04, X53).** Message search is done - a direct port of
+`Messenger.jsx`'s own name filter, added to `app/messages/index.tsx`. Group/shop-wide
+conversations turned out to be the same shape of finding as gift cards: `getConversationsByShopId`
+has a unit test but no UI anywhere, on either platform - left unbuilt, same call as gift cards, not
+re-raised as a fresh question since X51 already settled how to handle this shape of finding.
+
+**The booking-request field editor (gap 10) is done too (2026-09-04, X54)** - a new
+`form-booking-fields/[id].tsx` screen, direct port of web's `BookingRequestFieldsEditor.jsx`,
+reached from a new "Edit Fields" action on the booking_request row in `forms/index.tsx`. Same
+Up/Down-button reorder substitute as X30's generic FormBuilder, via a newly generalized
+`moveField<T>`. See X54's own DECISIONS.md entry.
+
+**Registration (gap 11) is done too (2026-09-04, X55), scoped to account creation only** - a new
+`register.tsx` screen ports web's `Register.jsx` account-type-and-account-fields steps, then logs
+the new account in and goes to Home; the three skippable follow-up steps (notifications, rates,
+shop cut) are already reachable from Settings once the account exists, so they aren't re-offered
+in a second wizard here. First-time password set (`/set-password/:token`) stays unbuilt - not a
+new gap, X29 already covers this exact URL for the same missing-deep-link reason. See X55's own
+DECISIONS.md entry.
+
+**Every named gap in the 2026-09-04 accounting is now closed, including gift cards (gap 5)**:
+Danny's own product calls (real Square payment collection; web first, then mobile) are both
+settled, and both platforms are built, see that section's own entry for the full file list.
+
+**Correction (2026-09-04): items 0 and 1 below were already fully closed back on 2026-08-27,
+this section just never caught up.** The paragraph that used to sit here (added 2026-08-25,
+edited again earlier today before this correction) claimed a real Square payment was still
+partly unverified. That was wrong twice over: `utils/square.js`'s own header comment and
+PRODUCTION_ROADMAP.md's "Suggested sequencing" item 6 both record that Danny confirmed real
+sandbox deposit and session charges working through the app's own UI on 2026-08-27, and the
+shop-cut-invoice-plus-webhook half was independently verified live even earlier, 2026-08-01/02
+(PRODUCTION_ROADMAP.md's "Shop-cut ledger" section) - connect, invoice, real sandbox payment,
+real webhook, `shopCutStatus` flipped to `paid`, confirmed by a follow-up query. Both predate
+today's conversation, where Danny separately reconfirmed the charge path again from his own
+memory of using it. See items 0 and 1 below for what each is now marked, and
+PRODUCTION_ROADMAP.md's "Suggested sequencing" for the fuller account, including three more
+sub-items (legacy `square*` field cleanup, the `PAYMENT_RECEIVED` trigger wiring, the shop-admin
+migration turning out to be unnecessary) that were also closed the same day and never mirrored
+back into this file.
+
+0. ~~Run both suites on a real machine~~ — **done, reported green 2026-08-18**, and again
+   2026-08-25 (found and fixed five more real bugs that pass, see PRODUCTION_ROADMAP.md's
+   "Suggested sequencing" item 1), and again 2026-09-04 for gift cards specifically (three more
+   real bugs, see M6's follow-up entries in DECISIONS.md). ~~Then the shop-admin migration~~ —
+   **turned out not to be needed, per PRODUCTION_ROADMAP.md's "Suggested sequencing" item 7**: the
+   divergent-shape bug that would have required it was fixed at the source in `seed.js`/
+   `seed-large.js`, and Danny re-ran those to correct the dev data 2026-08-27, so
+   `migrate-shop-admins-to-artists.js` has nothing left to find against current data. It stays in
+   the repo as a rescue tool if a real signup path ever produces a `STAFF`-only admin again, not
+   as an open task.
+
+1. ~~Take one real payment end to end~~ — **done, both halves, confirmed 2026-08-27 and again
+   2026-08-01/02 respectively; Danny reconfirmed the charge half again in conversation
+   2026-09-04.** The shop-cut-invoice-plus-webhook half was verified live first, 2026-08-01/02:
+   connect, `createAndPublishShopCutInvoice`, a real sandbox payment made by hand against Square's
+   own hosted page, a real Square-originated webhook, `shopCutStatus` flipped to `paid`, confirmed
+   by a follow-up query - see PRODUCTION_ROADMAP.md's "Shop-cut ledger" section for the full
+   account, including the exact gross-up figures Square returned. The direct-charge half
+   (`POST /v2/payments` for sessions and deposits) was the one piece still open after that, blocked
+   by a missing `PAYMENTS_WRITE` scope discovered 2026-08-11 (any account connected before that
+   date needs to disconnect and reconnect once, since a scope refresh returns only what was
+   originally granted). Closed per Danny's own confirmation 2026-08-27 that real sandbox deposit
+   and session charges had been working through the app's own UI for a while, including the
+   downstream effects (appointment status, shop-cut math off the real charged amount) - see
+   PRODUCTION_ROADMAP.md's "Suggested sequencing" item 6. `utils/square.js`'s own header comment
+   already reflects this correctly (fixed there back on 2026-08-27, per that same sequencing
+   entry) - this file, not that comment, was the one still out of date.
+
+2. ~~Drop the old `Shop` Square fields~~ — **done, same day, commit `6732aaf` (2026-08-27)**:
+   `scripts/drop-legacy-square-shop-fields.js` has been run for real against the pre-launch Atlas
+   database. See M9 for why they were left in place for one deploy in the first place.
 
 Gift cards, adjustment records, and the client-flags GraphQL surface (previously items 3/4 here)
-are all done — see Done above. What's actually left before this app could take real money is items
-1 (a real Square payment) and 0 (the two suites — done — then the migration) — both deferred, see
-above, not because there's other feature work queued ahead of them. A resolve-by-id mutation for a
-manually-raised client flag is a real, stated gap (see Known gaps) but nobody has asked for it yet.
+are all done - see Done above, and items 0/1/2 immediately above are now done too. ~~What is
+genuinely still open, per PRODUCTION_ROADMAP.md's own "Suggested sequencing" item 10: the
+test-coverage tail (`utils/appChrome.js`, roughly 48 other `components/**/*.jsx` files, and
+roughly 46 `server/utils/*.js` files never audited for unit tests - see that item's own itemized
+account and this file's matching "Known gaps" entry).~~ — **done, see this file's 2026-09-04
+"thirty-fifth entry" above** (commits `X61`-`X70`): every remaining web component and every
+`server/utils/*.js` file has been individually audited, with two real bugs found and fixed along
+the way. Still needs a real `npm test` run in both `server/` and `apps/web/` before it's fully
+closed - see that entry for exactly what hasn't been executed yet. Atlas automated backups, Square
+production
+credentials, and the App Store submission are all explicitly deferred by Danny's own call until
+closer to real paying users, not forgotten - see PRODUCTION_ROADMAP.md's own sequencing notes for
+each. A resolve-by-id mutation for a manually-raised client flag turned out to already exist too
+(item 9 in that same sequencing list, done 2026-08-21/22) - a separate paragraph earlier in this
+file claimed otherwise and has been corrected in place, same as everything else in this section.
 
 ~~**New candidate item, found 2026-08-18: wire `ClientFlagType.ensureSeeded()` into application
 boot.**~~ — **done, confirmed 2026-08-21/22**: `server/index.js` calls
@@ -2023,8 +3605,10 @@ regression.
   `confirmShopCutPaid`, `confirmBoothRentPaid`, `createStaffAccount`, and similar) are correctly
   left alone - each is a genuinely shop-only action with no independent-artist equivalent to grant,
   exactly as `hasAdminAuthority`'s own header comment enumerates.
-- **The reference-image upload 400** is parked until it recurs and a payload exists. `express.json()`
-  was on Express's 100kb default and is now 2mb; that is **not** confirmed as the cause.
+- ~~The reference-image upload 400~~ - **closed 2026-09-05, per Danny: already resolved, has
+  not recurred.** No specific root cause was confirmed (the `express.json()` 2mb bump was a
+  precaution, never confirmed as the fix); closing on Danny's own word rather than a diagnosis,
+  since there is no longer a failure to diagnose.
 - **Artists who already disconnected and reconnected** have no interval history. There was nothing to
   migrate — the old model overwrote it. New intervals start from the change.
 - ~~`computeChargeBreakdown` echoes raw credit inputs, not the clamped ones~~ — checked
@@ -2038,7 +3622,10 @@ regression.
   paged query — deliberately, since notes are embedded sub-documents on `Client`, not a separate
   collection `paginate()` can query with its own skip/limit. Projects and Appointments are NOT in
   this gap any more (see Done below) — this is now the one remaining list on that page that isn't
-  a real server-paged connection, and it's also the smallest of the three in practice.
+  a real server-paged connection, and it's also the smallest of the three in practice. Reviewed
+  again 2026-09-05 as one of the small parked cleanup items: still the right call per Danny -
+  a real fix means a $slice-based resolver or its own collection, real new infrastructure for a
+  list that's typed by hand and stays small in practice. Staying as-is.
 - ~~A manually-raised client flag has no resolve path~~ — **done 2026-08-21/22**:
   `resolveClientFlag(flagId)` mutation ships, wired into `ClientDashboard.jsx` with a per-row
   Resolve button. Not restricted to manually-raised flags — an admin can also clear a stale
@@ -2069,9 +3656,11 @@ regression.
   `ShopAnalyticsPanel`/`StatCard`, and a long tail of smaller single-purpose components (`IBModal`,
   `IBAlert`, `Pager`, `Sidebar`, `CropEasy`, and similar). Being worked through now, in waves,
   without pausing between them.~~ — **all 47 files now have a test file written, done
-  2026-08-26** (see that entry above). Uncommitted and never run against a real `vitest` yet —
-  only Babel-syntax-checked. This is the one item still needing a real test run before it can be
-  called closed.
+  2026-08-26**, and committed as `X61` on 2026-09-04 (see that entry above - this bullet just never
+  got updated when the commit landed). Along with the `server/utils/*.js` audit named in the
+  paragraph above this list, that closes both halves of this item. Neither half has been run
+  against a real `vitest`/MongoDB in this sandbox yet - only syntax-checked - see this file's
+  2026-09-04 "thirty-fifth entry" for exactly what still needs `npm test` run for real.
 - ~~A shop-connected plain artist's personal expense/income ledger has no UI~~ — **resolved
   2026-08-18, see the note near the top of this file.** Was deliberate scope, changed on request.
 - **`ExpenseType`/`IncomeType` have no delete, only deactivate** — matching `ClientFlagType`'s own

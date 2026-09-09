@@ -2,9 +2,10 @@ const express = require('express');
 const checkAuth = require('../utils/check-auth');
 const square = require('../utils/square');
 const SquareAccount = require('../models/SquareAccount');
+const GiftCard = require('../models/GiftCard');
 const { resolveArtistChargeAccount } = require('../utils/square-account');
 const { quoteAppointmentCharge, quoteDepositCharge } = require('../utils/charge-quote');
-const { processSquarePaymentInputSchema, validate } = require('../utils/validation');
+const { processSquarePaymentInputSchema, processGiftCardPaymentInputSchema, validate } = require('../utils/validation');
 const { checkRateLimit, getClientIp } = require('../utils/rate-limit');
 const Appointment = require('../models/Appointment');
 const { applyShopCut } = require('../utils/shop-cut');
@@ -16,6 +17,7 @@ const { Constants } = require('../utils/constants');
 const { recordEvent } = require('../utils/event-log');
 const { sendAutoResponsesForTrigger } = require('../utils/auto-responses');
 const { reportError } = require('../utils/error-reporting');
+const { getShopIdsForUser } = require('../utils/shop-membership');
 
 const router = express.Router();
 
@@ -296,6 +298,127 @@ router.post('/square/process-payment', express.json(), async (req, res) => {
     });
   } catch (err) {
     reportError(err, { context: '[square-payment] Failed to process payment' });
+    return res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+
+// This is the route a gift-card sale form's IBGiftCardPaymentForm points at (see
+// apps/web/src/components/IBSquarePayments/IBGiftCardPaymentForm.jsx). Mirrors
+// /square/process-payment above closely, but a gift card sale is simpler in one load-bearing way:
+// there is no equivalent of tax/tip/a fee-offset choice re-made at charge time. The offset choice
+// (M5/M6) was already made and priced into feeOffsetCents when createArtistGiftCard/
+// createShopGiftCard recorded the pending card - what gets charged here is exactly
+// faceValueCents + feeOffsetCents, read verbatim off that stored, already-validated document,
+// the same "the pending record is what gives the charge a stored figure to read, not one the
+// browser sends alongside the card" principle recordDeposit/quoteDepositCharge established.
+router.post('/square/process-gift-card-payment', express.json(), async (req, res) => {
+  let user;
+  try {
+    user = checkAuth({ req });
+  } catch (err) {
+    return res.status(401).json({ error: err.message });
+  }
+
+  const { allowed, retryAfterSeconds } = checkRateLimit(
+    `${getClientIp(req)}:processGiftCardPayment`,
+    { windowMs: 60 * 1000, max: 10 },
+  );
+  if (!allowed) {
+    return res
+      .status(429)
+      .json({ error: `Too many payment attempts. Try again in ${retryAfterSeconds}s.` });
+  }
+
+  const { valid, errors, data } = validate(processGiftCardPaymentInputSchema, req.body);
+  if (!valid) {
+    return res.status(400).json({ error: 'Invalid request', errors });
+  }
+
+  // Loaded and authorized BEFORE the charge - same reasoning as the appointment route above: a
+  // request naming a card the caller doesn't own has to fail without money moving.
+  const giftCard = await GiftCard.findById(data.giftCardId);
+  if (!giftCard) {
+    return res.status(404).json({ error: 'Gift card not found' });
+  }
+  if (giftCard.issuerType === 'ARTIST') {
+    // Same "no argument for who this acts for" shape as createArtistGiftCard itself - only the
+    // artist who started this sale can finish charging it.
+    if (String(user.id) !== String(giftCard.issuerArtistId)) {
+      return res.status(403).json({ error: 'Action not allowed' });
+    }
+  } else {
+    // Same floor createShopGiftCard itself uses (SHOP_ADMIN-or-better, genuinely shop-level, no
+    // "session owner" bypass) plus real membership in the shop this card belongs to.
+    const shopIds = await getShopIdsForUser(user.id);
+    if (
+      user.role > Constants.ROLES.SHOP_ADMIN ||
+      !shopIds.map(String).includes(String(giftCard.shopId))
+    ) {
+      return res.status(403).json({ error: 'Action not allowed' });
+    }
+  }
+
+  // Idempotency guard, same shape as the deposit/session checks above - re-posting an
+  // already-completed sale takes the money a second time under a fresh key, since as far as
+  // Square is concerned this is a different payment.
+  if (giftCard.saleStatus !== 'pending') {
+    return res.status(409).json({ error: 'This gift card has already been paid for.' });
+  }
+
+  const amountDueCents = giftCard.faceValueCents + giftCard.feeOffsetCents;
+
+  // THE SELLER'S OWN ACCOUNT, always - an artist-issued card into the issuing artist's account,
+  // a shop-issued card into whichever admin actually rang it up (soldByUserId) - never the shop's
+  // own account, since only an artist's own connected account can take a client's card (M6/M9).
+  // The shop's cut on a shop-issued card is settled afterwards through the shop-cut ledger, same
+  // as everywhere else in this app.
+  const chargeAccountUserId =
+    giftCard.issuerType === 'ARTIST' ? giftCard.issuerArtistId : giftCard.soldByUserId;
+  const account = await resolveArtistChargeAccount(chargeAccountUserId);
+  if (!SquareAccount.isUsable(account)) {
+    return res.status(400).json({
+      error: 'Connect Square in Settings before taking a card payment.',
+    });
+  }
+
+  try {
+    const payment = await square.createPaymentForAccount({
+      account,
+      sourceId: req.body.sourceId,
+      amountCents: amountDueCents,
+      idempotencyKey: req.body.idempotencyKey,
+      note: req.body.note || `InkBooks gift card ${giftCard.code}`,
+    });
+
+    const previousSaleStatus = giftCard.saleStatus;
+    giftCard.saleStatus = 'complete';
+    giftCard.squarePaymentId = payment.id;
+    await giftCard.save();
+
+    await recordEvent({
+      entityType: 'GiftCard',
+      entityId: giftCard._id,
+      action: 'update',
+      actorUserId: user.id,
+      shopId: giftCard.shopId,
+      summary: `Charged ${formatCents(amountDueCents)} via Square for a gift card sale`,
+      changes: [{ field: 'saleStatus', from: previousSaleStatus, to: giftCard.saleStatus }],
+    });
+
+    // No notification here - see resolvers/giftCards.js's own header comment on why gift card
+    // events are deliberately not wired into notifications yet (a NOTIFICATIONS_DESIGN.md
+    // decision this feature shipped without, same restraint that applies to sale/redemption
+    // there).
+
+    return res.status(200).json({
+      success: true,
+      paymentId: payment.id,
+      status: payment.status,
+      giftCardId: String(giftCard.id),
+    });
+  } catch (err) {
+    reportError(err, { context: '[square-gift-card-payment] Failed to process payment' });
     return res.status(err.status || 500).json({ error: err.message });
   }
 });

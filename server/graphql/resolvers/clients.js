@@ -56,6 +56,36 @@ module.exports = {
       }
       return (await canAccessClient(user, client)) ? client : null;
     }, Constants.ROLES.SHOP_STAFF),
+    // Same "who can see this client" rule as findClientByEmail just above, applied in bulk
+    // (clientScopeFilter) rather than per-record, since this can hand back several candidates for
+    // one keystroke instead of checking a single already-fetched record.
+    //
+    // 3-character floor matches the app bar's own search box (see components/search/
+    // GlobalSearch.jsx's MIN_QUERY_LENGTH) and Danny's own ask (2026-09-06): shorter than that,
+    // a prefix matches too much of the client list to be a useful suggestion and is pure extra
+    // query load per keystroke. Enforced here too, not just client-side - a UI change is not a
+    // security boundary.
+    findClientsByEmailPrefix: withAuth(async (_, { emailPrefix, limit }, context, info, user) => {
+      const normalized = String(emailPrefix || '').trim().toLowerCase();
+      if (normalized.length < 3) {
+        return [];
+      }
+      const scope = await clientScopeFilter(user);
+      if (!scope) {
+        return [];
+      }
+      // Anchored prefix match (^), not a substring search - "starts with what's been typed so
+      // far" is what an autosuggest-while-typing wants; a bare substring match would surface
+      // clients whose email merely CONTAINS the typed text anywhere, which reads as random to
+      // someone typing an address left to right.
+      const escaped = normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return Client.find({
+        ...scope,
+        email: { $regex: `^${escaped}`, $options: 'i' },
+      })
+        .sort({ email: 1 })
+        .limit(Math.min(Math.max(parseInt(limit, 10) || 8, 1), 20));
+    }, Constants.ROLES.SHOP_STAFF),
     // Was withAuth with no restriction at all - any authenticated user could pass an arbitrary
     // clientId and read that client's contact info. Same rule as getClients above, for one row.
     getClient: withAuth(async (_, { clientId }, context, info, user) => {
