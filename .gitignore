@@ -125,3 +125,6 @@ server/config.js
 # Scratch folder used by the device-bridge git-lock workaround (mv .git/*.lock here before
 # retrying a git command) - never intended to be committed.
 _to_delete/
+
+# Local seed data snapshots (real client/business data pulled from a live database - never commit)
+server/scripts/seed-data/

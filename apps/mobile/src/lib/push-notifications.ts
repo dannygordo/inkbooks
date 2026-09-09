@@ -164,7 +164,13 @@ export async function unregisterPushNotifications(
 // '/appointment/[id]', ... })` calls as a literal switch in _layout.tsx keeps every pathname a
 // real typed-routes literal there; this function only ever returns which case to take.
 
-export type PushNotificationTargetScreen = 'appointment' | 'bookingRequest' | 'conversation' | 'artist' | 'shop';
+export type PushNotificationTargetScreen =
+  | 'appointment'
+  | 'bookingRequest'
+  | 'conversation'
+  | 'artist'
+  | 'shop'
+  | 'staff';
 
 export type PushNotificationTarget = {
   screen: PushNotificationTargetScreen;
@@ -177,12 +183,20 @@ export type PushNotificationTarget = {
 // (DECISIONS.md X31 names BoothRentPanel as still-unported Settings work), so a boothRentCharge
 // notification simply opens the app to Home, same as tapping the app icon - not a bug, a real gap
 // named here rather than a dead navigation attempt.
+//
+// 'staff' added 2026-09-08 - utils/attention.js's unredeemedInvites used to tag every stranded
+// invite 'artist' regardless of whether the person was actually staff, which routed a tap on a
+// staff member's unredeemed-invite notification into the Artist screen with the wrong id shape
+// entirely (a User._id where Artist.findById expects an Artist document _id). Now that server
+// side correctly distinguishes the two, this needs its own screen to land on rather than
+// silently falling through to Home the way boothRentCharge does above.
 const SUBJECT_TYPE_SCREENS: Record<string, PushNotificationTargetScreen> = {
   appointment: 'appointment',
   bookingRequest: 'bookingRequest',
   conversation: 'conversation',
   artist: 'artist',
   shop: 'shop',
+  staff: 'staff',
 };
 
 /**
@@ -236,6 +250,9 @@ export function navigateForNotificationTarget(router: ImperativeRouter, target: 
       return;
     case 'shop':
       router.push({ pathname: '/shop/[id]', params: { id: target.id } });
+      return;
+    case 'staff':
+      router.push({ pathname: '/staff/[id]', params: { id: target.id } });
       return;
   }
 }

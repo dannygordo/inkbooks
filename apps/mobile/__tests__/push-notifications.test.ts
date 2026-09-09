@@ -224,6 +224,12 @@ describe('resolveNotificationTarget', () => {
       screen: 'shop',
       id: 'shop-1',
     });
+    // Regression coverage: utils/attention.js's unredeemedInvites used to tag every stranded
+    // invite 'artist' even when the person was actually staff (2026-09-08 fix).
+    expect(resolveNotificationTarget({ subjectType: 'staff', subjectId: 'staff-1' })).toEqual({
+      screen: 'staff',
+      id: 'staff-1',
+    });
   });
 
   it('returns null for a subjectType with no mobile screen (boothRentCharge)', () => {

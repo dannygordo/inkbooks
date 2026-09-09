@@ -130,21 +130,27 @@ describe('unredeemedInvites', () => {
 		expect(result).toHaveLength(1);
 		expect(result[0].type).toBe('invite_unredeemed');
 		expect(result[0].category).toBe('roster');
-		expect(result[0].subjectType).toBe('artist');
-		expect(result[0].subjectId).toBe(String(staff.userId));
+		// Regression coverage for the actual bug report: this used to hardcode 'artist' here
+		// regardless of Staff vs Artist, so a brand-new staff member's unredeemed invite showed up
+		// labeled as an artist. subjectId is the Staff document's own _id (what getOneStaff keys
+		// off), not the shared User._id staff.userId points at.
+		expect(result[0].subjectType).toBe('staff');
+		expect(result[0].subjectId).toBe(String(staff._id));
 		void shopAdmin;
 	});
 
 	it('surfaces a connected artist the same way, not just shop staff', async () => {
 		const { shop } = await createShopAdminUser();
-		const { user: artist } = await createArtistUser();
-		await connectArtistToShop(artist._id, shop._id);
-		await User.findByIdAndUpdate(artist._id, { hasSetPassword: false });
-		await createInviteToken(artist._id);
+		const { user: artistUser, artist } = await createArtistUser();
+		await connectArtistToShop(artistUser._id, shop._id);
+		await User.findByIdAndUpdate(artistUser._id, { hasSetPassword: false });
+		await createInviteToken(artistUser._id);
 
 		const result = await unredeemedInvites([String(shop._id)]);
 
 		expect(result).toHaveLength(1);
+		expect(result[0].subjectType).toBe('artist');
+		// The Artist document's own _id (what getArtist keys off), not artistUser._id.
 		expect(result[0].subjectId).toBe(String(artist._id));
 	});
 
