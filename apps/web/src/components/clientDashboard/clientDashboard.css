@@ -87,6 +87,19 @@
 	font-weight: 500;
 }
 
+/* The project/appointment title rows link to their project (2026-09-08, Danny) - styled to
+   read as the same plain text .clientDashboardListPrimary already is, with just enough of a
+   hover cue (color shift, underline) to signal it is clickable, rather than looking like a
+   typical blue link dropped into an otherwise plain list. */
+.clientDashboardListLink {
+	color: inherit;
+	text-decoration: none;
+}
+.clientDashboardListLink:hover {
+	color: var(--ib-primary);
+	text-decoration: underline;
+}
+
 .clientDashboardListMeta {
 	font-size: 13px;
 	color: var(--ib-text-secondary);
