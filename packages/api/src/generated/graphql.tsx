@@ -987,6 +987,7 @@ export type Mutation = {
   archiveForm: Form;
   archiveStaff?: Maybe<Staff>;
   assignSharedImageToProject: SharedImage;
+  cancelSession: Appointment;
   changePassword: User;
   confirmBoothRentPaid: BoothRentCharge;
   confirmGiftCardShopCutPaid: GiftCard;
@@ -1044,6 +1045,7 @@ export type Mutation = {
   registerDeviceToken: Scalars['Boolean']['output'];
   removeSharedImageFromList: Scalars['Boolean']['output'];
   requestPasswordReset: Scalars['Boolean']['output'];
+  rescheduleSession: Appointment;
   resetSessionTimer: Appointment;
   resetSystemMessageTemplate: Scalars['Boolean']['output'];
   resolveClientFlag: ClientFlag;
@@ -1128,6 +1130,12 @@ export type MutationAssignSharedImageToProjectArgs = {
   imageType: Scalars['String']['input'];
   projectId: Scalars['ID']['input'];
   sharedImageId: Scalars['ID']['input'];
+};
+
+
+export type MutationCancelSessionArgs = {
+  appointmentId: Scalars['ID']['input'];
+  note?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -1499,6 +1507,13 @@ export type MutationRemoveSharedImageFromListArgs = {
 
 export type MutationRequestPasswordResetArgs = {
   email: Scalars['String']['input'];
+};
+
+
+export type MutationRescheduleSessionArgs = {
+  appointmentId: Scalars['ID']['input'];
+  newDate: Scalars['String']['input'];
+  note?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -1891,6 +1906,7 @@ export type Query = {
   __typename?: 'Query';
   checkBookingSlugAvailable: BookingSlugAvailability;
   findClientByEmail?: Maybe<Client>;
+  findClientsByEmailPrefix: Array<Client>;
   getAppointment?: Maybe<Appointment>;
   getAppointmentsByArtist: AppointmentPage;
   getAppointmentsByProject?: Maybe<Array<Maybe<Appointment>>>;
@@ -1979,6 +1995,12 @@ export type QueryCheckBookingSlugAvailableArgs = {
 
 export type QueryFindClientByEmailArgs = {
   email: Scalars['String']['input'];
+};
+
+
+export type QueryFindClientsByEmailPrefixArgs = {
+  emailPrefix: Scalars['String']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
 };
 
 
