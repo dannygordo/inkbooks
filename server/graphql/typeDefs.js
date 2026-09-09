@@ -2040,6 +2040,17 @@ module.exports = gql`
     # leaking their name and phone to whoever can guess an address. Creating them is still correct
     # in that case - createClientAccount links the existing person to this shop.
     findClientByEmail(email: String!): Client
+    # Autosuggest for the same "do we already have this person?" question above, but for while
+    # they're still typing - findClientByEmail only ever answers once a full address is entered,
+    # so the artist gets no help at all until they've typed the whole thing correctly. This
+    # returns up to 'limit' clients whose email starts with 'emailPrefix', so a dropdown can offer
+    # candidates from partway through (2026-09-06: Danny asked for this to kick in at the 3rd
+    # character - see the resolver for where that floor is actually enforced).
+    #
+    # Same scoping as findClientByEmail (nothing leaks across shops), but bulk-scoped like
+    # getClients rather than per-record checked, since this can return several candidates per
+    # keystroke rather than the single record findClientByEmail does.
+    findClientsByEmailPrefix(emailPrefix: String!, limit: Int): [Client!]!
     # The types a manual-flag picker can offer: every platform-wide type (shopId omitted or null)
     # plus, when shopId is passed, that shop's own. Includes systemGenerated types too (NO_SHOWED)
     # so a client's flag list can label one correctly - raiseClientFlag below is what actually

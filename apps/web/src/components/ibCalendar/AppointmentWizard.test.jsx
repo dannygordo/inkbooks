@@ -59,7 +59,13 @@ vi.mock("../../services/ProjectService", async (importOriginal) => {
 
 vi.mock("../../services/ClientService", async (importOriginal) => {
 	const actual = await importOriginal();
-	return { default: { ...actual.default, useLazyFindClientByEmail: vi.fn() } };
+	return {
+		default: {
+			...actual.default,
+			useLazyFindClientByEmail: vi.fn(),
+			useLazyFindClientsByEmailPrefix: vi.fn(),
+		},
+	};
 });
 
 import ProjectService from "../../services/ProjectService";
@@ -105,6 +111,14 @@ function setup({
 	ClientService.useLazyFindClientByEmail.mockReturnValue([
 		findClientByEmail,
 		{ data: matchedClient ? { findClientByEmail: matchedClient } : undefined },
+	]);
+
+	// Autosuggest's own lookup (see AppointmentWizard.jsx) - no test here exercises the suggestion
+	// dropdown itself, so an empty result is all any of them need.
+	const findClientsByEmailPrefix = vi.fn();
+	ClientService.useLazyFindClientsByEmailPrefix.mockReturnValue([
+		findClientsByEmailPrefix,
+		{ data: undefined },
 	]);
 
 	const setModal = vi.fn();

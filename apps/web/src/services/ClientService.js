@@ -229,6 +229,24 @@ const ClientService = (() => {
 
 	const _useLazyFindClientByEmail = () => useLazyQuery(_FIND_CLIENT_BY_EMAIL);
 
+	// Autosuggest version of the same lookup, for while an email is still being typed - see
+	// typeDefs.js's findClientsByEmailPrefix for the 3-character floor and why this is a separate
+	// query rather than just calling findClientByEmail on every keystroke (that one only ever
+	// answers once a complete, exact address has been entered).
+	const _FIND_CLIENTS_BY_EMAIL_PREFIX = gql`
+		query FindClientsByEmailPrefix($emailPrefix: String!, $limit: Int) {
+			findClientsByEmailPrefix(emailPrefix: $emailPrefix, limit: $limit) {
+				id
+				firstName
+				lastName
+				email
+				phone
+			}
+		}
+	`;
+
+	const _useLazyFindClientsByEmailPrefix = () => useLazyQuery(_FIND_CLIENTS_BY_EMAIL_PREFIX);
+
 	// The manual-flag picker's options - see typeDefs.js's getClientFlagTypes. shopId is optional
 	// (platform-wide types only when omitted); Client.jsx doesn't currently know the viewer's own
 	// shop, so this is called without one for now - a shop wanting its own custom types is a real
@@ -302,6 +320,7 @@ const ClientService = (() => {
 		FETCH_CLIENT_DASHBOARD: _FETCH_CLIENT_DASHBOARD,
 		UPDATE_CLIENT_NOTES: _UPDATE_CLIENT_NOTES,
 		useLazyFindClientByEmail: _useLazyFindClientByEmail,
+		useLazyFindClientsByEmailPrefix: _useLazyFindClientsByEmailPrefix,
 		ARCHIVE_CLIENT_MUTATION: _ARCHIVE_CLIENT_MUTATION,
 		UNARCHIVE_CLIENT_MUTATION: _UNARCHIVE_CLIENT_MUTATION,
 		getClientFlagTypes: _getClientFlagTypes,
