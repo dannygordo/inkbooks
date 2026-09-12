@@ -68,3 +68,47 @@ mutation MarkBoothRentPaidManually($boothRentChargeId: ID!) {
 		createdAt
 	}
 }
+
+# The two shop-admin actions GetBoothRentPlans/GetBoothRentCharges above don't call - added for
+# artist/[id].tsx's ShopCutRatePanel port (mobile's ShopCutRatePanel.jsx equivalent), the shop-
+# admin-facing screen these DO belong on, unlike the artist's own read-only Settings > Rates view
+# this file's original header comment describes. Field selections match BoothRentService.js's
+# PLAN_FIELDS/CHARGE_FIELDS exactly, same as the two queries above.
+mutation SetBoothRentPlan($artistId: ID!, $shopId: ID!, $amountCents: Int!, $dueDayOfMonth: Int!, $effectiveFrom: DateTime) {
+	setBoothRentPlan(
+		artistId: $artistId
+		shopId: $shopId
+		amountCents: $amountCents
+		dueDayOfMonth: $dueDayOfMonth
+		effectiveFrom: $effectiveFrom
+	) {
+		id
+		artistId
+		shopId
+		amountCents
+		dueDayOfMonth
+		effectiveFrom
+		setByUserId
+		active
+		createdAt
+	}
+}
+
+mutation ConfirmBoothRentPaid($boothRentChargeId: ID!) {
+	confirmBoothRentPaid(boothRentChargeId: $boothRentChargeId) {
+		id
+		artistId
+		shopId
+		amountCents
+		periodMonth
+		dueDate
+		status
+		markedPaidAt
+		markedPaidByUserId
+		confirmedAt
+		confirmedByUserId
+		expenseId
+		incomeId
+		createdAt
+	}
+}

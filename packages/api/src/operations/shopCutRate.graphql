@@ -1,0 +1,48 @@
+# Artist detail's "Shop cut" panel (mobile port of apps/web's ShopCutRatePanel.jsx) - what an
+# artist owes the shop, and from when. Read by the artist themselves or a shop admin there;
+# written by a shop admin only (server-enforced, resolvers/shopCutRates.js) - see that web
+# component's own header comment for why the history is the UI (a rate change applies forward
+# only and never reprices work already performed).
+#
+# Field selections match ShopCutRateService.js's SHOP_CUT_RATE_FIELDS exactly.
+query GetShopCutRates($artistId: ID!, $shopId: ID!) {
+	getShopCutRates(artistId: $artistId, shopId: $shopId) {
+		id
+		artistId
+		shopId
+		percent
+		compensationModel
+		effectiveFrom
+		setByUserId
+		note
+		createdAt
+	}
+}
+
+mutation SetShopCutRate(
+	$artistId: ID!
+	$shopId: ID!
+	$percent: Int!
+	$compensationModel: String
+	$effectiveFrom: DateTime
+	$note: String
+) {
+	setShopCutRate(
+		artistId: $artistId
+		shopId: $shopId
+		percent: $percent
+		compensationModel: $compensationModel
+		effectiveFrom: $effectiveFrom
+		note: $note
+	) {
+		id
+		artistId
+		shopId
+		percent
+		compensationModel
+		effectiveFrom
+		setByUserId
+		note
+		createdAt
+	}
+}

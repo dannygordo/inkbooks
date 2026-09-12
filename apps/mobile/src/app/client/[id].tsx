@@ -3,6 +3,7 @@ import type { Reference } from '@apollo/client';
 import {
   useGetClientDashboardQuery,
   useGetClientFlagTypesQuery,
+  useGetFormsListQuery,
   useGetSharedImagesForClientQuery,
   useRaiseClientFlagMutation,
   useResolveClientFlagMutation,
@@ -10,18 +11,21 @@ import {
 } from '@inkbooks/api';
 import { useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/Button';
 import { FormField } from '@/components/FormField';
+import { FormFillOutModal } from '@/components/FormFillOutModal';
 import { PillRow } from '@/components/PillRow';
+import { SendAutoResponseButton } from '@/components/SendAutoResponseButton';
 import { SharedImagesGallery } from '@/components/SharedImagesGallery';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/auth';
 import { useTheme } from '@/hooks/use-theme';
+import { businessScopeFor } from '@/utils/businessScope';
 import { formatCents } from '@/utils/money';
 
 // The server's own max page size for these two lists isn't relevant here - a client's own
@@ -56,11 +60,14 @@ const formatDateTime = (iso: string | null | undefined) => {
  * client case only (`isSelf=false` on web) - a client viewing their OWN dashboard needs a client
  * login mode mobile doesn't have at all, out of scope by construction, not a cut (X15/X16).
  *
- * TWO SECTIONS DELIBERATELY NOT PORTED: `SendAutoResponseButton` (sending a client one of the
- * shop's canned auto-response messages from here) and the "Forms" section (filling out a
- * published form on the client's behalf via `FormFillOut`). Both are real, separate features
- * layered on top of this screen rather than part of "show what this client's record contains" -
- * this pass is the record itself: stats, history, notes, flags.
+ * SendAutoResponseButton and the staff-facing "Forms" section (2026-09-12, HANDOFF.md's "full
+ * accounting" item) were both named as deliberately-not-ported in this comment's earlier revision
+ * - now added, in the same relative order web's own ClientDashboard.jsx renders them (Auto-
+ * Response between Stats and Projects, Forms between Appointments/Shared-Images and Notes). Both
+ * stay staff/artist-only, matching web's own `!isSelf` gate - there is no self-service branch to
+ * add here, since mobile has no client login at all (X15/X16), same reasoning as everything else
+ * on this screen. Forms opens `FormFillOutModal.tsx` - this app's own RN `Modal`-based stand-in
+ * for web's global-modal-hosted `FormFillOut.jsx`, since there's no equivalent modal host here.
  *
  * PAGINATION: "Load more" grows the page LIMIT and refetches from offset 0, rather than porting
  * `EntityListPager`'s dual offset+page-size UI or building a `fetchMore` that merges two array
@@ -87,6 +94,19 @@ export default function ClientDetailScreen() {
 
   const [projectsLimit, setProjectsLimit] = useState(DASHBOARD_PAGE_SIZE);
   const [appointmentsLimit, setAppointmentsLimit] = useState(DASHBOARD_PAGE_SIZE);
+  const [fillOutFormId, setFillOutFormId] = useState<string | null>(null);
+
+  // Published forms in THIS viewer's own shop/artist scope - matching web's own
+  // `FormService.getForms(scope, "published", {limit: 25, offset: 0})` call exactly (see that
+  // file's own comment: only published forms are offered here, submitFormResponse itself refuses
+  // anything else server-side).
+  const formsScope = user ? businessScopeFor(user) : null;
+  const { data: formsData } = useGetFormsListQuery({
+    variables: { ...formsScope, status: 'published', page: { limit: 25, offset: 0 } },
+    skip: !formsScope,
+    fetchPolicy: 'cache-and-network',
+  });
+  const fillableForms = formsData?.getForms?.items ?? [];
 
   const { data, loading, error } = useGetClientDashboardQuery({
     variables: {
@@ -302,6 +322,12 @@ export default function ClientDetailScreen() {
             </View>
           ) : null}
 
+          {/* Staff/artist view only, matching web's `!isSelf` gate - a client sending themselves
+              an Auto-Response isn't a real action, and SendAutoResponseButton renders nothing
+              anyway once nobody can be sending on this viewer's own behalf. There is no isSelf
+              branch on mobile at all (X15/X16), so this is unconditional here. */}
+          <SendAutoResponseButton clientId={id ?? ''} />
+
           <View style={styles.card}>
             <ThemedText type="smallBold">Projects</ThemedText>
             {projects.length === 0 ? (
@@ -389,6 +415,33 @@ export default function ClientDetailScreen() {
               <SharedImagesGallery images={images} />
             )}
           </View>
+
+          {/* Staff/artist view only, matching web's `!isSelf` gate on this exact section - the
+              authenticated "staff filling this out on a client's behalf" path (see
+              FormFillOutModal.tsx). Only published forms in this viewer's own shop/artist scope
+              are offered, same as web. */}
+          {fillableForms.length > 0 ? (
+            <View style={styles.card}>
+              <ThemedText type="smallBold">Forms</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                Send a waiver, consent form, or intake questionnaire - fill it out here on their
+                behalf, or read it to them and enter what they say.
+              </ThemedText>
+              {fillableForms.map((form) => (
+                <View key={form.id} style={styles.formRow} testID={`client-form-${form.id}`}>
+                  <ThemedText type="default" numberOfLines={1} style={styles.formRowTitle}>
+                    {form.title}
+                  </ThemedText>
+                  <Button
+                    label="Fill Out"
+                    variant="secondary"
+                    onPress={() => setFillOutFormId(form.id)}
+                    testID={`client-form-fill-out-${form.id}`}
+                  />
+                </View>
+              ))}
+            </View>
+          ) : null}
 
           <View style={styles.card}>
             <View style={styles.cardHeader}>
@@ -513,6 +566,17 @@ export default function ClientDetailScreen() {
             )}
           </View>
         </ScrollView>
+
+        <FormFillOutModal
+          visible={Boolean(fillOutFormId)}
+          formId={fillOutFormId}
+          clientId={id ?? ''}
+          onClose={() => setFillOutFormId(null)}
+          onSubmitted={() => {
+            setFillOutFormId(null);
+            Alert.alert('Response submitted.');
+          }}
+        />
       </SafeAreaView>
     </ThemedView>
   );
@@ -558,6 +622,16 @@ const styles = StyleSheet.create({
   listRow: {
     gap: Spacing.half,
     paddingVertical: Spacing.two,
+  },
+  formRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+    paddingVertical: Spacing.two,
+  },
+  formRowTitle: {
+    flexShrink: 1,
   },
   error: {
     color: '#D33',

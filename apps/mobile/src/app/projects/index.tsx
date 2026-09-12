@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BottomTabBar } from '@/components/BottomTabBar';
 import { Avatar } from '@/components/Avatar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -129,6 +130,7 @@ export default function ProjectsScreen() {
           />
         )}
       </SafeAreaView>
+      <BottomTabBar />
     </ThemedView>
   );
 }

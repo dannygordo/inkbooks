@@ -1,11 +1,22 @@
 # settings/auto-responses.tsx (DECISIONS.md X39) - message templates fired automatically on a
 # lifecycle event, or sent by hand elsewhere (that manual "Send a message" picker -
-# SendAutoResponseButton.jsx/sendAutoResponseNow - stays out of scope, per SessionDetailForm.tsx's
-# own already-documented cut). Direct port of apps/web's AutoResponsesPanel.jsx.
+# SendAutoResponseButton.jsx/sendAutoResponseNow). Direct port of apps/web's AutoResponsesPanel.jsx.
 #
 # shopId XOR artistUserId scopes every call - but UNLIKE Expenses/Income, a shop-connected artist
 # queries BOTH scopes at once (their own artistUserId set AND their shop's shopId set), never just
-# one. sendAutoResponseNow deliberately omitted - not in scope here.
+# one.
+#
+# sendAutoResponseNow WAS ADDED for the ClientDashboard/client/[id].tsx port (2026-09-12,
+# HANDOFF.md's "full accounting" item) - it was deliberately left out of the X39 slice above (see
+# SessionDetailForm.tsx's own header comment on why: not an appointment-opening destination there)
+# but is the same manual "Send a message" action `SendAutoResponseButton.tsx` needs, unrelated to
+# that earlier cut. No input object - three plain top-level args, matching
+# resolvers/autoResponses.js's own sendAutoResponseNow exactly (appointmentId nullable, omitted for
+# a send with no appointment in play, e.g. from a client's own dashboard).
+mutation SendAutoResponseNow($autoResponseId: ID!, $clientId: ID!, $appointmentId: ID) {
+	sendAutoResponseNow(autoResponseId: $autoResponseId, clientId: $clientId, appointmentId: $appointmentId)
+}
+
 query GetAutoResponses($shopId: ID, $artistUserId: ID, $includeInactive: Boolean) {
 	getAutoResponses(shopId: $shopId, artistUserId: $artistUserId, includeInactive: $includeInactive) {
 		id

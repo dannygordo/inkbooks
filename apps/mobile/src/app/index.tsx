@@ -1,18 +1,12 @@
 import { FlashList } from '@shopify/flash-list';
 import type { AppointmentListItemFragment } from '@inkbooks/api';
-import {
-  useGetAppointmentsByArtistQuery,
-  useGetAppointmentsByShopQuery,
-  useGetInboxQuery,
-  useGetPendingBookingRequestCountQuery,
-  useGetUnreadMessageCountQuery,
-} from '@inkbooks/api';
+import { useGetAppointmentsByArtistQuery, useGetAppointmentsByShopQuery } from '@inkbooks/api';
 import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Avatar } from '@/components/Avatar';
+import { BottomTabBar } from '@/components/BottomTabBar';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -28,8 +22,7 @@ import {
   getAppointmentTitle,
 } from '@/utils/appointments';
 import { getThisWeekFilter } from '@/utils/dateRanges';
-import { canManageAppointment, canManageBusinessLedger, isShopAdminOrBetter, isStaffOrBetter } from '@/utils/permissions';
-import { canManageForms } from '@/utils/businessScope';
+import { canManageAppointment } from '@/utils/permissions';
 import { getUserShopId } from '@/utils/user';
 
 // A month of one shop's appointments in one response, not paged - same choice
@@ -58,36 +51,12 @@ const PAGE = { limit: 200 };
 export default function AppointmentsScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { user, logout } = useAuth();
+  // 2026-09-10: logout moved to more.tsx's Account section (Danny's overflowing-header report -
+  // see BottomTabBar.tsx's own header comment). The three badge-count queries that used to live
+  // here (unread messages/notifications/pending requests) moved out too - BottomTabBar owns
+  // messages+more's aggregate badge now, more.tsx owns notifications/booking-requests' own.
+  const { user } = useAuth();
   const shopId = getUserShopId(user);
-  // The header badge - same 60s-poll fallback web's own sidebar badge uses for every page that
-  // isn't the messenger itself (see messages/index.tsx's own header comment on why mobile has no
-  // faster, socket-driven path at all yet).
-  const { data: unreadData } = useGetUnreadMessageCountQuery({
-    skip: !user,
-    fetchPolicy: 'cache-and-network',
-    pollInterval: 60000,
-  });
-  const unreadCount = unreadData?.getUnreadMessageCount ?? 0;
-  // Same 60s-poll fallback as the messages badge above - the pending count only ever changes via
-  // convertBookingRequest, which already refetches this query itself on the screens that call it,
-  // so the poll here only has to catch a request that just came in from the public intake form.
-  const { data: pendingRequestData } = useGetPendingBookingRequestCountQuery({
-    skip: !user,
-    fetchPolicy: 'cache-and-network',
-    pollInterval: 60000,
-  });
-  const pendingRequestCount = pendingRequestData?.getPendingBookingRequestCount ?? 0;
-  // Same 60s-poll fallback as the other two header badges - see NotificationBell.jsx's own
-  // reasoning on why opening the menu doesn't clear this itself (a deliberate "mark all read" act,
-  // not a side effect of glancing at the list - see notifications/index.tsx's own header comment).
-  const { data: inboxData } = useGetInboxQuery({
-    variables: { includeRead: false },
-    skip: !user,
-    fetchPolicy: 'cache-and-network',
-    pollInterval: 60000,
-  });
-  const unreadNotificationCount = inboxData?.getInbox?.unreadCount ?? 0;
   // Computed once, on mount, not on every render - matches AppointmentsList.jsx's own
   // useState(getDefaultScheduleRange), which also fixes the window at the moment the screen opens
   // rather than sliding it every re-render.
@@ -166,125 +135,18 @@ export default function AppointmentsScreen() {
           <ThemedText type="subtitle" style={styles.title}>
             Appointments
           </ThemedText>
-          <View style={styles.headerActions}>
-            {/* Closes gap #1 of HANDOFF.md's 2026-09-04 parity accounting (X48) - the calendar was
-                read-only for this until now. No role gate, matching web's CreateEventButton.jsx
-                having none - any artist can book their own consult/session/personal entry. */}
-            <Pressable onPress={() => router.push('/appointment/new')} testID="new-appointment-button">
-              <ThemedText type="link">New</ThemedText>
-            </Pressable>
-            {/* Closes gap #4 of HANDOFF.md's 2026-09-04 parity accounting - the mobile
-                counterpart to web's Home.jsx. No role gate: every signed-in user (Artist or
-                Staff - mobile has no client login) gets a dashboard, same as web's own
-                userType branch having no role floor of its own. */}
-            <Pressable onPress={() => router.push('/dashboard')} testID="dashboard-button">
-              <ThemedText type="link">Dashboard</ThemedText>
-            </Pressable>
-            {isStaffOrBetter(user) ? (
-              <Pressable onPress={() => router.push('/artists')} testID="artists-button">
-                <ThemedText type="link">Artists</ThemedText>
-              </Pressable>
-            ) : null}
-            {isStaffOrBetter(user) ? (
-              <Pressable onPress={() => router.push('/staff')} testID="staff-button">
-                <ThemedText type="link">Staff</ThemedText>
-              </Pressable>
-            ) : null}
-            <Pressable onPress={() => router.push('/search')} testID="search-button">
-              <ThemedText type="link">Search</ThemedText>
-            </Pressable>
-            <Pressable onPress={() => router.push('/clients')} testID="clients-button">
-              <ThemedText type="link">Clients</ThemedText>
-            </Pressable>
-            <Pressable onPress={() => router.push('/projects')} testID="projects-button">
-              <ThemedText type="link">Projects</ThemedText>
-            </Pressable>
-            {isShopAdminOrBetter(user) ? (
-              <Pressable onPress={() => router.push('/shop-cut-confirmations')} testID="shop-cut-confirmations-button">
-                <ThemedText type="link">Shop Cuts</ThemedText>
-              </Pressable>
-            ) : null}
-            {isShopAdminOrBetter(user) ? (
-              <Pressable onPress={() => router.push('/shops')} testID="shops-button">
-                <ThemedText type="link">Shops</ThemedText>
-              </Pressable>
-            ) : null}
-            {canManageBusinessLedger(user) ? (
-              <Pressable onPress={() => router.push('/income')} testID="income-button">
-                <ThemedText type="link">Income</ThemedText>
-              </Pressable>
-            ) : null}
-            {canManageBusinessLedger(user) ? (
-              <Pressable onPress={() => router.push('/expenses')} testID="expenses-button">
-                <ThemedText type="link">Expenses</ThemedText>
-              </Pressable>
-            ) : null}
-            {canManageForms(user) ? (
-              <Pressable onPress={() => router.push('/forms')} testID="forms-button">
-                <ThemedText type="link">Forms</ThemedText>
-              </Pressable>
-            ) : null}
-            {/* Closes gap #5 of HANDOFF.md's 2026-09-04 parity accounting - the mobile
-                counterpart to web's Sidebar.jsx gift-cards link. canManageBusinessLedger (any
-                artist, or a shop-admin-or-better) rather than canManageForms - wider, since every
-                artist qualifies for at least the artist-issued-card half of the screen, matching
-                web's own Sidebar gate (isArtistUser || isShopAdminOrBetter). */}
-            {canManageBusinessLedger(user) ? (
-              <Pressable onPress={() => router.push('/gift-cards')} testID="gift-cards-button">
-                <ThemedText type="link">Gift Cards</ThemedText>
-              </Pressable>
-            ) : null}
-            {/* Closes gap #8 of HANDOFF.md's 2026-09-04 parity accounting - the mobile
-                counterpart to web's NotificationBell.jsx. No role gate: every signed-in user has
-                an inbox, matching web's own bell being visible to any account type. */}
-            <Pressable onPress={() => router.push('/notifications')} testID="notifications-button" style={styles.messagesButton}>
-              <ThemedText type="link">Notifications</ThemedText>
-              {unreadNotificationCount > 0 ? (
-                <View style={styles.messagesBadge} testID="notifications-unread-badge">
-                  <ThemedText type="small" style={styles.messagesBadgeText}>
-                    {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
-                  </ThemedText>
-                </View>
-              ) : null}
-            </Pressable>
-            <Pressable
-              onPress={() => router.push('/booking-requests')}
-              testID="booking-requests-button"
-              style={styles.messagesButton}
-            >
-              <ThemedText type="link">Requests</ThemedText>
-              {pendingRequestCount > 0 ? (
-                <View style={styles.messagesBadge} testID="booking-requests-unread-badge">
-                  <ThemedText type="small" style={styles.messagesBadgeText}>
-                    {pendingRequestCount > 9 ? '9+' : pendingRequestCount}
-                  </ThemedText>
-                </View>
-              ) : null}
-            </Pressable>
-            <Pressable onPress={() => router.push('/messages')} testID="messages-button" style={styles.messagesButton}>
-              <ThemedText type="link">Messages</ThemedText>
-              {unreadCount > 0 ? (
-                <View style={styles.messagesBadge} testID="messages-unread-badge">
-                  <ThemedText type="small" style={styles.messagesBadgeText}>
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </ThemedText>
-                </View>
-              ) : null}
-            </Pressable>
-            <Pressable onPress={() => router.push('/settings')} testID="settings-button">
-              <Avatar
-                imageUri={user?.avatar}
-                firstName={user?.firstName}
-                lastName={user?.lastName}
-                size={32}
-              />
-            </Pressable>
-            <Pressable onPress={() => logout()} testID="logout-button">
-              <ThemedText type="link" themeColor="textSecondary">
-                Log out
-              </ThemedText>
-            </Pressable>
-          </View>
+          {/* 2026-09-10: this header used to also hold Dashboard/Artists/Staff/Search/Clients/
+              Projects/Shop Cuts/Shops/Income/Expenses/Forms/Gift Cards/Notifications/Requests/
+              Messages/Settings/Log out - up to 17 Pressables in one unwrapped, unscrollable row.
+              On a real phone width most of them rendered off-screen entirely, which is what Danny
+              reported as a frozen/broken menu. They now live in the bottom tab bar (Clients,
+              Projects, Messages) and more.tsx (everything else), reached via BottomTabBar below -
+              see that component's own header comment. Only "New" stays here: it's the one action
+              specific to this screen (create a NEW appointment on THIS calendar), not a
+              navigation destination like the rest were. */}
+          <Pressable onPress={() => router.push('/appointment/new')} testID="new-appointment-button">
+            <ThemedText type="link">New</ThemedText>
+          </Pressable>
         </View>
 
         <OfflineBanner />
@@ -329,6 +191,7 @@ export default function AppointmentsScreen() {
           />
         )}
       </SafeAreaView>
+      <BottomTabBar />
     </ThemedView>
   );
 }
@@ -390,30 +253,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingTop: Spacing.two,
     paddingBottom: Spacing.two,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.three,
-  },
-  messagesButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.one,
-  },
-  messagesBadge: {
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    paddingHorizontal: 4,
-    backgroundColor: '#D33',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  messagesBadgeText: {
-    color: '#fff',
-    fontSize: 10,
-    lineHeight: 13,
   },
   title: {
     textAlign: 'left',

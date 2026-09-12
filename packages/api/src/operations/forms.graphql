@@ -238,3 +238,37 @@ mutation UpdateBookingRequestFields($formId: ID!, $fields: [BookingRequestFieldI
 		}
 	}
 }
+
+
+# GetFormToFillOut/SubmitFormResponse WERE ADDED for the ClientDashboard/client/[id].tsx port
+# (2026-09-12, HANDOFF.md's "full accounting" item) - the authenticated "staff filling this out on
+# a client's behalf" half of apps/web's FormFillOut.jsx/FormService.js (clientId supplied branch
+# only; the guest/public path and the self-service "client fills out their own copy" branch stay
+# out of scope, since mobile has no client login at all - X15/X16). GetFormToFillOut is a narrower
+# selection than GetFormForEdit's own further up (no slug/shopUseOnly/allowGuestSubmissions/
+# publicToken/systemKey/hidden - none of those are shown or used while filling a form out) rather
+# than reusing that query under a misleading name.
+query GetFormToFillOut($formId: ID!) {
+	getForm(formId: $formId) {
+		id
+		title
+		description
+		status
+		fields {
+			key
+			type
+			label
+			helpText
+			required
+			options
+		}
+	}
+}
+
+# Selection is just `id` - client/[id].tsx's onSubmitted callback (like web's own ClientDashboard.jsx
+# caller) only closes the modal and shows a success alert, never reads the created FormResponse.
+mutation SubmitFormResponse($input: SubmitFormResponseInput!) {
+	submitFormResponse(input: $input) {
+		id
+	}
+}

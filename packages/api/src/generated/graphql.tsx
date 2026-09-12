@@ -1953,6 +1953,7 @@ export type Query = {
   getMyGiftCards: Array<GiftCard>;
   getMySquareAuthorizationUrl: Scalars['String']['output'];
   getMySquareConnection: SquareConnection;
+  getMySquareMobileCredentials: SquareMobileCredentials;
   getMySquarePricingSettings: SquarePricingSettings;
   getNotificationSettings: NotificationSettings;
   getOneStaff?: Maybe<Staff>;
@@ -2102,6 +2103,7 @@ export type QueryGetBoothRentPlansArgs = {
 export type QueryGetChargeQuoteArgs = {
   applyFeeOffset?: InputMaybe<Scalars['Boolean']['input']>;
   appointmentId: Scalars['ID']['input'];
+  chargeType?: InputMaybe<Scalars['String']['input']>;
   subtotalCentsOverride?: InputMaybe<Scalars['Int']['input']>;
   tipCents?: InputMaybe<Scalars['Int']['input']>;
 };
@@ -2604,6 +2606,12 @@ export type SquareConnection = {
   source: Scalars['String']['output'];
 };
 
+export type SquareMobileCredentials = {
+  __typename?: 'SquareMobileCredentials';
+  accessToken: Scalars['String']['output'];
+  locationId: Scalars['String']['output'];
+};
+
 export type SquarePricingSettings = {
   __typename?: 'SquarePricingSettings';
   canEdit: Scalars['Boolean']['output'];
@@ -2975,7 +2983,7 @@ export type GetArtistDetailQueryVariables = Exact<{
 }>;
 
 
-export type GetArtistDetailQuery = { __typename?: 'Query', getArtist?: { __typename?: 'Artist', id: string, userId: string, firstName: string, lastName: string, email: string, title?: string | null, phone?: string | null, address?: string | null, city?: string | null, state?: string | null, zip?: string | null, instagram?: string | null, facebook?: string | null, avatar?: string | null, startDate: string, status?: number | null, user?: { __typename?: 'User', id: string, avatar?: string | null } | null } | null };
+export type GetArtistDetailQuery = { __typename?: 'Query', getArtist?: { __typename?: 'Artist', id: string, userId: string, firstName: string, lastName: string, email: string, title?: string | null, phone?: string | null, address?: string | null, city?: string | null, state?: string | null, zip?: string | null, instagram?: string | null, facebook?: string | null, avatar?: string | null, startDate: string, status?: number | null, shopId?: string | null, user?: { __typename?: 'User', id: string, avatar?: string | null } | null } | null };
 
 export type UpdateArtistIdentityMutationVariables = Exact<{
   artist: ArtistInput;
@@ -2997,6 +3005,15 @@ export type UnarchiveArtistMutationVariables = Exact<{
 
 
 export type UnarchiveArtistMutation = { __typename?: 'Mutation', unarchiveArtist?: { __typename?: 'Artist', id: string, status?: number | null } | null };
+
+export type SendAutoResponseNowMutationVariables = Exact<{
+  autoResponseId: Scalars['ID']['input'];
+  clientId: Scalars['ID']['input'];
+  appointmentId?: InputMaybe<Scalars['ID']['input']>;
+}>;
+
+
+export type SendAutoResponseNowMutation = { __typename?: 'Mutation', sendAutoResponseNow: boolean };
 
 export type GetAutoResponsesQueryVariables = Exact<{
   shopId?: InputMaybe<Scalars['ID']['input']>;
@@ -3080,6 +3097,24 @@ export type MarkBoothRentPaidManuallyMutationVariables = Exact<{
 
 
 export type MarkBoothRentPaidManuallyMutation = { __typename?: 'Mutation', markBoothRentPaidManually: { __typename?: 'BoothRentCharge', id: string, artistId: string, shopId: string, amountCents: number, periodMonth: string, dueDate: string, status: string, markedPaidAt?: string | null, markedPaidByUserId?: string | null, confirmedAt?: string | null, confirmedByUserId?: string | null, expenseId?: string | null, incomeId?: string | null, createdAt: string } };
+
+export type SetBoothRentPlanMutationVariables = Exact<{
+  artistId: Scalars['ID']['input'];
+  shopId: Scalars['ID']['input'];
+  amountCents: Scalars['Int']['input'];
+  dueDayOfMonth: Scalars['Int']['input'];
+  effectiveFrom?: InputMaybe<Scalars['DateTime']['input']>;
+}>;
+
+
+export type SetBoothRentPlanMutation = { __typename?: 'Mutation', setBoothRentPlan: { __typename?: 'BoothRentPlan', id: string, artistId: string, shopId: string, amountCents: number, dueDayOfMonth: number, effectiveFrom: string, setByUserId: string, active: boolean, createdAt: string } };
+
+export type ConfirmBoothRentPaidMutationVariables = Exact<{
+  boothRentChargeId: Scalars['ID']['input'];
+}>;
+
+
+export type ConfirmBoothRentPaidMutation = { __typename?: 'Mutation', confirmBoothRentPaid: { __typename?: 'BoothRentCharge', id: string, artistId: string, shopId: string, amountCents: number, periodMonth: string, dueDate: string, status: string, markedPaidAt?: string | null, markedPaidByUserId?: string | null, confirmedAt?: string | null, confirmedByUserId?: string | null, expenseId?: string | null, incomeId?: string | null, createdAt: string } };
 
 export type GetChargeQuoteQueryVariables = Exact<{
   appointmentId: Scalars['ID']['input'];
@@ -3356,6 +3391,20 @@ export type UpdateBookingRequestFieldsMutationVariables = Exact<{
 
 
 export type UpdateBookingRequestFieldsMutation = { __typename?: 'Mutation', updateBookingRequestFields: { __typename?: 'Form', id: string, title: string, description?: string | null, slug?: string | null, shopUseOnly: boolean, status: string, allowGuestSubmissions: boolean, publicToken?: string | null, systemKey?: string | null, fields: Array<{ __typename?: 'FormField', key: string, type: string, label: string, helpText?: string | null, required: boolean, options: Array<string>, hidden: boolean }> } };
+
+export type GetFormToFillOutQueryVariables = Exact<{
+  formId: Scalars['ID']['input'];
+}>;
+
+
+export type GetFormToFillOutQuery = { __typename?: 'Query', getForm: { __typename?: 'Form', id: string, title: string, description?: string | null, status: string, fields: Array<{ __typename?: 'FormField', key: string, type: string, label: string, helpText?: string | null, required: boolean, options: Array<string> }> } };
+
+export type SubmitFormResponseMutationVariables = Exact<{
+  input: SubmitFormResponseInput;
+}>;
+
+
+export type SubmitFormResponseMutation = { __typename?: 'Mutation', submitFormResponse: { __typename?: 'FormResponse', id: string } };
 
 export type GetProjectQueryVariables = Exact<{
   projectId: Scalars['ID']['input'];
@@ -3817,6 +3866,26 @@ export type ConfirmShopCutPaidMutationVariables = Exact<{
 
 
 export type ConfirmShopCutPaidMutation = { __typename?: 'Mutation', confirmShopCutPaid: { __typename?: 'Appointment', id: string, shopCutStatus: string, shopCutConfirmedAt?: string | null } };
+
+export type GetShopCutRatesQueryVariables = Exact<{
+  artistId: Scalars['ID']['input'];
+  shopId: Scalars['ID']['input'];
+}>;
+
+
+export type GetShopCutRatesQuery = { __typename?: 'Query', getShopCutRates: Array<{ __typename?: 'ShopCutRate', id: string, artistId: string, shopId: string, percent: number, compensationModel: string, effectiveFrom: string, setByUserId: string, note?: string | null, createdAt: string }> };
+
+export type SetShopCutRateMutationVariables = Exact<{
+  artistId: Scalars['ID']['input'];
+  shopId: Scalars['ID']['input'];
+  percent: Scalars['Int']['input'];
+  compensationModel?: InputMaybe<Scalars['String']['input']>;
+  effectiveFrom?: InputMaybe<Scalars['DateTime']['input']>;
+  note?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type SetShopCutRateMutation = { __typename?: 'Mutation', setShopCutRate: { __typename?: 'ShopCutRate', id: string, artistId: string, shopId: string, percent: number, compensationModel: string, effectiveFrom: string, setByUserId: string, note?: string | null, createdAt: string } };
 
 export type GetShopsListQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -5058,6 +5127,7 @@ export const GetArtistDetailDocument = gql`
     avatar
     startDate
     status
+    shopId
     user {
       id
       avatar
@@ -5214,6 +5284,43 @@ export function useUnarchiveArtistMutation(baseOptions?: Apollo.MutationHookOpti
 export type UnarchiveArtistMutationHookResult = ReturnType<typeof useUnarchiveArtistMutation>;
 export type UnarchiveArtistMutationResult = Apollo.MutationResult<UnarchiveArtistMutation>;
 export type UnarchiveArtistMutationOptions = Apollo.BaseMutationOptions<UnarchiveArtistMutation, UnarchiveArtistMutationVariables>;
+export const SendAutoResponseNowDocument = gql`
+    mutation SendAutoResponseNow($autoResponseId: ID!, $clientId: ID!, $appointmentId: ID) {
+  sendAutoResponseNow(
+    autoResponseId: $autoResponseId
+    clientId: $clientId
+    appointmentId: $appointmentId
+  )
+}
+    `;
+export type SendAutoResponseNowMutationFn = Apollo.MutationFunction<SendAutoResponseNowMutation, SendAutoResponseNowMutationVariables>;
+
+/**
+ * __useSendAutoResponseNowMutation__
+ *
+ * To run a mutation, you first call `useSendAutoResponseNowMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useSendAutoResponseNowMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [sendAutoResponseNowMutation, { data, loading, error }] = useSendAutoResponseNowMutation({
+ *   variables: {
+ *      autoResponseId: // value for 'autoResponseId'
+ *      clientId: // value for 'clientId'
+ *      appointmentId: // value for 'appointmentId'
+ *   },
+ * });
+ */
+export function useSendAutoResponseNowMutation(baseOptions?: Apollo.MutationHookOptions<SendAutoResponseNowMutation, SendAutoResponseNowMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<SendAutoResponseNowMutation, SendAutoResponseNowMutationVariables>(SendAutoResponseNowDocument, options);
+      }
+export type SendAutoResponseNowMutationHookResult = ReturnType<typeof useSendAutoResponseNowMutation>;
+export type SendAutoResponseNowMutationResult = Apollo.MutationResult<SendAutoResponseNowMutation>;
+export type SendAutoResponseNowMutationOptions = Apollo.BaseMutationOptions<SendAutoResponseNowMutation, SendAutoResponseNowMutationVariables>;
 export const GetAutoResponsesDocument = gql`
     query GetAutoResponses($shopId: ID, $artistUserId: ID, $includeInactive: Boolean) {
   getAutoResponses(
@@ -5768,6 +5875,103 @@ export function useMarkBoothRentPaidManuallyMutation(baseOptions?: Apollo.Mutati
 export type MarkBoothRentPaidManuallyMutationHookResult = ReturnType<typeof useMarkBoothRentPaidManuallyMutation>;
 export type MarkBoothRentPaidManuallyMutationResult = Apollo.MutationResult<MarkBoothRentPaidManuallyMutation>;
 export type MarkBoothRentPaidManuallyMutationOptions = Apollo.BaseMutationOptions<MarkBoothRentPaidManuallyMutation, MarkBoothRentPaidManuallyMutationVariables>;
+export const SetBoothRentPlanDocument = gql`
+    mutation SetBoothRentPlan($artistId: ID!, $shopId: ID!, $amountCents: Int!, $dueDayOfMonth: Int!, $effectiveFrom: DateTime) {
+  setBoothRentPlan(
+    artistId: $artistId
+    shopId: $shopId
+    amountCents: $amountCents
+    dueDayOfMonth: $dueDayOfMonth
+    effectiveFrom: $effectiveFrom
+  ) {
+    id
+    artistId
+    shopId
+    amountCents
+    dueDayOfMonth
+    effectiveFrom
+    setByUserId
+    active
+    createdAt
+  }
+}
+    `;
+export type SetBoothRentPlanMutationFn = Apollo.MutationFunction<SetBoothRentPlanMutation, SetBoothRentPlanMutationVariables>;
+
+/**
+ * __useSetBoothRentPlanMutation__
+ *
+ * To run a mutation, you first call `useSetBoothRentPlanMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useSetBoothRentPlanMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [setBoothRentPlanMutation, { data, loading, error }] = useSetBoothRentPlanMutation({
+ *   variables: {
+ *      artistId: // value for 'artistId'
+ *      shopId: // value for 'shopId'
+ *      amountCents: // value for 'amountCents'
+ *      dueDayOfMonth: // value for 'dueDayOfMonth'
+ *      effectiveFrom: // value for 'effectiveFrom'
+ *   },
+ * });
+ */
+export function useSetBoothRentPlanMutation(baseOptions?: Apollo.MutationHookOptions<SetBoothRentPlanMutation, SetBoothRentPlanMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<SetBoothRentPlanMutation, SetBoothRentPlanMutationVariables>(SetBoothRentPlanDocument, options);
+      }
+export type SetBoothRentPlanMutationHookResult = ReturnType<typeof useSetBoothRentPlanMutation>;
+export type SetBoothRentPlanMutationResult = Apollo.MutationResult<SetBoothRentPlanMutation>;
+export type SetBoothRentPlanMutationOptions = Apollo.BaseMutationOptions<SetBoothRentPlanMutation, SetBoothRentPlanMutationVariables>;
+export const ConfirmBoothRentPaidDocument = gql`
+    mutation ConfirmBoothRentPaid($boothRentChargeId: ID!) {
+  confirmBoothRentPaid(boothRentChargeId: $boothRentChargeId) {
+    id
+    artistId
+    shopId
+    amountCents
+    periodMonth
+    dueDate
+    status
+    markedPaidAt
+    markedPaidByUserId
+    confirmedAt
+    confirmedByUserId
+    expenseId
+    incomeId
+    createdAt
+  }
+}
+    `;
+export type ConfirmBoothRentPaidMutationFn = Apollo.MutationFunction<ConfirmBoothRentPaidMutation, ConfirmBoothRentPaidMutationVariables>;
+
+/**
+ * __useConfirmBoothRentPaidMutation__
+ *
+ * To run a mutation, you first call `useConfirmBoothRentPaidMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useConfirmBoothRentPaidMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [confirmBoothRentPaidMutation, { data, loading, error }] = useConfirmBoothRentPaidMutation({
+ *   variables: {
+ *      boothRentChargeId: // value for 'boothRentChargeId'
+ *   },
+ * });
+ */
+export function useConfirmBoothRentPaidMutation(baseOptions?: Apollo.MutationHookOptions<ConfirmBoothRentPaidMutation, ConfirmBoothRentPaidMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<ConfirmBoothRentPaidMutation, ConfirmBoothRentPaidMutationVariables>(ConfirmBoothRentPaidDocument, options);
+      }
+export type ConfirmBoothRentPaidMutationHookResult = ReturnType<typeof useConfirmBoothRentPaidMutation>;
+export type ConfirmBoothRentPaidMutationResult = Apollo.MutationResult<ConfirmBoothRentPaidMutation>;
+export type ConfirmBoothRentPaidMutationOptions = Apollo.BaseMutationOptions<ConfirmBoothRentPaidMutation, ConfirmBoothRentPaidMutationVariables>;
 export const GetChargeQuoteDocument = gql`
     query GetChargeQuote($appointmentId: ID!, $applyFeeOffset: Boolean, $tipCents: Int, $subtotalCentsOverride: Int) {
   getChargeQuote(
@@ -7513,6 +7717,93 @@ export function useUpdateBookingRequestFieldsMutation(baseOptions?: Apollo.Mutat
 export type UpdateBookingRequestFieldsMutationHookResult = ReturnType<typeof useUpdateBookingRequestFieldsMutation>;
 export type UpdateBookingRequestFieldsMutationResult = Apollo.MutationResult<UpdateBookingRequestFieldsMutation>;
 export type UpdateBookingRequestFieldsMutationOptions = Apollo.BaseMutationOptions<UpdateBookingRequestFieldsMutation, UpdateBookingRequestFieldsMutationVariables>;
+export const GetFormToFillOutDocument = gql`
+    query GetFormToFillOut($formId: ID!) {
+  getForm(formId: $formId) {
+    id
+    title
+    description
+    status
+    fields {
+      key
+      type
+      label
+      helpText
+      required
+      options
+    }
+  }
+}
+    `;
+
+/**
+ * __useGetFormToFillOutQuery__
+ *
+ * To run a query within a React component, call `useGetFormToFillOutQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetFormToFillOutQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetFormToFillOutQuery({
+ *   variables: {
+ *      formId: // value for 'formId'
+ *   },
+ * });
+ */
+export function useGetFormToFillOutQuery(baseOptions: Apollo.QueryHookOptions<GetFormToFillOutQuery, GetFormToFillOutQueryVariables> & ({ variables: GetFormToFillOutQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetFormToFillOutQuery, GetFormToFillOutQueryVariables>(GetFormToFillOutDocument, options);
+      }
+export function useGetFormToFillOutLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetFormToFillOutQuery, GetFormToFillOutQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetFormToFillOutQuery, GetFormToFillOutQueryVariables>(GetFormToFillOutDocument, options);
+        }
+// @ts-ignore
+export function useGetFormToFillOutSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetFormToFillOutQuery, GetFormToFillOutQueryVariables>): Apollo.UseSuspenseQueryResult<GetFormToFillOutQuery, GetFormToFillOutQueryVariables>;
+export function useGetFormToFillOutSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetFormToFillOutQuery, GetFormToFillOutQueryVariables>): Apollo.UseSuspenseQueryResult<GetFormToFillOutQuery | undefined, GetFormToFillOutQueryVariables>;
+export function useGetFormToFillOutSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetFormToFillOutQuery, GetFormToFillOutQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetFormToFillOutQuery, GetFormToFillOutQueryVariables>(GetFormToFillOutDocument, options);
+        }
+export type GetFormToFillOutQueryHookResult = ReturnType<typeof useGetFormToFillOutQuery>;
+export type GetFormToFillOutLazyQueryHookResult = ReturnType<typeof useGetFormToFillOutLazyQuery>;
+export type GetFormToFillOutSuspenseQueryHookResult = ReturnType<typeof useGetFormToFillOutSuspenseQuery>;
+export type GetFormToFillOutQueryResult = Apollo.QueryResult<GetFormToFillOutQuery, GetFormToFillOutQueryVariables>;
+export const SubmitFormResponseDocument = gql`
+    mutation SubmitFormResponse($input: SubmitFormResponseInput!) {
+  submitFormResponse(input: $input) {
+    id
+  }
+}
+    `;
+export type SubmitFormResponseMutationFn = Apollo.MutationFunction<SubmitFormResponseMutation, SubmitFormResponseMutationVariables>;
+
+/**
+ * __useSubmitFormResponseMutation__
+ *
+ * To run a mutation, you first call `useSubmitFormResponseMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useSubmitFormResponseMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [submitFormResponseMutation, { data, loading, error }] = useSubmitFormResponseMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useSubmitFormResponseMutation(baseOptions?: Apollo.MutationHookOptions<SubmitFormResponseMutation, SubmitFormResponseMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<SubmitFormResponseMutation, SubmitFormResponseMutationVariables>(SubmitFormResponseDocument, options);
+      }
+export type SubmitFormResponseMutationHookResult = ReturnType<typeof useSubmitFormResponseMutation>;
+export type SubmitFormResponseMutationResult = Apollo.MutationResult<SubmitFormResponseMutation>;
+export type SubmitFormResponseMutationOptions = Apollo.BaseMutationOptions<SubmitFormResponseMutation, SubmitFormResponseMutationVariables>;
 export const GetProjectDocument = gql`
     query GetProject($projectId: ID!) {
   getProject(projectId: $projectId) {
@@ -10762,6 +11053,111 @@ export function useConfirmShopCutPaidMutation(baseOptions?: Apollo.MutationHookO
 export type ConfirmShopCutPaidMutationHookResult = ReturnType<typeof useConfirmShopCutPaidMutation>;
 export type ConfirmShopCutPaidMutationResult = Apollo.MutationResult<ConfirmShopCutPaidMutation>;
 export type ConfirmShopCutPaidMutationOptions = Apollo.BaseMutationOptions<ConfirmShopCutPaidMutation, ConfirmShopCutPaidMutationVariables>;
+export const GetShopCutRatesDocument = gql`
+    query GetShopCutRates($artistId: ID!, $shopId: ID!) {
+  getShopCutRates(artistId: $artistId, shopId: $shopId) {
+    id
+    artistId
+    shopId
+    percent
+    compensationModel
+    effectiveFrom
+    setByUserId
+    note
+    createdAt
+  }
+}
+    `;
+
+/**
+ * __useGetShopCutRatesQuery__
+ *
+ * To run a query within a React component, call `useGetShopCutRatesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetShopCutRatesQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetShopCutRatesQuery({
+ *   variables: {
+ *      artistId: // value for 'artistId'
+ *      shopId: // value for 'shopId'
+ *   },
+ * });
+ */
+export function useGetShopCutRatesQuery(baseOptions: Apollo.QueryHookOptions<GetShopCutRatesQuery, GetShopCutRatesQueryVariables> & ({ variables: GetShopCutRatesQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetShopCutRatesQuery, GetShopCutRatesQueryVariables>(GetShopCutRatesDocument, options);
+      }
+export function useGetShopCutRatesLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetShopCutRatesQuery, GetShopCutRatesQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetShopCutRatesQuery, GetShopCutRatesQueryVariables>(GetShopCutRatesDocument, options);
+        }
+// @ts-ignore
+export function useGetShopCutRatesSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetShopCutRatesQuery, GetShopCutRatesQueryVariables>): Apollo.UseSuspenseQueryResult<GetShopCutRatesQuery, GetShopCutRatesQueryVariables>;
+export function useGetShopCutRatesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetShopCutRatesQuery, GetShopCutRatesQueryVariables>): Apollo.UseSuspenseQueryResult<GetShopCutRatesQuery | undefined, GetShopCutRatesQueryVariables>;
+export function useGetShopCutRatesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetShopCutRatesQuery, GetShopCutRatesQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetShopCutRatesQuery, GetShopCutRatesQueryVariables>(GetShopCutRatesDocument, options);
+        }
+export type GetShopCutRatesQueryHookResult = ReturnType<typeof useGetShopCutRatesQuery>;
+export type GetShopCutRatesLazyQueryHookResult = ReturnType<typeof useGetShopCutRatesLazyQuery>;
+export type GetShopCutRatesSuspenseQueryHookResult = ReturnType<typeof useGetShopCutRatesSuspenseQuery>;
+export type GetShopCutRatesQueryResult = Apollo.QueryResult<GetShopCutRatesQuery, GetShopCutRatesQueryVariables>;
+export const SetShopCutRateDocument = gql`
+    mutation SetShopCutRate($artistId: ID!, $shopId: ID!, $percent: Int!, $compensationModel: String, $effectiveFrom: DateTime, $note: String) {
+  setShopCutRate(
+    artistId: $artistId
+    shopId: $shopId
+    percent: $percent
+    compensationModel: $compensationModel
+    effectiveFrom: $effectiveFrom
+    note: $note
+  ) {
+    id
+    artistId
+    shopId
+    percent
+    compensationModel
+    effectiveFrom
+    setByUserId
+    note
+    createdAt
+  }
+}
+    `;
+export type SetShopCutRateMutationFn = Apollo.MutationFunction<SetShopCutRateMutation, SetShopCutRateMutationVariables>;
+
+/**
+ * __useSetShopCutRateMutation__
+ *
+ * To run a mutation, you first call `useSetShopCutRateMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useSetShopCutRateMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [setShopCutRateMutation, { data, loading, error }] = useSetShopCutRateMutation({
+ *   variables: {
+ *      artistId: // value for 'artistId'
+ *      shopId: // value for 'shopId'
+ *      percent: // value for 'percent'
+ *      compensationModel: // value for 'compensationModel'
+ *      effectiveFrom: // value for 'effectiveFrom'
+ *      note: // value for 'note'
+ *   },
+ * });
+ */
+export function useSetShopCutRateMutation(baseOptions?: Apollo.MutationHookOptions<SetShopCutRateMutation, SetShopCutRateMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<SetShopCutRateMutation, SetShopCutRateMutationVariables>(SetShopCutRateDocument, options);
+      }
+export type SetShopCutRateMutationHookResult = ReturnType<typeof useSetShopCutRateMutation>;
+export type SetShopCutRateMutationResult = Apollo.MutationResult<SetShopCutRateMutation>;
+export type SetShopCutRateMutationOptions = Apollo.BaseMutationOptions<SetShopCutRateMutation, SetShopCutRateMutationVariables>;
 export const GetShopsListDocument = gql`
     query GetShopsList {
   getShops {

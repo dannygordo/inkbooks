@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BottomTabBar } from '@/components/BottomTabBar';
 import { ConversationRow } from '@/components/ConversationRow';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -137,6 +138,7 @@ export default function MessagesInboxScreen() {
           />
         )}
       </SafeAreaView>
+      <BottomTabBar />
     </ThemedView>
   );
 }

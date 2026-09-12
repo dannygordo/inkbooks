@@ -3,6 +3,9 @@ import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useRouter } from 'expo-r
 import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
+import { StyleSheet } from 'react-native';
+
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AuthProvider, useAuth } from '@/context/auth';
 import { useEffectiveColorScheme } from '@/hooks/use-effective-color-scheme';
@@ -98,6 +101,12 @@ function RootNavigator() {
         </Stack.Protected>
         <Stack.Protected guard={!!user}>
           <Stack.Screen name="index" />
+          {/* Grouped catch-all for everything that used to be a Pressable text link in
+              index.tsx's header (2026-09-10) - see BottomTabBar.tsx's and more.tsx's own header
+              comments for why: that row overflowed off real phone widths, reported as a frozen/
+              broken menu. Reached from the bottom tab bar's fifth tab, same headerShown: false
+              pattern as index above (more.tsx renders its own title). */}
+          <Stack.Screen name="more" />
           {/* The in-app notification feed - closes gap #8 of HANDOFF.md's 2026-09-04 parity
               accounting (X52). Reached from a new bell-style "Notifications" link on index.tsx's
               header, no role gate - every signed-in user has an inbox. */}
@@ -250,15 +259,33 @@ function RootNavigator() {
 
 export default function RootLayout() {
   return (
-    <ApolloProvider client={apolloClient}>
-      {/* AuthProvider must be inside ApolloProvider - it calls useApolloClient() to wipe the
-          cache on every session change (see auth.tsx's own comment on the bug that prevents).
-          RootNavigator's own ThemeProvider (not this component) resolves the effective color
-          scheme, because that resolution needs useAuth() - AuthProvider has to be mounted above
-          it, not the other way around (X43). */}
-      <AuthProvider>
-        <RootNavigator />
-      </AuthProvider>
-    </ApolloProvider>
+    // react-native-gesture-handler's own docs require this wrapping the whole app root - see
+    // https://docs.swmansion.com/react-native-gesture-handler/docs/installation. It was
+    // missing entirely before 2026-09-12: react-native-screens' native stack (what expo-router's
+    // <Stack> renders on top of) depends on RNGH for its own gesture recognizers, and without
+    // this root view RNGH's gesture handling silently misbehaves - the concrete symptom Danny
+    // reported was ScrollViews across the app (Project detail chief among them) rendering their
+    // content but never responding to a scroll pan, not any one screen's own layout - because
+    // every screen sits under the same unwrapped root. The ScrollViews themselves were already
+    // correct (RN's own <ScrollView> applies flexGrow: 1 to itself internally - see
+    // ScrollView.js's baseVertical - so no per-screen style was missing); this is the fix.
+    <GestureHandlerRootView style={styles.gestureRoot}>
+      <ApolloProvider client={apolloClient}>
+        {/* AuthProvider must be inside ApolloProvider - it calls useApolloClient() to wipe the
+            cache on every session change (see auth.tsx's own comment on the bug that prevents).
+            RootNavigator's own ThemeProvider (not this component) resolves the effective color
+            scheme, because that resolution needs useAuth() - AuthProvider has to be mounted above
+            it, not the other way around (X43). */}
+        <AuthProvider>
+          <RootNavigator />
+        </AuthProvider>
+      </ApolloProvider>
+    </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  gestureRoot: {
+    flex: 1,
+  },
+});

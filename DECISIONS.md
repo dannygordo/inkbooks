@@ -2191,6 +2191,119 @@ for actually sharing it.
 `FORM_FIELD_TYPE_LABELS`/`formFieldTypeLabel`) - same "build the map directly, don't port
 `prettyConstantsListValue`" reasoning as `utils/projectStatus.ts` (X20).
 
+### X58. Auto-Responses manual send + Forms fill-out ported to Client Dashboard - closes the last two named parity gaps
+
+X49's own entry named two ClientDashboard.jsx sections as deliberately not ported:
+SendAutoResponseButton (the manual "Send a message" picker) and the staff/artist-facing Forms
+section (filling out a published form on a client's behalf). Both are now built, closing
+HANDOFF.md's "Mobile/web feature parity" accounting in full - see that file's own gap #3 entry.
+
+**`packages/api` additions.** `autoResponses.graphql` gains `SendAutoResponseNow($autoResponseId,
+$clientId, $appointmentId)` - no input object, three plain top-level args, matching
+`resolvers/autoResponses.js`'s own mutation exactly (`appointmentId` nullable, omitted for a send
+with no appointment in play). It was deliberately excluded from X39's own slice - that was a
+scope cut for THAT screen (SessionDetailForm.tsx: "not an appointment-opening destination there"),
+never a decision that it should stay unbuilt everywhere. `forms.graphql` gains
+`GetFormToFillOut($formId)` and `SubmitFormResponse($input)` - a narrower selection than
+`GetFormForEdit` (no slug/shopUseOnly/allowGuestSubmissions/publicToken/systemKey/hidden, none of
+which this screen shows), rather than reusing that query under a misleading name.
+
+**`SendAutoResponseButton.tsx`** - direct port of web's own component. Same dual-scope query shape
+`settings/auto-responses.tsx` (X39) already established (own `artistUserId` set AND, independently,
+the shop's `shopId` set when the viewer administers a connected shop - never a toggle between the
+two). RN has no cross-platform popover-menu primitive, so the grouped "Yours" / "From [shop]" list
+opens in this app's own `Modal` (the same primitive `SessionDetailForm.tsx`'s Square-charge dialog
+already uses) rather than a `Menu`.
+
+**`FormFieldsRenderer.tsx`** - all seven field types (short_text, paragraph, date, single_choice,
+multi_choice, file_upload, signature). single_choice/multi_choice deliberately do NOT reuse
+`PillRow` - that component was built for short, developer-authored enums (trigger types, status
+filters), where this screen's options are arbitrary, user-authored strings from FormBuilder (X30),
+unbounded in length and count. Each gets its own small local vertical row list with a
+radio/checkbox indicator instead. `file_upload` reuses `messages/[id].tsx`'s own
+`ImagePicker`-\>`FormData`-\>REST pattern against `/form-uploads` - that route is public/
+unauthenticated by design (`routes/formUploads.js`'s own comment: a guest filling out a public
+form has no account either), so unlike `/message-uploads` this fetch carries no Authorization
+header.
+
+**`FormFillOutModal.tsx`** - port of `FormFillOut.jsx`, for the authenticated
+"staff/artist-filling-this-out-on-a-client's-behalf" path only (`clientId` always supplied). The
+guest path and the self-service "client fills out their own copy" branch both stay out of scope,
+same reasoning as everywhere else on this screen - mobile has no client login at all (X15/X16).
+Web mounts `FormFillOut` inside its global modal host (`IBModal.jsx`); this app has no equivalent,
+so the component owns its own RN `Modal`, sized to ~90% of screen height with its own internal
+`ScrollView` rather than a bottom-sheet sized to content, since a form can run to many fields.
+
+**`client/[id].tsx`** wires both in, in the same relative order web's own `ClientDashboard.jsx`
+renders them: Send-a-message between Stats and Projects, Forms between Shared Images and Notes.
+
+Confirmed in this sandbox: `packages/api` codegen + build clean, `apps/mobile` `tsc --noEmit`
+clean (only the pre-existing, unrelated `sentry.ts` types gap remains), full Jest suite - 265/265,
+36 suites (unchanged - neither new component needed a pure-logic module of its own).
+
+### X57. Artist dashboard depth - ShopCutRatePanel and a Performance section ported to `artist/[id].tsx`, closing X22's deferred gap
+
+X22 (the Artists directory) deliberately deferred `ArtistPerformancePanel`/`ShopCutRatePanel` as
+"a separate, large, real feature, not a natural extension of a directory port." This closes that
+gap, and HANDOFF.md gap #4's own note that viewing one other specific artist's performance
+(web's `Artist.jsx`, `isSelf=false`) remained unbuilt after X50's own dashboard port.
+
+**New `packages/api` operations**: `shopCutRate.graphql` (`GetShopCutRates`,
+`SetShopCutRate($artistId, $shopId, $percent, $compensationModel, $effectiveFrom, $note)`),
+`boothRent.graphql` extended with `SetBoothRentPlan`/`ConfirmBoothRentPaid`, and
+`artists.graphql`'s `GetArtistDetail` gains a `shopId` field (needed by both new panels; `hourlyRate`/
+`flatRate`/`billingType` remain excluded, per that file's existing restraint).
+
+**New `components/ShopCutRatePanel.tsx`** and an extended `artist/[id].tsx` Performance section
+(stat cards, a date-range picker, upcoming/completed appointment lists) - reusing patterns already
+proven in `dashboard.tsx` (X50) rather than inventing new ones, which substantially de-risked this
+slice: roughly 80% of what this needed already existed as a working pattern one screen over.
+
+**SCOPED DOWN exactly as far as `isSelf=false` already scopes it down on web's OWN `Artist.jsx`**,
+not a further cut of this slice's own making - confirmed by reading the source, not assumed. Web's
+`shopWide` condition is `isSelf && shopId && role <= SHOP_ADMIN`, which is unreachable when the
+caller hardcodes `isSelf={false}` (`Artist.jsx`'s own call), so the shop-wide "Artist Totals" table
+and the `isSelf && <ShopCutPayoutList>` payouts section never render on web's own page either.
+Porting only the non-`shopWide` stat-card set and the two appointment lists is therefore a faithful
+port of what this screen actually shows on web.
+
+Confirmed in this sandbox: `apps/mobile` `tsc --noEmit` clean, full Jest suite - 265/265 (unchanged
+- no screen-level tests for Apollo-wired screens, matching the established convention since X47).
+
+### X56. Mobile-wide scroll/touch fixes - `GestureHandlerRootView` never mounted, and the More menu's own missing `ScrollView`
+
+Two independent bugs, surfaced in the same conversation but with different root causes - kept as
+one entry since both were diagnosed and fixed in the same pass, not because they're related.
+
+**Root cause 1: `GestureHandlerRootView` (`react-native-gesture-handler`) was never mounted
+anywhere in the app**, despite the package being a real, already-installed dependency backing
+`react-native-screens`' native-stack transitions - this is what made Danny's report ("the project
+screen does not scroll... none of the screens appear to be scrolling either vertically or
+horizontally") an app-wide symptom rather than one broken screen. Root-caused by elimination, not
+guessed: RN's own `ScrollView.js` source shows it self-applies `flexGrow: 1`/`overflow: 'scroll'`
+via its internal `baseVertical` style regardless of any caller-supplied `style` prop, so a missing
+style prop on a `ScrollView` was ruled OUT before touching anything - that theory would have meant
+an unnecessary style change across roughly 35 files chasing the wrong cause. `expo-router`'s own
+`ExpoRoot.js` auto-wraps the app in `SafeAreaProvider` but confirmed (via source read, not
+assumption) NOT to provide this wrapper; neither does `entry-classic.js`/`renderRootComponent.js`.
+Fixed by wrapping `RootLayout` in `apps/mobile/src/app/_layout.tsx`.
+
+**Root cause 2: `more.tsx`'s own missing `ScrollView`** - a real bug in this session's own earlier
+nav/branding redesign (the `More` screen rendered its sections in a plain `View` with `flex: 1`
+instead of a `ScrollView`), unrelated to root cause 1 above. Fixed, and disclosed to Danny as a
+separate bug from the `GestureHandlerRootView` fix rather than folded into it, since conflating two
+independently-diagnosed causes would have made the RCA harder to trust later.
+
+**Also investigated, still open**: an image-attachment upload reported failing in Messages
+("upload failed"). Audited the full path - client `fetch`, the REST route, the Firebase Storage
+helper - and found no code defect. Left open in HANDOFF.md rather than closed here: this sandbox
+cannot reproduce a real network/Firebase failure, so this needs Danny's exact error text or a
+Sentry `[message-uploads]` entry before it can be diagnosed further.
+
+Confirmed in this sandbox: `apps/mobile` `tsc --noEmit` clean, full Jest suite - 265/265, 36 suites
+(`more.test.tsx`'s own `jest.mock('expo-router', ...)` needed `usePathname` added - fixed alongside,
+since `more.tsx` renders `<BottomTabBar />`, which calls it).
+
 ### X55. Registration built on mobile, scoped to account creation - and why set-password stays unbuilt
 
 Ninth slice off the mobile/web parity accounting (HANDOFF.md, 2026-09-04) - gap #11, "Registration/

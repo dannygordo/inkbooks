@@ -32,10 +32,16 @@ export function Button({
   const theme = useTheme();
   const isDisabled = disabled || loading;
 
+  // 2026-09-10: was theme.text/theme.background (plain black-on-white in light mode, the
+  // reverse in dark) - every screen using this one shared primitive now picks up the real
+  // brand color instead. secondary's border/text move from a neutral gray outline to the same
+  // brand color, matching web's own outlined-button convention; danger moves off a hardcoded
+  // '#D33' onto the theme's real error color (same value in light mode, theme-aware in dark).
   const backgroundColor =
-    variant === 'primary' ? theme.text : variant === 'danger' ? 'transparent' : 'transparent';
-  const borderColor = variant === 'secondary' ? theme.backgroundSelected : 'transparent';
-  const textColor = variant === 'primary' ? theme.background : variant === 'danger' ? '#D33' : theme.text;
+    variant === 'primary' ? theme.primary : variant === 'danger' ? 'transparent' : 'transparent';
+  const borderColor = variant === 'secondary' ? theme.primary : 'transparent';
+  const textColor =
+    variant === 'primary' ? theme.primaryContrast : variant === 'danger' ? theme.error : theme.primary;
 
   return (
     <Pressable

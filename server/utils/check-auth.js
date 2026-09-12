@@ -71,11 +71,18 @@ const checkAuth = (context) => {
         throw new AuthenticationError('Invalid/expired token');
       }
     }
-    throw new Error(
+    throw new AuthenticationError(
       'Authentication token must be prefixed with the string: Bearer ',
     );
   }
-  throw new Error(
+  // Plain 'not logged in' - expected any time a request goes out before login, after logout,
+  // or from a public page. This used to throw a bare Error, which carries no extensions.code,
+  // so index.js's formatError treated it as an unexpected incident and reported every one of
+  // these (a query firing during the normal logged-out/just-logged-out window) to Sentry as if
+  // it were a real bug - see the 'Invalid/expired token' case a few lines up, which already
+  // got this right. AuthenticationError's UNAUTHENTICATED code is what formatError's
+  // EXPECTED_ERROR_CODES actually checks for.
+  throw new AuthenticationError(
     'Authentication header must be provided to perform this action',
   );
 };

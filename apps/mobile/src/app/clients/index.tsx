@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BottomTabBar } from '@/components/BottomTabBar';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { ThemedText } from '@/components/themed-text';
@@ -142,6 +143,7 @@ export default function ClientsScreen() {
           />
         )}
       </SafeAreaView>
+      <BottomTabBar />
     </ThemedView>
   );
 }

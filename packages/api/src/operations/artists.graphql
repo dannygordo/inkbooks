@@ -5,9 +5,11 @@
 # used to mount a shop-mate's revenue/shop-cut/appointment-history panel). See DECISIONS.md X22.
 #
 # Leaner than web's own ArtistService.js selections in one respect: hourlyRate/flatRate/
-# billingType are dropped from both GetArtistsList and GetArtistDetail - those back
-# ShopCutRatePanel/ArtistPerformancePanel, both deliberately deferred (see X22's own note on why a
-# Phase-7-scale dashboard doesn't belong bundled into a directory port).
+# billingType are dropped from both GetArtistsList and GetArtistDetail - those backed
+# ShopCutRatePanel/ArtistPerformancePanel, deliberately deferred at the time (X22). Both panels are
+# now ported (2026-09-12, closing that gap) - GetArtistDetail gained `shopId` for them, but
+# hourlyRate/flatRate/billingType stay excluded since neither panel actually reads them (percent/
+# compensationModel come from ShopCutRate's own history, not these three legacy Artist fields).
 query GetArtistsList($includeArchived: Boolean, $page: PageInput) {
 	getArtists(includeArchived: $includeArchived, page: $page) {
 		items {
@@ -53,6 +55,12 @@ query GetArtistDetail($artistId: ID!) {
 		avatar
 		startDate
 		status
+		# Added for artist/[id].tsx's performance-panel/shop-cut port (2026-09-12) - the shop this
+		# artist belongs to, needed to scope both getArtistAnalytics-adjacent appointment queries'
+		# shop-cut context and ShopCutRatePanel's getShopCutRates/getBoothRentPlans calls. Nullable,
+		# same reasoning as the type's own comment on Artist.shopId: an independent artist with no
+		# shop connection is a real, legal state, not an error.
+		shopId
 		user {
 			id
 			avatar
