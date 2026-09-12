@@ -12,12 +12,14 @@ query GetChargeQuote(
 	$applyFeeOffset: Boolean
 	$tipCents: Int
 	$subtotalCentsOverride: Int
+	$chargeType: String
 ) {
 	getChargeQuote(
 		appointmentId: $appointmentId
 		applyFeeOffset: $applyFeeOffset
 		tipCents: $tipCents
 		subtotalCentsOverride: $subtotalCentsOverride
+		chargeType: $chargeType
 	) {
 		subtotalCents
 		depositCreditCents

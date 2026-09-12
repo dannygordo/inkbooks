@@ -3121,6 +3121,7 @@ export type GetChargeQuoteQueryVariables = Exact<{
   applyFeeOffset?: InputMaybe<Scalars['Boolean']['input']>;
   tipCents?: InputMaybe<Scalars['Int']['input']>;
   subtotalCentsOverride?: InputMaybe<Scalars['Int']['input']>;
+  chargeType?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 
@@ -3686,6 +3687,21 @@ export type RequestPasswordResetMutationVariables = Exact<{
 
 export type RequestPasswordResetMutation = { __typename?: 'Mutation', requestPasswordReset: boolean };
 
+export type InspectPasswordTokenQueryVariables = Exact<{
+  token: Scalars['String']['input'];
+}>;
+
+
+export type InspectPasswordTokenQuery = { __typename?: 'Query', inspectPasswordToken: { __typename?: 'PasswordTokenStatus', valid: boolean, purpose?: string | null, firstName?: string | null } };
+
+export type SetPasswordWithTokenMutationVariables = Exact<{
+  token: Scalars['String']['input'];
+  newPassword: Scalars['String']['input'];
+}>;
+
+
+export type SetPasswordWithTokenMutation = { __typename?: 'Mutation', setPasswordWithToken: boolean };
+
 export type ProjectImageFieldsFragment = { __typename?: 'IBImage', id: string, url: string, title?: string | null, uploadedByDisplayName?: string | null, userId: string, avatar?: string | null, tags?: Array<string | null> | null, createdAt?: string | null, updatedAt?: string | null, userInfo?: { __typename?: 'User', firstName?: string | null, lastName?: string | null, avatar?: string | null } | null };
 
 export type GetProjectDetailQueryVariables = Exact<{
@@ -3934,6 +3950,11 @@ export type UpdateMyShopFormSlugMutationVariables = Exact<{
 
 
 export type UpdateMyShopFormSlugMutation = { __typename?: 'Mutation', updateMyShopFormSlug: { __typename?: 'Shop', id: string, formSlug?: string | null } };
+
+export type GetMySquareMobileCredentialsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetMySquareMobileCredentialsQuery = { __typename?: 'Query', getMySquareMobileCredentials: { __typename?: 'SquareMobileCredentials', accessToken: string, locationId: string } };
 
 export type GetMySquareConnectionQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -5973,12 +5994,13 @@ export type ConfirmBoothRentPaidMutationHookResult = ReturnType<typeof useConfir
 export type ConfirmBoothRentPaidMutationResult = Apollo.MutationResult<ConfirmBoothRentPaidMutation>;
 export type ConfirmBoothRentPaidMutationOptions = Apollo.BaseMutationOptions<ConfirmBoothRentPaidMutation, ConfirmBoothRentPaidMutationVariables>;
 export const GetChargeQuoteDocument = gql`
-    query GetChargeQuote($appointmentId: ID!, $applyFeeOffset: Boolean, $tipCents: Int, $subtotalCentsOverride: Int) {
+    query GetChargeQuote($appointmentId: ID!, $applyFeeOffset: Boolean, $tipCents: Int, $subtotalCentsOverride: Int, $chargeType: String) {
   getChargeQuote(
     appointmentId: $appointmentId
     applyFeeOffset: $applyFeeOffset
     tipCents: $tipCents
     subtotalCentsOverride: $subtotalCentsOverride
+    chargeType: $chargeType
   ) {
     subtotalCents
     depositCreditCents
@@ -6012,6 +6034,7 @@ export const GetChargeQuoteDocument = gql`
  *      applyFeeOffset: // value for 'applyFeeOffset'
  *      tipCents: // value for 'tipCents'
  *      subtotalCentsOverride: // value for 'subtotalCentsOverride'
+ *      chargeType: // value for 'chargeType'
  *   },
  * });
  */
@@ -9889,6 +9912,83 @@ export function useRequestPasswordResetMutation(baseOptions?: Apollo.MutationHoo
 export type RequestPasswordResetMutationHookResult = ReturnType<typeof useRequestPasswordResetMutation>;
 export type RequestPasswordResetMutationResult = Apollo.MutationResult<RequestPasswordResetMutation>;
 export type RequestPasswordResetMutationOptions = Apollo.BaseMutationOptions<RequestPasswordResetMutation, RequestPasswordResetMutationVariables>;
+export const InspectPasswordTokenDocument = gql`
+    query InspectPasswordToken($token: String!) {
+  inspectPasswordToken(token: $token) {
+    valid
+    purpose
+    firstName
+  }
+}
+    `;
+
+/**
+ * __useInspectPasswordTokenQuery__
+ *
+ * To run a query within a React component, call `useInspectPasswordTokenQuery` and pass it any options that fit your needs.
+ * When your component renders, `useInspectPasswordTokenQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useInspectPasswordTokenQuery({
+ *   variables: {
+ *      token: // value for 'token'
+ *   },
+ * });
+ */
+export function useInspectPasswordTokenQuery(baseOptions: Apollo.QueryHookOptions<InspectPasswordTokenQuery, InspectPasswordTokenQueryVariables> & ({ variables: InspectPasswordTokenQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<InspectPasswordTokenQuery, InspectPasswordTokenQueryVariables>(InspectPasswordTokenDocument, options);
+      }
+export function useInspectPasswordTokenLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<InspectPasswordTokenQuery, InspectPasswordTokenQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<InspectPasswordTokenQuery, InspectPasswordTokenQueryVariables>(InspectPasswordTokenDocument, options);
+        }
+// @ts-ignore
+export function useInspectPasswordTokenSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<InspectPasswordTokenQuery, InspectPasswordTokenQueryVariables>): Apollo.UseSuspenseQueryResult<InspectPasswordTokenQuery, InspectPasswordTokenQueryVariables>;
+export function useInspectPasswordTokenSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<InspectPasswordTokenQuery, InspectPasswordTokenQueryVariables>): Apollo.UseSuspenseQueryResult<InspectPasswordTokenQuery | undefined, InspectPasswordTokenQueryVariables>;
+export function useInspectPasswordTokenSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<InspectPasswordTokenQuery, InspectPasswordTokenQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<InspectPasswordTokenQuery, InspectPasswordTokenQueryVariables>(InspectPasswordTokenDocument, options);
+        }
+export type InspectPasswordTokenQueryHookResult = ReturnType<typeof useInspectPasswordTokenQuery>;
+export type InspectPasswordTokenLazyQueryHookResult = ReturnType<typeof useInspectPasswordTokenLazyQuery>;
+export type InspectPasswordTokenSuspenseQueryHookResult = ReturnType<typeof useInspectPasswordTokenSuspenseQuery>;
+export type InspectPasswordTokenQueryResult = Apollo.QueryResult<InspectPasswordTokenQuery, InspectPasswordTokenQueryVariables>;
+export const SetPasswordWithTokenDocument = gql`
+    mutation SetPasswordWithToken($token: String!, $newPassword: String!) {
+  setPasswordWithToken(token: $token, newPassword: $newPassword)
+}
+    `;
+export type SetPasswordWithTokenMutationFn = Apollo.MutationFunction<SetPasswordWithTokenMutation, SetPasswordWithTokenMutationVariables>;
+
+/**
+ * __useSetPasswordWithTokenMutation__
+ *
+ * To run a mutation, you first call `useSetPasswordWithTokenMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useSetPasswordWithTokenMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [setPasswordWithTokenMutation, { data, loading, error }] = useSetPasswordWithTokenMutation({
+ *   variables: {
+ *      token: // value for 'token'
+ *      newPassword: // value for 'newPassword'
+ *   },
+ * });
+ */
+export function useSetPasswordWithTokenMutation(baseOptions?: Apollo.MutationHookOptions<SetPasswordWithTokenMutation, SetPasswordWithTokenMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<SetPasswordWithTokenMutation, SetPasswordWithTokenMutationVariables>(SetPasswordWithTokenDocument, options);
+      }
+export type SetPasswordWithTokenMutationHookResult = ReturnType<typeof useSetPasswordWithTokenMutation>;
+export type SetPasswordWithTokenMutationResult = Apollo.MutationResult<SetPasswordWithTokenMutation>;
+export type SetPasswordWithTokenMutationOptions = Apollo.BaseMutationOptions<SetPasswordWithTokenMutation, SetPasswordWithTokenMutationVariables>;
 export const GetProjectDetailDocument = gql`
     query GetProjectDetail($projectId: ID!) {
   getProject(projectId: $projectId) {
@@ -11462,6 +11562,49 @@ export function useUpdateMyShopFormSlugMutation(baseOptions?: Apollo.MutationHoo
 export type UpdateMyShopFormSlugMutationHookResult = ReturnType<typeof useUpdateMyShopFormSlugMutation>;
 export type UpdateMyShopFormSlugMutationResult = Apollo.MutationResult<UpdateMyShopFormSlugMutation>;
 export type UpdateMyShopFormSlugMutationOptions = Apollo.BaseMutationOptions<UpdateMyShopFormSlugMutation, UpdateMyShopFormSlugMutationVariables>;
+export const GetMySquareMobileCredentialsDocument = gql`
+    query GetMySquareMobileCredentials {
+  getMySquareMobileCredentials {
+    accessToken
+    locationId
+  }
+}
+    `;
+
+/**
+ * __useGetMySquareMobileCredentialsQuery__
+ *
+ * To run a query within a React component, call `useGetMySquareMobileCredentialsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetMySquareMobileCredentialsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetMySquareMobileCredentialsQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetMySquareMobileCredentialsQuery(baseOptions?: Apollo.QueryHookOptions<GetMySquareMobileCredentialsQuery, GetMySquareMobileCredentialsQueryVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useQuery<GetMySquareMobileCredentialsQuery, GetMySquareMobileCredentialsQueryVariables>(GetMySquareMobileCredentialsDocument, options);
+      }
+export function useGetMySquareMobileCredentialsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetMySquareMobileCredentialsQuery, GetMySquareMobileCredentialsQueryVariables>) {
+          const options = {...defaultOptions, ...baseOptions}
+          return Apollo.useLazyQuery<GetMySquareMobileCredentialsQuery, GetMySquareMobileCredentialsQueryVariables>(GetMySquareMobileCredentialsDocument, options);
+        }
+// @ts-ignore
+export function useGetMySquareMobileCredentialsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetMySquareMobileCredentialsQuery, GetMySquareMobileCredentialsQueryVariables>): Apollo.UseSuspenseQueryResult<GetMySquareMobileCredentialsQuery, GetMySquareMobileCredentialsQueryVariables>;
+export function useGetMySquareMobileCredentialsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetMySquareMobileCredentialsQuery, GetMySquareMobileCredentialsQueryVariables>): Apollo.UseSuspenseQueryResult<GetMySquareMobileCredentialsQuery | undefined, GetMySquareMobileCredentialsQueryVariables>;
+export function useGetMySquareMobileCredentialsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetMySquareMobileCredentialsQuery, GetMySquareMobileCredentialsQueryVariables>) {
+          const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
+          return Apollo.useSuspenseQuery<GetMySquareMobileCredentialsQuery, GetMySquareMobileCredentialsQueryVariables>(GetMySquareMobileCredentialsDocument, options);
+        }
+export type GetMySquareMobileCredentialsQueryHookResult = ReturnType<typeof useGetMySquareMobileCredentialsQuery>;
+export type GetMySquareMobileCredentialsLazyQueryHookResult = ReturnType<typeof useGetMySquareMobileCredentialsLazyQuery>;
+export type GetMySquareMobileCredentialsSuspenseQueryHookResult = ReturnType<typeof useGetMySquareMobileCredentialsSuspenseQuery>;
+export type GetMySquareMobileCredentialsQueryResult = Apollo.QueryResult<GetMySquareMobileCredentialsQuery, GetMySquareMobileCredentialsQueryVariables>;
 export const GetMySquareConnectionDocument = gql`
     query GetMySquareConnection {
   getMySquareConnection {

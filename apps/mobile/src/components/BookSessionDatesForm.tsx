@@ -11,7 +11,7 @@ import { Button } from '@/components/Button';
 import { DateTimeField } from '@/components/DateTimeField';
 import { DurationPicker } from '@/components/DurationPicker';
 import { FormField } from '@/components/FormField';
-import { SquarePaymentForm } from '@/components/SquarePaymentForm';
+import { SquareChargePanel } from '@/components/SquareChargePanel';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/auth';
@@ -270,7 +270,7 @@ export function BookSessionDatesForm({
           Sessions booked. Take the {formatCents(pendingCardDeposit.depositCents)} deposit to
           finish.
         </ThemedText>
-        <SquarePaymentForm
+        <SquareChargePanel
           amountCents={pendingCardDeposit.depositCents}
           appointmentId={pendingCardDeposit.consultAppointmentId}
           chargeType="deposit"

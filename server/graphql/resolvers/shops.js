@@ -116,5 +116,29 @@ module.exports = {
             ownerName: null,
           };
         }),
+        // See typeDefs.js's own comment on this field. THE ARTIST'S OWN ACCOUNT ONLY - same
+        // resolveArtistChargeAccount every real card charge in this app uses (never the shop's),
+        // and scoped to the caller's own id with no argument for whose credentials to return, the
+        // same "no argument for who this acts for" shape createArtistGiftCard/redeemGiftCard use.
+        // Gated behind the same kill switch createPaymentForAccount is - if real Square payments
+        // are turned off in this environment, the mobile app should not even be able to obtain a
+        // live access token to authorize a reader with.
+        getMySquareMobileCredentials: withAuth(async (_, args, context, info, user) => {
+          square.assertPaymentsEnabled();
+          const account = await resolveArtistChargeAccount(user.id);
+          if (!SquareAccount.isUsable(account)) {
+            throw new UserInputError('Errors', {
+              errors: { square: 'Connect Square in Settings before taking a card payment.' },
+            });
+          }
+          // Refreshes in place if the stored token is close to its 30-day expiry, same as every
+          // other real Square call in this app - the mobile app always gets a token good for a
+          // real payment, never one that will be refused mid-authorize.
+          const accessToken = await square.getValidAccessToken(account);
+          return {
+            accessToken,
+            locationId: account.locationId,
+          };
+        }),
     }
 }

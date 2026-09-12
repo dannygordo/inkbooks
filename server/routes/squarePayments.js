@@ -5,7 +5,7 @@ const SquareAccount = require('../models/SquareAccount');
 const GiftCard = require('../models/GiftCard');
 const { resolveArtistChargeAccount } = require('../utils/square-account');
 const { quoteAppointmentCharge, quoteDepositCharge } = require('../utils/charge-quote');
-const { processSquarePaymentInputSchema, processGiftCardPaymentInputSchema, validate } = require('../utils/validation');
+const { processSquarePaymentInputSchema, processReaderPaymentInputSchema, processGiftCardPaymentInputSchema, validate } = require('../utils/validation');
 const { checkRateLimit, getClientIp } = require('../utils/rate-limit');
 const Appointment = require('../models/Appointment');
 const { applyShopCut } = require('../utils/shop-cut');
@@ -20,6 +20,93 @@ const { reportError } = require('../utils/error-reporting');
 const { getShopIdsForUser } = require('../utils/shop-membership');
 
 const router = express.Router();
+
+/**
+ * Everything that happens to an Appointment once a card charge for it is confirmed collected -
+ * shared between the nonce-based route (charges, then applies this) and the reader route
+ * (verifies with Square, then applies this). Mechanically unchanged from what
+ * /square/process-payment always did inline; moved here so the two routes cannot drift into
+ * recording a collected charge two different ways.
+ */
+async function applyCollectedAppointmentCharge({
+  appointment,
+  isDeposit,
+  breakdown,
+  paymentId,
+  paymentStatus,
+  actorUserId,
+}) {
+  const previousDepositStatus = appointment.depositStatus;
+  const previousAppointmentStatus = appointment.appointmentStatus;
+
+  if (isDeposit) {
+    appointment.depositStatus = 'available';
+    appointment.depositCollectedAt = appointment.depositCollectedAt || new Date();
+    appointment.depositPaymentMethod = 'square';
+    appointment.depositSquarePaymentId = paymentId;
+    appointment.taxCents = breakdown.taxCents;
+    appointment.feeCents = breakdown.feeOffsetCents;
+    appointment.totalCents = breakdown.amountDueCents;
+  } else {
+    appointment.subtotalCents = breakdown.subtotalCents;
+    appointment.taxCents = breakdown.taxCents;
+    appointment.feeCents = breakdown.feeOffsetCents;
+    appointment.tipCents = breakdown.tipCents;
+    appointment.totalCents = breakdown.totalCents;
+    appointment.squarePaymentId = paymentId;
+    appointment.appointmentStatus = 'completed';
+    appointment.appointmentDate = new Date();
+    await applyShopCut(appointment);
+  }
+  await appointment.save();
+
+  if (
+    !isDeposit &&
+    previousAppointmentStatus !== 'completed' &&
+    appointment.appointmentType === 'session'
+  ) {
+    await sendAutoResponsesForTrigger({ trigger: 'SESSION_COMPLETED', appointment });
+  }
+
+  await sendAutoResponsesForTrigger({ trigger: 'PAYMENT_RECEIVED', appointment });
+
+  await recordEvent({
+    entityType: 'Appointment',
+    entityId: appointment._id,
+    action: 'update',
+    actorUserId,
+    shopId: appointment.shopId,
+    summary: isDeposit
+      ? `Charged ${formatCents(breakdown.amountDueCents)} deposit via Square`
+      : `Charged ${formatCents(breakdown.amountDueCents)} via Square, session closed`,
+    changes: isDeposit
+      ? [{ field: 'depositStatus', from: previousDepositStatus, to: appointment.depositStatus }]
+      : [{ field: 'appointmentStatus', from: previousAppointmentStatus, to: appointment.appointmentStatus }],
+  });
+
+  await notifySafely({
+    actorId: actorUserId,
+    recipientIds: await moneyAudienceForArtist(appointment.userId),
+    type: isDeposit ? 'deposit_collected' : 'session_charged',
+    category: 'money',
+    subjectType: 'appointment',
+    subjectId: appointment._id,
+    amountCents: breakdown.amountDueCents,
+    title: isDeposit
+      ? `${formatCents(appointment.depositCents)} deposit collected${appointment.title ? ` — ${appointment.title}` : ''}`
+      : `${formatCents(breakdown.amountDueCents)} charged${appointment.title ? ` — ${appointment.title}` : ''}`,
+    body: `Taken by ${await actorName(actorUserId)} by card.`,
+  });
+
+  return {
+    success: true,
+    paymentId,
+    status: paymentStatus,
+    appointmentId: String(appointment.id),
+    breakdown,
+  };
+}
+
 
 // This is the route client/src/components/IBSquarePayments/squareConfig.js's PROCESS_URL points
 // at. Takes the source id (nonce/token) the client's Web Payments SDK produced and charges it via
@@ -175,129 +262,179 @@ router.post('/square/process-payment', express.json(), async (req, res) => {
       note: req.body.note || `InkBooks payment - user ${user.id}`,
     });
 
-    // Persist the breakdown the SERVER computed, not the caller's account of it.
-    //
-    // Stored as components rather than one figure, because they aren't recoverable from a total:
-    // tax and processing fees aren't the artist's income, and the tip is the artist's alone and
-    // is specifically excluded from the shop cut. Collapsing them into one number destroys
-    // exactly the distinctions the ledger runs on.
-    const { breakdown } = quote;
-    const previousDepositStatus = appointment.depositStatus;
-    const previousAppointmentStatus = appointment.appointmentStatus;
-
-    if (isDeposit) {
-      // The money has now arrived, so the pending record becomes a collected one. depositCents is
-      // NOT rewritten - it is the figure this charge was computed from, and rewriting it here
-      // would make the amount charged and the amount recorded two writes that could disagree,
-      // which is the whole thing the pending state exists to prevent.
-      appointment.depositStatus = 'available';
-      appointment.depositCollectedAt = appointment.depositCollectedAt || new Date();
-      appointment.depositPaymentMethod = 'square';
-      appointment.depositSquarePaymentId = payment.id;
-      // Tax and the offset are real money collected on top of the deposit (M11), so both are
-      // recorded - but neither is part of the deposit's face value and neither must become
-      // spendable credit. depositCents stays the deposit; taxCents and feeCents carry the rest.
-      //
-      // This is also what makes the session side add up: the deposit's face value is deducted from
-      // the session subtotal BEFORE tax there (M8), so the tax collected here plus the tax
-      // collected at the sitting covers the whole job exactly once.
-      appointment.taxCents = breakdown.taxCents;
-      appointment.feeCents = breakdown.feeOffsetCents;
-      appointment.totalCents = breakdown.amountDueCents;
-      // The cut was already applied at recordDeposit, against depositCents, and depositCents has
-      // not moved. Reapplying here would recompute it against the same figure for no reason - and
-      // subtotalCents is deliberately left alone for the same reason.
-    } else {
-      appointment.subtotalCents = breakdown.subtotalCents;
-      appointment.taxCents = breakdown.taxCents;
-      appointment.feeCents = breakdown.feeOffsetCents;
-      appointment.tipCents = breakdown.tipCents;
-      appointment.totalCents = breakdown.totalCents;
-      appointment.squarePaymentId = payment.id;
-      // A session paid by card, successfully, is done - there's no cash to hand over and no
-      // separate "mark it closed" step left for the artist to remember. Same transition
-      // mutations/appointments.js's updateAppointment makes when "Close Session" is clicked by
-      // hand; this is the other caller that can produce it, and it never comes through that
-      // mutation at all, so it has to be set here too.
-      //
-      // appointmentDate is stamped to THIS MOMENT for the same reason that resolver does it -
-      // reports run off when the work was actually settled, not off whatever slot it was booked
-      // into. A client charged today for a session booked (or rescheduled) some other day should
-      // show up today.
-      appointment.appointmentStatus = 'completed';
-      appointment.appointmentDate = new Date();
-      // Recomputed from the subtotal just written, so the cut reflects the money actually
-      // collected. Tips excluded by construction - see utils/shop-cut.js. The subtotal is now a
-      // figure the caller cannot influence, which is what makes the cut trustworthy.
-      await applyShopCut(appointment);
-    }
-    await appointment.save();
-
-    // Auto-Responses: a card charge auto-completing a session is the other way a
-    // SESSION_COMPLETED transition happens (see mutations/appointments.js's own copy of this same
-    // guard, for the "Close Session" button) - this path never goes through that mutation at all,
-    // so it needs its own call. Best-effort: never undoes the payment/save that already happened.
-    if (
-      !isDeposit &&
-      previousAppointmentStatus !== 'completed' &&
-      appointment.appointmentType === 'session'
-    ) {
-      await sendAutoResponsesForTrigger({ trigger: 'SESSION_COMPLETED', appointment });
-    }
-
-    // PAYMENT_RECEIVED fires for BOTH branches - a receipt is owed for a deposit exactly as much
-    // as for a session charge, and unlike SESSION_COMPLETED above it isn't reachable any other way
-    // (there is no manual/cash equivalent call site for it yet). Safe to call unconditionally
-    // here: the idempotency checks earlier in this route (depositSquarePaymentId/squarePaymentId)
-    // already guarantee this success path runs at most once per appointment per charge type.
-    await sendAutoResponsesForTrigger({ trigger: 'PAYMENT_RECEIVED', appointment });
-
-    await recordEvent({
-      entityType: 'Appointment',
-      entityId: appointment._id,
-      action: 'update',
-      actorUserId: user.id,
-      shopId: appointment.shopId,
-      summary: isDeposit
-        ? `Charged ${formatCents(breakdown.amountDueCents)} deposit via Square`
-        : `Charged ${formatCents(breakdown.amountDueCents)} via Square, session closed`,
-      changes: isDeposit
-        ? [{ field: 'depositStatus', from: previousDepositStatus, to: appointment.depositStatus }]
-        : [{ field: 'appointmentStatus', from: previousAppointmentStatus, to: appointment.appointmentStatus }],
-    });
-
-    // The person who took the payment is the actor. There IS one here - this route is
-    // authenticated (checkAuth above), so unlike a Square webhook it never has to guess.
-    //
-    // If this ever moves to a webhook, the actor is the artist whose session was paid, NOT null.
-    // notify() throws on a missing actorId precisely so that decision gets made rather than
-    // defaulted into notifying everybody including the person who caused it.
-    //
-    // The deposit notification lives here rather than in recordDeposit, because this is the moment
-    // the money actually arrives - recordDeposit only agreed an amount.
-    await notifySafely({
-      actorId: user.id,
-      recipientIds: await moneyAudienceForArtist(appointment.userId),
-      type: isDeposit ? 'deposit_collected' : 'session_charged',
-      category: 'money',
-      subjectType: 'appointment',
-      subjectId: appointment._id,
-      amountCents: breakdown.amountDueCents,
-      title: isDeposit
-        ? `${formatCents(appointment.depositCents)} deposit collected${appointment.title ? ` — ${appointment.title}` : ''}`
-        : `${formatCents(breakdown.amountDueCents)} charged${appointment.title ? ` — ${appointment.title}` : ''}`,
-      body: `Taken by ${await actorName(user.id)} by card.`,
-    });
-
-    return res.status(200).json({
-      success: true,
+    const result = await applyCollectedAppointmentCharge({
+      appointment,
+      isDeposit,
+      breakdown: quote.breakdown,
       paymentId: payment.id,
-      status: payment.status,
-      appointmentId: String(appointment.id),
-      breakdown,
+      paymentStatus: payment.status,
+      actorUserId: user.id,
     });
+
+    return res.status(200).json(result);
   } catch (err) {
     reportError(err, { context: '[square-payment] Failed to process payment' });
+    return res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// The Mobile Payments SDK's card-reader route. The mobile app's own reader integration
+// (apps/mobile/src/services/squareReader.ts) authorizes the SDK on-device with this artist's own
+// Square access token (getMySquareMobileCredentials, resolvers/shops.js) and pairs a physical
+// Square reader over Bluetooth - both happen entirely on the phone, never through this server.
+// By the time this route is called, startPayment() has already finished: the card was tapped,
+// inserted or swiped, and Square has already completed a real charge. See
+// utils/square.js's getPaymentForAccount for why that flips the safety model from "decide the
+// amount, then charge it" to "decide what SHOULD have been charged, then verify Square's own
+// record of what was".
+router.post('/square/process-reader-payment', express.json(), async (req, res) => {
+  let user;
+  try {
+    user = checkAuth({ req });
+  } catch (err) {
+    return res.status(401).json({ error: err.message });
+  }
+
+  const { allowed, retryAfterSeconds } = checkRateLimit(
+    `${getClientIp(req)}:processReaderPayment`,
+    { windowMs: 60 * 1000, max: 10 },
+  );
+  if (!allowed) {
+    return res
+      .status(429)
+      .json({ error: `Too many payment attempts. Try again in ${retryAfterSeconds}s.` });
+  }
+
+  const { valid, errors } = validate(processReaderPaymentInputSchema, req.body);
+  if (!valid) {
+    return res.status(400).json({ error: 'Invalid request', errors });
+  }
+
+  const appointment = await Appointment.findById(req.body.appointmentId);
+  if (!appointment) {
+    return res.status(404).json({ error: 'Appointment not found' });
+  }
+  if (user.role > Constants.ROLES.SHOP_ADMIN && String(user.id) !== String(appointment.userId)) {
+    return res.status(403).json({ error: 'Action not allowed' });
+  }
+
+  const isDeposit = req.body.chargeType === 'deposit';
+
+  if (isDeposit && appointment.depositSquarePaymentId) {
+    return res.status(409).json({ error: 'This deposit has already been paid.' });
+  }
+  if (!isDeposit && appointment.squarePaymentId) {
+    return res.status(409).json({ error: 'This session has already been paid.' });
+  }
+
+  // REPLAY GUARD, specific to this route. The nonce-based route above can't be handed a payment id
+  // that already belongs to a different appointment or gift card - Square mints a fresh id from a
+  // fresh sourceId every time. This route is handed a payment id BY THE CLIENT, and a client that
+  // is buggy or malicious could send the same completed payment id against a second appointment,
+  // asking this route to record one real Square payment as if it paid for two separate things.
+  const alreadyRecordedElsewhere = await Appointment.findOne({
+    _id: { $ne: appointment._id },
+    $or: [
+      { depositSquarePaymentId: req.body.paymentId },
+      { squarePaymentId: req.body.paymentId },
+    ],
+  });
+  if (alreadyRecordedElsewhere) {
+    return res.status(409).json({ error: 'This payment has already been recorded elsewhere.' });
+  }
+
+  let quote;
+  try {
+    quote = isDeposit
+      ? await quoteDepositCharge(appointment, {
+          applyFeeOffset: Boolean(req.body.applyFeeOffset),
+        })
+      : await quoteAppointmentCharge(appointment, {
+          applyFeeOffset: Boolean(req.body.applyFeeOffset),
+          tipCents: req.body.tipCents ?? 0,
+        });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+
+  if (quote.breakdown.amountDueCents <= 0) {
+    return res.status(400).json({
+      error: isDeposit
+        ? 'This deposit has no amount to collect.'
+        : 'There is nothing left to collect on this session.',
+    });
+  }
+
+  const account = await resolveArtistChargeAccount(appointment.userId);
+  if (!SquareAccount.isUsable(account)) {
+    return res.status(400).json({
+      error: 'Connect Square in Settings before taking a card payment.',
+    });
+  }
+
+  try {
+    const payment = await square.getPaymentForAccount({
+      account,
+      paymentId: req.body.paymentId,
+    });
+
+    if (!payment) {
+      return res.status(404).json({ error: 'Square has no record of that payment.' });
+    }
+    // COMPLETED is Square's terminal success state for a card-present payment - APPROVED alone
+    // means authorized but not yet captured, which is not money InkBooks can treat as collected.
+    if (payment.status !== 'COMPLETED') {
+      return res.status(400).json({
+        error: `This payment has not completed on Square's side yet (status: ${payment.status}).`,
+      });
+    }
+    if (payment.location_id !== account.locationId) {
+      // A real payment id, but not one made against THIS seller's own connected location - either
+      // a stale credential on the device or a client sending a payment id it has no business
+      // naming. Refused rather than recorded: this is exactly the class of mismatch
+      // getPaymentForAccount exists to catch.
+      return res.status(400).json({ error: 'This payment does not belong to your account.' });
+    }
+
+    const chargedAmountCents = payment.amount_money && payment.amount_money.amount;
+    if (chargedAmountCents !== quote.breakdown.amountDueCents) {
+      // FAIL CLOSED ON A MISMATCH, DELIBERATELY. The money has already moved - Square says so -
+      // but what Square says was charged and what this appointment currently owes disagree, most
+      // likely because something about the appointment changed in the gap between the reader
+      // quoting a total and this request arriving (a price edit, a second charge attempt, a
+      // clock/rate change). Auto-applying the payment to the ledger anyway would let a stale
+      // amount silently become the recorded truth. Refusing to auto-apply does not lose the
+      // payment - it is real, on Square's own dashboard, and reportError below puts it in front
+      // of a person - it just stops this route from writing a number to the appointment that
+      // doesn't match what was actually quoted.
+      reportError(new Error('Reader payment amount does not match the current quote'), {
+        context: '[square-reader-payment] amount mismatch - needs manual reconciliation',
+        paymentId: payment.id,
+        appointmentId: String(appointment.id),
+        chargedAmountCents,
+        expectedAmountCents: quote.breakdown.amountDueCents,
+      });
+      return res.status(409).json({
+        error:
+          "The reader charged a card, but the amount doesn't match what's currently owed on " +
+          'this appointment. Nothing has been recorded here - the charge is on your Square ' +
+          'dashboard, and this needs a manual look before it can be applied.',
+        paymentId: payment.id,
+      });
+    }
+
+    const result = await applyCollectedAppointmentCharge({
+      appointment,
+      isDeposit,
+      breakdown: quote.breakdown,
+      paymentId: payment.id,
+      paymentStatus: payment.status,
+      actorUserId: user.id,
+    });
+
+    return res.status(200).json(result);
+  } catch (err) {
+    reportError(err, { context: '[square-reader-payment] Failed to record reader payment' });
     return res.status(err.status || 500).json({ error: err.message });
   }
 });

@@ -227,6 +227,14 @@ module.exports = gql`
   }
   # The caller's own view of a Square connection. Deliberately exposes only non-secret fields -
   # the encrypted access/refresh tokens never leave the server, exactly as on Shop.
+  # See getMySquareMobileCredentials above. Never cached client-side - fetched fresh immediately
+  # before each on-device authorize() call and held in memory only for the lifetime of that
+  # payment screen.
+  type SquareMobileCredentials {
+    accessToken: String!
+    locationId: String!
+  }
+
   type SquareConnection {
     # 'shop' or 'artist' - who OWNS the account these sessions charge into. An artist connected to
     # a shop gets 'shop' here even if they personally have never touched Square, because that is
@@ -1959,6 +1967,12 @@ module.exports = gql`
       applyFeeOffset: Boolean
       tipCents: Int
       subtotalCentsOverride: Int
+      # 'session' (default) or 'deposit' - which of quoteAppointmentCharge/quoteDepositCharge
+      # (utils/charge-quote.js) answers this quote. Added for the card-reader flow, which needs a
+      # fresh, authoritative amount for EITHER charge type before telling the Mobile Payments SDK
+      # what to charge on the reader - unlike the nonce flow, a reader payment can't be vetoed by
+      # the server after the fact, so the amount handed to the reader has to come from here.
+      chargeType: String
     ): ChargeQuote!
     getAppointmentsByProject(projectId: ID!): [Appointment]
 
@@ -1979,6 +1993,16 @@ module.exports = gql`
     # the SHOP's account, so the source field is what the settings panel needs in order to say
     # something true rather than showing a connect button that would build a dead connection.
     getMySquareConnection: SquareConnection!
+    # The caller's OWN Square access token and location id, decrypted, for the Mobile Payments
+    # SDK's on-device authorize() call (apps/mobile/src/services/squareReader.ts). Square's SDK
+    # takes this token directly - there is no separate short-lived "mobile authorization code" for
+    # it the way the now-retired Reader SDK required (Square's Mobile Authorization API was
+    # deprecated alongside Reader SDK; the Mobile Payments SDK "contains its own authorization
+    # methods"). This is real, live, 30-day-lived credentials for a real Square account, so it is
+    # asked for fresh right before a reader payment (never cached, never written to device
+    # storage) and this resolver refuses to hand it out at all when SQUARE_PAYMENTS_ENABLED=false -
+    # see resolvers/shops.js.
+    getMySquareMobileCredentials: SquareMobileCredentials!
     # The tax rate and offset in force for the caller, and whether they may change them. Read by
     # the settings panel; the same values routes/squarePayments.js computes every charge from.
     getMySquarePricingSettings: SquarePricingSettings!

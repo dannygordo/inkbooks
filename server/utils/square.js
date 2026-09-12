@@ -541,6 +541,54 @@ async function createPaymentForAccount({ account, sourceId, amountCents, idempot
   return data.payment;
 }
 
+/**
+ * Looks up a payment already made against this account, for the Mobile Payments SDK's
+ * card-present flow (routes/squarePayments.js's process-reader-payment route).
+ *
+ * ---------------------------------------------------------------------------------------------
+ * WHY THIS EXISTS ALONGSIDE createPaymentForAccount RATHER THAN INSTEAD OF IT. Every other charge
+ * in this app follows the same shape as createPaymentForAccount: the server decides the amount,
+ * then charges it - so nothing is ever recorded that the server did not itself request. A card
+ * reader breaks that shape structurally. The Mobile Payments SDK runs on the device, paired over
+ * Bluetooth to hardware this server never touches, and it finishes the charge - taps the card,
+ * talks to Square, gets a completed payment - before this server hears about it at all. There is
+ * no sourceId/nonce handed back for the server to charge; by the time process-reader-payment is
+ * called, the money has already moved.
+ *
+ * So the safety property has to be rebuilt the other way round: instead of the server deciding
+ * the amount and then charging it, the server computes what SHOULD have been charged (the exact
+ * same quoteAppointmentCharge/quoteDepositCharge functions createPaymentForAccount's callers use)
+ * and then asks Square directly what this payment id actually says, rather than trusting whatever
+ * the app on the phone claims. A compromised or buggy mobile client can lie about a payment id or
+ * an amount; it cannot make Square's own records say something Square did not do.
+ * ---------------------------------------------------------------------------------------------
+ */
+async function getPaymentForAccount({ account, paymentId }) {
+  if (!account || !account.locationId) {
+    throw new Error('This Square connection is missing a location id - reconnect Square.');
+  }
+  const accessToken = await getValidAccessToken(account);
+
+  const response = await fetch(`${getBaseUrl()}/v2/payments/${encodeURIComponent(paymentId)}`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Square-Version': SQUARE_API_VERSION,
+    },
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    const message =
+      (data && data.errors && data.errors.map((e) => e.detail).join('; ')) ||
+      `Square Payments API lookup failed with status ${response.status}`;
+    const error = new Error(message);
+    error.squareErrors = data && data.errors;
+    error.status = response.status;
+    throw error;
+  }
+  return data.payment;
+}
+
 module.exports = {
   buildAuthorizationUrl,
   exchangeCodeForToken,
@@ -551,4 +599,6 @@ module.exports = {
   verifyWebhookSignature,
   getEnvironment,
   createPaymentForAccount,
+  getPaymentForAccount,
+  assertPaymentsEnabled,
 };

@@ -11,7 +11,10 @@
       "supportsTablet": true,
       "bundleIdentifier": "net.inkbooks.mobile",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSBluetoothAlwaysUsageDescription": "InkBooks uses Bluetooth to connect to a Square card reader so you can take payments in person.",
+        "NSLocationWhenInUseUsageDescription": "InkBooks uses your location to confirm in-person card payments happen at a supported location, as required by Square.",
+        "NSMicrophoneUsageDescription": "Some Square card readers use the microphone port to communicate card data to your device."
       }
     },
     "android": {
@@ -22,7 +25,14 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "RECORD_AUDIO",
+        "BLUETOOTH_CONNECT",
+        "BLUETOOTH_SCAN",
+        "READ_PHONE_STATE"
+      ]
     },
     "web": {
       "output": "static",
@@ -43,6 +53,16 @@
         {
           "icon": "./assets/images/icon.png",
           "color": "#208AEF"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36,
+            "minSdkVersion": 28
+          }
         }
       ]
     ],

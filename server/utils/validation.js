@@ -479,6 +479,23 @@ const processSquarePaymentInputSchema = z.object({
   tipCents: z.number().int().nonnegative().nullish(),
 });
 
+// routes/squarePayments.js's process-reader-payment route's own body validator. No sourceId and
+// no amount here - unlike a keyed/WebView charge, a card-present reader payment has ALREADY
+// happened by the time this request is made (the Mobile Payments SDK charges the card on-device,
+// directly against Square, the moment startPayment() resolves). What this route needs is enough
+// to look that payment up and verify it, not enough to create one - see squarePayments.js for why
+// that makes this a verify-then-record route rather than a charge route.
+const processReaderPaymentInputSchema = z.object({
+  // Square's own payment id, returned by the Mobile Payments SDK's startPayment() call on the
+  // device. This is what gets looked up via GET /v2/payments/{id} and checked against a freshly
+  // computed quote before anything is written to the appointment.
+  paymentId: z.string().trim().min(1, 'paymentId must not be empty'),
+  appointmentId: objectIdSchema,
+  chargeType: z.enum(['session', 'deposit']).nullish(),
+  applyFeeOffset: z.boolean().nullish(),
+  tipCents: z.number().int().nonnegative().nullish(),
+});
+
 /**
  * One appointment-reminder rule: how long before the appointment it fires. See
  * models/ReminderSettings.js for why this is minutes rather than hours (a same-day "30 minutes
@@ -910,6 +927,7 @@ module.exports = {
   appointmentIdInputSchema,
   boothRentChargeIdInputSchema,
   processSquarePaymentInputSchema,
+  processReaderPaymentInputSchema,
   squarePricingSettingsInputSchema,
   reminderRuleInputSchema,
   updateReminderSettingsInputSchema,

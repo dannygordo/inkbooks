@@ -95,6 +95,10 @@ function RootNavigator() {
               only, same guard as login itself; a signed-in user changes a password they know from
               settings/index.tsx instead. */}
           <Stack.Screen name="reset-password" options={{ headerShown: true, title: 'Reset Password' }} />
+          {/* Where an invite or reset link actually lands - see set-password/[token].tsx's own
+              header comment and passwordReset.graphql's for the deep-link scope this closes and
+              what's still a deliberate follow-up (the emailed link itself still points at web). */}
+          <Stack.Screen name="set-password/[token]" options={{ headerShown: true, title: 'Set Password' }} />
           {/* Cold self-signup (gap #11, X55) - see register.tsx's own header comment for why it's
               scoped to account creation only, deferring notifications/rates/shop-cut to Settings. */}
           <Stack.Screen name="register" options={{ headerShown: true, title: 'Create Account' }} />

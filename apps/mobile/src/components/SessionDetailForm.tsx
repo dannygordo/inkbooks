@@ -22,7 +22,7 @@ import { Alert, Modal, ScrollView, StyleSheet, Switch, TextInput, View } from 'r
 import { Button } from '@/components/Button';
 import { DateTimeField } from '@/components/DateTimeField';
 import { FormField } from '@/components/FormField';
-import { SquarePaymentForm } from '@/components/SquarePaymentForm';
+import { SquareChargePanel } from '@/components/SquareChargePanel';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -619,7 +619,7 @@ export function SessionDetailForm({
                 <ThemedText type="smallBold">
                   Charge {formatCents(squareModal.amountDueCents)} for {project.title}
                 </ThemedText>
-                <SquarePaymentForm
+                <SquareChargePanel
                   amountCents={squareModal.amountDueCents}
                   appointmentId={appointment.id}
                   applyFeeOffset={applyFeeOffset}
@@ -630,7 +630,7 @@ export function SessionDetailForm({
                     onClosed();
                   }}
                   onError={() => {
-                    // Surfaced inline by SquarePaymentForm itself - nothing extra to do here.
+                    // Surfaced inline by SquareChargePanel's own children - nothing extra to do here.
                   }}
                 />
               </>

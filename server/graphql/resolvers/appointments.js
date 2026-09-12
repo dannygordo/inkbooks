@@ -13,7 +13,7 @@ const {
   canManageArtist,
 } = require('../../utils/shop-membership');
 const { paginate } = require('../../utils/pagination');
-const { quoteAppointmentCharge } = require('../../utils/charge-quote');
+const { quoteAppointmentCharge, quoteDepositCharge } = require('../../utils/charge-quote');
 const { resolveArtistChargeAccount } = require('../../utils/square-account');
 const SquareAccount = require('../../models/SquareAccount');
 
@@ -126,7 +126,7 @@ module.exports = {
     getChargeQuote: withAuth(
       async (
         _,
-        { appointmentId, applyFeeOffset, tipCents, subtotalCentsOverride },
+        { appointmentId, applyFeeOffset, tipCents, subtotalCentsOverride, chargeType },
         context,
         info,
         user,
@@ -149,14 +149,20 @@ module.exports = {
           }
         }
 
-        const { settings, breakdown } = await quoteAppointmentCharge(appointment, {
-          applyFeeOffset: Boolean(applyFeeOffset),
-          tipCents: tipCents || 0,
-          subtotalCentsOverride:
-            subtotalCentsOverride === null || subtotalCentsOverride === undefined
-              ? undefined
-              : subtotalCentsOverride,
-        });
+        // 'deposit' routes to quoteDepositCharge instead - see utils/charge-quote.js. Both return
+        // the same breakdown shape (computeChargeBreakdown, one function, both callers), so
+        // nothing downstream of this branch needs to know which ran.
+        const { settings, breakdown } =
+          chargeType === 'deposit'
+            ? await quoteDepositCharge(appointment, { applyFeeOffset: Boolean(applyFeeOffset) })
+            : await quoteAppointmentCharge(appointment, {
+                applyFeeOffset: Boolean(applyFeeOffset),
+                tipCents: tipCents || 0,
+                subtotalCentsOverride:
+                  subtotalCentsOverride === null || subtotalCentsOverride === undefined
+                    ? undefined
+                    : subtotalCentsOverride,
+              });
         const account = await resolveArtistChargeAccount(appointment.userId);
 
         return {

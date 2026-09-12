@@ -1,0 +1,9 @@
+# The card-reader flow's own operation: apps/mobile/src/services/squareReader.ts calls this
+# imperatively (apolloClient.query, not a hook) immediately before each on-device authorize() call
+# - see typeDefs.js's own comment on why this is fetched fresh every time rather than cached.
+query GetMySquareMobileCredentials {
+	getMySquareMobileCredentials {
+		accessToken
+		locationId
+	}
+}

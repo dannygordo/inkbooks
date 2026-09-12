@@ -8,6 +8,45 @@ Last updated: 2026-09-12.
 
 ---
 
+### 2026-09-12 (forty-sixth entry): Square Mobile Payments SDK card reader integration, and first-time password set via deep link (X87)
+
+Danny, verbatim: "the card reader is a must. make it happen. client portal is not required for the
+initial version, but first time password set functionality is." Both built this session.
+
+Card reader: `mobile-payments-sdk-react-native` wraps a physical Square reader for card-present
+charges, added alongside the existing WebView/manual-entry flow via a new `SquareChargePanel`
+toggle (defaults to the reader), not a replacement of it. The existing security invariant, the
+server computes the authoritative amount before the charge happens, cannot hold in its original
+form here: a reader charges on device, before the server is in the loop at all. New model instead:
+verify after the fact. See DECISIONS.md X87 for the full reasoning and rejected alternative. New
+route `POST /square/process-reader-payment` (which also extracted the existing nonce-based route's
+post-charge logic into `applyCollectedAppointmentCharge` so both share it), new query
+`getMySquareMobileCredentials` for the mobile SDK's own OAuth handoff, and `getChargeQuote` gains a
+`chargeType` arg (session vs deposit) so a stale quote type can't be requested against the wrong
+appointment field.
+
+First-time password set: `set-password/[token].tsx` ports web's `SetPassword.jsx` in full (invite
+vs reset framing, password length and match validation client side, routes to `/login` rather than
+auto-login on success, matching web's own stated security rationale), registered in the logged-out
+`Stack.Protected` group. The emailed invite/reset link itself still points at the web URL, not the
+app's custom scheme, deliberately unchanged, not an oversight; see DECISIONS.md's Open section for
+why (Universal Links infrastructure would be needed first).
+
+Confirmed in this sandbox: `apps/mobile` `tsc --noEmit` clean, full Jest suite 270/270 across 37
+suites (the 5 new `set-password.test.tsx` cases included), `packages/api` codegen and build clean,
+every touched server file passes `node --check`. **Not yet verified**: server side `vitest` could
+not run here, same `mongodb-memory-server`/`fastdl.mongodb.org` proxy block as every other server
+change this file already tracks that way, needs a real `npm test` run in `server/` on Danny's own
+machine. No physical reader pairing or EAS native build was attempted either, needs Danny's own
+device/EAS credentials and cannot be done from this kind of sandbox at all. The Kotlin/AGP/
+compileSdk 36 interaction the SDK's own README calls out was not blind patched, since the
+documented fix targets a different React Native/gradle-plugin version than this app runs (0.86.3);
+watch for it on the first real Android build rather than assuming it's already handled.
+
+Client portal (mobile client login and self-service) remains the one deliberate exclusion left,
+per Danny's own call this session - everything else named across this file's parity accounting is
+now either built or a stated, deliberate cut.
+
 ### 2026-09-12 (forty-fifth entry): full mobile/web parity reached - Auto-Responses manual send and Forms fill-out ported to Client Dashboard (X58)
 
 Danny: "i see the artist dashboard now. make sure to finish porting everything over from the web

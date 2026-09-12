@@ -3822,6 +3822,40 @@ Only `requestPasswordReset` is ported to `packages/api` (`passwordReset.graphql`
 
 ---
 
+### X87. Card-present Square payments verify the charge after the fact, instead of the server pricing it before the charge happens
+
+Every other Square flow in this app lets the server compute the authoritative amount after
+tokenization but before the charge fires, because a `cnon:` nonce is inert until the server's own
+`/v2/payments` call spends it. A physical reader breaks that: the Mobile Payments SDK authorizes
+and settles the charge on device, against the seller's own OAuth access token, before the server is
+in the loop at all. There is no point between "the client has committed to charging card X" and
+"the money has moved" for the server to intervene.
+
+Model: let the reader charge happen, then verify. `POST /square/process-reader-payment` takes only
+a `paymentId` (never an amount from the client), computes a fresh quote server side
+(`quoteAppointmentCharge`/`quoteDepositCharge`, unchanged from the nonce flow), fetches that
+`paymentId` back from Square's own `GET /v2/payments/{id}`, and requires all three to match before
+writing anything: `status === 'COMPLETED'`, `location_id` equal to the connected account's own
+location, and `amount_money.amount` equal to the fresh quote's `amountDueCents`. A cross-appointment
+replay guard (the same `paymentId` cannot be applied to two different appointments) and the existing
+already-paid idempotency check sit alongside those three. Any mismatch fails closed: 409/400/404,
+and the appointment is left untouched.
+
+This is weaker than "the server decided the amount before money moved" in one narrow sense (a
+compromised client could in principle charge a card for less and just accept the write failing
+rather than let the shop collect the difference), but it is the strongest guarantee available once
+a physical reader is in play, and it fails toward "no record, no payout claimed" rather than toward
+"the shop believes it was paid when it wasn't."
+
+Rejected: trusting a client-supplied amount at write time. The client has already computed and
+displayed the amount it charged the reader with, so accepting that same number again at write time
+gains nothing and removes the one check that catches a stale quote or a tampered client.
+
+Implemented in `server/routes/squarePayments.js` (`process-reader-payment`, and the extraction of
+`applyCollectedAppointmentCharge` so the existing nonce-based route and this one share their
+post-charge logic), `server/utils/square.js` (`getPaymentForAccount`), and mobile's
+`services/squareReader.ts` / `components/SquareReaderPaymentForm.tsx`.
+
 ## Process
 
 ### PR1. Tests are written alongside the feature or fix, not queued for a later pass
@@ -4143,3 +4177,9 @@ Nothing is blocking. A few things are parked rather than undecided:
 - **MSG3's group-thread gap.** `MESSAGE_RECEIVED` currently skips any conversation with more than
   one Artist member rather than picking one. Parked until group threads (a shop general inbox with
   multiple staff, say) actually exist in practice - no rule has been asked for yet.
+- **The emailed invite/reset link still points at the web `SetPassword` URL, not
+  `inkbooks://set-password/...`.** Mobile now has a working deep-link screen for it (X87), but
+  switching the email link itself needs Universal Links infrastructure (an AASA file /
+  assetlinks.json, hosted and domain-verified) so the link still works for someone without the app
+  already installed. Not built; a link that only works after the app is installed is worse than the
+  current, always-working web link.
