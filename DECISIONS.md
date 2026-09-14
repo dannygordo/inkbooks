@@ -3856,6 +3856,126 @@ Implemented in `server/routes/squarePayments.js` (`process-reader-payment`, and 
 post-charge logic), `server/utils/square.js` (`getPaymentForAccount`), and mobile's
 `services/squareReader.ts` / `components/SquareReaderPaymentForm.tsx`.
 
+### X88. The Android native build needs three fixes beyond expo-build-properties' documented options, once a third-party Kotlin SDK enters the tree
+
+Adding mobile-payments-sdk-react-native (X87) took five real EAS build attempts to go green,
+each one surfacing the next problem only once the previous one was fixed (Gradle stops at its
+first failure, and this sandbox cannot run a real Android build itself to see further ahead).
+Recorded here so the next native dependency that hits the same class of problem doesn't repeat
+the same five rounds:
+
+1. **Square's Maven repo URL has a `/public/` segment easy to miss.** `com.squareup.sdk:mobile-
+   payments-sdk` and `com.squareup.sdk:mockreader-ui` aren't on Maven Central or Google's repo.
+   The correct URL is `https://sdk.squareup.com/public/android/`, not `https://sdk.squareup.com/
+   android` (the latter returns something Gradle's POM parser rejects outright with "Already seen
+   doctype", which surfaces identically, and confusingly, for every unrelated dependency in the
+   graph too - only the artifacts that exist nowhere else actually fail to resolve). Set via
+   expo-build-properties' `android.extraMavenRepos`, which works as documented.
+
+2. **`android.kotlinVersion` does NOT work on this project (React Native 0.86.3).** Tried setting
+   it to "2.2.21" to match a real Kotlin binary-metadata mismatch (Square's SDK ships metadata
+   version 2.3.0; this project's resolved compiler was 2.1.0, which can only read up to 2.2.0).
+   A build afterward still reported compiler 2.1.0 - matches long-standing expo/expo issues
+   #17564 and #22464 ("kotlinVersion not applied"). Left in place, it also produced a SEPARATE,
+   much more confusing failure two rounds later (`NoSuchMethodError` on
+   `KotlinJvmCompilerOptions.getJvmDefault()`, persisting identically across two different
+   compiler-args DSLs), consistent with the override injecting a second, conflicting
+   kotlin-gradle-plugin version onto the classpath alongside React Native's own pinned one.
+   **Rule: don't set `expo-build-properties`' `android.kotlinVersion` on this project.** Removed
+   from `app.json` entirely. If a future SDK genuinely needs a newer Kotlin project-wide, that
+   needs to happen through React Native's own supported channel for it, not this option.
+
+3. **The actual fix for the metadata mismatch is a compiler flag, not a version bump.**
+   `apps/mobile/plugins/withSquareKotlinCompat.js`, a local Expo config plugin registered in
+   `app.json`, hooks the generated root `android/build.gradle` (`withProjectBuildGradle`) and
+   adds `-Xskip-metadata-version-check` to every Kotlin compile task via `compilerOptions` (the
+   current, non-deprecated Kotlin Gradle Plugin API - an earlier version using the deprecated
+   `kotlinOptions` bridge is exactly what triggered the `getJvmDefault()` crash in #2). Safe here
+   because the mismatch is a version gate, not an actual incompatible language feature. The same
+   plugin also excludes `org.bouncycastle:bcprov-jdk15on` project-wide
+   (`configurations.all { exclude ... }`) - Square's SDK pulls in the newer, actively-maintained
+   `bcprov-jdk15to18` artifact, which ships the identical class package under a different name,
+   and something already in this app's dependency graph pulls the older `bcprov-jdk15on`; Android
+   fails hard on the resulting duplicate classes rather than picking one. `bcprov-jdk15to18` is a
+   strict superset, so excluding the older one is safe and standard for this exact conflict.
+
+The first successful build with all three fixes in place: `-Xskip-metadata-version-check` plus
+the BouncyCastle exclude plus `extraMavenRepos`, and NO `kotlinVersion` override. Confirmed
+against a real EAS build, both `development` profile builds (iOS simulator and this Android
+dev client) now succeed.
+
+### X89. iOS needed two more fixes beyond X88 before the Square reader SDK actually ran: a CocoaPods hook-timing bug, and a missing one-time native `initialize()` call
+
+Getting `mobile-payments-sdk-react-native` working on iOS took two further rounds after X88 (which
+was Android-only), both only diagnosable from real crash reports off a real device build:
+
+1. **The bundled frameworks stayed nested, causing a dyld launch crash** (`Library not loaded:
+   @rpath/SquareReader.framework/SquareReader`). `SquareMobilePaymentsSDK.framework` ships
+   `CorePaymentCard.framework`, `SquareReader.framework`, and `LCRCore.framework` nested under its
+   own `Frameworks/` subdirectory, and its own bundled `setup` script (read directly off a built
+   `.app` to confirm) flattens them up to `$BUILT_PRODUCTS_DIR/$FRAMEWORKS_FOLDER_PATH`, but only
+   when run at the right point in the build. Three timing attempts before the fix landed:
+   - A `withXcodeProject`-added Run Script phase during `expo prebuild`: too early, since `expo
+     prebuild` runs before `pod install`, and CocoaPods appends its own `"[CP] Embed Pods
+     Frameworks"` phase after ours, bumping ours out of last position.
+   - A Podfile `post_install` hook: CocoaPods only allows one `post_install` block per Podfile
+     ("Specifying multiple `post_install` hooks is unsupported" - Expo's generated Podfile already
+     defines its own for `react_native_post_install`), so this required anchoring into the
+     existing block rather than appending a second one. Confirmed via CocoaPods 1.16.2's own source
+     that `post_install` fires from inside `generate_pods_project`, before `integrate_user_project`
+     - the step that actually adds the `"[CP] Embed Pods Frameworks"` phase to the app target -
+     so `post_install` is structurally too early to see that phase at all. An explicit `raise` when
+     the phase wasn't found confirmed this empirically: it fired.
+   - `post_integrate` is the correct hook (per CocoaPods' own docs, it runs "after the project is
+     written to disk," and its call site is confirmed via source to fire after
+     `UserProjectIntegrator.integrate!` completes) - but **its documented API
+     (`PostIntegrateHooksContext`, exposing `.umbrella_targets`) does not match this CocoaPods
+     version's actual runtime behavior.** A build using `.umbrella_targets` failed with `undefined
+     method 'umbrella_targets' for #<Pod::Installer:...>` - the block argument is actually the same
+     raw `Pod::Installer` object `post_install` receives. **Rule: use `post_integrate` for timing,
+     but access it via `.aggregate_targets` / `.user_project.native_targets` (the `Pod::Installer`
+     API), not the documented `PostIntegrateHooksContext` API.**
+
+   Fixed in `apps/mobile/plugins/withSquareIosSetup.js`: a `post_integrate` Podfile hook that
+   appends framework-flattening logic (invoking `SquareMobilePaymentsSDK.framework`'s own bundled
+   `setup` script) onto the tail of CocoaPods' own `"[CP] Embed Pods Frameworks"` script phase's
+   existing `shell_script` string, rather than fighting over relative phase order. Also sets
+   `ENABLE_USER_SCRIPT_SANDBOXING = 'NO'` (both project-wide via `withXcodeProject` and per-target
+   in the Podfile hook) - required for the appended script to actually run un-sandboxed. Confirmed
+   via a real crash report's own Binary Images list: all three frameworks now load from the
+   top-level `Frameworks/` path, not the nested one.
+
+2. **A Swift `assertionFailure` crash the instant the JS bundle imports the reader module**, before
+   any user action. Root cause, found by reading the SDK's own Swift source directly:
+   `MobilePaymentsSdkReactNative.swift` holds `private let mobilePaymentsSDK = MobilePaymentsSDK.shared`
+   as an eager stored property, which runs the moment the class is instantiated - and React
+   Native's `NativeModules.MobilePaymentsSdkReactNative` accessor (used at JS module-load time in
+   `mobile-payments-sdk-react-native`'s own `base_sdk.ts`) triggers that instantiation merely by
+   being imported. Square's docs confirm the actual requirement: a one-time native `initialize()`
+   call is mandatory before anything else touches the SDK, and is separate from and prior to
+   `authorize(accessToken, locationId)` (which only logs a specific seller in) - iOS needs
+   `MobilePaymentsSDK.initialize(applicationLaunchOptions:squareApplicationID:)` in AppDelegate's
+   `didFinishLaunchingWithOptions`, Android needs `MobilePaymentsSdk.initialize(applicationId,
+   context)` in `Application.onCreate()`. Neither call existed anywhere in this codebase on either
+   platform.
+
+   Fixed via a new plugin, `apps/mobile/plugins/withSquareSdkInitialize.js`, injecting the
+   `initialize()` call (and its required import) into the generated `AppDelegate.swift` (via
+   `withAppDelegate`) and `MainApplication.kt` (via `withMainApplication`). The Square Application
+   ID is hardcoded in the plugin - safe to embed client-side per Square's own docs, unlike the
+   OAuth access token `squareReader.ts` fetches per-session or `SQUARE_APPLICATION_SECRET` (both
+   stay server-only); matches `SQUARE_SANDBOX_APPLICATION_ID` in `server/.env.development` as of
+   2026-09-13. One bug along the way, worth flagging for the next config plugin that inserts a
+   line near the top of a generated file: the first anchor regex, `/^(import .+\n)/` with no `m`
+   flag, only matches at string position 0 - the real first line of the generated file is `internal
+   import Expo`, not a bare `import` line, so the injection silently no-op'd (JS's `.replace()`
+   returns the original string unchanged on no match; it does not throw). Fixed by anchoring on the
+   literal, unambiguous `import React\n` line instead of position 0.
+
+Both fixes confirmed together against a real EAS `development` build and a real iOS Simulator run:
+the app launches with no crash, Metro connects, and the JS bundle (which imports `squareReader.ts`,
+and therefore the native module, on load) reaches live UI.
+
 ## Process
 
 ### PR1. Tests are written alongside the feature or fix, not queued for a later pass

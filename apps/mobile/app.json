@@ -61,10 +61,16 @@
           "android": {
             "compileSdkVersion": 36,
             "targetSdkVersion": 36,
-            "minSdkVersion": 28
+            "minSdkVersion": 28,
+            "extraMavenRepos": [
+              "https://sdk.squareup.com/public/android/"
+            ]
           }
         }
-      ]
+      ],
+      "./plugins/withSquareKotlinCompat",
+      "./plugins/withSquareIosSetup",
+      "./plugins/withSquareSdkInitialize"
     ],
     "experiments": {
       "typedRoutes": true,

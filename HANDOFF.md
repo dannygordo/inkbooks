@@ -4,7 +4,42 @@
 has not been verified. `DECISIONS.md` is *rules* — the settled calls and why. They change at
 different rates, which is why they are separate files.
 
-Last updated: 2026-09-12.
+Last updated: 2026-09-14.
+
+---
+
+### 2026-09-14 (forty-seventh entry): iOS dev-client build for the Square reader SDK (X87/X88) actually launches now (X89)
+
+X87 built the reader integration; X88 fixed Android's native build. iOS still would not run: two
+more real-device crashes, fixed this session, see DECISIONS.md X89 for the full mechanism on both.
+
+First, a dyld launch crash (`Library not loaded: @rpath/SquareReader.framework/SquareReader`) -
+`SquareMobilePaymentsSDK.framework`'s bundled frameworks stayed nested instead of flattening to the
+app's top-level `Frameworks/`. Took three timing attempts (a prebuild-time Run Script phase, then a
+Podfile `post_install` hook, both too early relative to CocoaPods' own framework-embed phase) before
+landing on a Podfile `post_integrate` hook in `apps/mobile/plugins/withSquareIosSetup.js` that
+appends flattening logic onto CocoaPods' own `"[CP] Embed Pods Frameworks"` script phase. Notably,
+this CocoaPods version's actual `post_integrate` API does not match its own documentation (raw
+`Pod::Installer`, not the documented `PostIntegrateHooksContext`) - confirmed only by a build
+actually failing on the documented API and pointing at what worked instead.
+
+Second, a Swift `assertionFailure` crash the instant the JS bundle imported the reader module.
+Square's SDK needs a one-time native `initialize()` call, separate from `authorize()`, that this
+codebase never made on either platform - added via a new plugin,
+`apps/mobile/plugins/withSquareSdkInitialize.js`, patching the generated `AppDelegate.swift` and
+`MainApplication.kt`. Android's injection worked first try; iOS's import-line injection silently
+no-op'd on the first attempt (a regex anchored to string position 0, but the real file's first line
+is `internal import Expo`, not a bare `import` line) - fixed by anchoring on the literal `import
+React` line instead.
+
+Confirmed against a real EAS `development` build and a real iOS Simulator run: the app now launches
+with no crash, Metro connects over `expo start --dev-client`, and the JS bundle (which imports
+`squareReader.ts`, and therefore the native module, at load time) reaches live UI. **Not yet
+verified**: no physical Square reader has been paired yet, and no real charge has been run through
+either platform's reader flow - the server's verify-after-the-fact check in
+`process-reader-payment` (X87) has never been exercised against a genuine reader payment. Next
+session: pair a reader against the Square sandbox seller account and run one real end-to-end
+deposit and session charge on both platforms before considering this feature done.
 
 ---
 
@@ -46,6 +81,28 @@ watch for it on the first real Android build rather than assuming it's already h
 Client portal (mobile client login and self-service) remains the one deliberate exclusion left,
 per Danny's own call this session - everything else named across this file's parity accounting is
 now either built or a stated, deliberate cut.
+
+**Update, same day:** Danny ran the server test suite for real and confirmed it green, then
+pushed both commits (`9629d8c`, `b94925e`) to `feat/push-notifications`. That closes the one
+verification gap this entry originally flagged - server-side `vitest` never ran in this sandbox,
+only `node --check`. Taken at Danny's word, not independently re-run from here. What's left before
+the card reader is actually usable is unchanged from above: a real EAS native build (this pulls in
+a native module, so it needs a fresh dev client, not Expo Go or the existing JS-only OTA channels)
+and a physical Bluetooth reader pairing test, neither of which this sandbox can do.
+
+**Second update, 2026-09-13:** the first real EAS native build. iOS (simulator profile,
+no signing needed) succeeded on the first attempt. Android took five rounds to go green, each
+round's fix confirmed for real and each next failure only visible once the prior one was fixed -
+see DECISIONS.md X88 for the full account (wrong Square Maven repo path, an
+`expo-build-properties.android.kotlinVersion` override that doesn't work on this project and
+actively made things worse, a Kotlin metadata-version mismatch fixed with a compiler flag via a
+new local config plugin `apps/mobile/plugins/withSquareKotlinCompat.js`, and a duplicate-
+BouncyCastle-class conflict fixed by excluding the older artifact). **Both `development`-profile
+builds now succeed for real, EAS build IDs `d57b09cc` (Android, the final passing run superseded
+the two shown here) and `0df67106` (iOS).** This is the first native binary that actually
+contains the card reader integration - next steps are installing it on a real device/simulator,
+pairing a physical Square reader, and running one real charge end to end against the sandbox,
+none of which this sandbox can do; see PRODUCTION_ROADMAP.md-style next steps in chat.
 
 ### 2026-09-12 (forty-fifth entry): full mobile/web parity reached - Auto-Responses manual send and Forms fill-out ported to Client Dashboard (X58)
 
